@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
+    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" />
+  </ItemGroup>
+</Project>
