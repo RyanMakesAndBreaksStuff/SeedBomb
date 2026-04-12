@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/assets/">
+    <File Path="../Art Assets/aurora_rift.png" />
+    <File Path="../Art Assets/nova_burst.png" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="Docs/DATAGEN_IMPLEMENTATION_PLAN.md" />
+    <File Path="Docs/DATAGEN_MANIFEST.md" />
+    <File Path="Docs/Technology Stack Audit for Dataverse Synthetic Data with Blazor Server_ 2025 Compatibility and Migration Analysis.pdf" />
+    <File Path="Docs/WhitePaper — algorithms.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/DataGen.Web/DataGen.Web.csproj" />
+  </Folder>
+</Solution>

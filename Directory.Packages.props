@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Dataverse (targets net8.0, forward-compatible with net10.0) -->
+    <PackageVersion Include="Microsoft.PowerPlatform.Dataverse.Client" Version="[1.2.10, 2.0.0)" />
+    <!-- Identity -->
+    <PackageVersion Include="Microsoft.Identity.Web" Version="[4.6.0, 5.0.0)" />
+    <PackageVersion Include="Microsoft.Identity.Web.UI" Version="[4.5.0, 5.0.0)" />
+    <PackageVersion Include="Microsoft.Identity.Web.Azure" Version="[4.6.0, 5.0.0)" />
+    <PackageVersion Include="Microsoft.Identity.Web.TokenCache" Version="[4.2.0, 5.0.0)" />
+    <!-- UI -->
+    <PackageVersion Include="MudBlazor" Version="[9.3.0, 10.0.0)" />
+    <!-- Data Generation -->
+    <PackageVersion Include="Bogus" Version="[35.6.5, 36.0.0)" />
+    <!-- Testing -->
+    <PackageVersion Include="xunit.v3" Version="[3.2.2, 4.0.0)" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="[3.0.2, 4.0.0)" />
+    <PackageVersion Include="coverlet.MTP" Version="[8.0.0, 9.0.0)" />
+    <PackageVersion Include="Moq" Version="[4.20.0, 5.0.0)" />
+    <PackageVersion Include="bunit" Version="[2.0.0, 3.0.0)" />
+    <!-- Caching -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="[10.0.0, 11.0.0)" />
+  </ItemGroup>
+</Project>
