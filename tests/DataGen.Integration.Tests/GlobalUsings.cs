@@ -1,0 +1,14 @@
+global using Xunit;
+global using Moq;
+global using Microsoft.Extensions.Logging.Abstractions;
+global using Microsoft.PowerPlatform.Dataverse.Client;
+global using Microsoft.Xrm.Sdk;
+global using Microsoft.Xrm.Sdk.Messages;
+global using Microsoft.Xrm.Sdk.Metadata;
+global using DataGen.Bulk;
+global using DataGen.Bulk.Contracts;
+global using DataGen.Core.Contracts;
+global using DataGen.Core.EdgeCases;
+global using DataGen.Core.Generators;
+global using DataGen.Core.Graph;
+global using DataGen.Core.Metadata;
