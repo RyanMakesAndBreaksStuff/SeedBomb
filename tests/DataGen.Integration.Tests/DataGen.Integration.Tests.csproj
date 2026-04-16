@@ -2,13 +2,14 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);1591;xUnit1051</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/DataGen.Core/DataGen.Core.csproj" />
     <ProjectReference Include="../../src/DataGen.Bulk/DataGen.Bulk.csproj" />
-    <ProjectReference Include="../../src/DataGen.Web/DataGen.Web.csproj" />
     <PackageReference Include="xunit.v3" />
-
     <PackageReference Include="coverlet.MTP" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="XrmMockup365" />
   </ItemGroup>
 </Project>
