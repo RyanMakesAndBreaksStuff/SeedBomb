@@ -1,0 +1,47 @@
+using Bogus;
+
+namespace DataGen.Core.Tests;
+
+public class MemoFieldGeneratorTests
+{
+    private readonly MemoFieldGenerator _gen = new();
+    private readonly DataverseRecordPool _pool = new();
+    private readonly Faker _faker = DeterministicFaker.Create(42, 0);
+
+    [Fact]
+    public void CanGenerate_MemoMetadata_ReturnsTrue()
+        => Assert.True(_gen.CanGenerate(new MemoAttributeMetadata()));
+
+    [Fact]
+    public void CanGenerate_StringMetadata_ReturnsFalse()
+        => Assert.False(_gen.CanGenerate(new StringAttributeMetadata()));
+
+    [Fact]
+    public void Generate_PlainMemo_ReturnsString()
+    {
+        var attr = new MemoAttributeMetadata { LogicalName = "description", MaxLength = 2000 };
+        var result = _gen.Generate(attr, _faker, _pool);
+        Assert.IsType<string>(result);
+        Assert.NotEmpty((string)result!);
+    }
+
+    [Fact]
+    public void Generate_RichTextField_ReturnsNull()
+    {
+        var attr = new MemoAttributeMetadata
+        {
+            LogicalName = "richtext",
+            FormatName = MemoFormatName.RichText
+        };
+        var result = _gen.Generate(attr, _faker, _pool);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Generate_RespectsMaxLength()
+    {
+        var attr = new MemoAttributeMetadata { LogicalName = "description", MaxLength = 20 };
+        var result = (string)_gen.Generate(attr, _faker, _pool)!;
+        Assert.True(result.Length <= 20, $"Length {result.Length} exceeds MaxLength 20");
+    }
+}
