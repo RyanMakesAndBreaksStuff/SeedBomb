@@ -23,38 +23,54 @@ public class TopologicalSort
     }
 
     /// <summary>
-    /// Returns a topological ordering of entities. Entities with no incoming edges appear first.
+    /// Returns a topological ordering of entities such that every entity's lookup targets
+    /// (dependencies) appear before the entity itself. Entities with no dependencies sort first.
+    /// Time complexity: O(V+E).
     /// </summary>
+    /// <remarks>
+    /// Graph edges go FROM the dependent entity TO its dependency
+    /// (e.g. contact → account means "contact depends on account").
+    /// The sort uses the dependency count (out-degree) as the queue key so that
+    /// entities with zero unresolved dependencies are emitted first.
+    /// </remarks>
     /// <param name="graph">The dependency graph (should be acyclic after cycle-breaking).</param>
-    /// <returns>An ordered list of entity logical names.</returns>
+    /// <returns>An ordered list of entity logical names, dependencies before dependents.</returns>
     /// <exception cref="CyclicalDependencyException">Thrown if unresolved cycles remain.</exception>
     public IReadOnlyList<string> Sort(DependencyGraph graph)
     {
         ArgumentNullException.ThrowIfNull(graph);
 
-        var inDegree = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // dependencyCount[X] = number of entities X still needs to wait for before it can be created.
+        // Edges are stored as source → target where source depends on target.
+        // So dependencyCount = number of outgoing edges per node.
+        var dependencyCount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // Initialize in-degree for all nodes
+        // dependents[X] = entities that depend on X (i.e. X must be created before these).
+        var dependents = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var node in graph.Nodes)
         {
-            inDegree[node] = 0;
+            dependencyCount[node] = 0;
+            dependents[node] = [];
         }
 
-        // Calculate in-degrees from edges
         foreach (var (source, targets) in graph.Edges)
         {
             foreach (var target in targets)
             {
-                if (inDegree.ContainsKey(target))
-                {
-                    inDegree[target]++;
-                }
+                if (!dependencyCount.ContainsKey(source)) continue;
+
+                dependencyCount[source]++;
+
+                if (!dependents.ContainsKey(target))
+                    dependents[target] = [];
+                dependents[target].Add(source);
             }
         }
 
-        // Seed queue with nodes having in-degree 0 (no dependencies)
+        // Seed queue with nodes that have zero dependencies — they can be created immediately.
         var queue = new Queue<string>(
-            inDegree.Where(kvp => kvp.Value == 0)
+            dependencyCount.Where(kvp => kvp.Value == 0)
                 .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(kvp => kvp.Key));
 
@@ -65,14 +81,12 @@ public class TopologicalSort
             var current = queue.Dequeue();
             sorted.Add(current);
 
-            if (graph.Edges.TryGetValue(current, out var targets))
+            // current is now created; all entities that depended on it have one fewer blocker.
+            foreach (var dependent in dependents[current].OrderBy(t => t, StringComparer.OrdinalIgnoreCase))
             {
-                foreach (var target in targets.OrderBy(t => t, StringComparer.OrdinalIgnoreCase))
+                if (--dependencyCount[dependent] == 0)
                 {
-                    if (--inDegree[target] == 0)
-                    {
-                        queue.Enqueue(target);
-                    }
+                    queue.Enqueue(dependent);
                 }
             }
         }

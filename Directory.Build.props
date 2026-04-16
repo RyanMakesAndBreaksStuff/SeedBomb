@@ -6,5 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Only fail on moderate/high/critical NuGet audit vulnerabilities.
+         Low-severity vulnerabilities in transitive deps from the Dataverse SDK
+         (System.Security.Cryptography.Xml 8.0.2) are outside our control. -->
+    <NuGetAuditLevel>moderate</NuGetAuditLevel>
+  </PropertyGroup>
+  <!-- Test projects do not require XML doc comments on every public member -->
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 </Project>
