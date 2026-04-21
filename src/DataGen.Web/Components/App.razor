@@ -14,7 +14,12 @@
 </head>
 
 <body>
-    <Routes />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+    <ErrorBoundary>
+        <Routes />
+    </ErrorBoundary>
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
