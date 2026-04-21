@@ -11,6 +11,7 @@ public sealed class DataverseServiceClientFactory : IServiceClientFactory
 {
     private readonly string _dataverseUrl;
     private readonly ITokenAcquisition _tokenAcquisition;
+    private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cachedClient;
 
     /// <summary>
@@ -31,22 +32,33 @@ public sealed class DataverseServiceClientFactory : IServiceClientFactory
         if (_cachedClient is { IsReady: true })
             return _cachedClient;
 
-        var scope = $"{_dataverseUrl}/.default";
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_cachedClient is { IsReady: true })
+                return _cachedClient;
 
-        _cachedClient = new ServiceClient(
-            instanceUrl: new Uri(_dataverseUrl),
-            tokenProviderFunction: async _ =>
-                await _tokenAcquisition.GetAccessTokenForUserAsync([scope]).ConfigureAwait(false),
-            useUniqueInstance: true);
+            _cachedClient = new ServiceClient(
+                instanceUrl: new Uri(_dataverseUrl),
+                tokenProviderFunction: async _ =>
+                    await _tokenAcquisition.GetAccessTokenForUserAsync(
+                        new[] { $"{_dataverseUrl}/.default" }).ConfigureAwait(false),
+                useUniqueInstance: true);
 
-        _cachedClient.EnableAffinityCookie = false;
-        return await Task.FromResult(_cachedClient).ConfigureAwait(false);
+            _cachedClient.EnableAffinityCookie = false;
+            return _cachedClient;
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     /// <inheritdoc />
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _cachedClient?.Dispose();
-        await ValueTask.CompletedTask.ConfigureAwait(false);
+        _lock.Dispose();
+        return ValueTask.CompletedTask;
     }
 }
