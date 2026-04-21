@@ -6,7 +6,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
+    <ProjectReference Include="../DataGen.Bulk/DataGen.Bulk.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="MudBlazor" />
+    <PackageReference Include="Microsoft.Identity.Web" />
+    <PackageReference Include="Microsoft.Identity.Web.UI" />
+    <PackageReference Include="Microsoft.Identity.Web.Azure" />
   </ItemGroup>
+
 </Project>
