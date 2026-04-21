@@ -42,15 +42,13 @@ builder.Services.AddMemoryCache();
 // DataverseServiceClientFactory — scoped per Blazor circuit
 builder.Services.AddScoped<IServiceClientFactory, DataverseServiceClientFactory>();
 
-// DataverseMetadataProvider needs a ServiceClient — resolve via IServiceClientFactory
+// DataverseMetadataProvider needs a ServiceClient — resolve via IServiceClientFactory.
+// Task.Run() escapes the RendererSynchronizationContext so the blocking GetAwaiter().GetResult()
+// call cannot deadlock even if CreateAsync ever gains real async work.
 builder.Services.AddScoped<IMetadataProvider>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    // ServiceClient is obtained synchronously here because this runs during scope build-up,
-    // not in a hot path. The factory caches the instance after the first async creation;
-    // we invoke GetAwaiter().GetResult() ONLY here, at DI registration resolution time —
-    // outside any Blazor circuit / SynchronizationContext that would deadlock.
-    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
     return ActivatorUtilities.CreateInstance<DataverseMetadataProvider>(sp, client);
 });
 
@@ -58,14 +56,14 @@ builder.Services.AddScoped<IMetadataProvider>(sp =>
 builder.Services.AddScoped<MessageAvailabilityChecker>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
     return ActivatorUtilities.CreateInstance<MessageAvailabilityChecker>(sp, (IOrganizationServiceAsync2)client);
 });
 
 builder.Services.AddScoped<DeferredLookupBackfill>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
     return ActivatorUtilities.CreateInstance<DeferredLookupBackfill>(sp, (IOrganizationServiceAsync2)client);
 });
 
@@ -81,7 +79,7 @@ builder.Services.AddScoped<ThrottlePolicy>();
 builder.Services.AddScoped<IBulkCreator>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
     return ActivatorUtilities.CreateInstance<BulkCreator>(sp, (IOrganizationServiceAsync2)client);
 });
 
