@@ -1,32 +1,117 @@
-using MudBlazor.Services;
+using DataGen.Bulk;
+using DataGen.Bulk.Contracts;
+using DataGen.Core.EdgeCases;
+using DataGen.Core.Generators;
+using DataGen.Core.Graph;
+using DataGen.Core.Metadata;
 using DataGen.Web.Components;
+using DataGen.Web.Hubs;
+using DataGen.Web.Services;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
+using Microsoft.PowerPlatform.Dataverse.Client;
+using MudBlazor.Services;
+
+// BulkCreator handles ThreadPool tuning internally on first use.
+// Boost minimum threads here as well so the pool is warm before any request arrives.
+ThreadPool.SetMinThreads(100, 100);
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add MudBlazor services
+var dataverseUrl = builder.Configuration["DataverseUrl"]
+    ?? throw new InvalidOperationException("DataverseUrl not configured");
+
+// Auth — Microsoft.Identity.Web v4
+builder.Services
+    .AddMicrosoftIdentityWebAppAuthentication(builder.Configuration, "AzureAd")
+    .EnableTokenAcquisitionToCallDownstreamApi([$"{dataverseUrl}/.default"])
+    .AddInMemoryTokenCaches();
+
+builder.Services.AddMicrosoftIdentityAzureTokenCredential();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddHttpContextAccessor();
+
+// MVC controllers for Identity.Web account pages (login / logout)
+builder.Services.AddControllersWithViews()
+    .AddMicrosoftIdentityUI();
+
+// Memory cache (required by DataverseMetadataProvider)
+builder.Services.AddMemoryCache();
+
+// DataverseServiceClientFactory — scoped per Blazor circuit
+builder.Services.AddScoped<IServiceClientFactory, DataverseServiceClientFactory>();
+
+// DataverseMetadataProvider needs a ServiceClient — resolve via IServiceClientFactory
+builder.Services.AddScoped<IMetadataProvider>(sp =>
+{
+    var factory = sp.GetRequiredService<IServiceClientFactory>();
+    // ServiceClient is obtained synchronously here because this runs during scope build-up,
+    // not in a hot path. The factory caches the instance after the first async creation;
+    // we invoke GetAwaiter().GetResult() ONLY here, at DI registration resolution time —
+    // outside any Blazor circuit / SynchronizationContext that would deadlock.
+    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    return ActivatorUtilities.CreateInstance<DataverseMetadataProvider>(sp, client);
+});
+
+// Services that need IOrganizationServiceAsync2 — ServiceClient implements it
+builder.Services.AddScoped<MessageAvailabilityChecker>(sp =>
+{
+    var factory = sp.GetRequiredService<IServiceClientFactory>();
+    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    return ActivatorUtilities.CreateInstance<MessageAvailabilityChecker>(sp, (IOrganizationServiceAsync2)client);
+});
+
+builder.Services.AddScoped<DeferredLookupBackfill>(sp =>
+{
+    var factory = sp.GetRequiredService<IServiceClientFactory>();
+    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    return ActivatorUtilities.CreateInstance<DeferredLookupBackfill>(sp, (IOrganizationServiceAsync2)client);
+});
+
+// Pure DI — only need ILogger<T> from the container
+builder.Services.AddScoped<GraphBuilder>();
+builder.Services.AddScoped<CycleDetector>();
+builder.Services.AddScoped<TopologicalSort>();
+builder.Services.AddScoped<GeneratorFactory>();
+builder.Services.AddScoped<EdgeCaseValidator>();
+builder.Services.AddScoped<ThrottlePolicy>();
+
+// BulkCreator — needs IOrganizationServiceAsync2 plus all the above scoped services
+builder.Services.AddScoped<IBulkCreator>(sp =>
+{
+    var factory = sp.GetRequiredService<IServiceClientFactory>();
+    var client = factory.CreateAsync().GetAwaiter().GetResult();
+    return ActivatorUtilities.CreateInstance<BulkCreator>(sp, (IOrganizationServiceAsync2)client);
+});
+
+// MudBlazor
 builder.Services.AddMudServices();
 
-// Add services to the container.
+// SignalR
+builder.Services.AddSignalR();
+
+// Blazor Server
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddHubOptions(o => o.MaximumReceiveMessageSize = 64 * 1024);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-
 app.UseHttpsRedirection();
-
-
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapControllers();
+app.MapHub<ProgressHub>("/hubs/progress");
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
