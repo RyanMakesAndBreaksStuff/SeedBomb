@@ -11,7 +11,7 @@
          NU1903 = high severity. Warning is still emitted; only error promotion is suppressed.
          Revisit when Microsoft.PowerPlatform.Dataverse.Client ships an updated dep. -->
     <NuGetAuditLevel>moderate</NuGetAuditLevel>
-    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903</WarningsNotAsErrors>
   </PropertyGroup>
   <!-- Test projects do not require XML doc comments on every public member -->
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
