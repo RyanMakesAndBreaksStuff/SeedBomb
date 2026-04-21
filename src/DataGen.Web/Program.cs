@@ -12,8 +12,9 @@ using Microsoft.Identity.Web.UI;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using MudBlazor.Services;
 
-// BulkCreator handles ThreadPool tuning internally on first use.
-// Boost minimum threads here as well so the pool is warm before any request arrives.
+// Warm thread pool before any ServiceClient construction.
+// ServicePointManager.DefaultConnectionLimit is obsolete (SYSLIB0014) on .NET 10 —
+// SocketsHttpHandler manages connection limits per-endpoint instead.
 ThreadPool.SetMinThreads(100, 100);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -87,13 +88,12 @@ builder.Services.AddScoped<IBulkCreator>(sp =>
 // MudBlazor
 builder.Services.AddMudServices();
 
-// SignalR
-builder.Services.AddSignalR();
+// SignalR — 64 KB max message size for ProgressHub payloads
+builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 64 * 1024);
 
 // Blazor Server
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddHubOptions(o => o.MaximumReceiveMessageSize = 64 * 1024);
+    .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
