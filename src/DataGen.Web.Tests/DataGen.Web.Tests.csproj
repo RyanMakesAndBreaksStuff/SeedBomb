@@ -3,9 +3,11 @@
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <NuGetAudit>False</NuGetAudit>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DataGen.Web/DataGen.Web.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
     <PackageReference Include="xunit.v3" />
 
     <PackageReference Include="coverlet.MTP" />
