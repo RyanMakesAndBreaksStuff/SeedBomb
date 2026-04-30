@@ -1,5 +1,7 @@
 using System.ServiceModel;
 using DataGen.Core.Exceptions;
+using Xunit;
+using Moq;
 
 namespace DataGen.Integration.Tests;
 
@@ -36,14 +38,14 @@ public class DeferredLookupBackfillIntegrationTests
         graph.AddNode("contact");
         graph.AddNode("account");
 
-        var deferred = new DeferredLookup("contact", "accountid", ["account"]);
+        var deferred = new DeferredLookup("contact", "accountid", new[] { "account" });
         graph.DeferEdge("contact", deferred);
 
         var pool = new DataverseRecordPool();
         var contactId = Guid.NewGuid();
         var accountId = Guid.NewGuid();
-        pool.Add("contact", [contactId]);
-        pool.Add("account", [accountId]);
+        pool.Add("contact", new[] { contactId });
+        pool.Add("account", new[] { accountId });
 
         var errors = await backfill.BackfillLookupsAsync(graph, pool, batchSize: 10);
 
@@ -51,9 +53,9 @@ public class DeferredLookupBackfillIntegrationTests
         serviceMock.Verify(s => s.ExecuteAsync(
             It.Is<ExecuteMultipleRequest>(r =>
                 r.Requests.Count == 1 &&
-                r.Requests[0] is UpdateRequest ur &&
-                ur.Target.LogicalName == "contact" &&
-                ur.Target.Id == contactId),
+                r.Requests[0] is UpdateRequest &&
+                ((UpdateRequest)r.Requests[0]).Target.LogicalName == "contact" &&
+                ((UpdateRequest)r.Requests[0]).Target.Id == contactId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -67,7 +69,7 @@ public class DeferredLookupBackfillIntegrationTests
         graph.AddNode("contact");
         graph.AddNode("account");
 
-        var deferred = new DeferredLookup("contact", "accountid", ["account"]);
+        var deferred = new DeferredLookup("contact", "accountid", new[] { "account" });
         graph.DeferEdge("contact", deferred);
 
         // Pool has no records — backfill should skip gracefully

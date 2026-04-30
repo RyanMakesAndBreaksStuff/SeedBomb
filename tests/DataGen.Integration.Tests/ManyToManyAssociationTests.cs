@@ -1,3 +1,8 @@
+using System.ServiceModel;
+using Xunit;
+using Moq;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace DataGen.Integration.Tests;
 
 public class ManyToManyAssociationTests
@@ -36,8 +41,8 @@ public class ManyToManyAssociationTests
         var pool = new DataverseRecordPool();
         var accountId = Guid.NewGuid();
         var contactId = Guid.NewGuid();
-        pool.Add("account", [accountId]);
-        pool.Add("contact", [contactId]);
+        pool.Add("account", new[] { accountId });
+        pool.Add("contact", new[] { contactId });
 
         var errors = await backfill.AssociateManyToManyAsync(graph, pool, batchSize: 10);
 
@@ -45,10 +50,10 @@ public class ManyToManyAssociationTests
         serviceMock.Verify(s => s.ExecuteAsync(
             It.Is<ExecuteMultipleRequest>(r =>
                 r.Requests.Count == 1 &&
-                r.Requests[0] is AssociateRequest ar &&
-                ar.Target.LogicalName == "account" &&
-                ar.Target.Id == accountId &&
-                ar.Relationship.SchemaName == "new_account_contact"),
+                r.Requests[0].GetType() == typeof(AssociateRequest) &&
+                ((AssociateRequest)r.Requests[0]).Target.LogicalName == "account" &&
+                ((AssociateRequest)r.Requests[0]).Target.Id == accountId &&
+                ((AssociateRequest)r.Requests[0]).Relationship.SchemaName == "new_account_contact"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -66,8 +71,8 @@ public class ManyToManyAssociationTests
         graph.AddRelationship(rel);
 
         var pool = new DataverseRecordPool();
-        pool.Add("account", [Guid.NewGuid()]);
-        pool.Add("contact", [Guid.NewGuid()]);
+        pool.Add("account", new[] { Guid.NewGuid() });
+        pool.Add("contact", new[] { Guid.NewGuid() });
 
         var errors = await backfill.AssociateManyToManyAsync(graph, pool, batchSize: 10);
 
@@ -75,7 +80,7 @@ public class ManyToManyAssociationTests
         // Should only see 1 batch call for 1 account record, even though the relationship
         // is indexed under both "account" and "contact" in the graph.
         serviceMock.Verify(s => s.ExecuteAsync(
-            It.Is<ExecuteMultipleRequest>(r => r.Requests.Count == 1 && r.Requests[0] is AssociateRequest),
+            It.Is<ExecuteMultipleRequest>(r => r.Requests.Count == 1 && r.Requests[0].GetType() == typeof(AssociateRequest)),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }
