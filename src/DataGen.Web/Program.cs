@@ -74,6 +74,7 @@ builder.Services.AddScoped<TopologicalSort>();
 builder.Services.AddScoped<GeneratorFactory>();
 builder.Services.AddScoped<EdgeCaseValidator>();
 builder.Services.AddScoped<ThrottlePolicy>();
+builder.Services.AddScoped<GenerationService>();
 
 // BulkCreator — needs IOrganizationServiceAsync2 plus all the above scoped services
 builder.Services.AddScoped<IBulkCreator>(sp =>
