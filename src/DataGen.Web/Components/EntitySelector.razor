@@ -1,0 +1,76 @@
+@inject IMetadataProvider MetadataProvider
+@inject ILogger<EntitySelector> Logger
+
+@if (_loading)
+{
+    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="my-2" />
+}
+else if (_loadError is not null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true">@_loadError</MudAlert>
+}
+else
+{
+    <MudSelect T="string"
+               MultiSelection="true"
+               SelectedValues="_selectedValues"
+               SelectedValuesChanged="OnSelectionChanged"
+               Label="Entities to generate"
+               Variant="Variant.Outlined"
+               Dense="true"
+               HelperText="@($"{_selectedValues.Count(v => v is not null)} of {_entities.Count} selected  ● = custom entity")">
+        @foreach (var entity in _entities.OrderBy(e => e.DisplayName))
+        {
+            <MudSelectItem T="string" Value="@entity.LogicalName">
+                @entity.DisplayName@(entity.IsCustom ? " ●" : "")
+            </MudSelectItem>
+        }
+    </MudSelect>
+}
+
+@code {
+    /// <summary>Fires when the entity selection changes.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<EntitySummary>> SelectedEntitiesChanged { get; set; }
+
+    private bool _loading = true;
+    private string? _loadError;
+    private IReadOnlyList<EntitySummary> _entities = [];
+    private IReadOnlyCollection<string?> _selectedValues = [];
+
+    /// <summary>Returns the currently selected entity summaries.</summary>
+    public IReadOnlyList<EntitySummary> SelectedEntities
+    {
+        get
+        {
+            var names = _selectedValues.Where(v => v is not null).ToHashSet();
+            return _entities.Where(e => names.Contains(e.LogicalName)).ToList();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            _entities = await MetadataProvider.ListUserEntitiesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load entity list");
+            _loadError = "Failed to load entities — check Dataverse connection.";
+        }
+        finally
+        {
+            _loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OnSelectionChanged(IReadOnlyCollection<string?> values)
+    {
+        _selectedValues = values;
+        await SelectedEntitiesChanged.InvokeAsync(SelectedEntities);
+    }
+}
