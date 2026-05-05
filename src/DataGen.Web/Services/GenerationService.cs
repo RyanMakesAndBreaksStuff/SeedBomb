@@ -89,7 +89,7 @@ public sealed class GenerationService
                     Elapsed: sw.Elapsed);
 
                 uiProgress?.Report(update);
-                _ = _progressHub.Clients.Group(sessionId).SendAsync(HubMethods.OnProgress, update);
+                PushToGroup(sessionId, HubMethods.OnProgress, update);
             });
 
             var result = await _bulkCreator.CreateAsync(config, metadataDict, graph, bulkProgress, ct);
@@ -99,7 +99,7 @@ public sealed class GenerationService
                 result.TotalRecords,
                 sw.Elapsed);
 
-            _ = _progressHub.Clients.Group(sessionId).SendAsync(HubMethods.OnComplete, result.TotalRecords);
+            PushToGroup(sessionId, HubMethods.OnComplete, result.TotalRecords);
 
             return result;
         }
@@ -111,7 +111,7 @@ public sealed class GenerationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Generation failed for session {SessionId}", sessionId);
-            _ = _progressHub.Clients.Group(sessionId).SendAsync(HubMethods.OnError, ex.Message);
+            PushToGroup(sessionId, HubMethods.OnError, ex.ToString());
             throw;
         }
     }
@@ -124,6 +124,21 @@ public sealed class GenerationService
     {
         var update = new ProgressUpdate(phase, string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero);
         uiProgress?.Report(update);
-        await _progressHub.Clients.Group(sessionId).SendAsync(HubMethods.OnPhaseChange, phase, ct);
+        try
+        {
+            await _progressHub.Clients.Group(sessionId).SendAsync(HubMethods.OnPhaseChange, phase, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SignalR phase push failed for session {SessionId}", sessionId);
+        }
+    }
+
+    private void PushToGroup(string sessionId, string method, object? arg = null)
+    {
+        _ = _progressHub.Clients.Group(sessionId).SendAsync(method, arg)
+            .ContinueWith(
+                t => _logger.LogWarning(t.Exception, "SignalR push failed for session {SessionId} method {Method}", sessionId, method),
+                TaskContinuationOptions.OnlyOnFaulted);
     }
 }

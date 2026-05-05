@@ -7,7 +7,8 @@
 }
 else if (_loadError is not null)
 {
-    <MudAlert Severity="Severity.Error" Dense="true">@_loadError</MudAlert>
+    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_loadError</MudAlert>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="LoadEntitiesAsync">Retry</MudButton>
 }
 else
 {
@@ -51,6 +52,14 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        await LoadEntitiesAsync();
+    }
+
+    private async Task LoadEntitiesAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        await InvokeAsync(StateHasChanged);
 
         try
         {
@@ -59,7 +68,7 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load entity list");
-            _loadError = "Failed to load entities — check Dataverse connection.";
+            _loadError = $"Failed to load entities: {ex.Message}";
         }
         finally
         {

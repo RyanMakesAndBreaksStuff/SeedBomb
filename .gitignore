@@ -40,6 +40,8 @@ ScaffoldingReadMe.txt
 ~$*
 *~
 CodeCoverage/
+/.agents
+/.claude
 
 # MSBuild Binary and Structured Log
 *.binlog
@@ -53,3 +55,4 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 /.vs
+/src/DataGen.Web/appsettings.json

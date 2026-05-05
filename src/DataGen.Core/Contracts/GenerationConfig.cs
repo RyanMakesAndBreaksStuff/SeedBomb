@@ -35,8 +35,4 @@ public record GenerationConfig
     /// </summary>
     public int MaxRetries { get; init; } = 3;
 
-    /// <summary>
-    /// Gets the optional SignalR connection ID for progress reporting.
-    /// </summary>
-    public string? ConnectionId { get; init; }
 }

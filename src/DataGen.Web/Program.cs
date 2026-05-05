@@ -48,23 +48,50 @@ builder.Services.AddScoped<IServiceClientFactory, DataverseServiceClientFactory>
 builder.Services.AddScoped<IMetadataProvider>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-    return ActivatorUtilities.CreateInstance<DataverseMetadataProvider>(sp, client);
+    try
+    {
+        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
+        return ActivatorUtilities.CreateInstance<DataverseMetadataProvider>(sp, client);
+    }
+    catch (Exception ex)
+    {
+        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
+            .LogError(ex, "Failed to create ServiceClient for MetadataProvider. Verify AzureAd config and user secrets.");
+        throw;
+    }
 });
 
 // Services that need IOrganizationServiceAsync2 — ServiceClient implements it
 builder.Services.AddScoped<MessageAvailabilityChecker>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-    return ActivatorUtilities.CreateInstance<MessageAvailabilityChecker>(sp, (IOrganizationServiceAsync2)client);
+    try
+    {
+        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
+        return ActivatorUtilities.CreateInstance<MessageAvailabilityChecker>(sp, (IOrganizationServiceAsync2)client);
+    }
+    catch (Exception ex)
+    {
+        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
+            .LogError(ex, "Failed to create ServiceClient for MessageAvailabilityChecker. Verify AzureAd config and user secrets.");
+        throw;
+    }
 });
 
 builder.Services.AddScoped<DeferredLookupBackfill>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-    return ActivatorUtilities.CreateInstance<DeferredLookupBackfill>(sp, (IOrganizationServiceAsync2)client);
+    try
+    {
+        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
+        return ActivatorUtilities.CreateInstance<DeferredLookupBackfill>(sp, (IOrganizationServiceAsync2)client);
+    }
+    catch (Exception ex)
+    {
+        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
+            .LogError(ex, "Failed to create ServiceClient for DeferredLookupBackfill. Verify AzureAd config and user secrets.");
+        throw;
+    }
 });
 
 // Pure DI — only need ILogger<T> from the container
@@ -80,8 +107,17 @@ builder.Services.AddScoped<GenerationService>();
 builder.Services.AddScoped<IBulkCreator>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-    return ActivatorUtilities.CreateInstance<BulkCreator>(sp, (IOrganizationServiceAsync2)client);
+    try
+    {
+        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
+        return ActivatorUtilities.CreateInstance<BulkCreator>(sp, (IOrganizationServiceAsync2)client);
+    }
+    catch (Exception ex)
+    {
+        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
+            .LogError(ex, "Failed to create ServiceClient for BulkCreator. Verify AzureAd config and user secrets.");
+        throw;
+    }
 });
 
 // MudBlazor

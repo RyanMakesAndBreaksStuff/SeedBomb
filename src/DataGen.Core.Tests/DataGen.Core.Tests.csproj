@@ -8,7 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
     <PackageReference Include="xunit.v3" />
-    <PackageReference Include="coverlet.MTP" />
     <PackageReference Include="Moq" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
@@ -8,7 +8,6 @@
     <ProjectReference Include="../../src/DataGen.Core/DataGen.Core.csproj" />
     <ProjectReference Include="../../src/DataGen.Bulk/DataGen.Bulk.csproj" />
     <PackageReference Include="xunit.v3" />
-    <PackageReference Include="coverlet.MTP" />
     <PackageReference Include="Moq" />
     <PackageReference Include="XrmMockup365" />
   </ItemGroup>

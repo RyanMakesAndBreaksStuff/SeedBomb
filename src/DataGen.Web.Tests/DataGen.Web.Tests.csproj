@@ -9,8 +9,6 @@
     <ProjectReference Include="../DataGen.Web/DataGen.Web.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
     <PackageReference Include="xunit.v3" />
-
-    <PackageReference Include="coverlet.MTP" />
     <PackageReference Include="Moq" />
     <PackageReference Include="bunit" />
   </ItemGroup>
