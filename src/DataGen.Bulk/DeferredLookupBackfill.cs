@@ -35,12 +35,14 @@ public class DeferredLookupBackfill
     /// <param name="graph">The dependency graph with deferred edge information.</param>
     /// <param name="pool">The record pool containing IDs of all created records.</param>
     /// <param name="batchSize">Number of updates per ExecuteMultiple batch.</param>
+    /// <param name="seed">RNG seed for deterministic target selection. Should match the generation seed.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> BackfillLookupsAsync(
         DependencyGraph graph,
         DataverseRecordPool pool,
         int batchSize,
+        int seed = 42,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(graph);
@@ -56,8 +58,7 @@ public class DeferredLookupBackfill
 
         _logger.LogInformation("Starting deferred lookup backfill for {EntityCount} entities.", graph.DeferredEdges.Count);
 
-        // Use a simple seeded random for deterministic backfill selection
-        var rng = new Random(42);
+        var rng = new Random(seed);
 
         foreach (var (sourceEntity, deferredLookups) in graph.DeferredEdges)
         {
@@ -109,12 +110,14 @@ public class DeferredLookupBackfill
     /// <param name="graph">The dependency graph with N:N relationship information.</param>
     /// <param name="pool">The record pool containing IDs of all created records.</param>
     /// <param name="batchSize">Number of associations per ExecuteMultiple batch.</param>
+    /// <param name="seed">RNG seed for deterministic association selection. Should match the generation seed.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> AssociateManyToManyAsync(
         DependencyGraph graph,
         DataverseRecordPool pool,
         int batchSize,
+        int seed = 42,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(graph);
@@ -124,7 +127,7 @@ public class DeferredLookupBackfill
         var processedRelationships = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         _logger.LogInformation("Starting N:N association pass.");
-        var rng = new Random(42);
+        var rng = new Random(seed);
 
         foreach (var (entityName, relationships) in graph.Relationships)
         {

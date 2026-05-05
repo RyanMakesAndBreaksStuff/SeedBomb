@@ -14,6 +14,9 @@ public class DependencyGraph
     private readonly Dictionary<string, List<ManyToManyRelationship>> _relationships = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _nodes = new(StringComparer.OrdinalIgnoreCase);
 
+    private IReadOnlyDictionary<string, IReadOnlyList<DeferredLookup>>? _deferredEdgesCache;
+    private IReadOnlyDictionary<string, IReadOnlyList<ManyToManyRelationship>>? _relationshipsCache;
+
     /// <summary>
     /// Gets the direct dependency edges. Key = source entity, Value = set of target entities.
     /// </summary>
@@ -24,7 +27,7 @@ public class DependencyGraph
     /// must be backfilled after initial record creation.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<DeferredLookup>> DeferredEdges =>
-        _deferredEdges.ToDictionary(
+        _deferredEdgesCache ??= _deferredEdges.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<DeferredLookup>)kvp.Value.AsReadOnly(),
             StringComparer.OrdinalIgnoreCase);
@@ -39,7 +42,7 @@ public class DependencyGraph
     /// Gets many-to-many relationships keyed by entity logical name.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<ManyToManyRelationship>> Relationships =>
-        _relationships.ToDictionary(
+        _relationshipsCache ??= _relationships.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<ManyToManyRelationship>)kvp.Value.AsReadOnly(),
             StringComparer.OrdinalIgnoreCase);
@@ -92,6 +95,7 @@ public class DependencyGraph
             _deferredEdges[source] = deferred;
         }
         deferred.Add(deferredLookup);
+        _deferredEdgesCache = null;
     }
 
     /// <summary>
@@ -126,5 +130,6 @@ public class DependencyGraph
             _relationships[entityLogicalName] = list;
         }
         list.Add(relationship);
+        _relationshipsCache = null;
     }
 }

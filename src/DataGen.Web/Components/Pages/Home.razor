@@ -134,13 +134,15 @@
         _result = null;
         _cts = new CancellationTokenSource();
 
-        var counts = _fieldOverrides?.GetCounts()
-            ?? _selectedEntities.ToDictionary(e => e.LogicalName, _ => 10);
+        var rawCounts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
+        var counts = _selectedEntities.ToDictionary(
+            e => e.LogicalName,
+            e => rawCounts.TryGetValue(e.LogicalName, out var c) ? c : 10);
 
         var config = new GenerationConfig
         {
             EntityLogicalNames = [.. _selectedEntities.Select(e => e.LogicalName)],
-            RecordCounts = counts.ToDictionary(kv => kv.Key, kv => kv.Value),
+            RecordCounts = counts,
             Seed = _seed,
             BatchSize = _batchSize,
             MaxParallelism = _maxParallelism,

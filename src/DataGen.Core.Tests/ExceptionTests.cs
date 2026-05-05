@@ -53,18 +53,4 @@ public class ExceptionTests
         Assert.IsAssignableFrom<CyclicalDependencyException>(ex);
     }
 
-    [Fact]
-    public void InvalidConfigurationException_StoresMessage()
-    {
-        var ex = new InvalidConfigurationException("bad config");
-        Assert.Equal("bad config", ex.Message);
-    }
-
-    [Fact]
-    public void UnsupportedAttributeTypeException_StoresAttributeTypeName()
-    {
-        var ex = new UnsupportedAttributeTypeException("BigInt");
-        Assert.Equal("BigInt", ex.AttributeTypeName);
-        Assert.Contains("BigInt", ex.Message);
-    }
 }

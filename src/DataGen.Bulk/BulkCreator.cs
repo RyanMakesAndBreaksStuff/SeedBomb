@@ -1,5 +1,6 @@
 using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
+using DataGen.Core.Exceptions;
 using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
@@ -27,6 +28,8 @@ public class BulkCreator : IBulkCreator
     private readonly TopologicalSort _topologicalSort;
     private readonly DeferredLookupBackfill _deferredBackfill;
     private readonly ILogger<BulkCreator> _logger;
+
+    private const int MinThreadPoolThreads = 100;
 
     private static bool _threadPoolTuned;
     private static readonly object _tuningLock = new();
@@ -114,12 +117,12 @@ public class BulkCreator : IBulkCreator
         // Phase 2: backfill deferred lookups
         _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
         var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
-            graph, pool, config.BatchSize, ct).ConfigureAwait(false);
+            graph, pool, config.BatchSize, config.Seed, ct).ConfigureAwait(false);
         allErrors.AddRange(backfillErrors);
 
         // Phase 3: N:N associations
         var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
-            graph, pool, config.BatchSize, ct).ConfigureAwait(false);
+            graph, pool, config.BatchSize, config.Seed, ct).ConfigureAwait(false);
         allErrors.AddRange(associateErrors);
 
         var elapsed = DateTimeOffset.UtcNow - runStart;
@@ -145,10 +148,8 @@ public class BulkCreator : IBulkCreator
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
-        // Determine which attributes to generate (sequential, on calling thread)
-        var attributesToGenerate = GetGeneratableAttributes(meta);
-
         // Sequential Bogus generation — single Faker instance, no sharing across threads
+        var attributesToGenerate = GetGeneratableAttributes(meta);
         var faker = DeterministicFaker.Create(config.Seed, entityIndex);
         var entities = new List<Entity>(recordCount);
 
@@ -164,11 +165,23 @@ public class BulkCreator : IBulkCreator
             entities.Add(entity);
         }
 
-        // Split into batches and submit in parallel
         var batches = entities.Chunk(config.BatchSize).ToArray();
         var useCreateMultiple = await _messageChecker
             .IsCreateMultipleAvailableAsync(entityName, ct).ConfigureAwait(false);
 
+        return await SubmitEntityBatchesAsync(
+            entityName, batches, useCreateMultiple, recordCount, config, progress, ct).ConfigureAwait(false);
+    }
+
+    private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitEntityBatchesAsync(
+        string entityName,
+        Entity[][] batches,
+        bool useCreateMultiple,
+        int recordCount,
+        GenerationConfig config,
+        IProgress<BulkCreationProgress>? progress,
+        CancellationToken ct)
+    {
         var allIds = new List<Guid>(recordCount);
         var allErrors = new List<BatchError>();
         var createdCount = 0;
@@ -180,7 +193,7 @@ public class BulkCreator : IBulkCreator
             CancellationToken = ct
         };
 
-        // Thread-safe accumulators for parallel batch results
+        // Thread-safe accumulators indexed by batch position
         var idBags = new List<Guid>[batches.Length];
         var errorBags = new List<BatchError>[batches.Length];
 
@@ -253,7 +266,9 @@ public class BulkCreator : IBulkCreator
         };
 
         var response = (CreateMultipleResponse)await _service.ExecuteAsync(request, ct).ConfigureAwait(false);
-        var ids = response.Ids?.ToList() ?? [];
+        if (response.Ids is null)
+            throw new DataGenerationException($"CreateMultiple returned null Ids for '{entityName}'.");
+        var ids = response.Ids.ToList();
 
         _logger.LogDebug("CreateMultiple: {Entity} batch of {BatchSize} → {IdCount} IDs.",
             entityName, batch.Length, ids.Count);
@@ -319,8 +334,9 @@ public class BulkCreator : IBulkCreator
         lock (_tuningLock)
         {
             if (_threadPoolTuned) return;
-            // Boost minimum threads to reduce latency ramp-up for burst parallel API calls
-            ThreadPool.SetMinThreads(100, 100);
+            // Boost minimum threads to reduce latency ramp-up for burst parallel API calls.
+            // Program.cs sets the same value at startup; this is a safety net for non-web hosts.
+            ThreadPool.SetMinThreads(MinThreadPoolThreads, MinThreadPoolThreads);
             _threadPoolTuned = true;
         }
     }

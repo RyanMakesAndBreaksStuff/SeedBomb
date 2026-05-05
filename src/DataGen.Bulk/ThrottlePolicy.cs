@@ -91,7 +91,7 @@ public class ThrottlePolicy
             }
         }
 
-        // Unreachable unless the loop exits without return or throw (shouldn't happen)
+        // Required by compiler — logically unreachable because catch blocks always throw on final attempt
         throw new DataGenerationException(
             $"Batch creation for '{entityName}' exhausted {maxRetries} retries with no result.");
     }
