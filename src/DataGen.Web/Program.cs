@@ -12,6 +12,7 @@ using Microsoft.Identity.Web.UI;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using MudBlazor.Services;
 
+
 // Warm thread pool before any ServiceClient construction.
 // ServicePointManager.DefaultConnectionLimit is obsolete (SYSLIB0014) on .NET 10 —
 // SocketsHttpHandler manages connection limits per-endpoint instead.
@@ -129,6 +130,7 @@ builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 64 * 1024);
 // Blazor Server
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
 
 var app = builder.Build();
 
