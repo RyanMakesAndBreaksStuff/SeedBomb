@@ -10,6 +10,7 @@ using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
+using System.ServiceModel;
 
 namespace DataGen.Bulk;
 
@@ -243,17 +244,29 @@ public class BulkCreator : IBulkCreator
     {
         if (useCreateMultiple)
         {
-            return await _throttlePolicy.ExecuteAsync(
-                () => CreateMultipleAsync(entityName, batch, ct),
-                entityName, maxRetries, ct).ConfigureAwait(false);
+            try
+            {
+                return await _throttlePolicy.ExecuteAsync(
+                    () => CreateMultipleAsync(entityName, batch, ct),
+                    entityName, maxRetries, ct).ConfigureAwait(false);
+            }
+            catch (DataGenerationException ex) when (IsCreateMultipleUnsupported(ex))
+            {
+                _logger.LogWarning(
+                    "CreateMultiple rejected by Dataverse for {Entity} (sdkmessagefilter false positive); falling back to ExecuteMultiple.",
+                    entityName);
+                _messageChecker.MarkUnsupported(entityName);
+            }
         }
-        else
-        {
-            return await _throttlePolicy.ExecuteAsync(
-                () => ExecuteMultipleFallbackAsync(entityName, batch, ct),
-                entityName, maxRetries, ct).ConfigureAwait(false);
-        }
+
+        return await _throttlePolicy.ExecuteAsync(
+            () => ExecuteMultipleFallbackAsync(entityName, batch, ct),
+            entityName, maxRetries, ct).ConfigureAwait(false);
     }
+
+    private static bool IsCreateMultipleUnsupported(DataGenerationException ex) =>
+        ex.InnerException is FaultException<OrganizationServiceFault> fault &&
+        fault.Detail?.ErrorCode == unchecked((int)0x80040800);
 
     private async Task<(List<Guid> ids, List<BatchError> errors)> CreateMultipleAsync(
         string entityName,
@@ -312,8 +325,13 @@ public class BulkCreator : IBulkCreator
             }
         }
 
-        _logger.LogDebug("ExecuteMultiple: {Entity} batch of {BatchSize} → {IdCount} IDs, {ErrorCount} errors.",
-            entityName, batch.Length, ids.Count, errors.Count);
+        if (errors.Count > 0)
+            _logger.LogWarning(
+                "ExecuteMultiple: {Entity} batch had {ErrorCount}/{BatchSize} failures. First error [{Code}]: {Message}",
+                entityName, errors.Count, batch.Length, errors[0].FaultCode, errors[0].ErrorMessage);
+        else
+            _logger.LogDebug("ExecuteMultiple: {Entity} batch of {BatchSize} → {IdCount} IDs.",
+                entityName, batch.Length, ids.Count);
 
         return (ids, errors);
     }
@@ -324,7 +342,7 @@ public class BulkCreator : IBulkCreator
 
         return meta.Attributes
             .Where(FieldFilter.ShouldGenerateField)
-            .Where(a => _edgeCaseValidator.Validate(a, meta).Action != FieldAction.Fail)
+            .Where(a => _edgeCaseValidator.Validate(a, meta).Action == FieldAction.Generate)
             .ToArray();
     }
 

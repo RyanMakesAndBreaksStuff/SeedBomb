@@ -28,6 +28,14 @@ public class MessageAvailabilityChecker
     }
 
     /// <summary>
+    /// Marks <c>CreateMultiple</c> as unsupported for the given entity, overriding any cached value.
+    /// Call this when a <c>CreateMultiple</c> call is rejected at runtime to prevent repeated attempts.
+    /// </summary>
+    /// <param name="entityLogicalName">The entity logical name.</param>
+    public void MarkUnsupported(string entityLogicalName) =>
+        _cache[entityLogicalName] = false;
+
+    /// <summary>
     /// Determines whether the <c>CreateMultiple</c> message is supported for the given entity.
     /// Result is cached for the lifetime of this instance.
     /// </summary>

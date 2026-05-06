@@ -4,7 +4,7 @@ using Microsoft.Xrm.Sdk.Metadata;
 namespace DataGen.Core.EdgeCases;
 
 /// <summary>
-/// Validates attributes against 13 edge-case categories to determine how each
+/// Validates attributes against 14 edge-case categories to determine how each
 /// field should be handled during data generation.
 /// </summary>
 public class EdgeCaseValidator
@@ -21,7 +21,7 @@ public class EdgeCaseValidator
     }
 
     /// <summary>
-    /// Validates a field against the 13 edge-case categories and returns the appropriate action.
+    /// Validates a field against the 14 edge-case categories and returns the appropriate action.
     /// </summary>
     /// <param name="attr">The attribute metadata to validate.</param>
     /// <param name="entity">The owning entity metadata (for alternate key checks).</param>
@@ -75,8 +75,8 @@ public class EdgeCaseValidator
 
         if (string.Equals(attr.LogicalName, "statuscode", StringComparison.OrdinalIgnoreCase))
         {
-            result.RequireSpecialHandling("StatusCode");
-            _logger.LogDebug("Special handling for {Field}: statuscode", attr.LogicalName);
+            result.Skip("statuscode must match statecode; Dataverse sets default on create");
+            _logger.LogDebug("Skipping {Field}: statuscode", attr.LogicalName);
             return result;
         }
 
@@ -143,7 +143,16 @@ public class EdgeCaseValidator
             return result;
         }
 
-        // 12. Polymorphic lookups — multiple possible target entities
+        // 12. UTC offset integers — Format metadata may be null but Dataverse validates against timezonedefinition; skip
+        if (attr is IntegerAttributeMetadata &&
+            attr.LogicalName?.EndsWith("utcoffset", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            result.Skip("UTC offset fields require valid timezone definition codes; optional address field");
+            _logger.LogDebug("Skipping {Field}: utcoffset requires timezone definition lookup", attr.LogicalName);
+            return result;
+        }
+
+        // 13. Polymorphic lookups — multiple possible target entities
         if (attr is LookupAttributeMetadata { Targets.Length: > 1 })
         {
             result.RequireSpecialHandling("PolymorphicLookup");
@@ -151,7 +160,7 @@ public class EdgeCaseValidator
             return result;
         }
 
-        // 13. Owner-type lookups — always reference systemuser
+        // 14. Owner-type lookups — always reference systemuser
         if (attr is LookupAttributeMetadata lookupMeta &&
             string.Equals(lookupMeta.LogicalName, "ownerid", StringComparison.OrdinalIgnoreCase))
         {

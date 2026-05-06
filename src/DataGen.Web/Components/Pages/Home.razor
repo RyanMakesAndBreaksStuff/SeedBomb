@@ -1,25 +1,33 @@
-@page "/"
+@page "/app"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@implements IDisposable
 
 @inject GenerationService GenerationService
 @inject ISnackbar Snackbar
 
-<PageTitle>DataGen</PageTitle>
+<PageTitle>Dataverse Data Seeder</PageTitle>
 
-<MudText Typo="Typo.h5" GutterBottom="true">Synthetic Data Generator</MudText>
-<MudDivider Class="mb-6" />
+<div class="home-grid">
 
-<MudGrid>
-    <MudItem xs="12" md="8">
+    <!-- ── Left column: steps ── -->
+    <div class="home-main">
 
-        <MudPaper Class="pa-4" Outlined="true">
-            <MudText Typo="Typo.subtitle1" Class="mb-3">1 — Select entities</MudText>
+        <!-- 01 — Entities -->
+        <div class="ds-card">
+            <div class="step-header">
+                <div class="step-num">01</div>
+                <span class="step-title">SELECT ENTITIES</span>
+            </div>
             <EntitySelector @ref="_entitySelector" SelectedEntitiesChanged="OnEntitiesChanged" />
-        </MudPaper>
+        </div>
 
-        <MudPaper Class="pa-4 mt-4" Outlined="true">
-            <MudText Typo="Typo.subtitle1" Class="mb-3">2 — Configure generation</MudText>
+        <!-- 02 — Configure -->
+        <div class="ds-card">
+            <div class="step-header">
+                <div class="step-num">02</div>
+                <span class="step-title">CONFIGURE</span>
+            </div>
             <MudGrid>
                 <MudItem xs="12" sm="4">
                     <MudNumericField T="int"
@@ -48,60 +56,106 @@
                 </MudItem>
             </MudGrid>
             <FieldOverrides @ref="_fieldOverrides" Entities="_selectedEntities" />
-        </MudPaper>
+        </div>
 
-        <MudPaper Class="pa-4 mt-4" Outlined="true">
-            <MudText Typo="Typo.subtitle1" Class="mb-3">3 — Generate</MudText>
-            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <!-- 03 — Execute -->
+        <div class="ds-card @(_isGenerating ? "generating-active" : "")">
+            <div class="step-header">
+                <div class="step-num">03</div>
+                <span class="step-title">EXECUTE</span>
+            </div>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            Size="Size.Large"
                            OnClick="OnGenerateAsync"
                            Disabled="@(_isGenerating || !_selectedEntities.Any())"
-                           StartIcon="@Icons.Material.Filled.PlayArrow">
-                    @(_isGenerating ? "Generating…" : "Generate")
+                           StartIcon="@Icons.Material.Filled.PlayArrow"
+                           Style="min-width: 220px; height: 48px;">
+                    @(_isGenerating ? "GENERATING..." : "GENERATE DATA")
                 </MudButton>
                 @if (_isGenerating)
                 {
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Error"
                                OnClick="OnCancel"
-                               StartIcon="@Icons.Material.Filled.Stop">
-                        Cancel
+                               StartIcon="@Icons.Material.Filled.Stop"
+                               Style="height: 48px;">
+                        ABORT
                     </MudButton>
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
                 }
             </MudStack>
-        </MudPaper>
+        </div>
 
-    </MudItem>
+    </div>
 
-    <MudItem xs="12" md="4">
+    <!-- ── Right column: live status ── -->
+    <div class="home-side">
+
         @if (_isGenerating || _progress is not null)
         {
-            <MudPaper Class="pa-4" Outlined="true">
-                <MudText Typo="Typo.subtitle1" Class="mb-3">Progress</MudText>
+            <div class="ds-card @(_isGenerating ? "ds-card-accent" : "")">
+                <div class="step-header">
+                    <div class="side-indicator @(_isGenerating ? "indicator-active" : "indicator-done")"></div>
+                    <span class="step-title">@(_isGenerating ? "ACTIVE" : "COMPLETE")</span>
+                </div>
                 <ProgressMonitor Progress="_progress" />
-            </MudPaper>
+            </div>
         }
 
         @if (_result is not null)
         {
-            <MudPaper Class="pa-4 mt-4" Outlined="true">
-                <MudAlert Severity="Severity.Success" Dense="true">
-                    @_result.TotalRecords.ToString("N0") records created
-                    in @($"{(int)_result.Elapsed.TotalMinutes:00}:{_result.Elapsed.Seconds:00}")
-                </MudAlert>
+            <div class="ds-card ds-card-accent">
+                <div class="result-count">@_result.TotalRecords.ToString("N0")</div>
+                <div class="result-label">RECORDS CREATED</div>
+                <div class="result-time">in @($"{(int)_result.Elapsed.TotalMinutes:00}:{_result.Elapsed.Seconds:00}")</div>
                 @if (_result.Errors.Count > 0)
                 {
-                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">
                         @_result.Errors.Count batch error(s) — check logs
                     </MudAlert>
                 }
-            </MudPaper>
+            </div>
         }
-    </MudItem>
-</MudGrid>
+
+        @if (_selectedEntities.Any() && !_isGenerating && _result is null)
+        {
+            <div class="ds-card ds-card-dim">
+                <div class="step-header" style="margin-bottom: 14px;">
+                    <span class="step-title">QUEUED</span>
+                    <MudSpacer />
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: .7rem; color: #3A7848;">
+                        @_selectedEntities.Count entities
+                    </span>
+                </div>
+                @foreach (var e in _selectedEntities.Take(9))
+                {
+                    <div class="queue-item">
+                        <div class="queue-dot"></div>
+                        <span class="queue-name">@e.DisplayName</span>
+                    </div>
+                }
+                @if (_selectedEntities.Count > 9)
+                {
+                    <div class="queue-more">+@(_selectedEntities.Count - 9) more</div>
+                }
+            </div>
+        }
+
+        @if (!_selectedEntities.Any() && !_isGenerating && _result is null)
+        {
+            <div class="ds-card ds-card-dim" style="text-align: center; padding: 40px 24px;">
+                <MudIcon Icon="@Icons.Material.Outlined.DataArray"
+                         Style="font-size: 2.4rem; color: #181E2E; display: block; margin: 0 auto 14px;" />
+                <div style="font-family: 'Syncopate', sans-serif; font-size: .58rem; letter-spacing: .18em; color: #181E2E;">
+                    SELECT ENTITIES TO BEGIN
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
 
 @code {
     private EntitySelector? _entitySelector;
@@ -118,6 +172,16 @@
     private int? _maxParallelism;
 
     private readonly string _sessionId = Guid.NewGuid().ToString("N");
+    private bool _disposed;
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _disposed = true;
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
 
     private void OnEntitiesChanged(IReadOnlyList<EntitySummary> entities)
     {
@@ -150,6 +214,7 @@
 
         var progress = new Progress<ProgressUpdate>(update =>
         {
+            if (_disposed) return;
             _progress = update;
             InvokeAsync(StateHasChanged);
         });
@@ -172,7 +237,8 @@
             _isGenerating = false;
             _cts?.Dispose();
             _cts = null;
-            await InvokeAsync(StateHasChanged);
+            if (!_disposed)
+                await InvokeAsync(StateHasChanged);
         }
     }
 
