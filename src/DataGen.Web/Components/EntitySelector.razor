@@ -1,3 +1,4 @@
+@implements IDisposable
 @inject IMetadataProvider MetadataProvider
 @inject ILogger<EntitySelector> Logger
 
@@ -48,6 +49,11 @@ else
         }
     }
 
+    private bool _disposed;
+
+    /// <inheritdoc />
+    public void Dispose() => _disposed = true;
+
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -59,7 +65,7 @@ else
     {
         _loading = true;
         _loadError = null;
-        await InvokeAsync(StateHasChanged);
+        if (!_disposed) await InvokeAsync(StateHasChanged);
 
         try
         {
@@ -73,7 +79,7 @@ else
         finally
         {
             _loading = false;
-            await InvokeAsync(StateHasChanged);
+            if (!_disposed) await InvokeAsync(StateHasChanged);
         }
     }
 
