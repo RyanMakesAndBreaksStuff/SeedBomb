@@ -18,7 +18,6 @@ public class ThrottlePolicy
 
     private static readonly TimeSpan BaseDelay = TimeSpan.FromSeconds(2);
     private readonly ILogger<ThrottlePolicy> _logger;
-    private readonly Random _random = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ThrottlePolicy"/> class.
@@ -105,13 +104,13 @@ public class ThrottlePolicy
             ErrorCodeConcurrentRequests;
     }
 
-    private TimeSpan ComputeDelay(int attempt, FaultException<OrganizationServiceFault>? ex)
+    private static TimeSpan ComputeDelay(int attempt, FaultException<OrganizationServiceFault>? ex)
     {
         // Exponential backoff: base * 2^attempt
         var exponential = BaseDelay * Math.Pow(2, attempt);
 
         // Jitter: up to 1 second of random offset to avoid thundering herd
-        var jitter = TimeSpan.FromMilliseconds(_random.NextDouble() * 1000);
+        var jitter = TimeSpan.FromMilliseconds(Random.Shared.NextDouble() * 1000);
 
         return exponential + jitter;
     }
