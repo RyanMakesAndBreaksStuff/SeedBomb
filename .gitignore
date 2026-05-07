@@ -56,3 +56,5 @@ TestResult.xml
 nunit-*.xml
 /.vs
 /src/DataGen.Web/appsettings.json
+/supervisor
+/teamplan.md

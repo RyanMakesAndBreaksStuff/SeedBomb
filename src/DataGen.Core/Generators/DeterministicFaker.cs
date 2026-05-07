@@ -21,8 +21,6 @@ public static class DeterministicFaker
     /// <returns>A seeded Faker instance.</returns>
     public static Faker Create(int baseSeed, int entityIndex)
     {
-        Randomizer.Seed = new Random(baseSeed + entityIndex);
-        var faker = new Faker();
-        return faker;
+        return new Faker { Random = new Randomizer(baseSeed + entityIndex) };
     }
 }
