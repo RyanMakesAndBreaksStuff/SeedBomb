@@ -103,4 +103,22 @@ public class ThrottlePolicyTests
                 maxRetries: 3,
                 cts.Token));
     }
+
+    [Fact]
+    public async Task ExecuteAsync_CalledConcurrently_AllSucceed()
+    {
+        // Regression: _random = new Random() corrupts under concurrent access.
+        // Random.Shared is thread-safe; this test would hang or throw before the fix.
+        var results = new System.Collections.Concurrent.ConcurrentBag<int>();
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, 40),
+            new ParallelOptions { MaxDegreeOfParallelism = 8 },
+            async (i, ct) =>
+            {
+                var result = await _policy.ExecuteAsync(
+                    () => Task.FromResult(i), "entity", maxRetries: 0, ct);
+                results.Add(result);
+            });
+        Assert.Equal(40, results.Count);
+    }
 }
