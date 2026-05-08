@@ -17,11 +17,9 @@ internal sealed class MoneyFieldGenerator : IFieldGenerator
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)
     {
         var moneyMeta = (MoneyAttributeMetadata)metadata;
-        var min = moneyMeta.MinValue ?? 0.0;
-        var max = moneyMeta.MaxValue ?? 10000.0;
+        var min = (decimal)(moneyMeta.MinValue ?? 0.0);
+        var max = (decimal)(moneyMeta.MaxValue ?? 10000.0);
         var precision = moneyMeta.Precision ?? 2;
-
-        var value = Math.Round(faker.Random.Double(min, max), precision);
-        return new Money(Convert.ToDecimal(value));
+        return new Money(Math.Round(faker.Random.Decimal(min, max), precision));
     }
 }
