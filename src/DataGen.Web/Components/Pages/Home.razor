@@ -5,6 +5,7 @@
 
 @inject GenerationService GenerationService
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 <PageTitle>Dataverse Data Seeder</PageTitle>
 
@@ -79,9 +80,10 @@
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Error"
                                OnClick="OnCancel"
+                               Disabled="@_isCancelling"
                                StartIcon="@Icons.Material.Filled.Stop"
                                Style="height: 48px;">
-                        ABORT
+                        @(_isCancelling ? "ABORTING..." : "ABORT")
                     </MudButton>
                     <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
                 }
@@ -195,6 +197,7 @@
     private ProgressUpdate? _progress;
     private GenerationResult? _result;
     private bool _isGenerating;
+    private bool _isCancelling;
     private CancellationTokenSource? _cts;
 
     private int _seed = 42;
@@ -214,6 +217,7 @@
 
     private void OnEntitiesChanged(IReadOnlyList<EntitySummary> entities)
     {
+        if (_isGenerating) return;
         _selectedEntities = entities;
         _result = null;
         _progress = null;
@@ -258,6 +262,16 @@
         {
             Snackbar.Add("Generation cancelled", Severity.Warning);
         }
+        catch (Microsoft.Identity.Client.MsalUiRequiredException)
+        {
+            Snackbar.Add("Session expired — please sign in again", Severity.Warning);
+            Navigation.NavigateTo("/MicrosoftIdentity/Account/SignIn", forceLoad: true);
+        }
+        catch (Microsoft.Identity.Web.MicrosoftIdentityWebChallengeUserException)
+        {
+            Snackbar.Add("Session expired — please sign in again", Severity.Warning);
+            Navigation.NavigateTo("/MicrosoftIdentity/Account/SignIn", forceLoad: true);
+        }
         catch (Exception ex)
         {
             Snackbar.Add($"Generation failed: {ex.Message}", Severity.Error);
@@ -265,6 +279,7 @@
         finally
         {
             _isGenerating = false;
+            _isCancelling = false;
             _cts?.Dispose();
             _cts = null;
             if (!_disposed)
@@ -272,5 +287,10 @@
         }
     }
 
-    private void OnCancel() => _cts?.Cancel();
+    private void OnCancel()
+    {
+        _isCancelling = true;
+        _cts?.Cancel();
+        InvokeAsync(StateHasChanged);
+    }
 }
