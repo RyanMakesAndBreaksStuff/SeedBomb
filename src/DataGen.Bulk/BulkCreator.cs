@@ -151,6 +151,7 @@ public class BulkCreator : IBulkCreator
     {
         // Sequential Bogus generation — single Faker instance, no sharing across threads
         var attributesToGenerate = GetGeneratableAttributes(meta);
+        var alternateKeyAttrs = GetAlternateKeyAttributes(meta);
         var faker = DeterministicFaker.Create(config.Seed, entityIndex);
         var entities = new List<Entity>(recordCount);
 
@@ -163,12 +164,16 @@ public class BulkCreator : IBulkCreator
                 if (value is not null)
                     entity[attr.LogicalName!] = value;
             }
+            foreach (var attr in alternateKeyAttrs)
+            {
+                entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i);
+            }
             entities.Add(entity);
         }
 
         var batches = entities.Chunk(config.BatchSize).ToArray();
         var useCreateMultiple = await _messageChecker
-            .IsCreateMultipleAvailableAsync(entityName, ct).ConfigureAwait(false);
+            .IsCreateMultipleAvailableAsync(entityName, meta.ObjectTypeCode ?? 0, ct).ConfigureAwait(false);
 
         return await SubmitEntityBatchesAsync(
             entityName, batches, useCreateMultiple, recordCount, config, progress, ct).ConfigureAwait(false);
@@ -345,6 +350,32 @@ public class BulkCreator : IBulkCreator
             .Where(a => _edgeCaseValidator.Validate(a, meta).Action == FieldAction.Generate)
             .ToArray();
     }
+
+    private AttributeMetadata[] GetAlternateKeyAttributes(EntityMetadata meta)
+    {
+        if (meta.Attributes is null) return [];
+
+        return meta.Attributes
+            .Where(FieldFilter.ShouldGenerateField)
+            .Where(a =>
+            {
+                var result = _edgeCaseValidator.Validate(a, meta);
+                return result.Action == FieldAction.SpecialHandling
+                       && result.HandlingCategory == "AlternateKeyUniqueness";
+            })
+            .ToArray();
+    }
+
+    private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex) =>
+        attr switch
+        {
+            StringAttributeMetadata s => TruncateKey($"{entityName}-{recordIndex:D8}", s.MaxLength ?? 100),
+            IntegerAttributeMetadata => recordIndex,
+            _ => TruncateKey($"{entityName}-{recordIndex:D8}", 100)
+        };
+
+    private static string TruncateKey(string value, int maxLength) =>
+        value.Length > maxLength ? value[..maxLength] : value;
 
     private static void EnsureThreadPoolTuned()
     {

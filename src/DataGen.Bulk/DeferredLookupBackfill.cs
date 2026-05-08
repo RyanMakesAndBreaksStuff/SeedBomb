@@ -15,16 +15,23 @@ namespace DataGen.Bulk;
 public class DeferredLookupBackfill
 {
     private readonly IOrganizationServiceAsync2 _service;
+    private readonly ThrottlePolicy _throttlePolicy;
     private readonly ILogger<DeferredLookupBackfill> _logger;
+    private const int MaxRetries = 3;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeferredLookupBackfill"/> class.
     /// </summary>
     /// <param name="service">The Dataverse organization service.</param>
+    /// <param name="throttlePolicy">The throttle retry policy.</param>
     /// <param name="logger">The logger instance.</param>
-    public DeferredLookupBackfill(IOrganizationServiceAsync2 service, ILogger<DeferredLookupBackfill> logger)
+    public DeferredLookupBackfill(
+        IOrganizationServiceAsync2 service,
+        ThrottlePolicy throttlePolicy,
+        ILogger<DeferredLookupBackfill> logger)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _throttlePolicy = throttlePolicy ?? throw new ArgumentNullException(nameof(throttlePolicy));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -215,8 +222,10 @@ public class DeferredLookupBackfill
 
             try
             {
-                var response = (ExecuteMultipleResponse)await _service
-                    .ExecuteAsync(execMulti, ct).ConfigureAwait(false);
+                var response = await _throttlePolicy.ExecuteAsync(
+                    async () => (ExecuteMultipleResponse)await _service
+                        .ExecuteAsync(execMulti, ct).ConfigureAwait(false),
+                    context, MaxRetries, ct).ConfigureAwait(false);
 
                 if (response.IsFaulted)
                 {
