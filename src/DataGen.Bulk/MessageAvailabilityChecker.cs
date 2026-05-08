@@ -40,10 +40,9 @@ public class MessageAvailabilityChecker
     /// Result is cached for the lifetime of this instance.
     /// </summary>
     /// <param name="entityLogicalName">The entity logical name to check.</param>
-    /// <param name="objectTypeCode">The integer ObjectTypeCode for the entity (from <c>EntityMetadata.ObjectTypeCode</c>).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if CreateMultiple is supported; false if ExecuteMultiple fallback should be used.</returns>
-    public async Task<bool> IsCreateMultipleAvailableAsync(string entityLogicalName, int objectTypeCode, CancellationToken ct = default)
+    public async Task<bool> IsCreateMultipleAvailableAsync(string entityLogicalName, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entityLogicalName);
 
@@ -53,20 +52,20 @@ public class MessageAvailabilityChecker
             return cached;
         }
 
-        var available = await QueryCreateMultipleSupportAsync(entityLogicalName, objectTypeCode, ct).ConfigureAwait(false);
+        var available = await QueryCreateMultipleSupportAsync(entityLogicalName, ct).ConfigureAwait(false);
         _cache[entityLogicalName] = available;
 
         _logger.LogInformation("CreateMultiple availability for {Entity}: {Available}", entityLogicalName, available);
         return available;
     }
 
-    private async Task<bool> QueryCreateMultipleSupportAsync(string entityLogicalName, int objectTypeCode, CancellationToken ct)
+    private async Task<bool> QueryCreateMultipleSupportAsync(string entityLogicalName, CancellationToken ct)
     {
         try
         {
             var query = new QueryExpression("sdkmessagefilter")
             {
-                ColumnSet = new ColumnSet("sdkmessagefilterid"),
+                ColumnSet = new ColumnSet("sdkmessagefilterid", "primaryobjecttypecode"),
                 TopCount = 1,
                 Criteria = new FilterExpression
                 {
@@ -75,7 +74,7 @@ public class MessageAvailabilityChecker
                         new ConditionExpression(
                             "primaryobjecttypecode",
                             ConditionOperator.Equal,
-                            objectTypeCode)
+                            entityLogicalName)
                     }
                 }
             };
@@ -84,6 +83,14 @@ public class MessageAvailabilityChecker
             messageLink.LinkCriteria.AddCondition("name", ConditionOperator.Equal, "CreateMultiple");
 
             var result = await _service.RetrieveMultipleAsync(query, ct).ConfigureAwait(false);
+
+            if (result.Entities.Count > 0 && result.Entities[0].Contains("primaryobjecttypecode"))
+            {
+                var rawOtc = result.Entities[0]["primaryobjecttypecode"];
+                _logger.LogDebug("sdkmessagefilter.primaryobjecttypecode raw for {Entity}: {RawValue} ({Type})",
+                    entityLogicalName, rawOtc, rawOtc?.GetType().Name ?? "null");
+            }
+
             return result.Entities.Count > 0;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
