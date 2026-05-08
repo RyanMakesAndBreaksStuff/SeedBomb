@@ -106,11 +106,24 @@ public class ThrottlePolicy
 
     private static TimeSpan ComputeDelay(int attempt, FaultException<OrganizationServiceFault>? ex)
     {
-        // Exponential backoff: base * 2^attempt
         var exponential = BaseDelay * Math.Pow(2, attempt);
-
-        // Jitter: up to 1 second of random offset to avoid thundering herd
         var jitter = TimeSpan.FromMilliseconds(Random.Shared.NextDouble() * 1000);
+
+        if (ex?.Detail?.ErrorDetails?.TryGetValue("Retry-After", out var retryAfterObj) == true)
+        {
+            TimeSpan retryAfter;
+            if (retryAfterObj is TimeSpan ts)
+                retryAfter = ts;
+            else if (retryAfterObj is int seconds)
+                retryAfter = TimeSpan.FromSeconds(seconds);
+            else if (int.TryParse(retryAfterObj?.ToString(), out var s))
+                retryAfter = TimeSpan.FromSeconds(s);
+            else
+                retryAfter = TimeSpan.Zero;
+
+            // Use Retry-After as floor; exponential is the minimum we'll wait regardless
+            return TimeSpan.FromTicks(Math.Max(exponential.Ticks, retryAfter.Ticks)) + jitter;
+        }
 
         return exponential + jitter;
     }
