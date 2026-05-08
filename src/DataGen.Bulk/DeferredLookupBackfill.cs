@@ -17,7 +17,6 @@ public class DeferredLookupBackfill
     private readonly IOrganizationServiceAsync2 _service;
     private readonly ThrottlePolicy _throttlePolicy;
     private readonly ILogger<DeferredLookupBackfill> _logger;
-    private const int MaxRetries = 3;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeferredLookupBackfill"/> class.
@@ -43,6 +42,7 @@ public class DeferredLookupBackfill
     /// <param name="pool">The record pool containing IDs of all created records.</param>
     /// <param name="batchSize">Number of updates per ExecuteMultiple batch.</param>
     /// <param name="seed">RNG seed for deterministic target selection. Should match the generation seed.</param>
+    /// <param name="maxRetries">Maximum number of retry attempts for throttle faults.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> BackfillLookupsAsync(
@@ -50,6 +50,7 @@ public class DeferredLookupBackfill
         DataverseRecordPool pool,
         int batchSize,
         int seed = 42,
+        int maxRetries = 3,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(graph);
@@ -102,7 +103,7 @@ public class DeferredLookupBackfill
             }).ToList();
 
             // Submit in batches via ExecuteMultiple
-            var batchErrors = await SubmitUpdateBatchesAsync(sourceEntity, updates, batchSize, ct).ConfigureAwait(false);
+            var batchErrors = await SubmitUpdateBatchesAsync(sourceEntity, updates, batchSize, maxRetries, ct).ConfigureAwait(false);
             errors.AddRange(batchErrors);
         }
 
@@ -118,6 +119,7 @@ public class DeferredLookupBackfill
     /// <param name="pool">The record pool containing IDs of all created records.</param>
     /// <param name="batchSize">Number of associations per ExecuteMultiple batch.</param>
     /// <param name="seed">RNG seed for deterministic association selection. Should match the generation seed.</param>
+    /// <param name="maxRetries">Maximum number of retry attempts for throttle faults.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> AssociateManyToManyAsync(
@@ -125,6 +127,7 @@ public class DeferredLookupBackfill
         DataverseRecordPool pool,
         int batchSize,
         int seed = 42,
+        int maxRetries = 3,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(graph);
@@ -175,7 +178,7 @@ public class DeferredLookupBackfill
                 }).ToList();
 
                 var batchErrors = await SubmitOrganizationRequestBatchesAsync(
-                    $"{rel.SchemaName} (N:N)", requests, batchSize, ct).ConfigureAwait(false);
+                    $"{rel.SchemaName} (N:N)", requests, batchSize, maxRetries, ct).ConfigureAwait(false);
                 errors.AddRange(batchErrors);
             }
         }
@@ -188,16 +191,18 @@ public class DeferredLookupBackfill
         string entityName,
         List<Entity> updates,
         int batchSize,
+        int maxRetries,
         CancellationToken ct)
     {
         var requests = updates.Select(e => (OrganizationRequest)new UpdateRequest { Target = e }).ToList();
-        return await SubmitOrganizationRequestBatchesAsync(entityName, requests, batchSize, ct).ConfigureAwait(false);
+        return await SubmitOrganizationRequestBatchesAsync(entityName, requests, batchSize, maxRetries, ct).ConfigureAwait(false);
     }
 
     private async Task<List<BatchError>> SubmitOrganizationRequestBatchesAsync(
         string context,
         List<OrganizationRequest> requests,
         int batchSize,
+        int maxRetries,
         CancellationToken ct)
     {
         var errors = new List<BatchError>();
@@ -225,7 +230,7 @@ public class DeferredLookupBackfill
                 var response = await _throttlePolicy.ExecuteAsync(
                     async () => (ExecuteMultipleResponse)await _service
                         .ExecuteAsync(execMulti, ct).ConfigureAwait(false),
-                    context, MaxRetries, ct).ConfigureAwait(false);
+                    context, maxRetries, ct).ConfigureAwait(false);
 
                 if (response.IsFaulted)
                 {
