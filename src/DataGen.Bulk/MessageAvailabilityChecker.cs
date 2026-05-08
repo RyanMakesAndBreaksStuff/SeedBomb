@@ -40,9 +40,10 @@ public class MessageAvailabilityChecker
     /// Result is cached for the lifetime of this instance.
     /// </summary>
     /// <param name="entityLogicalName">The entity logical name to check.</param>
+    /// <param name="objectTypeCode">The integer ObjectTypeCode for the entity (from <c>EntityMetadata.ObjectTypeCode</c>).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if CreateMultiple is supported; false if ExecuteMultiple fallback should be used.</returns>
-    public async Task<bool> IsCreateMultipleAvailableAsync(string entityLogicalName, CancellationToken ct = default)
+    public async Task<bool> IsCreateMultipleAvailableAsync(string entityLogicalName, int objectTypeCode, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entityLogicalName);
 
@@ -52,14 +53,14 @@ public class MessageAvailabilityChecker
             return cached;
         }
 
-        var available = await QueryCreateMultipleSupportAsync(entityLogicalName, ct).ConfigureAwait(false);
+        var available = await QueryCreateMultipleSupportAsync(entityLogicalName, objectTypeCode, ct).ConfigureAwait(false);
         _cache[entityLogicalName] = available;
 
         _logger.LogInformation("CreateMultiple availability for {Entity}: {Available}", entityLogicalName, available);
         return available;
     }
 
-    private async Task<bool> QueryCreateMultipleSupportAsync(string entityLogicalName, CancellationToken ct)
+    private async Task<bool> QueryCreateMultipleSupportAsync(string entityLogicalName, int objectTypeCode, CancellationToken ct)
     {
         try
         {
@@ -74,7 +75,7 @@ public class MessageAvailabilityChecker
                         new ConditionExpression(
                             "primaryobjecttypecode",
                             ConditionOperator.Equal,
-                            entityLogicalName)
+                            objectTypeCode)
                     }
                 }
             };

@@ -21,7 +21,7 @@ public class MessageAvailabilityCheckerTests
             MakeServiceMock(hasRecords: true).Object,
             NullLogger<MessageAvailabilityChecker>.Instance);
 
-        var result = await checker.IsCreateMultipleAvailableAsync("new_widget");
+        var result = await checker.IsCreateMultipleAvailableAsync("new_widget", objectTypeCode: 1);
 
         Assert.True(result);
     }
@@ -33,7 +33,7 @@ public class MessageAvailabilityCheckerTests
             MakeServiceMock(hasRecords: false).Object,
             NullLogger<MessageAvailabilityChecker>.Instance);
 
-        var result = await checker.IsCreateMultipleAvailableAsync("account");
+        var result = await checker.IsCreateMultipleAvailableAsync("account", objectTypeCode: 1);
 
         Assert.False(result);
     }
@@ -46,8 +46,8 @@ public class MessageAvailabilityCheckerTests
             mock.Object,
             NullLogger<MessageAvailabilityChecker>.Instance);
 
-        await checker.IsCreateMultipleAvailableAsync("new_widget");
-        await checker.IsCreateMultipleAvailableAsync("new_widget");
+        await checker.IsCreateMultipleAvailableAsync("new_widget", objectTypeCode: 1);
+        await checker.IsCreateMultipleAvailableAsync("new_widget", objectTypeCode: 1);
 
         // Service should only be called once (result is cached)
         mock.Verify(s => s.RetrieveMultipleAsync(
@@ -65,7 +65,7 @@ public class MessageAvailabilityCheckerTests
             mock.Object,
             NullLogger<MessageAvailabilityChecker>.Instance);
 
-        var result = await checker.IsCreateMultipleAvailableAsync("account");
+        var result = await checker.IsCreateMultipleAvailableAsync("account", objectTypeCode: 1);
 
         Assert.False(result); // Falls back to ExecuteMultiple-safe default
     }
@@ -78,6 +78,27 @@ public class MessageAvailabilityCheckerTests
             NullLogger<MessageAvailabilityChecker>.Instance);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            checker.IsCreateMultipleAvailableAsync(null!));
+            checker.IsCreateMultipleAvailableAsync(null!, objectTypeCode: 0));
+    }
+
+    [Fact]
+    public async Task IsCreateMultipleAvailableAsync_UsesOtcIntegerInCondition()
+    {
+        QueryExpression? capturedQuery = null;
+        var mock = new Mock<IOrganizationServiceAsync2>();
+        mock.Setup(s => s.RetrieveMultipleAsync(It.IsAny<QueryBase>(), It.IsAny<CancellationToken>()))
+            .Callback<QueryBase, CancellationToken>((q, _) => capturedQuery = (QueryExpression)q)
+            .ReturnsAsync(new EntityCollection());
+
+        var checker = new MessageAvailabilityChecker(
+            mock.Object,
+            NullLogger<MessageAvailabilityChecker>.Instance);
+
+        await checker.IsCreateMultipleAvailableAsync("account", objectTypeCode: 1, CancellationToken.None);
+
+        Assert.NotNull(capturedQuery);
+        var cond = capturedQuery.Criteria.Conditions[0];
+        Assert.Equal("primaryobjecttypecode", cond.AttributeName);
+        Assert.Equal(1, cond.Values[0]); // Must be integer 1, not string "account"
     }
 }
