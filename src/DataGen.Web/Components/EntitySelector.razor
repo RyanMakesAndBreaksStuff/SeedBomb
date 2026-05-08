@@ -50,9 +50,16 @@ else
     }
 
     private bool _disposed;
+    private CancellationTokenSource? _loadCts;
 
     /// <inheritdoc />
-    public void Dispose() => _disposed = true;
+    public void Dispose()
+    {
+        _disposed = true;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = null;
+    }
 
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -63,13 +70,21 @@ else
 
     private async Task LoadEntitiesAsync()
     {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+
         _loading = true;
         _loadError = null;
         if (!_disposed) await InvokeAsync(StateHasChanged);
 
         try
         {
-            _entities = await MetadataProvider.ListUserEntitiesAsync();
+            _entities = await MetadataProvider.ListUserEntitiesAsync(_loadCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogDebug("Entity list load cancelled (component disposed).");
         }
         catch (Exception ex)
         {

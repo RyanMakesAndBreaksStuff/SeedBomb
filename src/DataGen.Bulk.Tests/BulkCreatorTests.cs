@@ -27,6 +27,7 @@ public class BulkCreatorTests
         var topologicalSort = new TopologicalSort(NullLogger<TopologicalSort>.Instance);
         var deferredBackfill = new DeferredLookupBackfill(
             serviceMock.Object,
+            new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             NullLogger<DeferredLookupBackfill>.Instance);
 
         var sut = new BulkCreator(
@@ -196,7 +197,7 @@ public class BulkCreatorTests
             new MessageAvailabilityChecker(new Mock<IOrganizationServiceAsync2>().Object, NullLogger<MessageAvailabilityChecker>.Instance),
             new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             new TopologicalSort(NullLogger<TopologicalSort>.Instance),
-            new DeferredLookupBackfill(new Mock<IOrganizationServiceAsync2>().Object, NullLogger<DeferredLookupBackfill>.Instance),
+            new DeferredLookupBackfill(new Mock<IOrganizationServiceAsync2>().Object, new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance), NullLogger<DeferredLookupBackfill>.Instance),
             NullLogger<BulkCreator>.Instance));
     }
 
@@ -212,7 +213,7 @@ public class BulkCreatorTests
             new MessageAvailabilityChecker(serviceMock.Object, NullLogger<MessageAvailabilityChecker>.Instance),
             new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             new TopologicalSort(NullLogger<TopologicalSort>.Instance),
-            new DeferredLookupBackfill(serviceMock.Object, NullLogger<DeferredLookupBackfill>.Instance),
+            new DeferredLookupBackfill(serviceMock.Object, new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance), NullLogger<DeferredLookupBackfill>.Instance),
             null!));
     }
 

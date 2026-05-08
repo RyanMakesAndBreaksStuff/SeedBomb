@@ -43,57 +43,32 @@ builder.Services.AddMemoryCache();
 // DataverseServiceClientFactory — scoped per Blazor circuit
 builder.Services.AddScoped<IServiceClientFactory, DataverseServiceClientFactory>();
 
-// DataverseMetadataProvider needs a ServiceClient — resolve via IServiceClientFactory.
-// Task.Run() escapes the RendererSynchronizationContext so the blocking GetAwaiter().GetResult()
-// call cannot deadlock even if CreateAsync ever gains real async work.
-builder.Services.AddScoped<IMetadataProvider>(sp =>
+// One ServiceClient per Blazor circuit — shared by all services in the scope.
+// Task.Run escapes RendererSynchronizationContext so blocking GetResult cannot deadlock.
+// MaxRetryCount = 0 lets ThrottlePolicy own all retry logic without SDK-level multiplication.
+builder.Services.AddScoped<IOrganizationServiceAsync2>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
     try
     {
         var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-        return ActivatorUtilities.CreateInstance<DataverseMetadataProvider>(sp, client);
+        client.MaxRetryCount = 0;
+        client.RetryPauseTime = TimeSpan.Zero;
+        return (IOrganizationServiceAsync2)client;
     }
     catch (Exception ex)
     {
-        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
-            .LogError(ex, "Failed to create ServiceClient for MetadataProvider. Verify AzureAd config and user secrets.");
+        sp.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("DataverseStartup")
+            .LogError(ex, "Failed to create ServiceClient. Verify AzureAd config and user secrets.");
         throw;
     }
 });
 
-// Services that need IOrganizationServiceAsync2 — ServiceClient implements it
-builder.Services.AddScoped<MessageAvailabilityChecker>(sp =>
-{
-    var factory = sp.GetRequiredService<IServiceClientFactory>();
-    try
-    {
-        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-        return ActivatorUtilities.CreateInstance<MessageAvailabilityChecker>(sp, (IOrganizationServiceAsync2)client);
-    }
-    catch (Exception ex)
-    {
-        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
-            .LogError(ex, "Failed to create ServiceClient for MessageAvailabilityChecker. Verify AzureAd config and user secrets.");
-        throw;
-    }
-});
-
-builder.Services.AddScoped<DeferredLookupBackfill>(sp =>
-{
-    var factory = sp.GetRequiredService<IServiceClientFactory>();
-    try
-    {
-        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-        return ActivatorUtilities.CreateInstance<DeferredLookupBackfill>(sp, (IOrganizationServiceAsync2)client);
-    }
-    catch (Exception ex)
-    {
-        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
-            .LogError(ex, "Failed to create ServiceClient for DeferredLookupBackfill. Verify AzureAd config and user secrets.");
-        throw;
-    }
-});
+// All pipeline services resolve IOrganizationServiceAsync2 from the container.
+builder.Services.AddScoped<IMetadataProvider, DataverseMetadataProvider>();
+builder.Services.AddScoped<MessageAvailabilityChecker>();
+builder.Services.AddScoped<DeferredLookupBackfill>();
 
 // Pure DI — only need ILogger<T> from the container
 builder.Services.AddScoped<GraphBuilder>();
@@ -104,22 +79,7 @@ builder.Services.AddScoped<EdgeCaseValidator>();
 builder.Services.AddScoped<ThrottlePolicy>();
 builder.Services.AddScoped<GenerationService>();
 
-// BulkCreator — needs IOrganizationServiceAsync2 plus all the above scoped services
-builder.Services.AddScoped<IBulkCreator>(sp =>
-{
-    var factory = sp.GetRequiredService<IServiceClientFactory>();
-    try
-    {
-        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-        return ActivatorUtilities.CreateInstance<BulkCreator>(sp, (IOrganizationServiceAsync2)client);
-    }
-    catch (Exception ex)
-    {
-        sp.GetRequiredService<ILoggerFactory>().CreateLogger("DataverseStartup")
-            .LogError(ex, "Failed to create ServiceClient for BulkCreator. Verify AzureAd config and user secrets.");
-        throw;
-    }
-});
+builder.Services.AddScoped<IBulkCreator, BulkCreator>();
 
 // MudBlazor
 builder.Services.AddMudServices();

@@ -16,10 +16,9 @@ internal sealed class DecimalFieldGenerator : IFieldGenerator
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)
     {
         var decMeta = (DecimalAttributeMetadata)metadata;
-        var min = (double)(decMeta.MinValue ?? 0m);
-        var max = (double)(decMeta.MaxValue ?? 10000m);
+        var min = decMeta.MinValue ?? 0m;
+        var max = decMeta.MaxValue ?? 10000m;
         var precision = decMeta.Precision ?? 2;
-
-        return Math.Round(Convert.ToDecimal(faker.Random.Double(min, max)), precision);
+        return Math.Round(faker.Random.Decimal(min, max), precision);
     }
 }

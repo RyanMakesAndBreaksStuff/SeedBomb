@@ -4,15 +4,15 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Dataverse (targets net8.0, forward-compatible with net10.0) -->
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.7" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.7" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.Identity.Web.MicrosoftGraph" Version="4.3.0" />
+    <PackageVersion Include="Microsoft.Identity.Web.MicrosoftGraph" Version="4.9.0" />
     <PackageVersion Include="Microsoft.PowerPlatform.Dataverse.Client" Version="[1.2.10, 2.0.0)" />
     <!-- Identity -->
-    <PackageVersion Include="Microsoft.Identity.Web" Version="4.8.0" />
-    <PackageVersion Include="Microsoft.Identity.Web.UI" Version="[4.5.0, 5.0.0)" />
-    <PackageVersion Include="Microsoft.Identity.Web.Azure" Version="[4.6.0, 5.0.0)" />
+    <PackageVersion Include="Microsoft.Identity.Web" Version="4.9.0" />
+    <PackageVersion Include="Microsoft.Identity.Web.UI" Version="4.9.0" />
+    <PackageVersion Include="Microsoft.Identity.Web.Azure" Version="4.9.0" />
     <PackageVersion Include="Microsoft.Identity.Web.TokenCache" Version="[4.2.0, 5.0.0)" />
     <!-- UI -->
     <PackageVersion Include="MudBlazor" Version="9.4.0" />
@@ -25,7 +25,7 @@
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="bunit" Version="2.7.2" />
     <!-- Caching -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="[10.0.0, 11.0.0)" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
     <!-- In-memory Dataverse simulation engine for integration tests (targets net8.0; runs on net10 via compat) -->
     <PackageVersion Include="XrmMockup365" Version="1.18.0" />
   </ItemGroup>
