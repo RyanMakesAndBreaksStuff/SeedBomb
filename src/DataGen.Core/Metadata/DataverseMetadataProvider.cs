@@ -15,7 +15,7 @@ namespace DataGen.Core.Metadata;
 /// </summary>
 public class DataverseMetadataProvider : IMetadataProvider
 {
-    private readonly ServiceClient _client;
+    private readonly IOrganizationServiceAsync2 _service;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DataverseMetadataProvider> _logger;
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
@@ -23,12 +23,15 @@ public class DataverseMetadataProvider : IMetadataProvider
     /// <summary>
     /// Initializes a new instance of the <see cref="DataverseMetadataProvider"/> class.
     /// </summary>
-    /// <param name="client">The Dataverse ServiceClient instance.</param>
+    /// <param name="service">The Dataverse organization service instance.</param>
     /// <param name="cache">The memory cache for metadata.</param>
     /// <param name="logger">The logger instance.</param>
-    public DataverseMetadataProvider(ServiceClient client, IMemoryCache cache, ILogger<DataverseMetadataProvider> logger)
+    public DataverseMetadataProvider(
+        IOrganizationServiceAsync2 service,
+        IMemoryCache cache,
+        ILogger<DataverseMetadataProvider> logger)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _service = service ?? throw new ArgumentNullException(nameof(service));
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -56,7 +59,7 @@ public class DataverseMetadataProvider : IMetadataProvider
                 RetrieveAsIfPublished = true
             };
 
-            var response = (RetrieveEntityResponse)await _client.ExecuteAsync(request, ct).ConfigureAwait(false);
+            var response = (RetrieveEntityResponse)await _service.ExecuteAsync(request, ct).ConfigureAwait(false);
             var metadata = response.EntityMetadata;
 
             _cache.Set(cacheKey, metadata, CacheDuration);
@@ -70,19 +73,13 @@ public class DataverseMetadataProvider : IMetadataProvider
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<EntityMetadata>> GetEntitiesAsync(string[] logicalNames, CancellationToken ct = default)
+    public async Task<IReadOnlyList<EntityMetadata>> GetEntitiesAsync(
+        string[] logicalNames,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(logicalNames);
-
-        _logger.LogInformation("Retrieving metadata for {EntityCount} entities", logicalNames.Length);
-
-        var results = new List<EntityMetadata>(logicalNames.Length);
-        foreach (var name in logicalNames)
-        {
-            ct.ThrowIfCancellationRequested();
-            results.Add(await GetEntityAsync(name, ct).ConfigureAwait(false));
-        }
-
+        var tasks = logicalNames.Select(name => GetEntityAsync(name, ct));
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
         return results.AsReadOnly();
     }
 
@@ -120,7 +117,7 @@ public class DataverseMetadataProvider : IMetadataProvider
                 }
             };
 
-            var response = (RetrieveMetadataChangesResponse)await _client
+            var response = (RetrieveMetadataChangesResponse)await _service
                 .ExecuteAsync(request, ct).ConfigureAwait(false);
 
             var summaries = response.EntityMetadata
