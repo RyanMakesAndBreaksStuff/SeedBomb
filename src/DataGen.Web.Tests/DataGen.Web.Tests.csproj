@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
@@ -7,9 +7,10 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DataGen.Web/DataGen.Web.csproj" />
+    <PackageReference Include="bunit" />
+    <PackageReference Include="bunit.core" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Moq" />
-    <PackageReference Include="bunit" />
   </ItemGroup>
 </Project>

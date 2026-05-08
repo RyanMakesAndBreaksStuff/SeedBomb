@@ -152,20 +152,22 @@ public class EdgeCaseValidator
             return result;
         }
 
-        // 13. Polymorphic lookups — multiple possible target entities
-        if (attr is LookupAttributeMetadata { Targets.Length: > 1 })
-        {
-            result.RequireSpecialHandling("PolymorphicLookup");
-            _logger.LogDebug("Special handling for {Field}: polymorphic lookup", attr.LogicalName);
-            return result;
-        }
-
-        // 14. Owner-type lookups — always reference systemuser
+        // 13. Owner-type lookups — ownerid is polymorphic (systemuser + team) but Dataverse
+        // auto-defaults it to the calling user, so route it as OwnerLookup before the generic
+        // polymorphic check (which would otherwise shadow it).
         if (attr is LookupAttributeMetadata lookupMeta &&
             string.Equals(lookupMeta.LogicalName, "ownerid", StringComparison.OrdinalIgnoreCase))
         {
             result.RequireSpecialHandling("OwnerLookup");
             _logger.LogDebug("Special handling for {Field}: owner lookup", attr.LogicalName);
+            return result;
+        }
+
+        // 14. Polymorphic lookups — multiple possible target entities
+        if (attr is LookupAttributeMetadata { Targets.Length: > 1 })
+        {
+            result.RequireSpecialHandling("PolymorphicLookup");
+            _logger.LogDebug("Special handling for {Field}: polymorphic lookup", attr.LogicalName);
             return result;
         }
 
