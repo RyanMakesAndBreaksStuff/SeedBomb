@@ -137,12 +137,12 @@ public class BulkCreator : IBulkCreator
         // Phase 2: backfill deferred lookups
         _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
         var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
-            graph, pool, config.BatchSize, config.Seed, ct).ConfigureAwait(false);
+            graph, pool, config.BatchSize, config.Seed, ct: ct).ConfigureAwait(false);
         allErrors.AddRange(backfillErrors);
 
         // Phase 3: N:N associations
         var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
-            graph, pool, config.BatchSize, config.Seed, ct).ConfigureAwait(false);
+            graph, pool, config.BatchSize, config.Seed, ct: ct).ConfigureAwait(false);
         allErrors.AddRange(associateErrors);
 
         var elapsed = DateTimeOffset.UtcNow - runStart;
