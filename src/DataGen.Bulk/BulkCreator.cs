@@ -189,8 +189,21 @@ public class BulkCreator : IBulkCreator
             {
                 var level = attr.RequiredLevel?.Value ?? AttributeRequiredLevel.None;
                 if (level == AttributeRequiredLevel.SystemRequired)
+                {
+                    var validation = _edgeCaseValidator.Validate(attr, meta);
+                    if (validation.Action == FieldAction.SpecialHandling
+                        && validation.HandlingCategory == "OwnerLookup")
+                    {
+                        // ownerid is SystemRequired on every Dataverse table; omit it and let
+                        // Dataverse default to the calling user on insert.
+                        _logger.LogDebug(
+                            "Entity {Entity}: skipping ownerid — Dataverse will default to calling user",
+                            entityName);
+                        continue;
+                    }
                     throw new DataGenerationException(
                         $"Entity '{entityName}': required lookup '{attr.LogicalName}' (SystemRequired) has no generator — cannot create records.");
+                }
                 if (level == AttributeRequiredLevel.ApplicationRequired)
                     _logger.LogWarning(
                         "Entity {Entity}: lookup {Field} is ApplicationRequired but may have no generator",
@@ -216,7 +229,7 @@ public class BulkCreator : IBulkCreator
                     entity[attr.LogicalName!] = value;
             }
 
-            // Special handling attrs that route to generators (DateTime, MultiSelect, PolymorphicLookup, OwnerLookup, RichText, Money)
+            // Special handling attrs that route to generators (DateTime, MultiSelect, PolymorphicLookup, RichText, Money)
             foreach (var attr in specialHandlingAttrs)
             {
                 var value = _generatorFactory.Generate(attr, faker, pool);
@@ -460,7 +473,9 @@ public class BulkCreator : IBulkCreator
                 var result = _edgeCaseValidator.Validate(a, meta);
                 if (result.Action != FieldAction.SpecialHandling) return false;
                 var cat = result.HandlingCategory ?? string.Empty;
-                return cat is "MultiSelect" or "PolymorphicLookup" or "OwnerLookup" or "RichText" or "CurrencyValidation"
+                // OwnerLookup is intentionally excluded — ownerid is omitted from the Create
+                // payload and Dataverse defaults it to the calling user.
+                return cat is "MultiSelect" or "PolymorphicLookup" or "RichText" or "CurrencyValidation"
                        || cat.StartsWith("DateTime_", StringComparison.OrdinalIgnoreCase);
             })
             .ToArray();

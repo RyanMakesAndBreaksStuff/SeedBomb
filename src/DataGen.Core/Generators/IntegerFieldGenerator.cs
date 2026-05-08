@@ -31,10 +31,23 @@ internal sealed class IntegerFieldGenerator : IFieldGenerator
             IntegerFormat.TimeZone => faker.PickRandom(ValidTimezoneCodes),
             // Duration is stored in minutes; keep it a reasonable positive span.
             IntegerFormat.Duration => faker.Random.Int(0, 480),
-            // Some timezone fields report Format=null in metadata but Dataverse still validates against timezonedefinition.
-            _ when intMeta.LogicalName?.EndsWith("utcoffset", StringComparison.OrdinalIgnoreCase) == true
+            // Some timezone fields report Format=null in metadata but Dataverse still validates
+            // against timezonedefinition (e.g. utcconversiontimezonecode on every entity,
+            // address1_utcoffset, etc.).
+            _ when IsTimeZoneCodeAttribute(intMeta.LogicalName)
                 => faker.PickRandom(ValidTimezoneCodes),
+            // timezoneruleversionnumber is an opaque version stamp — Dataverse expects it to be
+            // either a known version or -1; safest is a small non-negative integer.
+            _ when intMeta.LogicalName?.Equals("timezoneruleversionnumber", StringComparison.OrdinalIgnoreCase) == true
+                => 0,
             _ => faker.Random.Int(intMeta.MinValue ?? 0, intMeta.MaxValue ?? 100)
         };
+    }
+
+    private static bool IsTimeZoneCodeAttribute(string? logicalName)
+    {
+        if (string.IsNullOrEmpty(logicalName)) return false;
+        return logicalName.EndsWith("utcoffset", StringComparison.OrdinalIgnoreCase)
+            || logicalName.EndsWith("timezonecode", StringComparison.OrdinalIgnoreCase);
     }
 }

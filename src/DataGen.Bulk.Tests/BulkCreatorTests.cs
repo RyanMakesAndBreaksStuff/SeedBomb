@@ -218,6 +218,105 @@ public class BulkCreatorTests
     }
 
     [Fact]
+    public async Task CreateAsync_OwnerIdSystemRequired_OmitsFromPayloadAndDoesNotThrow()
+    {
+        var (sut, serviceMock) = BuildSut();
+
+        var capturedEntities = new List<Entity>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
+            {
+                if (req is ExecuteMultipleRequest emr)
+                {
+                    var responses = new ExecuteMultipleResponseItemCollection();
+                    for (int i = 0; i < emr.Requests.Count; i++)
+                    {
+                        if (emr.Requests[i] is CreateRequest cr)
+                            capturedEntities.Add(cr.Target);
+                        var createResp = new CreateResponse { Results = { ["id"] = Guid.NewGuid() } };
+                        responses.Add(new ExecuteMultipleResponseItem { RequestIndex = i, Response = createResp });
+                    }
+                    return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+                }
+                return new OrganizationResponse();
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var ownerLookup = new LookupAttributeMetadata
+        {
+            LogicalName = "ownerid",
+            Targets = ["systemuser", "team"]
+        };
+        ownerLookup.GetType().GetProperty("RequiredLevel")!.SetValue(
+            ownerLookup,
+            new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { ownerLookup });
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            BatchSize = 10
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = meta
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Errors);
+        Assert.Single(capturedEntities);
+        Assert.False(capturedEntities[0].Contains("ownerid"),
+            "ownerid must be omitted so Dataverse defaults to the calling user");
+    }
+
+    [Fact]
+    public async Task CreateAsync_NonOwnerIdSystemRequiredLookupWithoutGenerator_StillThrows()
+    {
+        var (sut, _) = BuildSut();
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var customLookup = new LookupAttributeMetadata
+        {
+            LogicalName = "new_customrequiredlookupid",
+            Targets = ["contact"]
+        };
+        customLookup.GetType().GetProperty("RequiredLevel")!.SetValue(
+            customLookup,
+            new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { customLookup });
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            BatchSize = 10
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = meta
+        };
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            sut.CreateAsync(config, metadata, graph));
+        Assert.Contains("SystemRequired", ex.Message);
+        Assert.Contains("new_customrequiredlookupid", ex.Message);
+    }
+
+    [Fact]
     public async Task CreateAsync_EmptyConfig_ReturnsNonNegativeElapsedTime()
     {
         var (sut, _) = BuildSut();
