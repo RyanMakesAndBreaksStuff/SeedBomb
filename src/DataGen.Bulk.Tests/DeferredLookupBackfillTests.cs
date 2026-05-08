@@ -1,5 +1,6 @@
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
+using System.ServiceModel;
 
 namespace DataGen.Bulk.Tests;
 
@@ -36,7 +37,10 @@ public class DeferredLookupBackfillTests
     }
 
     private static DeferredLookupBackfill BuildSut(IOrganizationServiceAsync2 service) =>
-        new DeferredLookupBackfill(service, NullLogger<DeferredLookupBackfill>.Instance);
+        new DeferredLookupBackfill(
+            service,
+            new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
+            NullLogger<DeferredLookupBackfill>.Instance);
 
     // ─── constructor guard tests ──────────────────────────────────────────────
 
@@ -44,7 +48,10 @@ public class DeferredLookupBackfillTests
     public void Constructor_NullService_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new DeferredLookupBackfill(null!, NullLogger<DeferredLookupBackfill>.Instance));
+            new DeferredLookupBackfill(
+                null!,
+                new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
+                NullLogger<DeferredLookupBackfill>.Instance));
     }
 
     [Fact]
@@ -52,7 +59,18 @@ public class DeferredLookupBackfillTests
     {
         var mock = new Mock<IOrganizationServiceAsync2>();
         Assert.Throws<ArgumentNullException>(() =>
-            new DeferredLookupBackfill(mock.Object, null!));
+            new DeferredLookupBackfill(
+                mock.Object,
+                new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
+                null!));
+    }
+
+    [Fact]
+    public void Constructor_NullThrottlePolicy_ThrowsArgumentNullException()
+    {
+        var mock = new Mock<IOrganizationServiceAsync2>();
+        Assert.Throws<ArgumentNullException>(() =>
+            new DeferredLookupBackfill(mock.Object, null!, NullLogger<DeferredLookupBackfill>.Instance));
     }
 
     // ─── BackfillLookupsAsync – null guards ───────────────────────────────────
@@ -319,8 +337,49 @@ public class DeferredLookupBackfillTests
         var errors = await sut.BackfillLookupsAsync(graph, pool, batchSize: 50);
 
         Assert.Single(errors);
-        Assert.Equal("test error", errors[0].ErrorMessage);
+        Assert.Contains("test error", errors[0].ErrorMessage);
         Assert.Null(errors[0].FaultCode);
+    }
+
+    [Fact]
+    public async Task BackfillLookupsAsync_ThrottleOnFirstAttempt_RetriesAndSucceeds()
+    {
+        int callCount = 0;
+        var throttleFault = new FaultException<OrganizationServiceFault>(
+            new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Throttled" }, "Throttled");
+
+        var mock = new Mock<IOrganizationServiceAsync2>();
+        mock.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (Interlocked.Increment(ref callCount) == 1) throw throttleFault;
+                return Task.FromResult<OrganizationResponse>(new ExecuteMultipleResponse
+                {
+                    Results = new ParameterCollection
+                    {
+                        ["Responses"] = new ExecuteMultipleResponseItemCollection()
+                    }
+                });
+            });
+
+        var sut = new DeferredLookupBackfill(
+            mock.Object,
+            new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
+            NullLogger<DeferredLookupBackfill>.Instance);
+
+        var graph = new DependencyGraph();
+        graph.AddNode("contact");
+        graph.AddNode("account");
+        graph.DeferEdge("contact", new DeferredLookup("contact", "parentcustomerid", ["account"]));
+
+        var pool = new DataverseRecordPool();
+        pool.Add("contact", [Guid.NewGuid()]);
+        pool.Add("account", [Guid.NewGuid()]);
+
+        var errors = await sut.BackfillLookupsAsync(graph, pool, batchSize: 50);
+
+        Assert.Empty(errors);
+        Assert.Equal(2, callCount);
     }
 
     // ─── BackfillLookupsAsync – batching ─────────────────────────────────────
