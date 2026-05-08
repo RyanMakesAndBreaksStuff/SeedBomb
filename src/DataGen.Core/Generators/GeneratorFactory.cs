@@ -62,11 +62,18 @@ public class GeneratorFactory
         ArgumentNullException.ThrowIfNull(pool);
 
         var type = attr.GetType();
-        if (_generators.TryGetValue(type, out var generator))
+
+        // Walk inheritance chain to handle SDK subtype metadata (e.g. CustomerAttributeMetadata → LookupAttributeMetadata)
+        var current = type;
+        while (current != null && current != typeof(object))
         {
-            _logger.LogDebug("Generating value for {FieldName} using {GeneratorType}",
-                attr.LogicalName, generator.GetType().Name);
-            return generator.Generate(attr, faker, pool);
+            if (_generators.TryGetValue(current, out var generator))
+            {
+                _logger.LogDebug("Generating value for {FieldName} using {GeneratorType} (matched via {MatchedType})",
+                    attr.LogicalName, generator.GetType().Name, current.Name);
+                return generator.Generate(attr, faker, pool);
+            }
+            current = current.BaseType;
         }
 
         _logger.LogDebug("No generator registered for {AttributeType}, skipping {FieldName}",
