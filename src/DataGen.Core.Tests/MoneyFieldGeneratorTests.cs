@@ -40,4 +40,21 @@ public class MoneyFieldGeneratorTests
         var result = _gen.Generate(attr, _faker, _pool);
         Assert.IsType<Money>(result);
     }
+
+    [Fact]
+    public void Generate_NoPrecisionLossViaDoubleIntermediate()
+    {
+        var attr = new MoneyAttributeMetadata
+        {
+            LogicalName = "price",
+            MinValue = 0.01,
+            MaxValue = 0.99,
+            Precision = 2
+        };
+        var result = (Money)_gen.Generate(attr, _faker, _pool)!;
+        Assert.True(result.Value >= 0.01m && result.Value <= 0.99m,
+            $"Value {result.Value} outside [0.01, 0.99]");
+        var scale = (decimal.GetBits(result.Value)[3] >> 16) & 0xFF;
+        Assert.True(scale <= 2, $"Decimal scale {scale} exceeds precision 2");
+    }
 }
