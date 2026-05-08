@@ -201,7 +201,6 @@
     private int _batchSize = 500;
     private int? _maxParallelism;
 
-    private readonly string _sessionId = Guid.NewGuid().ToString("N");
     private bool _disposed;
 
     /// <inheritdoc />
@@ -252,7 +251,7 @@
 
         try
         {
-            _result = await GenerationService.GenerateAsync(config, _sessionId, progress, _cts.Token);
+            _result = await GenerationService.GenerateAsync(config, progress, _cts.Token);
             Snackbar.Add($"Created {_result.TotalRecords:N0} records", Severity.Success);
         }
         catch (OperationCanceledException)
