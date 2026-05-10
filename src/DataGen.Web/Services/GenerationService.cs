@@ -2,15 +2,12 @@ using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
-using DataGen.Web.Hubs;
-using Microsoft.AspNetCore.SignalR;
 
 namespace DataGen.Web.Services;
 
 /// <summary>
 /// Orchestrates the full generation pipeline: schema inspection → dependency resolution → bulk creation.
-/// Progress is reported via an <see cref="IProgress{T}"/> callback (for Blazor circuit updates)
-/// and pushed to SignalR group <c>sessionId</c> (for external observers).
+/// Progress is reported via an <see cref="IProgress{T}"/> callback for Blazor circuit updates.
 /// </summary>
 public sealed class GenerationService
 {
@@ -19,7 +16,6 @@ public sealed class GenerationService
     private readonly CycleDetector _cycleDetector;
     private readonly TopologicalSort _topoSort;
     private readonly IBulkCreator _bulkCreator;
-    private readonly IHubContext<ProgressHub> _progressHub;
     private readonly ILogger<GenerationService> _logger;
 
     /// <summary>Initializes a new instance of <see cref="GenerationService"/>.</summary>
@@ -29,7 +25,6 @@ public sealed class GenerationService
         CycleDetector cycleDetector,
         TopologicalSort topoSort,
         IBulkCreator bulkCreator,
-        IHubContext<ProgressHub> progressHub,
         ILogger<GenerationService> logger)
     {
         _metadata = metadata;
@@ -37,7 +32,6 @@ public sealed class GenerationService
         _cycleDetector = cycleDetector;
         _topoSort = topoSort;
         _bulkCreator = bulkCreator;
-        _progressHub = progressHub;
         _logger = logger;
     }
 
@@ -45,13 +39,11 @@ public sealed class GenerationService
     /// Runs the full generation pipeline for the specified <paramref name="config"/>.
     /// </summary>
     /// <param name="config">Entity selection, record counts, seed, and batch settings.</param>
-    /// <param name="sessionId">SignalR group name for push notifications to external observers.</param>
-    /// <param name="uiProgress">Optional callback invoked on each batch completion for Blazor UI updates.</param>
+    /// <param name="uiProgress">Optional callback invoked on each phase/batch completion for Blazor UI updates.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Generation result containing created record IDs, elapsed time, and any batch errors.</returns>
     public async Task<GenerationResult> GenerateAsync(
         GenerationConfig config,
-        string sessionId,
         IProgress<ProgressUpdate>? uiProgress = null,
         CancellationToken ct = default)
     {
@@ -59,12 +51,12 @@ public sealed class GenerationService
 
         try
         {
-            await PushPhaseAsync(sessionId, uiProgress, "Inspecting schema", ct);
+            uiProgress?.Report(new ProgressUpdate("Inspecting schema", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
 
             var metadataList = await _metadata.GetEntitiesAsync(config.EntityLogicalNames, ct);
             var metadataDict = metadataList.ToDictionary(e => e.LogicalName);
 
-            await PushPhaseAsync(sessionId, uiProgress, "Resolving dependencies", ct);
+            uiProgress?.Report(new ProgressUpdate("Resolving dependencies", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
 
             var graph = _graphBuilder.Build(metadataDict);
             var cycles = _cycleDetector.FindStronglyConnectedComponents(graph);
@@ -74,11 +66,11 @@ public sealed class GenerationService
                 _cycleDetector.BreakCycles(graph, cycles, metadataDict);
             }
 
-            await PushPhaseAsync(sessionId, uiProgress, "Generating records", ct);
+            uiProgress?.Report(new ProgressUpdate("Generating records", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
 
             var bulkProgress = new Progress<BulkCreationProgress>(p =>
             {
-                var update = new ProgressUpdate(
+                uiProgress?.Report(new ProgressUpdate(
                     Phase: "Generating",
                     EntityName: p.EntityLogicalName,
                     RecordsCreated: p.RecordsCreated,
@@ -86,10 +78,7 @@ public sealed class GenerationService
                     BatchesCompleted: p.BatchIndex,
                     TotalBatches: p.TotalBatches,
                     RecordsPerMinute: p.RecordsPerMinute,
-                    Elapsed: sw.Elapsed);
-
-                uiProgress?.Report(update);
-                PushToGroup(sessionId, HubMethods.OnProgress, update);
+                    Elapsed: sw.Elapsed));
             });
 
             var result = await _bulkCreator.CreateAsync(config, metadataDict, graph, bulkProgress, ct);
@@ -99,46 +88,17 @@ public sealed class GenerationService
                 result.TotalRecords,
                 sw.Elapsed);
 
-            PushToGroup(sessionId, HubMethods.OnComplete, result.TotalRecords);
-
             return result;
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Generation cancelled for session {SessionId}", sessionId);
+            _logger.LogInformation("Generation cancelled");
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Generation failed for session {SessionId}", sessionId);
-            PushToGroup(sessionId, HubMethods.OnError, ex.ToString());
+            _logger.LogError(ex, "Generation failed");
             throw;
         }
-    }
-
-    private async Task PushPhaseAsync(
-        string sessionId,
-        IProgress<ProgressUpdate>? uiProgress,
-        string phase,
-        CancellationToken ct)
-    {
-        var update = new ProgressUpdate(phase, string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero);
-        uiProgress?.Report(update);
-        try
-        {
-            await _progressHub.Clients.Group(sessionId).SendAsync(HubMethods.OnPhaseChange, phase, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "SignalR phase push failed for session {SessionId}", sessionId);
-        }
-    }
-
-    private void PushToGroup(string sessionId, string method, object? arg = null)
-    {
-        _ = _progressHub.Clients.Group(sessionId).SendAsync(method, arg)
-            .ContinueWith(
-                t => _logger.LogWarning(t.Exception, "SignalR push failed for session {SessionId} method {Method}", sessionId, method),
-                TaskContinuationOptions.OnlyOnFaulted);
     }
 }

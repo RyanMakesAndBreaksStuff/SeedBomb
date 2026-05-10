@@ -10,6 +10,7 @@ using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
+using Microsoft.Xrm.Sdk.Query;
 using System.ServiceModel;
 
 namespace DataGen.Bulk;
@@ -70,13 +71,17 @@ public class BulkCreator : IBulkCreator
         ArgumentNullException.ThrowIfNull(entityMetadata);
         ArgumentNullException.ThrowIfNull(graph);
 
+        var pool = new DataverseRecordPool();
+        await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
         EnsureThreadPoolTuned();
 
         var sortedEntities = _topologicalSort.Sort(graph);
-        var pool = new DataverseRecordPool();
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
         var allErrors = new List<BatchError>();
         var runStart = DateTimeOffset.UtcNow;
+
+        // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
+        var effectiveDop = config.MaxParallelism ?? 8;
 
         _logger.LogInformation(
             "Starting bulk creation for {EntityCount} entities.",
@@ -104,7 +109,7 @@ public class BulkCreator : IBulkCreator
                 recordCount, entityName);
 
             var (createdIds, errors) = await CreateEntityRecordsAsync(
-                entityName, meta, entityIndex, recordCount, config, pool, progress, ct).ConfigureAwait(false);
+                entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, progress, ct).ConfigureAwait(false);
 
             pool.Add(entityName, createdIds);
             allCreatedRecords[entityName] = createdIds.AsReadOnly();
@@ -113,6 +118,20 @@ public class BulkCreator : IBulkCreator
             _logger.LogInformation(
                 "Completed {Entity}: {Created}/{Requested} records created.",
                 entityName, createdIds.Count, recordCount);
+
+            // After first entity, read server-recommended DOP if no user override
+            if (entityIndex == 0 && config.MaxParallelism is null &&
+                _service is ServiceClient sc)
+            {
+                var hint = sc.RecommendedDegreesOfParallelism;
+                if (hint > 0)
+                {
+                    effectiveDop = hint;
+                    _logger.LogInformation(
+                        "DOP updated to {Dop} from ServiceClient.RecommendedDegreesOfParallelism",
+                        effectiveDop);
+                }
+            }
         }
 
         // Phase 2: backfill deferred lookups
@@ -145,6 +164,7 @@ public class BulkCreator : IBulkCreator
         int entityIndex,
         int recordCount,
         GenerationConfig config,
+        int effectiveDop,
         DataverseRecordPool pool,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
@@ -152,6 +172,8 @@ public class BulkCreator : IBulkCreator
         // Sequential Bogus generation — single Faker instance, no sharing across threads
         var attributesToGenerate = GetGeneratableAttributes(meta);
         var alternateKeyAttrs = GetAlternateKeyAttributes(meta);
+        var specialHandlingAttrs = GetRoutableSpecialHandlingAttributes(meta);
+        var hasMoney = specialHandlingAttrs.Any(a => a is MoneyAttributeMetadata);
         var faker = DeterministicFaker.Create(config.Seed, entityIndex);
         var entities = new List<Entity>(recordCount);
 
@@ -164,6 +186,25 @@ public class BulkCreator : IBulkCreator
                 if (value is not null)
                     entity[attr.LogicalName!] = value;
             }
+
+            // Special handling attrs that route to generators (DateTime, MultiSelect, PolymorphicLookup, OwnerLookup, RichText, Money)
+            foreach (var attr in specialHandlingAttrs)
+            {
+                var value = _generatorFactory.Generate(attr, faker, pool);
+                if (value is not null)
+                    entity[attr.LogicalName!] = value;
+            }
+
+            // Inject transactioncurrencyid for entities with money fields
+            if (hasMoney)
+            {
+                var currencyId = pool.GetRandom("transactioncurrency", faker);
+                if (currencyId.HasValue)
+                    entity["transactioncurrencyid"] = new EntityReference("transactioncurrency", currencyId.Value);
+                else
+                    _logger.LogWarning("No transactioncurrency in pool for {Entity} — money fields may be rejected by Dataverse", entityName);
+            }
+
             foreach (var attr in alternateKeyAttrs)
             {
                 entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i);
@@ -173,10 +214,10 @@ public class BulkCreator : IBulkCreator
 
         var batches = entities.Chunk(config.BatchSize).ToArray();
         var useCreateMultiple = await _messageChecker
-            .IsCreateMultipleAvailableAsync(entityName, meta.ObjectTypeCode ?? 0, ct).ConfigureAwait(false);
+            .IsCreateMultipleAvailableAsync(entityName, ct).ConfigureAwait(false);
 
         return await SubmitEntityBatchesAsync(
-            entityName, batches, useCreateMultiple, recordCount, config, progress, ct).ConfigureAwait(false);
+            entityName, batches, useCreateMultiple, recordCount, config, effectiveDop, progress, ct).ConfigureAwait(false);
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitEntityBatchesAsync(
@@ -185,6 +226,7 @@ public class BulkCreator : IBulkCreator
         bool useCreateMultiple,
         int recordCount,
         GenerationConfig config,
+        int effectiveDop,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
@@ -195,7 +237,7 @@ public class BulkCreator : IBulkCreator
 
         var parallelOptions = new ParallelOptions
         {
-            MaxDegreeOfParallelism = config.MaxParallelism ?? Environment.ProcessorCount,
+            MaxDegreeOfParallelism = effectiveDop,
             CancellationToken = ct
         };
 
@@ -209,8 +251,21 @@ public class BulkCreator : IBulkCreator
             async (batchIndex, innerCt) =>
             {
                 var batch = batches[batchIndex];
-                var (batchIds, batchErrors) = await SubmitBatchAsync(
-                    entityName, batch, useCreateMultiple, config.MaxRetries, innerCt).ConfigureAwait(false);
+                List<Guid> batchIds;
+                List<BatchError> batchErrors;
+
+                try
+                {
+                    (batchIds, batchErrors) = await SubmitBatchAsync(
+                        entityName, batch, useCreateMultiple, config.MaxRetries, innerCt).ConfigureAwait(false);
+                }
+                catch (DataGenerationException ex)
+                {
+                    _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
+                        batchIndex + 1, batches.Length, entityName);
+                    batchIds = [];
+                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message, 0)];
+                }
 
                 idBags[batchIndex] = batchIds;
                 errorBags[batchIndex] = batchErrors;
@@ -280,7 +335,7 @@ public class BulkCreator : IBulkCreator
     {
         var request = new CreateMultipleRequest
         {
-            Targets = new EntityCollection(batch.ToList())
+            Targets = new EntityCollection(batch.ToList()) { EntityName = entityName }
         };
 
         var response = (CreateMultipleResponse)await _service.ExecuteAsync(request, ct).ConfigureAwait(false);
@@ -364,6 +419,50 @@ public class BulkCreator : IBulkCreator
                        && result.HandlingCategory == "AlternateKeyUniqueness";
             })
             .ToArray();
+    }
+
+    private AttributeMetadata[] GetRoutableSpecialHandlingAttributes(EntityMetadata meta)
+    {
+        if (meta.Attributes is null) return [];
+
+        return meta.Attributes
+            .Where(FieldFilter.ShouldGenerateField)
+            .Where(a =>
+            {
+                var result = _edgeCaseValidator.Validate(a, meta);
+                if (result.Action != FieldAction.SpecialHandling) return false;
+                var cat = result.HandlingCategory ?? string.Empty;
+                return cat is "MultiSelect" or "PolymorphicLookup" or "OwnerLookup" or "RichText" or "CurrencyValidation"
+                       || cat.StartsWith("DateTime_", StringComparison.OrdinalIgnoreCase);
+            })
+            .ToArray();
+    }
+
+    private async Task PopulateCurrencyPoolAsync(DataverseRecordPool pool, CancellationToken ct)
+    {
+        try
+        {
+            var query = new QueryExpression("transactioncurrency")
+            {
+                ColumnSet = new ColumnSet("transactioncurrencyid"),
+                TopCount = 10
+            };
+            var result = await _service.RetrieveMultipleAsync(query, ct).ConfigureAwait(false);
+            if (result.Entities.Count > 0)
+            {
+                pool.Add("transactioncurrency", result.Entities.Select(e => e.Id));
+                _logger.LogInformation("Loaded {Count} transactioncurrency record(s) into pool",
+                    result.Entities.Count);
+            }
+            else
+            {
+                _logger.LogWarning("No transactioncurrency records found — money fields will be skipped");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to query transactioncurrency pool — money fields may be skipped");
+        }
     }
 
     private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex) =>

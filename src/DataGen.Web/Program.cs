@@ -5,8 +5,8 @@ using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
 using DataGen.Web.Components;
-using DataGen.Web.Hubs;
 using DataGen.Web.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using Microsoft.PowerPlatform.Dataverse.Client;
@@ -37,11 +37,18 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllersWithViews()
     .AddMicrosoftIdentityUI();
 
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
+
 // Memory cache (required by DataverseMetadataProvider)
 builder.Services.AddMemoryCache();
 
-// DataverseServiceClientFactory — scoped per Blazor circuit
-builder.Services.AddScoped<IServiceClientFactory, DataverseServiceClientFactory>();
+// DataverseServiceClientFactory — scoped per Blazor circuit.
+// Register concrete type first so DI tracks it for DisposeAsync on circuit teardown.
+builder.Services.AddScoped<DataverseServiceClientFactory>();
+builder.Services.AddScoped<IServiceClientFactory>(sp => sp.GetRequiredService<DataverseServiceClientFactory>());
 
 // One ServiceClient per Blazor circuit — shared by all services in the scope.
 // Task.Run escapes RendererSynchronizationContext so blocking GetResult cannot deadlock.
@@ -84,9 +91,6 @@ builder.Services.AddScoped<IBulkCreator, BulkCreator>();
 // MudBlazor
 builder.Services.AddMudServices();
 
-// SignalR — 64 KB max message size for ProgressHub payloads
-builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 64 * 1024);
-
 // Blazor Server
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -108,7 +112,6 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapControllers();
-app.MapHub<ProgressHub>("/hubs/progress");
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
