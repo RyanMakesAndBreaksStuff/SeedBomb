@@ -11,12 +11,17 @@ using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using MudBlazor.Services;
+using System.Net;
 
 
 // Warm thread pool before any ServiceClient construction.
-// ServicePointManager.DefaultConnectionLimit is obsolete (SYSLIB0014) on .NET 10 —
-// SocketsHttpHandler manages connection limits per-endpoint instead.
+// See Dataverse guidance on parallel request tuning ("send-parallel-requests").
 ThreadPool.SetMinThreads(100, 100);
+#pragma warning disable SYSLIB0014
+ServicePointManager.DefaultConnectionLimit = 65000;
+ServicePointManager.Expect100Continue = false;
+ServicePointManager.UseNagleAlgorithm = false;
+#pragma warning restore SYSLIB0014
 
 var builder = WebApplication.CreateBuilder(args);
 

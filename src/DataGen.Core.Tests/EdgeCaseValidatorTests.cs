@@ -95,12 +95,11 @@ public class EdgeCaseValidatorTests
 
     // 6. statuscode
     [Fact]
-    public void Validate_StatusCodeField_ReturnsSpecialHandling()
+    public void Validate_StatusCodeField_ReturnsSkip()
     {
         var attr = new StringAttributeMetadata { LogicalName = "statuscode" };
         var result = _validator.Validate(attr, EmptyEntity());
-        Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("StatusCode", result.HandlingCategory);
+        Assert.Equal(FieldAction.Skip, result.Action);
     }
 
     // 7. Picklist with no options

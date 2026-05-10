@@ -7,6 +7,7 @@ using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -30,11 +31,6 @@ public class BulkCreator : IBulkCreator
     private readonly TopologicalSort _topologicalSort;
     private readonly DeferredLookupBackfill _deferredBackfill;
     private readonly ILogger<BulkCreator> _logger;
-
-    private const int MinThreadPoolThreads = 100;
-
-    private static bool _threadPoolTuned;
-    private static readonly object _tuningLock = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BulkCreator"/> class.
@@ -73,7 +69,6 @@ public class BulkCreator : IBulkCreator
 
         var pool = new DataverseRecordPool();
         await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
-        EnsureThreadPoolTuned();
 
         var sortedEntities = _topologicalSort.Sort(graph);
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
@@ -82,6 +77,9 @@ public class BulkCreator : IBulkCreator
 
         // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
         var effectiveDop = config.MaxParallelism ?? 8;
+
+        if (config.RecordCounts.Values.Sum() >= 5000 && config.MaxParallelism is null)
+            await WarmupAndAdoptRecommendedDopAsync(ct).ConfigureAwait(false);
 
         _logger.LogInformation(
             "Starting bulk creation for {EntityCount} entities.",
@@ -119,7 +117,7 @@ public class BulkCreator : IBulkCreator
                 "Completed {Entity}: {Created}/{Requested} records created.",
                 entityName, createdIds.Count, recordCount);
 
-            // After first entity, read server-recommended DOP if no user override
+            // After first entity, re-read server-recommended DOP if no user override
             if (entityIndex == 0 && config.MaxParallelism is null &&
                 _service is ServiceClient sc)
             {
@@ -358,6 +356,13 @@ public class BulkCreator : IBulkCreator
                     entityName);
                 _messageChecker.MarkUnsupported(entityName);
             }
+            catch (DataGenerationException ex) when (ex.InnerException is FaultException<OrganizationServiceFault>)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "CreateMultiple failed for {Entity}; performing single ExecuteMultiple fallback batch.",
+                    entityName);
+            }
         }
 
         return await _throttlePolicy.ExecuteAsync(
@@ -519,16 +524,19 @@ public class BulkCreator : IBulkCreator
     private static string TruncateKey(string value, int maxLength) =>
         value.Length > maxLength ? value[..maxLength] : value;
 
-    private static void EnsureThreadPoolTuned()
+    private async Task WarmupAndAdoptRecommendedDopAsync(CancellationToken ct)
     {
-        if (_threadPoolTuned) return;
-        lock (_tuningLock)
+        try
         {
-            if (_threadPoolTuned) return;
-            // Boost minimum threads to reduce latency ramp-up for burst parallel API calls.
-            // Program.cs sets the same value at startup; this is a safety net for non-web hosts.
-            ThreadPool.SetMinThreads(MinThreadPoolThreads, MinThreadPoolThreads);
-            _threadPoolTuned = true;
+            await _service.ExecuteAsync(new WhoAmIRequest(), ct).ConfigureAwait(false);
+            if (_service is ServiceClient sc && sc.RecommendedDegreesOfParallelism > 0)
+            {
+                _logger.LogInformation("Warmup completed; server recommended DOP is {Dop}", sc.RecommendedDegreesOfParallelism);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Warmup WhoAmI failed; continuing with default DOP.");
         }
     }
 }

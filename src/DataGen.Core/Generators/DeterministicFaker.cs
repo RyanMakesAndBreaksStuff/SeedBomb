@@ -21,6 +21,9 @@ public static class DeterministicFaker
     /// <returns>A seeded Faker instance.</returns>
     public static Faker Create(int baseSeed, int entityIndex)
     {
-        return new Faker { Random = new Randomizer(baseSeed + entityIndex) };
+        // Knuth multiplicative hash (32-bit). Stable across runtimes/machines.
+        // Collision space: 2^32; >65k entity-seed pairs increases collision probability.
+        var mixed = unchecked((int)((uint)baseSeed * 2654435761u) ^ entityIndex);
+        return new Faker { Random = new Randomizer(mixed) };
     }
 }

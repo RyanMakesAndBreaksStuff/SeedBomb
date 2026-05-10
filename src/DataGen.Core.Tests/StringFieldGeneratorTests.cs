@@ -14,6 +14,12 @@ public class StringFieldGeneratorTests
         return (string)_gen.Generate(attr, _faker, _pool)!;
     }
 
+    private string GenerateWithFormat(string fieldName, StringFormatName format, int maxLength = 200)
+    {
+        var attr = new StringAttributeMetadata { LogicalName = fieldName, MaxLength = maxLength, FormatName = format };
+        return (string)_gen.Generate(attr, _faker, _pool)!;
+    }
+
     [Fact]
     public void CanGenerate_StringMetadata_ReturnsTrue()
         => Assert.True(_gen.CanGenerate(new StringAttributeMetadata()));
@@ -82,6 +88,13 @@ public class StringFieldGeneratorTests
     {
         var value = Generate("websiteurl");
         Assert.Matches(@"https?://", value);
+    }
+
+    [Fact]
+    public void Generate_FormatEmail_TakesPriority()
+    {
+        var value = GenerateWithFormat("customtext", StringFormatName.Email);
+        Assert.Contains("@", value);
     }
 
     [Fact]

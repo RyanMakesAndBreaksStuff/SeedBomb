@@ -43,13 +43,26 @@ public class DateTimeFieldGeneratorTests
     }
 
     [Fact]
+    public void Generate_TimeZoneIndependent_ReturnsUnspecifiedKind()
+    {
+        var attr = new DateTimeAttributeMetadata
+        {
+            LogicalName = "scheduledstart",
+            DateTimeBehavior = DateTimeBehavior.TimeZoneIndependent
+        };
+        var result = (DateTime)_gen.Generate(attr, _faker, _pool)!;
+        Assert.Equal(DateTimeKind.Unspecified, result.Kind);
+    }
+
+    [Fact]
     public void Generate_ValueInExpectedRange()
     {
         var attr = new DateTimeAttributeMetadata { LogicalName = "createdon" };
         var result = (DateTime)_gen.Generate(attr, _faker, _pool)!;
 
         var start = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        Assert.True(result >= start && result <= DeterministicFaker.ReferenceDate,
+        var end = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+        Assert.True(result >= start && result <= end,
             $"Date {result} is outside expected range");
     }
 }

@@ -1,6 +1,7 @@
 using Bogus;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
+using System.Collections.Concurrent;
 
 namespace DataGen.Core.Generators;
 
@@ -11,6 +12,7 @@ namespace DataGen.Core.Generators;
 public class GeneratorFactory
 {
     private readonly Dictionary<Type, IFieldGenerator> _generators = new();
+    private readonly ConcurrentDictionary<Type, bool> _typeMatchCache = new();
     private readonly ILogger<GeneratorFactory> _logger;
 
     /// <summary>
@@ -34,7 +36,7 @@ public class GeneratorFactory
         RegisterGenerator<DoubleAttributeMetadata>(new DoubleFieldGenerator());
         RegisterGenerator<MemoAttributeMetadata>(new MemoFieldGenerator());
         RegisterGenerator<UniqueIdentifierAttributeMetadata>(new UniqueIdentifierFieldGenerator());
-        RegisterGenerator<StatusAttributeMetadata>(new StatusFieldGenerator());
+        RegisterGenerator<BigIntAttributeMetadata>(new BigIntFieldGenerator());
     }
 
     /// <summary>
@@ -62,6 +64,12 @@ public class GeneratorFactory
         ArgumentNullException.ThrowIfNull(pool);
 
         var type = attr.GetType();
+        if (_typeMatchCache.TryGetValue(type, out var hasMatch) && !hasMatch)
+        {
+            _logger.LogDebug("No generator registered for {AttributeType}, skipping {FieldName}",
+                type.Name, attr.LogicalName);
+            return null;
+        }
 
         // Walk inheritance chain to handle SDK subtype metadata (e.g. CustomerAttributeMetadata → LookupAttributeMetadata)
         var current = type;
@@ -71,13 +79,16 @@ public class GeneratorFactory
             {
                 _logger.LogDebug("Generating value for {FieldName} using {GeneratorType} (matched via {MatchedType})",
                     attr.LogicalName, generator.GetType().Name, current.Name);
+                _typeMatchCache[type] = true;
                 return generator.Generate(attr, faker, pool);
             }
             current = current.BaseType;
         }
 
-        _logger.LogDebug("No generator registered for {AttributeType}, skipping {FieldName}",
-            type.Name, attr.LogicalName);
+        if (_typeMatchCache.TryAdd(type, false))
+            _logger.LogWarning("No generator registered for {AttributeType}, skipping {FieldName}", type.Name, attr.LogicalName);
+        else
+            _logger.LogDebug("No generator registered for {AttributeType}, skipping {FieldName}", type.Name, attr.LogicalName);
         return null;
     }
 }

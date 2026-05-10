@@ -1,6 +1,8 @@
 using DataGen.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
+using System.IO;
+using System.Net.Http;
 using System.ServiceModel;
 
 namespace DataGen.Bulk;
@@ -75,6 +77,16 @@ public class ThrottlePolicy
                     entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
+            catch (HttpRequestException) when (attempt < maxRetries)
+            {
+                var delay = ComputeDelay(attempt, null);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+            }
+            catch (IOException) when (attempt < maxRetries)
+            {
+                var delay = ComputeDelay(attempt, null);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+            }
             catch (FaultException<OrganizationServiceFault> ex)
             {
                 // Non-throttle fault OR throttle fault on the final attempt — give up
@@ -107,7 +119,8 @@ public class ThrottlePolicy
     private static TimeSpan ComputeDelay(int attempt, FaultException<OrganizationServiceFault>? ex)
     {
         var exponential = BaseDelay * Math.Pow(2, attempt);
-        var jitter = TimeSpan.FromMilliseconds(Random.Shared.NextDouble() * 1000);
+        exponential = TimeSpan.FromSeconds(Math.Min(60, exponential.TotalSeconds));
+        var jitter = TimeSpan.FromMilliseconds((Random.Shared.NextDouble() * 4000) - 2000);
 
         if (ex?.Detail?.ErrorDetails?.TryGetValue("Retry-After", out var retryAfterObj) == true)
         {

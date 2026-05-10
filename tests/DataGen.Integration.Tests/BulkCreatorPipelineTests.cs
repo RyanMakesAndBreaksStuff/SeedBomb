@@ -80,14 +80,15 @@ public class BulkCreatorPipelineTests
     private static BulkCreator MakeBulkCreator(Mock<IOrganizationServiceAsync2> serviceMock)
     {
         var service = serviceMock.Object;
+        var checker = new MessageAvailabilityChecker(service, NullLogger<MessageAvailabilityChecker>.Instance);
         return new BulkCreator(
             service,
             new GeneratorFactory(NullLogger<GeneratorFactory>.Instance),
             new EdgeCaseValidator(NullLogger<EdgeCaseValidator>.Instance),
-            new MessageAvailabilityChecker(service, NullLogger<MessageAvailabilityChecker>.Instance),
+            checker,
             new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             new TopologicalSort(NullLogger<TopologicalSort>.Instance),
-            new DeferredLookupBackfill(service, NullLogger<DeferredLookupBackfill>.Instance),
+            new DeferredLookupBackfill(service, checker, new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance), NullLogger<DeferredLookupBackfill>.Instance),
             NullLogger<BulkCreator>.Instance);
     }
 

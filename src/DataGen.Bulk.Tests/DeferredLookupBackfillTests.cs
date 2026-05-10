@@ -39,6 +39,7 @@ public class DeferredLookupBackfillTests
     private static DeferredLookupBackfill BuildSut(IOrganizationServiceAsync2 service) =>
         new DeferredLookupBackfill(
             service,
+            new MessageAvailabilityChecker(service, NullLogger<MessageAvailabilityChecker>.Instance),
             new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             NullLogger<DeferredLookupBackfill>.Instance);
 
@@ -50,6 +51,7 @@ public class DeferredLookupBackfillTests
         Assert.Throws<ArgumentNullException>(() =>
             new DeferredLookupBackfill(
                 null!,
+                new MessageAvailabilityChecker(new Mock<IOrganizationServiceAsync2>().Object, NullLogger<MessageAvailabilityChecker>.Instance),
                 new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
                 NullLogger<DeferredLookupBackfill>.Instance));
     }
@@ -61,6 +63,7 @@ public class DeferredLookupBackfillTests
         Assert.Throws<ArgumentNullException>(() =>
             new DeferredLookupBackfill(
                 mock.Object,
+                new MessageAvailabilityChecker(mock.Object, NullLogger<MessageAvailabilityChecker>.Instance),
                 new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
                 null!));
     }
@@ -70,7 +73,23 @@ public class DeferredLookupBackfillTests
     {
         var mock = new Mock<IOrganizationServiceAsync2>();
         Assert.Throws<ArgumentNullException>(() =>
-            new DeferredLookupBackfill(mock.Object, null!, NullLogger<DeferredLookupBackfill>.Instance));
+            new DeferredLookupBackfill(
+                mock.Object,
+                new MessageAvailabilityChecker(mock.Object, NullLogger<MessageAvailabilityChecker>.Instance),
+                null!,
+                NullLogger<DeferredLookupBackfill>.Instance));
+    }
+
+    [Fact]
+    public void Constructor_NullMessageChecker_ThrowsArgumentNullException()
+    {
+        var mock = new Mock<IOrganizationServiceAsync2>();
+        Assert.Throws<ArgumentNullException>(() =>
+            new DeferredLookupBackfill(
+                mock.Object,
+                null!,
+                new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
+                NullLogger<DeferredLookupBackfill>.Instance));
     }
 
     // ─── BackfillLookupsAsync – null guards ───────────────────────────────────
@@ -364,6 +383,7 @@ public class DeferredLookupBackfillTests
 
         var sut = new DeferredLookupBackfill(
             mock.Object,
+            new MessageAvailabilityChecker(mock.Object, NullLogger<MessageAvailabilityChecker>.Instance),
             new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             NullLogger<DeferredLookupBackfill>.Instance);
 

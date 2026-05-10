@@ -14,7 +14,7 @@ public class MessageAvailabilityChecker
 {
     private readonly IOrganizationServiceAsync2 _service;
     private readonly ILogger<MessageAvailabilityChecker> _logger;
-    private readonly ConcurrentDictionary<string, bool> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<(string entityLogicalName, string messageName), bool> _cache = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MessageAvailabilityChecker"/> class.
@@ -33,7 +33,7 @@ public class MessageAvailabilityChecker
     /// </summary>
     /// <param name="entityLogicalName">The entity logical name.</param>
     public void MarkUnsupported(string entityLogicalName) =>
-        _cache[entityLogicalName] = false;
+        _cache[(entityLogicalName, "CreateMultiple")] = false;
 
     /// <summary>
     /// Determines whether the <c>CreateMultiple</c> message is supported for the given entity.
@@ -46,20 +46,41 @@ public class MessageAvailabilityChecker
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entityLogicalName);
 
-        if (_cache.TryGetValue(entityLogicalName, out var cached))
+        var cacheKey = (entityLogicalName, "CreateMultiple");
+        if (_cache.TryGetValue(cacheKey, out var cached))
         {
             _logger.LogDebug("Cache hit for CreateMultiple availability: {Entity} = {Available}", entityLogicalName, cached);
             return cached;
         }
 
-        var available = await QueryCreateMultipleSupportAsync(entityLogicalName, ct).ConfigureAwait(false);
-        _cache[entityLogicalName] = available;
+        var available = await QueryMessageSupportAsync(entityLogicalName, "CreateMultiple", ct).ConfigureAwait(false);
+        _cache[cacheKey] = available;
 
         _logger.LogInformation("CreateMultiple availability for {Entity}: {Available}", entityLogicalName, available);
         return available;
     }
 
-    private async Task<bool> QueryCreateMultipleSupportAsync(string entityLogicalName, CancellationToken ct)
+    /// <summary>
+    /// Determines whether the <c>UpdateMultiple</c> message is supported for the given entity.
+    /// Result is cached for the lifetime of this instance.
+    /// </summary>
+    /// <param name="entityLogicalName">The entity logical name to check.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if UpdateMultiple is supported; otherwise false.</returns>
+    public async Task<bool> IsUpdateMultipleAvailableAsync(string entityLogicalName, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entityLogicalName);
+
+        var cacheKey = (entityLogicalName, "UpdateMultiple");
+        if (_cache.TryGetValue(cacheKey, out var cached))
+            return cached;
+
+        var available = await QueryMessageSupportAsync(entityLogicalName, "UpdateMultiple", ct).ConfigureAwait(false);
+        _cache[cacheKey] = available;
+        return available;
+    }
+
+    private async Task<bool> QueryMessageSupportAsync(string entityLogicalName, string messageName, CancellationToken ct)
     {
         try
         {
@@ -80,7 +101,7 @@ public class MessageAvailabilityChecker
             };
 
             var messageLink = query.AddLink("sdkmessage", "sdkmessageid", "sdkmessageid");
-            messageLink.LinkCriteria.AddCondition("name", ConditionOperator.Equal, "CreateMultiple");
+            messageLink.LinkCriteria.AddCondition("name", ConditionOperator.Equal, messageName);
 
             var result = await _service.RetrieveMultipleAsync(query, ct).ConfigureAwait(false);
 
