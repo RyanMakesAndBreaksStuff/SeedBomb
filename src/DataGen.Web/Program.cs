@@ -2,6 +2,7 @@ using DataGen.Bulk;
 using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
+using DataGen.Core.Metadata;
 using DataGen.Web.Components;
 using DataGen.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -83,6 +84,9 @@ builder.Services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsyn
         }
     };
 });
+
+// Lazy IMetadataProvider for EntitySelector — resolves service client on first call
+builder.Services.AddScoped<IMetadataProvider, LazyMetadataProvider>();
 
 // Pure DI — only need ILogger<T> from the container
 builder.Services.AddScoped<GraphBuilder>();
