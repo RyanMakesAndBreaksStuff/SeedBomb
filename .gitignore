@@ -58,3 +58,4 @@ nunit-*.xml
 /src/DataGen.Web/appsettings.json
 /supervisor
 /teamplan.md
+/.claude/settings.local.json
