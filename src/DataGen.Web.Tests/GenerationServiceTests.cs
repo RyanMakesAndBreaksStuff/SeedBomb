@@ -116,4 +116,43 @@ public class GenerationServiceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => sut.GenerateAsync(config, uiProgress: null, ct: cts.Token));
     }
+
+    /// <summary>
+    /// Contract test for A6: GenerationService should expose an async service-client
+    /// resolution path via factory to avoid sync-over-async call chains.
+    /// This test verifies that the async factory is invoked during generation.
+    /// </summary>
+    [Fact]
+    public async Task GenerateAsync_ResolvesServiceClientViaAsyncFactory_WithoutBlockingSyncPath()
+    {
+        // Arrange: mock async factory delegate
+        var asyncFactoryCalled = false;
+        Func<CancellationToken, Task<IOrganizationServiceAsync2>> asyncFactory = async ct =>
+        {
+            asyncFactoryCalled = true;
+            var mockService = new Mock<IOrganizationServiceAsync2>();
+            mockService.Setup(s => s.CreateAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Guid.NewGuid());
+            return mockService.Object;
+        };
+
+        var mockLoggerFactory = new Mock<ILoggerFactory>();
+        var mockLogger = new Mock<ILogger<GenerationService>>();
+        mockLoggerFactory.Setup(lf => lf.CreateLogger(It.IsAny<string>()))
+            .Returns(mockLogger.Object);
+
+        var service = new GenerationService(asyncFactory, mockLoggerFactory.Object, mockLogger.Object);
+
+        // Act
+        var ct = CancellationToken.None;
+        var result = await service.GenerateAsync(
+            orgId: "test-org",
+            entityLogicalName: "account",
+            recordCount: 1,
+            ct: ct);
+
+        // Assert
+        Assert.True(asyncFactoryCalled, "Async factory delegate should have been invoked");
+        Assert.NotNull(result);
+    }
 }
