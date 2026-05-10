@@ -8,7 +8,11 @@ namespace DataGen.Integration.Tests;
 public class ManyToManyAssociationTests
 {
     private static DeferredLookupBackfill MakeBackfill(Mock<IOrganizationServiceAsync2> serviceMock)
-        => new(serviceMock.Object, NullLogger<DeferredLookupBackfill>.Instance);
+    {
+        var checker = new MessageAvailabilityChecker(serviceMock.Object, NullLogger<MessageAvailabilityChecker>.Instance);
+        var throttle = new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance);
+        return new DeferredLookupBackfill(serviceMock.Object, checker, throttle, NullLogger<DeferredLookupBackfill>.Instance);
+    }
 
     private static Mock<IOrganizationServiceAsync2> MakeSuccessfulServiceMock()
     {

@@ -42,12 +42,11 @@ public class GeneratorFactoryTests
     }
 
     [Fact]
-    public void Generate_UnknownAttributeType_ReturnsNull()
+    public void Generate_BigIntAttribute_ReturnsLong()
     {
-        // BigIntAttributeMetadata has no registered generator
         var attr = new BigIntAttributeMetadata { LogicalName = "bigfield" };
         var result = _factory.Generate(attr, _faker, _pool);
-        Assert.Null(result);
+        Assert.IsType<long>(result);
     }
 
     [Fact]

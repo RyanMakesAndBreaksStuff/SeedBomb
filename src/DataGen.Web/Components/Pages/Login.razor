@@ -1,5 +1,6 @@
 @page "/"
 @page "/login"
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @layout LoginLayout
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthState
@@ -52,6 +53,7 @@
 </div>
 
 @code {
+    // Direct /app access bypasses this page by design due to app-level authorization.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;

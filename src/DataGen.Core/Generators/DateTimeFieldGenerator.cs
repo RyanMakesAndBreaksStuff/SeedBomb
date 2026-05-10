@@ -16,14 +16,20 @@ internal sealed class DateTimeFieldGenerator : IFieldGenerator
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)
     {
         var dtMeta = (DateTimeAttributeMetadata)metadata;
-        var start = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var end = DeterministicFaker.ReferenceDate;
+        var start = DateTimeAttributeMetadata.MinSupportedValue > DateTime.MinValue
+            ? DateTimeAttributeMetadata.MinSupportedValue
+            : new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = DateTimeAttributeMetadata.MaxSupportedValue > DateTime.MinValue
+            ? DateTimeAttributeMetadata.MaxSupportedValue
+            : new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
 
         var date = faker.Date.Between(start, end);
 
         // DateOnly behavior strips time component
         if (dtMeta.DateTimeBehavior?.Value == "DateOnly")
             return date.Date;
+        if (dtMeta.DateTimeBehavior?.Value == "TimeZoneIndependent")
+            return DateTime.SpecifyKind(date, DateTimeKind.Unspecified);
 
         return DateTime.SpecifyKind(date, DateTimeKind.Utc);
     }

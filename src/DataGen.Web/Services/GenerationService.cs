@@ -68,8 +68,16 @@ public sealed class GenerationService
 
             uiProgress?.Report(new ProgressUpdate("Generating records", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
 
+            var progressRelayWindow = TimeSpan.FromMilliseconds(100);
+            var lastProgressAt = TimeSpan.Zero;
             var bulkProgress = new Progress<BulkCreationProgress>(p =>
             {
+                var now = sw.Elapsed;
+                var isTerminal = p.BatchIndex == p.TotalBatches;
+                if (!isTerminal && (now - lastProgressAt) < progressRelayWindow)
+                    return;
+                lastProgressAt = now;
+
                 uiProgress?.Report(new ProgressUpdate(
                     Phase: "Generating",
                     EntityName: p.EntityLogicalName,
@@ -78,7 +86,7 @@ public sealed class GenerationService
                     BatchesCompleted: p.BatchIndex,
                     TotalBatches: p.TotalBatches,
                     RecordsPerMinute: p.RecordsPerMinute,
-                    Elapsed: sw.Elapsed));
+                    Elapsed: now));
             });
 
             var result = await _bulkCreator.CreateAsync(config, metadataDict, graph, bulkProgress, ct);

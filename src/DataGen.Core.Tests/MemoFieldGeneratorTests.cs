@@ -26,15 +26,16 @@ public class MemoFieldGeneratorTests
     }
 
     [Fact]
-    public void Generate_RichTextField_ReturnsNull()
+    public void Generate_RichTextField_ReturnsHtmlParagraph()
     {
         var attr = new MemoAttributeMetadata
         {
             LogicalName = "richtext",
             FormatName = MemoFormatName.RichText
         };
-        var result = _gen.Generate(attr, _faker, _pool);
-        Assert.Null(result);
+        var result = (string)_gen.Generate(attr, _faker, _pool)!;
+        Assert.StartsWith("<p>", result);
+        Assert.Contains("</p>", result);
     }
 
     [Fact]

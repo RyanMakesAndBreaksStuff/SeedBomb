@@ -15,6 +15,7 @@ namespace DataGen.Bulk;
 public class DeferredLookupBackfill
 {
     private readonly IOrganizationServiceAsync2 _service;
+    private readonly MessageAvailabilityChecker _messageAvailabilityChecker;
     private readonly ThrottlePolicy _throttlePolicy;
     private readonly ILogger<DeferredLookupBackfill> _logger;
 
@@ -22,14 +23,17 @@ public class DeferredLookupBackfill
     /// Initializes a new instance of the <see cref="DeferredLookupBackfill"/> class.
     /// </summary>
     /// <param name="service">The Dataverse organization service.</param>
+    /// <param name="messageAvailabilityChecker">Message capability checker.</param>
     /// <param name="throttlePolicy">The throttle retry policy.</param>
     /// <param name="logger">The logger instance.</param>
     public DeferredLookupBackfill(
         IOrganizationServiceAsync2 service,
+        MessageAvailabilityChecker messageAvailabilityChecker,
         ThrottlePolicy throttlePolicy,
         ILogger<DeferredLookupBackfill> logger)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _messageAvailabilityChecker = messageAvailabilityChecker ?? throw new ArgumentNullException(nameof(messageAvailabilityChecker));
         _throttlePolicy = throttlePolicy ?? throw new ArgumentNullException(nameof(throttlePolicy));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -102,8 +106,10 @@ public class DeferredLookupBackfill
                 return update;
             }).ToList();
 
-            // Submit in batches via ExecuteMultiple
-            var batchErrors = await SubmitUpdateBatchesAsync(sourceEntity, updates, batchSize, maxRetries, ct).ConfigureAwait(false);
+            var useUpdateMultiple = await _messageAvailabilityChecker.IsUpdateMultipleAvailableAsync(sourceEntity, ct).ConfigureAwait(false);
+            var batchErrors = useUpdateMultiple
+                ? await SubmitUpdateMultipleBatchesAsync(sourceEntity, updates, batchSize, maxRetries, ct).ConfigureAwait(false)
+                : await SubmitUpdateBatchesAsync(sourceEntity, updates, batchSize, maxRetries, ct).ConfigureAwait(false);
             errors.AddRange(batchErrors);
         }
 
@@ -196,6 +202,42 @@ public class DeferredLookupBackfill
     {
         var requests = updates.Select(e => (OrganizationRequest)new UpdateRequest { Target = e }).ToList();
         return await SubmitOrganizationRequestBatchesAsync(entityName, requests, batchSize, maxRetries, ct).ConfigureAwait(false);
+    }
+
+    private async Task<List<BatchError>> SubmitUpdateMultipleBatchesAsync(
+        string entityName,
+        List<Entity> updates,
+        int batchSize,
+        int maxRetries,
+        CancellationToken ct)
+    {
+        var errors = new List<BatchError>();
+        var batches = updates.Chunk(batchSize).ToList();
+
+        for (int i = 0; i < batches.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var request = new UpdateMultipleRequest
+            {
+                Targets = new EntityCollection(batches[i]) { EntityName = entityName }
+            };
+
+            try
+            {
+                await _throttlePolicy.ExecuteAsync(
+                    async () => await _service.ExecuteAsync(request, ct).ConfigureAwait(false),
+                    entityName,
+                    maxRetries,
+                    ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "UpdateMultiple failed for {Entity}; falling back to ExecuteMultiple updates.", entityName);
+                return await SubmitUpdateBatchesAsync(entityName, updates, batchSize, maxRetries, ct).ConfigureAwait(false);
+            }
+        }
+
+        return errors;
     }
 
     private async Task<List<BatchError>> SubmitOrganizationRequestBatchesAsync(

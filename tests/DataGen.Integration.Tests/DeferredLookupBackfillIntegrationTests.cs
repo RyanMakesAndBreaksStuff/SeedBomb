@@ -1,5 +1,6 @@
 using System.ServiceModel;
 using DataGen.Core.Exceptions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Moq;
 
@@ -8,7 +9,11 @@ namespace DataGen.Integration.Tests;
 public class DeferredLookupBackfillIntegrationTests
 {
     private static DeferredLookupBackfill MakeBackfill(Mock<IOrganizationServiceAsync2> serviceMock)
-        => new(serviceMock.Object, NullLogger<DeferredLookupBackfill>.Instance);
+    {
+        var checker = new MessageAvailabilityChecker(serviceMock.Object, NullLogger<MessageAvailabilityChecker>.Instance);
+        var throttle = new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance);
+        return new DeferredLookupBackfill(serviceMock.Object, checker, throttle, NullLogger<DeferredLookupBackfill>.Instance);
+    }
 
     private static Mock<IOrganizationServiceAsync2> MakeSuccessfulServiceMock()
     {

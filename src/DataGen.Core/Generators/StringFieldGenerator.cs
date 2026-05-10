@@ -19,7 +19,14 @@ internal sealed class StringFieldGenerator : IFieldGenerator
         var maxLength = stringMeta.MaxLength ?? 100;
         var name = metadata.LogicalName ?? string.Empty;
 
-        var value = GenerateByFieldName(name, faker);
+        var value = stringMeta.FormatName?.Value switch
+        {
+            "Email" => faker.Internet.Email(),
+            "Url" => faker.Internet.Url(),
+            "Phone" => faker.Phone.PhoneNumber(),
+            "TickerSymbol" => faker.Random.AlphaNumeric(4).ToUpperInvariant(),
+            _ => GenerateByFieldName(name, faker)
+        };
         return Truncate(value, maxLength);
     }
 

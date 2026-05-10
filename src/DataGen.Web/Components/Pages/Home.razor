@@ -1,11 +1,12 @@
 @page "/app"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@implements IDisposable
+@implements IAsyncDisposable
 
 @inject GenerationService GenerationService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject ILogger<Home> Logger
 
 <PageTitle>Dataverse Data Seeder</PageTitle>
 
@@ -199,20 +200,28 @@
     private bool _isGenerating;
     private bool _isCancelling;
     private CancellationTokenSource? _cts;
+    private Task<GenerationResult>? _generationTask;
 
     private int _seed = 42;
     private int _batchSize = 500;
     private int? _maxParallelism;
 
-    private bool _disposed;
-
     /// <inheritdoc />
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        _disposed = true;
         _cts?.Cancel();
+        if (_generationTask is not null)
+        {
+            try
+            {
+                await _generationTask.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken.None);
+            }
+            catch (TimeoutException)
+            {
+                Logger.LogWarning("Generation task did not drain within 10s during disposal; allowing background completion.");
+            }
+        }
         _cts?.Dispose();
-        _cts = null;
     }
 
     private void OnEntitiesChanged(IReadOnlyList<EntitySummary> entities)
@@ -248,24 +257,35 @@
 
         var progress = new Progress<ProgressUpdate>(update =>
         {
-            if (_disposed) return;
-            _progress = update;
-            InvokeAsync(StateHasChanged);
+            InvokeAsync(() =>
+            {
+                _progress = update;
+                StateHasChanged();
+            });
         });
 
         try
         {
-            _result = await GenerationService.GenerateAsync(config, progress, _cts.Token);
+            _generationTask = GenerationService.GenerateAsync(config, progress, _cts.Token);
+            _result = await _generationTask;
             Snackbar.Add($"Created {_result.TotalRecords:N0} records", Severity.Success);
         }
         catch (OperationCanceledException)
         {
             Snackbar.Add("Generation cancelled", Severity.Warning);
         }
-        catch (Microsoft.Identity.Client.MsalUiRequiredException)
+        catch (Microsoft.Identity.Client.MsalUiRequiredException ex)
         {
-            Snackbar.Add("Session expired — please sign in again", Severity.Warning);
-            Navigation.NavigateTo("/MicrosoftIdentity/Account/SignIn", forceLoad: true);
+            var classification = ex.Classification.ToString();
+            if (ex.Classification is Microsoft.Identity.Client.UiRequiredExceptionClassification.BasicAction or Microsoft.Identity.Client.UiRequiredExceptionClassification.AdditionalAction)
+            {
+                Snackbar.Add("Session expired — please sign in again", Severity.Warning);
+                Navigation.NavigateTo("/MicrosoftIdentity/Account/SignIn", forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add($"Generation failed (ref {System.Diagnostics.Activity.Current?.Id ?? "n/a"}; {classification})", Severity.Error);
+            }
         }
         catch (Microsoft.Identity.Web.MicrosoftIdentityWebChallengeUserException)
         {
@@ -274,7 +294,15 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Generation failed: {ex.Message}", Severity.Error);
+            if (ex.GetBaseException() is Microsoft.Identity.Client.MsalUiRequiredException or Microsoft.Identity.Web.MicrosoftIdentityWebChallengeUserException)
+            {
+                Snackbar.Add("Session expired — please sign in again", Severity.Warning);
+                Navigation.NavigateTo("/MicrosoftIdentity/Account/SignIn", forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add($"Generation failed (ref {System.Diagnostics.Activity.Current?.Id ?? "n/a"})", Severity.Error);
+            }
         }
         finally
         {
@@ -282,8 +310,7 @@
             _isCancelling = false;
             _cts?.Dispose();
             _cts = null;
-            if (!_disposed)
-                await InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged);
         }
     }
 
