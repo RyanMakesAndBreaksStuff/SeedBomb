@@ -58,23 +58,26 @@ builder.Services.AddScoped<IServiceClientFactory>(sp => sp.GetRequiredService<Da
 // One ServiceClient per Blazor circuit — shared by all services in the scope.
 // Task.Run escapes RendererSynchronizationContext so blocking GetResult cannot deadlock.
 // MaxRetryCount = 0 lets ThrottlePolicy own all retry logic without SDK-level multiplication.
-builder.Services.AddScoped<IOrganizationServiceAsync2>(sp =>
+builder.Services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsync2>>>(sp =>
 {
     var factory = sp.GetRequiredService<IServiceClientFactory>();
-    try
+    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+    return async ct =>
     {
-        var client = Task.Run(() => factory.CreateAsync()).GetAwaiter().GetResult();
-        client.MaxRetryCount = 0;
-        client.RetryPauseTime = TimeSpan.Zero;
-        return (IOrganizationServiceAsync2)client;
-    }
-    catch (Exception ex)
-    {
-        sp.GetRequiredService<ILoggerFactory>()
-            .CreateLogger("DataverseStartup")
-            .LogError(ex, "Failed to create ServiceClient. Verify AzureAd config and user secrets.");
-        throw;
-    }
+        try
+        {
+            var client = await factory.CreateAsync(ct).ConfigureAwait(false);
+            client.MaxRetryCount = 0;
+            client.RetryPauseTime = TimeSpan.Zero;
+            return (IOrganizationServiceAsync2)client;
+        }
+        catch (Exception ex)
+        {
+            loggerFactory.CreateLogger("DataverseStartup")
+                .LogError(ex, "Failed to create ServiceClient during DI registration. Verify AzureAd config and user secrets.");
+            throw;
+        }
+    };
 });
 
 // All pipeline services resolve IOrganizationServiceAsync2 from the container.
