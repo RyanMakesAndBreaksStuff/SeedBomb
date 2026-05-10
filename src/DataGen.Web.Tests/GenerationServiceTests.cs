@@ -4,6 +4,11 @@ public class GenerationServiceTests
 {
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Creates a GenerationService instance with mocked dependencies for testing.
+    /// Uses real, non-virtual collaborators (GraphBuilder, CycleDetector, TopologicalSort)
+    /// which are side-effect-free and cheap to construct.
+    /// </summary>
     private static GenerationService BuildSut(
         Mock<IMetadataProvider>? metadataMock = null,
         Mock<IBulkCreator>? bulkCreatorMock = null)
@@ -24,6 +29,21 @@ public class GenerationServiceTests
             topoSort,
             bulkCreatorMock.Object,
             NullLogger<GenerationService>.Instance);
+    }
+
+    /// <summary>
+    /// Creates a mocked <see cref="ILoggerFactory"/> that returns a mocked
+    /// <see cref="ILogger{T}"/> for GenerationService. Used by tests that require
+    /// explicit logger control (e.g., async factory verification).
+    /// </summary>
+    private Mock<ILoggerFactory> CreateMockLoggerFactory()
+    {
+        // Mocks the ILoggerFactory to ensure predictable logger instances during testing.
+        var mockLoggerFactory = new Mock<ILoggerFactory>();
+        var mockLogger = new Mock<ILogger<GenerationService>>();
+        mockLoggerFactory.Setup(lf => lf.CreateLogger(It.IsAny<string>()))
+            .Returns(mockLogger.Object);
+        return mockLoggerFactory;
     }
 
     // ── Happy path ─────────────────────────────────────────────────────────────
@@ -120,28 +140,39 @@ public class GenerationServiceTests
     /// <summary>
     /// Contract test for A6: GenerationService should expose an async service-client
     /// resolution path via factory to avoid sync-over-async call chains.
-    /// This test verifies that the async factory is invoked during generation.
+    /// This test verifies that:
+    /// 1. The async factory is invoked during generation (not a sync fallback path)
+    /// 2. The result is a valid GenerationResult with expected structure
     /// </summary>
     [Fact]
     public async Task GenerateAsync_ResolvesServiceClientViaAsyncFactory_WithoutBlockingSyncPath()
     {
-        // Arrange: mock async factory delegate
+        // Arrange: Mock async factory to track invocation and provide a mocked service client.
+        // The factory must be async to prevent blocking sync-over-async patterns.
         var asyncFactoryCalled = false;
         Func<CancellationToken, Task<IOrganizationServiceAsync2>> asyncFactory = async ct =>
         {
             asyncFactoryCalled = true;
             var mockService = new Mock<IOrganizationServiceAsync2>();
+
+            // Mock ExecuteAsync so DataverseMetadataProvider can resolve entity metadata.
+            var entityMeta = new EntityMetadata { LogicalName = "account" };
+            var metaResponse = new RetrieveEntityResponse();
+            metaResponse.Results["EntityMetadata"] = entityMeta;
+            mockService
+                .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(metaResponse);
+
+            // Mock CreateAsync to return a valid GUID for each record creation.
             mockService.Setup(s => s.CreateAsync(It.IsAny<Entity>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Guid.NewGuid());
             return mockService.Object;
         };
 
-        var mockLoggerFactory = new Mock<ILoggerFactory>();
-        var mockLogger = new Mock<ILogger<GenerationService>>();
-        mockLoggerFactory.Setup(lf => lf.CreateLogger(It.IsAny<string>()))
-            .Returns(mockLogger.Object);
+        // Mock ILoggerFactory to provide predictable logging during the test.
+        var mockLoggerFactory = CreateMockLoggerFactory();
 
-        var service = new GenerationService(asyncFactory, mockLoggerFactory.Object, mockLogger.Object);
+        var service = new GenerationService(asyncFactory, mockLoggerFactory.Object);
 
         // Act
         var ct = CancellationToken.None;
@@ -152,7 +183,14 @@ public class GenerationServiceTests
             ct: ct);
 
         // Assert
+        // Verify the async factory was invoked (proving async path, not sync fallback).
         Assert.True(asyncFactoryCalled, "Async factory delegate should have been invoked");
+
+        // Verify the result is a valid GenerationResult instance with expected structure.
         Assert.NotNull(result);
+        Assert.IsType<GenerationResult>(result);
+        Assert.NotNull(result.CreatedRecords);
+        Assert.NotNull(result.Errors);
+        Assert.True(result.Elapsed >= TimeSpan.Zero, "Elapsed time must be non-negative");
     }
 }
