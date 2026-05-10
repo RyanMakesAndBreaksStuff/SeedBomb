@@ -121,4 +121,44 @@ public class ThrottlePolicyTests
             });
         Assert.Equal(40, results.Count);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_HonorsRetryAfterHeader_WhenPresent()
+    {
+        // Arrange — fault with Retry-After: 4 seconds.
+        // BaseDelay=2s, attempt=0 → exponential=2s; 4s > 2s so Retry-After wins.
+        // Without the fix, max delay would be ~3s (2s + 1s jitter); with it, floor is 4s.
+        var fault = new OrganizationServiceFault
+        {
+            ErrorCode = -2147015902, // NumberOfRequests throttle code
+            Message = "Too many requests"
+        };
+        fault.ErrorDetails["Retry-After"] = 4; // 4 seconds — exceeds exponential floor
+
+        var faultException = new FaultException<OrganizationServiceFault>(
+            fault,
+            new FaultReason("Too many requests"));
+
+        var callCount = 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        var result = await _policy.ExecuteAsync<int>(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1) throw faultException;
+                return Task.FromResult(42);
+            },
+            "account",
+            maxRetries: 2,
+            CancellationToken.None);
+
+        sw.Stop();
+
+        Assert.Equal(42, result);
+        Assert.Equal(2, callCount);
+        // Retry-After=4s means delay >= 4s; assert >= 3500ms to allow for timer resolution
+        Assert.True(sw.Elapsed.TotalMilliseconds >= 3500,
+            $"Expected >= 3500ms delay (Retry-After=4s), got {sw.Elapsed.TotalMilliseconds}ms");
+    }
 }

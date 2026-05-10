@@ -137,12 +137,12 @@ public class BulkCreator : IBulkCreator
         // Phase 2: backfill deferred lookups
         _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
         var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
-            graph, pool, config.BatchSize, config.Seed, ct).ConfigureAwait(false);
+            graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
         allErrors.AddRange(backfillErrors);
 
         // Phase 3: N:N associations
         var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
-            graph, pool, config.BatchSize, config.Seed, ct).ConfigureAwait(false);
+            graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
         allErrors.AddRange(associateErrors);
 
         var elapsed = DateTimeOffset.UtcNow - runStart;
@@ -169,6 +169,35 @@ public class BulkCreator : IBulkCreator
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
+        // T-06: pre-flight — warn about any attributes that will be silently skipped due to FieldAction.Fail
+        if (meta.Attributes is not null)
+        {
+            foreach (var attr in meta.Attributes)
+            {
+                var validation = _edgeCaseValidator.Validate(attr, meta);
+                if (validation.Action == FieldAction.Fail)
+                    _logger.LogWarning(
+                        "Entity {Entity}: field {Field} has FieldAction.Fail — field will be skipped",
+                        entityName, attr.LogicalName);
+            }
+        }
+
+        // T-25: pre-flight required-lookup validation
+        if (meta.Attributes is not null)
+        {
+            foreach (var attr in meta.Attributes.OfType<LookupAttributeMetadata>())
+            {
+                var level = attr.RequiredLevel?.Value ?? AttributeRequiredLevel.None;
+                if (level == AttributeRequiredLevel.SystemRequired)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': required lookup '{attr.LogicalName}' (SystemRequired) has no generator — cannot create records.");
+                if (level == AttributeRequiredLevel.ApplicationRequired)
+                    _logger.LogWarning(
+                        "Entity {Entity}: lookup {Field} is ApplicationRequired but may have no generator",
+                        entityName, attr.LogicalName);
+            }
+        }
+
         // Sequential Bogus generation — single Faker instance, no sharing across threads
         var attributesToGenerate = GetGeneratableAttributes(meta);
         var alternateKeyAttrs = GetAlternateKeyAttributes(meta);
@@ -271,16 +300,15 @@ public class BulkCreator : IBulkCreator
                 errorBags[batchIndex] = batchErrors;
 
                 var elapsed = (DateTimeOffset.UtcNow - entityStart).TotalMinutes;
-                var ratePerMin = elapsed > 0
-                    ? (Interlocked.Add(ref createdCount, batchIds.Count)) / elapsed
-                    : 0;
+                var added = Interlocked.Add(ref createdCount, batchIds.Count);
+                var ratePerMin = elapsed >= 0.001 ? added / elapsed : 0;
 
                 progress?.Report(new BulkCreationProgress
                 {
                     EntityLogicalName = entityName,
                     BatchIndex = batchIndex + 1,
                     TotalBatches = batches.Length,
-                    RecordsCreated = createdCount,
+                    RecordsCreated = added,
                     TotalRecords = recordCount,
                     RecordsPerMinute = ratePerMin,
                     ErrorMessage = batchErrors.Count > 0 ? batchErrors[0].ErrorMessage : null

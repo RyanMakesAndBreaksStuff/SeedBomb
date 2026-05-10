@@ -1,0 +1,10 @@
+global using Xunit;
+global using Moq;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Logging.Abstractions;
+global using Microsoft.Xrm.Sdk.Metadata;
+global using DataGen.Bulk.Contracts;
+global using DataGen.Core.Contracts;
+global using DataGen.Core.Graph;
+global using DataGen.Core.Metadata;
+global using DataGen.Web.Services;
