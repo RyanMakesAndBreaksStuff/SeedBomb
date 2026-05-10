@@ -1,9 +1,7 @@
 using DataGen.Bulk;
-using DataGen.Bulk.Contracts;
 using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
-using DataGen.Core.Metadata;
 using DataGen.Web.Components;
 using DataGen.Web.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -47,7 +45,7 @@ builder.Services.AddAuthorizationBuilder()
         .RequireAuthenticatedUser()
         .Build());
 
-// Memory cache (required by DataverseMetadataProvider)
+// Memory cache (used by pipeline metadata components constructed per-run)
 builder.Services.AddMemoryCache();
 
 // DataverseServiceClientFactory — scoped per Blazor circuit.
@@ -86,11 +84,6 @@ builder.Services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsyn
     };
 });
 
-// All pipeline services resolve IOrganizationServiceAsync2 from the container.
-builder.Services.AddScoped<IMetadataProvider, DataverseMetadataProvider>();
-builder.Services.AddScoped<MessageAvailabilityChecker>();
-builder.Services.AddScoped<DeferredLookupBackfill>();
-
 // Pure DI — only need ILogger<T> from the container
 builder.Services.AddScoped<GraphBuilder>();
 builder.Services.AddScoped<CycleDetector>();
@@ -99,8 +92,6 @@ builder.Services.AddScoped<GeneratorFactory>();
 builder.Services.AddScoped<EdgeCaseValidator>();
 builder.Services.AddScoped<ThrottlePolicy>();
 builder.Services.AddScoped<GenerationService>();
-
-builder.Services.AddScoped<IBulkCreator, BulkCreator>();
 
 // MudBlazor
 builder.Services.AddMudServices();
