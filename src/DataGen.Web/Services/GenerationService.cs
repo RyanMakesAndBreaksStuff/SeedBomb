@@ -149,9 +149,10 @@ public sealed class GenerationService
         {
             var service = await _serviceFactory(ct).ConfigureAwait(false);
 
+            // NOTE: Keep in sync with DI registration in Program.cs
             // Build per-run pipeline components using the resolved service.
             var lf = _loggerFactory!;
-            var cache = new MemoryCache(new MemoryCacheOptions());
+            using var cache = new MemoryCache(new MemoryCacheOptions());
             var metadata = new DataverseMetadataProvider(service, cache, lf.CreateLogger<DataverseMetadataProvider>());
             var graphBuilder = new GraphBuilder(lf.CreateLogger<GraphBuilder>());
             var cycleDetector = new CycleDetector(lf.CreateLogger<CycleDetector>());
@@ -186,12 +187,15 @@ public sealed class GenerationService
 
             var result = await bulkCreator.CreateAsync(config, metadataDict, graph, null, ct).ConfigureAwait(false);
 
-            _logger.LogInformation("Generation completed: {Result}", result);
+            _logger.LogInformation(
+                "Generation complete — {Total} records in {Elapsed}",
+                result.TotalRecords,
+                sw.Elapsed);
             return result;
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Generation cancelled");
+            _logger.LogInformation("Generation cancelled for {OrgId}/{Entity}", orgId, entityLogicalName);
             throw;
         }
         catch (Exception ex)
