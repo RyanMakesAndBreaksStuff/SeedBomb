@@ -1,0 +1,18 @@
+{
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "Domain": "REPLACE_WITH_YOUR_DOMAIN",
+    "TenantId": "REPLACE_WITH_TENANT_ID",
+    "ClientId": "REPLACE_WITH_CLIENT_ID",
+    "CallbackPath": "/signin-oidc",
+    "SignedOutCallbackPath": "/signout-callback-oidc"
+  },
+  "DataverseUrl": "https://REPLACE_WITH_YOUR_ORG.crm.dynamics.com/",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
