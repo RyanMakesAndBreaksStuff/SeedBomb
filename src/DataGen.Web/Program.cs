@@ -1,4 +1,5 @@
 using DataGen.Bulk;
+using DataGen.Bulk.Contracts;
 using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
@@ -87,6 +88,9 @@ builder.Services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsyn
 
 // IMetadataProvider — defers ServiceClient construction to first metadata call
 builder.Services.AddScoped<IMetadataProvider, LazyMetadataProvider>();
+
+// IBulkCreator — defers ServiceClient construction and sub-pipeline assembly to first CreateAsync call
+builder.Services.AddScoped<IBulkCreator, LazyBulkCreator>();
 
 // Pure DI — only need ILogger<T> from the container
 builder.Services.AddScoped<GraphBuilder>();
