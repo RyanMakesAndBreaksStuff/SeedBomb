@@ -91,8 +91,9 @@ public class DeferredLookupBackfill
                 var update = new Entity(sourceEntity) { Id = id };
                 foreach (var deferred in deferredLookups)
                 {
-                    // Pick a random target from the first available target entity that has records
-                    foreach (var targetEntity in deferred.TargetEntities)
+                    // Pick a random target from the first available target entity that has records.
+                    // Sort by logical name for deterministic selection across schema refreshes.
+                    foreach (var targetEntity in deferred.TargetEntities.Order())
                     {
                         var targetIds = pool.Get(targetEntity);
                         if (targetIds.Count > 0)
