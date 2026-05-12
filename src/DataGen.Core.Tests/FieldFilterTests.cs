@@ -126,6 +126,18 @@ public class FieldFilterTests
     }
 
     [Fact]
+    public void ShouldGenerateField_SystemRequiredField_ReturnsFalse()
+    {
+        var attr = new StringAttributeMetadata
+        {
+            LogicalName = "overriddencreatedon",
+            IsValidForCreate = true,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired)
+        };
+        Assert.False(FieldFilter.ShouldGenerateField(attr));
+    }
+
+    [Fact]
     public void ShouldGenerateField_ThrowsOnNull()
     {
         Assert.Throws<ArgumentNullException>(() => FieldFilter.ShouldGenerateField(null!));

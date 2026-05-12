@@ -185,6 +185,29 @@ html, body {
     margin-bottom: 22px;
 }
 
+.login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 52px;
+    background: #3A7848;
+    color: #fff;
+    font-family: 'Syncopate', sans-serif;
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-decoration: none;
+    border-radius: 4px;
+    margin-bottom: 22px;
+    transition: background 0.15s;
+}
+
+.login-btn:hover {
+    background: #2e5e39;
+    color: #fff;
+}
+
 .login-footer {
     font-family: 'JetBrains Mono', monospace;
     font-size: .58rem;

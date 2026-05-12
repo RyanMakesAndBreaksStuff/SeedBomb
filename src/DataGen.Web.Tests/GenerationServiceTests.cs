@@ -138,6 +138,40 @@ public class GenerationServiceTests
     }
 
     /// <summary>
+    /// GenerationService has a direct pipeline constructor and an async-factory
+    /// constructor for focused tests. The app DI path must resolve the direct
+    /// pipeline constructor even when both dependency sets are registered.
+    /// </summary>
+    [Fact]
+    public void ServiceProvider_ResolvesGenerationService_WhenBothConstructorDependencySetsAreRegistered()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddScoped(_ => new Mock<IMetadataProvider>().Object);
+        services.AddScoped(_ => new Mock<IBulkCreator>().Object);
+        services.AddScoped<GraphBuilder>();
+        services.AddScoped<CycleDetector>();
+        services.AddScoped<TopologicalSort>();
+        services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsync2>>>(_ =>
+            _ => Task.FromResult(new Mock<IOrganizationServiceAsync2>().Object));
+        services.AddScoped<GenerationService>();
+
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true
+        });
+
+        // Act
+        using var scope = provider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<GenerationService>();
+
+        // Assert
+        Assert.NotNull(service);
+    }
+
+    /// <summary>
     /// Contract test for A6: GenerationService should expose an async service-client
     /// resolution path via factory to avoid sync-over-async call chains.
     /// This test verifies that:

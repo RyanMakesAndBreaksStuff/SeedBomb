@@ -17,9 +17,7 @@ internal sealed class DateTimeFieldGenerator : IFieldGenerator
         var start = DateTimeAttributeMetadata.MinSupportedValue > DateTime.MinValue
             ? DateTimeAttributeMetadata.MinSupportedValue
             : new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var end = DateTimeAttributeMetadata.MaxSupportedValue > DateTime.MinValue
-            ? DateTimeAttributeMetadata.MaxSupportedValue
-            : new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+        var end = DateTime.UtcNow.AddYears(15);
 
         var date = faker.Date.Between(start, end);
 

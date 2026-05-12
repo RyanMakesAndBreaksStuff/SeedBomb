@@ -53,9 +53,11 @@ public class DateTimeFieldGeneratorTests
         var attr = new DateTimeAttributeMetadata { LogicalName = "createdon" };
         var result = (DateTime)_gen.Generate(attr, _faker, _pool)!;
 
-        var start = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var end = new DateTime(2026, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+        var start = DateTimeAttributeMetadata.MinSupportedValue > DateTime.MinValue
+            ? DateTimeAttributeMetadata.MinSupportedValue
+            : new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = DateTime.UtcNow.AddYears(15);
         Assert.True(result >= start && result <= end,
-            $"Date {result} is outside expected range");
+            $"Date {result} is outside expected range [{start}, {end}]");
     }
 }

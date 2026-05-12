@@ -60,5 +60,9 @@ nunit-*.xml
 /teamplan.md
 /.claude/settings.local.json
 /.claude/settings.json
-/Docs/imgs
 /src/DataGen.Web/appsettings.json
+/src/DataGen.Web/Properties/serviceDependencies.local.json
+/Docs/imgs
+/tasks/todo.md
+/src/DataGen.Web/appsettings.Development.json
+*.csv

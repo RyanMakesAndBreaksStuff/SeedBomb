@@ -18,12 +18,21 @@ public static class FieldFilter
         ArgumentNullException.ThrowIfNull(attr);
 
         return attr.IsValidForCreate == true
+            && !IsSystemRequired(attr)
             && !IsCalculatedOrFormula(attr)
             && !IsAutoNumber(attr)
             && !IsBaseCurrencyField(attr.LogicalName)
             && !IsFileOrImageColumn(attr)
             && !IsStateCode(attr);
     }
+
+    /// <summary>
+    /// Determines whether the attribute is system-required (managed by Dataverse, not settable by callers).
+    /// </summary>
+    /// <param name="attr">The attribute metadata.</param>
+    /// <returns>True if the field is system-required.</returns>
+    public static bool IsSystemRequired(AttributeMetadata attr)
+        => attr.RequiredLevel?.Value == AttributeRequiredLevel.SystemRequired;
 
     /// <summary>
     /// Determines whether the attribute is a calculated, rollup, or formula field.

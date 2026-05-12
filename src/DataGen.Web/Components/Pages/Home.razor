@@ -7,6 +7,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Dataverse Data Seeder</PageTitle>
 
@@ -257,10 +258,15 @@
 
         var progress = new Progress<ProgressUpdate>(update =>
         {
-            InvokeAsync(() =>
+            InvokeAsync(async () =>
             {
                 _progress = update;
                 StateHasChanged();
+                _ = JSRuntime.InvokeVoidAsync("console.log",
+                    "[DataGen]", update.Phase, update.EntityName,
+                    $"{update.RecordsCreated}/{update.TotalRecords}",
+                    $"batch {update.BatchesCompleted}/{update.TotalBatches}",
+                    $"{update.RecordsPerMinute:F0} rec/min");
             });
         });
 

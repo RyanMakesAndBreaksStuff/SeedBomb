@@ -252,6 +252,16 @@ public class BulkCreator : IBulkCreator
             entities.Add(entity);
         }
 
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            for (int i = 0; i < entities.Count; i++)
+            {
+                var fields = string.Join(", ", entities[i].Attributes
+                    .Select(a => $"{a.Key}={a.Value}"));
+                _logger.LogDebug("[Pre-create] {Entity}[{Index}]: {Fields}", entityName, i, fields);
+            }
+        }
+
         var batches = entities.Chunk(config.BatchSize).ToArray();
         var useCreateMultiple = await _messageChecker
             .IsCreateMultipleAvailableAsync(entityName, ct).ConfigureAwait(false);

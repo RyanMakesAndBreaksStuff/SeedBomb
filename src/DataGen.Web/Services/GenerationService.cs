@@ -45,7 +45,7 @@ public sealed class GenerationService
     }
 
     /// <summary>Initializes a new instance of <see cref="GenerationService"/> with an async service factory (async-resolution path).</summary>
-    public GenerationService(
+    internal GenerationService(
         Func<CancellationToken, Task<IOrganizationServiceAsync2>> serviceFactory,
         ILoggerFactory loggerFactory)
     {
