@@ -9,8 +9,6 @@ namespace DataGen.Core.Generators;
 internal sealed class DecimalFieldGenerator : IFieldGenerator
 {
     /// <inheritdoc/>
-    public bool CanGenerate(AttributeMetadata metadata)
-        => metadata is DecimalAttributeMetadata;
 
     /// <inheritdoc/>
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)

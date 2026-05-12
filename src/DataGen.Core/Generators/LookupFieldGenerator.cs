@@ -10,8 +10,6 @@ namespace DataGen.Core.Generators;
 internal sealed class LookupFieldGenerator : IFieldGenerator
 {
     /// <inheritdoc/>
-    public bool CanGenerate(AttributeMetadata metadata)
-        => metadata is LookupAttributeMetadata;
 
     /// <inheritdoc/>
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)

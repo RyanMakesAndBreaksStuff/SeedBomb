@@ -18,8 +18,6 @@ internal sealed class IntegerFieldGenerator : IFieldGenerator
     ];
 
     /// <inheritdoc/>
-    public bool CanGenerate(AttributeMetadata metadata)
-        => metadata is IntegerAttributeMetadata;
 
     /// <inheritdoc/>
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)

@@ -9,13 +9,6 @@ namespace DataGen.Core.Generators;
 public interface IFieldGenerator
 {
     /// <summary>
-    /// Determines whether this generator can produce values for the given attribute.
-    /// </summary>
-    /// <param name="metadata">The attribute metadata.</param>
-    /// <returns>True if this generator handles the attribute type.</returns>
-    bool CanGenerate(AttributeMetadata metadata);
-
-    /// <summary>
     /// Generates a fake value for the given attribute.
     /// </summary>
     /// <param name="metadata">The attribute metadata.</param>
