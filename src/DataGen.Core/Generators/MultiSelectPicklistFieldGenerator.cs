@@ -10,8 +10,6 @@ namespace DataGen.Core.Generators;
 internal sealed class MultiSelectPicklistFieldGenerator : IFieldGenerator
 {
     /// <inheritdoc/>
-    public bool CanGenerate(AttributeMetadata metadata)
-        => metadata is MultiSelectPicklistAttributeMetadata;
 
     /// <inheritdoc/>
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)

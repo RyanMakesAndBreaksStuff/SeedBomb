@@ -20,13 +20,6 @@ public class MultiSelectPicklistFieldGeneratorTests
         };
     }
 
-    [Fact]
-    public void CanGenerate_MultiSelectMetadata_ReturnsTrue()
-        => Assert.True(_gen.CanGenerate(new MultiSelectPicklistAttributeMetadata()));
-
-    [Fact]
-    public void CanGenerate_PicklistMetadata_ReturnsFalse()
-        => Assert.False(_gen.CanGenerate(new PicklistAttributeMetadata()));
 
     [Fact]
     public void Generate_WithOptions_ReturnsOptionSetValueCollection()

@@ -7,13 +7,6 @@ public class LookupFieldGeneratorTests
     private readonly LookupFieldGenerator _gen = new();
     private readonly Faker _faker = DeterministicFaker.Create(42, 0);
 
-    [Fact]
-    public void CanGenerate_LookupMetadata_ReturnsTrue()
-        => Assert.True(_gen.CanGenerate(new LookupAttributeMetadata()));
-
-    [Fact]
-    public void CanGenerate_StringMetadata_ReturnsFalse()
-        => Assert.False(_gen.CanGenerate(new StringAttributeMetadata()));
 
     [Fact]
     public void Generate_EmptyPool_ReturnsNull()

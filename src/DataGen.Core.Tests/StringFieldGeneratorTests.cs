@@ -20,13 +20,6 @@ public class StringFieldGeneratorTests
         return (string)_gen.Generate(attr, _faker, _pool)!;
     }
 
-    [Fact]
-    public void CanGenerate_StringMetadata_ReturnsTrue()
-        => Assert.True(_gen.CanGenerate(new StringAttributeMetadata()));
-
-    [Fact]
-    public void CanGenerate_IntegerMetadata_ReturnsFalse()
-        => Assert.False(_gen.CanGenerate(new IntegerAttributeMetadata()));
 
     [Theory]
     [InlineData("emailaddress1")]

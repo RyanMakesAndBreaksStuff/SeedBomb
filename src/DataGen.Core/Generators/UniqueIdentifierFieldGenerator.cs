@@ -9,8 +9,6 @@ namespace DataGen.Core.Generators;
 internal sealed class UniqueIdentifierFieldGenerator : IFieldGenerator
 {
     /// <inheritdoc/>
-    public bool CanGenerate(AttributeMetadata metadata)
-        => metadata is UniqueIdentifierAttributeMetadata;
 
     /// <inheritdoc/>
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)

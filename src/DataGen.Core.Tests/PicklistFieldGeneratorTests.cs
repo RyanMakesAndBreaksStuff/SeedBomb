@@ -20,13 +20,6 @@ public class PicklistFieldGeneratorTests
         };
     }
 
-    [Fact]
-    public void CanGenerate_PicklistMetadata_ReturnsTrue()
-        => Assert.True(_gen.CanGenerate(new PicklistAttributeMetadata()));
-
-    [Fact]
-    public void CanGenerate_StringMetadata_ReturnsFalse()
-        => Assert.False(_gen.CanGenerate(new StringAttributeMetadata()));
 
     [Fact]
     public void Generate_WithOptions_ReturnsValidOptionSetValue()

@@ -5,8 +5,6 @@ namespace DataGen.Core.Generators;
 
 internal sealed class BigIntFieldGenerator : IFieldGenerator
 {
-    public bool CanGenerate(AttributeMetadata metadata)
-        => metadata is BigIntAttributeMetadata;
 
     public object? Generate(AttributeMetadata metadata, Faker faker, DataverseRecordPool pool)
     {
