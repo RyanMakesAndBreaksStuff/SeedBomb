@@ -61,3 +61,4 @@ nunit-*.xml
 /.claude/settings.local.json
 /.claude/settings.json
 /Docs/imgs
+/src/DataGen.Web/appsettings.json
