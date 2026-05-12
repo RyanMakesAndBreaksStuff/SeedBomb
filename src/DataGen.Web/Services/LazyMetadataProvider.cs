@@ -7,23 +7,27 @@ using Microsoft.Xrm.Sdk.Metadata;
 namespace DataGen.Web.Services;
 
 /// <summary>
-/// Scoped IMetadataProvider that resolves IOrganizationServiceAsync2 lazily on first use
-/// via the async factory delegate, avoiding any sync-over-async at DI construction time.
+/// Scoped adapter that defers <see cref="DataverseMetadataProvider"/> construction until the first
+/// metadata call, at which point the async ServiceClient factory is awaited. This allows
+/// <see cref="IMetadataProvider"/> to be registered in the DI container without requiring a
+/// synchronous <see cref="IOrganizationServiceAsync2"/> at scope creation time.
 /// </summary>
-internal sealed class LazyMetadataProvider : IMetadataProvider, IDisposable
+internal sealed class LazyMetadataProvider : IMetadataProvider
 {
     private readonly Func<CancellationToken, Task<IOrganizationServiceAsync2>> _serviceFactory;
-    private readonly ILoggerFactory _loggerFactory;
+    private readonly IMemoryCache _cache;
+    private readonly ILogger<DataverseMetadataProvider> _logger;
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private DataverseMetadataProvider? _inner;
-    private MemoryCache? _cache;
 
     public LazyMetadataProvider(
         Func<CancellationToken, Task<IOrganizationServiceAsync2>> serviceFactory,
-        ILoggerFactory loggerFactory)
+        IMemoryCache cache,
+        ILogger<DataverseMetadataProvider> logger)
     {
         _serviceFactory = serviceFactory;
-        _loggerFactory = loggerFactory;
+        _cache = cache;
+        _logger = logger;
     }
 
     private async Task<DataverseMetadataProvider> GetInnerAsync(CancellationToken ct)
@@ -35,8 +39,7 @@ internal sealed class LazyMetadataProvider : IMetadataProvider, IDisposable
         {
             if (_inner is not null) return _inner;
             var service = await _serviceFactory(ct).ConfigureAwait(false);
-            _cache = new MemoryCache(new MemoryCacheOptions());
-            _inner = new DataverseMetadataProvider(service, _cache, _loggerFactory.CreateLogger<DataverseMetadataProvider>());
+            _inner = new DataverseMetadataProvider(service, _cache, _logger);
             return _inner;
         }
         finally
@@ -53,10 +56,4 @@ internal sealed class LazyMetadataProvider : IMetadataProvider, IDisposable
 
     public async Task<IReadOnlyList<EntitySummary>> ListUserEntitiesAsync(CancellationToken ct = default)
         => await (await GetInnerAsync(ct).ConfigureAwait(false)).ListUserEntitiesAsync(ct).ConfigureAwait(false);
-
-    public void Dispose()
-    {
-        _cache?.Dispose();
-        _initLock.Dispose();
-    }
 }
