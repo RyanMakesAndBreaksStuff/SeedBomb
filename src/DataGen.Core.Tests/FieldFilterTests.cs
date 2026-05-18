@@ -17,10 +17,10 @@ public class FieldFilterTests
     }
 
     [Fact]
-    public void ShouldGenerateField_NullIsValidForCreate_ReturnsFalse()
+    public void ShouldGenerateField_NullIsValidForCreate_ReturnsTrue()
     {
         var attr = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = null };
-        Assert.False(FieldFilter.ShouldGenerateField(attr));
+        Assert.True(FieldFilter.ShouldGenerateField(attr));
     }
 
     [Fact]

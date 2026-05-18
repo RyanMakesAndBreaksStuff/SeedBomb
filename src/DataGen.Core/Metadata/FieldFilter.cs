@@ -17,7 +17,7 @@ public static class FieldFilter
     {
         ArgumentNullException.ThrowIfNull(attr);
 
-        return attr.IsValidForCreate == true
+        return attr.IsValidForCreate != false
             && !IsSystemRequired(attr)
             && !IsCalculatedOrFormula(attr)
             && !IsAutoNumber(attr)
