@@ -126,15 +126,49 @@ public class FieldFilterTests
     }
 
     [Fact]
-    public void ShouldGenerateField_SystemRequiredField_ReturnsFalse()
+    public void ShouldGenerateField_SystemRequiredNonStringField_ReturnsFalse()
     {
-        var attr = new StringAttributeMetadata
+        var attr = new DateTimeAttributeMetadata
         {
             LogicalName = "overriddencreatedon",
             IsValidForCreate = true,
             RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired)
         };
         Assert.False(FieldFilter.ShouldGenerateField(attr));
+    }
+
+    [Fact]
+    public void IsSystemRequired_StringAttribute_IsExempted_ReturnsFalse()
+    {
+        var attr = new StringAttributeMetadata
+        {
+            LogicalName = "lastname",
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired)
+        };
+        Assert.False(FieldFilter.IsSystemRequired(attr));
+    }
+
+    [Fact]
+    public void IsSystemRequired_DateTimeAttribute_ReturnsTrue()
+    {
+        var attr = new DateTimeAttributeMetadata
+        {
+            LogicalName = "createdon",
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired)
+        };
+        Assert.True(FieldFilter.IsSystemRequired(attr));
+    }
+
+    [Fact]
+    public void ShouldGenerateField_SystemRequiredStringField_ReturnsTrue()
+    {
+        var attr = new StringAttributeMetadata
+        {
+            LogicalName = "lastname",
+            IsValidForCreate = true,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired)
+        };
+        Assert.True(FieldFilter.ShouldGenerateField(attr));
     }
 
     [Fact]

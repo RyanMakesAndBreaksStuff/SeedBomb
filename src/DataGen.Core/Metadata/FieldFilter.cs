@@ -32,7 +32,8 @@ public static class FieldFilter
     /// <param name="attr">The attribute metadata.</param>
     /// <returns>True if the field is system-required.</returns>
     public static bool IsSystemRequired(AttributeMetadata attr)
-        => attr.RequiredLevel?.Value == AttributeRequiredLevel.SystemRequired;
+        => attr.RequiredLevel?.Value == AttributeRequiredLevel.SystemRequired
+        && attr is not StringAttributeMetadata;
 
     /// <summary>
     /// Determines whether the attribute is a calculated, rollup, or formula field.
