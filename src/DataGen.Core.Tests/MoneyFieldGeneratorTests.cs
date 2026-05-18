@@ -50,4 +50,22 @@ public class MoneyFieldGeneratorTests
         var scale = (decimal.GetBits(result.Value)[3] >> 16) & 0xFF;
         Assert.True(scale <= 2, $"Decimal scale {scale} exceeds precision 2");
     }
+
+    [Fact]
+    public void Generate_DataverseMaxValue_ClampsToTenMillion()
+    {
+        var attr = new MoneyAttributeMetadata
+        {
+            LogicalName = "creditlimit",
+            MinValue = 0.0,
+            MaxValue = 100_000_000_000_000.0,
+            Precision = 2
+        };
+        var result = (Money)_gen.Generate(attr, _faker, _pool)!;
+
+        Assert.True(result.Value <= 10_000_000m,
+            $"creditlimit {result.Value} exceeds the 10M hard cap");
+        Assert.True(result.Value >= 0m,
+            $"creditlimit {result.Value} below 0");
+    }
 }
