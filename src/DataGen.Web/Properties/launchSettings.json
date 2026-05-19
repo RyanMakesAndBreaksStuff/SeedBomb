@@ -12,12 +12,13 @@
     "https": {
       "commandName": "Project",
       "launchBrowser": true,
+      "launchUrl": "http://localhost:5188",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:5188",
-      "nativeDebugging": true
+      "debugEngines": "managed,native"
     },
     "Container (.NET SDK)": {
       "commandName": "SdkContainer",

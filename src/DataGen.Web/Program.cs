@@ -123,7 +123,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapStaticAssets();
+app.MapStaticAssets()
+    .Add(static endpointBuilder =>
+        endpointBuilder.Metadata.Add(new AllowAnonymousAttribute()));
 app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

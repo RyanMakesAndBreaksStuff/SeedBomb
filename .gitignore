@@ -66,3 +66,4 @@ nunit-*.xml
 /tasks/todo.md
 /src/DataGen.Web/appsettings.Development.json
 *.csv
+/Docs/5-18-26_plan_to_cleanup_data_generated.md
