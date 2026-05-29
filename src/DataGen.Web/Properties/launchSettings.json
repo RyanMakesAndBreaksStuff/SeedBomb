@@ -16,9 +16,9 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "dotnetRunMessages": true,
+      "dotnetRunMessages": false,
       "applicationUrl": "http://localhost:5188",
-      "debugEngines": "managed,native"
+      "debugEngines": "managed"
     },
     "Container (.NET SDK)": {
       "commandName": "SdkContainer",

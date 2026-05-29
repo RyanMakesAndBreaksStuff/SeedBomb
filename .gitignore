@@ -67,3 +67,12 @@ nunit-*.xml
 /src/DataGen.Web/appsettings.Development.json
 *.csv
 /Docs/5-18-26_plan_to_cleanup_data_generated.md
+/Docs
+/tasks
+/.codex
+/.superpowers/brainstorm
+/.cursorrules
+/AGENTS.md
+/AGENTS.md.lean-ctx.bak
+/displayissue.png
+/src/DataGen.Web/wwwroot/appsettings.json

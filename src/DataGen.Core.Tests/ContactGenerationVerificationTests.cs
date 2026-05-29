@@ -75,4 +75,14 @@ public class ContactGenerationVerificationTests
         Assert.True(result.Value >= 0m,
             $"creditlimit {result.Value} below 0");
     }
+
+    [Fact]
+    public void ShouldGenerateField_StringWithEmptyAutoNumberFormat_ReturnsTrue()
+    {
+        var attr = new StringAttributeMetadata { LogicalName = "telephone1" };
+        attr.IsValidForCreate = true;
+        // Simulate SDK returning "" instead of null for non-auto-number fields
+        attr.AutoNumberFormat = "";
+        Assert.True(FieldFilter.ShouldGenerateField(attr));
+    }
 }

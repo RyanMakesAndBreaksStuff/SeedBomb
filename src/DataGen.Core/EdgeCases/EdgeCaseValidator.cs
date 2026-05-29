@@ -42,7 +42,7 @@ public class EdgeCaseValidator
         }
 
         // 2. Auto-number — server-generated, skip
-        if (attr is StringAttributeMetadata { AutoNumberFormat: not null })
+        if (attr is StringAttributeMetadata { AutoNumberFormat.Length: > 0 })
         {
             result.Skip("Auto-number fields are server-generated");
             _logger.LogDebug("Skipping {Field}: auto-number", attr.LogicalName);

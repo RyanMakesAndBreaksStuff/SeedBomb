@@ -23,7 +23,8 @@ public static class FieldFilter
             && !IsAutoNumber(attr)
             && !IsBaseCurrencyField(attr.LogicalName)
             && !IsFileOrImageColumn(attr)
-            && !IsStateCode(attr);
+            && !IsStateCode(attr)
+            && !IsBpfField(attr);
     }
 
     /// <summary>
@@ -49,7 +50,7 @@ public static class FieldFilter
     /// <param name="attr">The attribute metadata.</param>
     /// <returns>True if the field is auto-numbered.</returns>
     public static bool IsAutoNumber(AttributeMetadata attr)
-        => attr is StringAttributeMetadata { AutoNumberFormat: not null };
+        => attr is StringAttributeMetadata { AutoNumberFormat.Length: > 0 };
 
     /// <summary>
     /// Determines whether the field is a base currency field (auto-calculated from exchange rates).
@@ -74,4 +75,17 @@ public static class FieldFilter
     /// <returns>True if the field is statecode.</returns>
     public static bool IsStateCode(AttributeMetadata attr)
         => string.Equals(attr.LogicalName, "statecode", StringComparison.OrdinalIgnoreCase);
+
+    // traversedpath is StringAttributeMetadata + SystemRequired, so the StringAttributeMetadata
+    // carve-out in IsSystemRequired would otherwise let it through. Dataverse owns its value
+    // (comma-separated stage GUIDs written by the BPF engine); any caller-supplied value is rejected.
+    private static readonly HashSet<string> _bpfFields = ["traversedpath", "stageid", "processid"];
+
+    /// <summary>
+    /// Determines whether the attribute is a Business Process Flow system field managed by Dataverse.
+    /// </summary>
+    /// <param name="attr">The attribute metadata.</param>
+    /// <returns>True if the field is BPF-managed and must not be set on create.</returns>
+    public static bool IsBpfField(AttributeMetadata attr)
+        => attr.LogicalName is not null && _bpfFields.Contains(attr.LogicalName);
 }
