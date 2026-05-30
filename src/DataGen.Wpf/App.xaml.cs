@@ -12,23 +12,27 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        _host = Host.CreateDefaultBuilder()
-            .ConfigureServices((_, services) =>
-            {
-                // Feature registrations added by integration tasks (F5, W1-INT, W2-INT)
-            })
-            .Build();
-
-        await _host.StartAsync();
+        try
+        {
+            var builder = Host.CreateApplicationBuilder();
+            // Feature registrations added by integration tasks (F5, W1-INT, W2-INT)
+            _host = builder.Build();
+            await _host.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Startup failed: {ex.Message}", "DataGen",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
     }
 
     /// <inheritdoc />
-    protected override async void OnExit(ExitEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
         if (_host is not null)
         {
-            await _host.StopAsync();
+            _host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
             _host.Dispose();
         }
         base.OnExit(e);
