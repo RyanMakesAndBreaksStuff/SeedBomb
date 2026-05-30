@@ -9,6 +9,11 @@
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Identity.Web.MicrosoftGraph" Version="4.9.0" />
     <PackageVersion Include="Microsoft.PowerPlatform.Dataverse.Client" Version="[1.2.10, 2.0.0)" />
+    <!-- WPF Desktop -->
+    <PackageVersion Include="WPF-UI" Version="4.2.0" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.1" />
     <!-- Identity -->
     <PackageVersion Include="Microsoft.Identity.Web" Version="4.9.0" />
     <PackageVersion Include="Microsoft.Identity.Web.UI" Version="4.9.0" />

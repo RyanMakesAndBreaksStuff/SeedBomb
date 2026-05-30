@@ -13,6 +13,7 @@
     <Project Path="src/DataGen.Core/DataGen.Core.csproj" />
     <Project Path="src/DataGen.Bulk/DataGen.Bulk.csproj" />
     <Project Path="src/DataGen.Web/DataGen.Web.csproj" />
+    <Project Path="src/DataGen.Wpf/DataGen.Wpf.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="src/DataGen.Bulk.Tests/DataGen.Bulk.Tests.csproj" />
