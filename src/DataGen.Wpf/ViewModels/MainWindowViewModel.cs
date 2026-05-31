@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace DataGen.Wpf.ViewModels;
 
+/// <summary>ViewModel for <see cref="DataGen.Wpf.Views.Windows.MainWindow"/>.</summary>
 public partial class MainWindowViewModel : ObservableObject
 {
     [ObservableProperty]

@@ -2,11 +2,9 @@ using System.Windows.Controls;
 
 namespace DataGen.Wpf.Views.Stubs;
 
-// stub page, filled in Wave 2
+/// <summary>Generate page stub — replaced in Wave 2.</summary>
 public partial class GeneratePage : Page
 {
-    public GeneratePage()
-    {
-        InitializeComponent();
-    }
+    /// <summary>Initialises the page.</summary>
+    public GeneratePage() => InitializeComponent();
 }

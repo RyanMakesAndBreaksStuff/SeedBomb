@@ -1,9 +1,19 @@
+using DataGen.Wpf.Services.Auth;
+using DataGen.Wpf.Services.Dataverse;
+using DataGen.Wpf.Services.Generation;
+using DataGen.Wpf.Services.History;
+using DataGen.Wpf.Services.Settings;
+using DataGen.Wpf.ViewModels;
+using DataGen.Wpf.Views.Stubs;
+using DataGen.Wpf.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Windows;
+using Wpf.Ui;
 
 namespace DataGen.Wpf;
 
+/// <summary>WPF application entry point. Hosts the generic host and owns window lifetime.</summary>
 public partial class App : Application
 {
     private IHost? _host;
@@ -15,9 +25,25 @@ public partial class App : Application
         try
         {
             var builder = Host.CreateApplicationBuilder();
-            // Feature registrations added by integration tasks (F5, W1-INT, W2-INT)
+            ConfigureServices(builder.Services);
             _host = builder.Build();
             await _host.StartAsync();
+
+            // Attempt silent token acquisition before showing any window.
+            // Pass nint.Zero to suppress any interactive popup — silent-only path.
+            var auth = _host.Services.GetRequiredService<IAuthService>();
+            var result = await auth.SignInAsync(nint.Zero);
+
+            if (result.Succeeded)
+            {
+                ShowMainWindow(result.DisplayName ?? string.Empty);
+            }
+            else
+            {
+                // W1-A will wire LoginWindow.LoginSucceeded → ShowMainWindow.
+                var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
+                loginWindow.Show();
+            }
         }
         catch (Exception ex)
         {
@@ -25,6 +51,21 @@ public partial class App : Application
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    /// <summary>Shows the main window and populates header user info.</summary>
+    /// <param name="displayName">The signed-in user's display name.</param>
+    internal void ShowMainWindow(string displayName)
+    {
+        var vm = _host!.Services.GetRequiredService<MainWindowViewModel>();
+        vm.UserDisplayName = displayName;
+
+        var settings = _host.Services.GetRequiredService<ISettingsService>();
+        var s = settings.LoadAsync().GetAwaiter().GetResult();
+        vm.OrgUrl = s.OrgUrl;
+
+        var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+        mainWindow.Show();
     }
 
     /// <inheritdoc />
@@ -36,5 +77,31 @@ public partial class App : Application
             _host.Dispose();
         }
         base.OnExit(e);
+    }
+
+    private static void ConfigureServices(IServiceCollection sc)
+    {
+        // WPF UI framework services
+        sc.AddSingleton<ISnackbarService, SnackbarService>();
+        sc.AddSingleton<IContentDialogService, ContentDialogService>();
+
+        // App services — all singleton (one app lifetime)
+        sc.AddSingleton<ISettingsService, JsonSettingsService>();
+        sc.AddSingleton<IAuthService, MsalAuthService>();
+        sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
+        sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
+        sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();
+
+        // Windows — singleton so only one instance exists at a time
+        sc.AddSingleton<MainWindow>();
+        sc.AddSingleton<LoginWindow>();
+
+        // ViewModels — transient so each window/page gets a fresh instance
+        sc.AddTransient<MainWindowViewModel>();
+
+        // Stub pages — NavigationView resolves these from DI via SetServiceProvider
+        sc.AddTransient<GeneratePage>();
+        sc.AddTransient<HistoryPage>();
+        sc.AddTransient<SettingsPage>();
     }
 }
