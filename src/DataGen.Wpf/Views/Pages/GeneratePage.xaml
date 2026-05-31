@@ -1,0 +1,145 @@
+<Page x:Class="DataGen.Wpf.Views.Pages.GeneratePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:controls="clr-namespace:DataGen.Wpf.Views.Controls">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="300" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ── Left: stepper + wizard cards ─────────────────────────────── -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24,16,16,24">
+
+                <!-- Stepper strip -->
+                <ItemsControl ItemsSource="{Binding Steps}"
+                              Style="{StaticResource StepperStyle}" />
+
+                <!-- Card 01 — Select Entities -->
+                <ui:Card Margin="0,16,0,0">
+                    <StackPanel>
+                        <TextBlock Text="01  SELECT ENTITIES"
+                                   Style="{StaticResource StepHeaderStyle}" />
+                        <controls:EntitySelectorControl x:Name="EntitySelectorCtrl"
+                                                        SelectedEntitiesChanged="OnEntitiesChanged" />
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Card 02 — Configure (shown once entities are selected) -->
+                <ui:Card Margin="0,12,0,0"
+                         Visibility="{Binding CanConfigure, Converter={StaticResource BoolToVisible}}">
+                    <StackPanel>
+                        <TextBlock Text="02  CONFIGURE"
+                                   Style="{StaticResource StepHeaderStyle}" />
+                        <UniformGrid Columns="3" Margin="0,0,0,12">
+                            <ui:NumberBox Header="Seed"
+                                          Value="{Binding Seed, Mode=TwoWay}"
+                                          Minimum="0"
+                                          Margin="0,0,8,0" />
+                            <ui:NumberBox Header="Batch Size"
+                                          Value="{Binding BatchSize, Mode=TwoWay}"
+                                          Minimum="1"
+                                          Maximum="1000"
+                                          Margin="0,0,8,0" />
+                            <ui:NumberBox Header="Max Parallelism"
+                                          Value="{Binding MaxParallelism, Mode=TwoWay}"
+                                          Minimum="0"
+                                          PlaceholderText="auto" />
+                        </UniformGrid>
+                        <controls:FieldOverridesControl x:Name="FieldOverridesCtrl" />
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Card 03 — Execute (shown once entities are selected) -->
+                <ui:Card Margin="0,12,0,0"
+                         Visibility="{Binding CanExecute, Converter={StaticResource BoolToVisible}}">
+                    <StackPanel>
+                        <TextBlock Text="03  EXECUTE"
+                                   Style="{StaticResource StepHeaderStyle}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                            <ui:Button Content="{Binding GenerateLabel}"
+                                       Appearance="Primary"
+                                       Height="44"
+                                       MinWidth="200"
+                                       Command="{Binding GenerateCommand}" />
+                            <ui:Button Content="{Binding CancelLabel}"
+                                       Appearance="Danger"
+                                       Height="44"
+                                       Margin="12,0,0,0"
+                                       Command="{Binding AbortCommand}"
+                                       Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
+                            <ui:ProgressRing IsIndeterminate="True"
+                                             Width="28" Height="28"
+                                             Margin="12,0,0,0"
+                                             VerticalAlignment="Center"
+                                             Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
+                        </StackPanel>
+                        <TextBlock Text="Waiting for in-flight batches to drain…"
+                                   Opacity="0.5"
+                                   FontSize="11"
+                                   Margin="0,6,0,0"
+                                   Visibility="{Binding IsCancelling, Converter={StaticResource BoolToVisible}}" />
+                    </StackPanel>
+                </ui:Card>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ── Right: live status panel ──────────────────────────────────── -->
+        <StackPanel Grid.Column="1" Margin="0,16,24,24">
+
+            <!-- Progress card -->
+            <ui:Card>
+                <StackPanel>
+                    <TextBlock Text="{Binding StatusLabel}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,12" />
+                    <controls:ProgressMonitorControl Progress="{Binding CurrentProgress}" />
+                </StackPanel>
+            </ui:Card>
+
+            <!-- Entity queue dots -->
+            <ui:Card Margin="0,12,0,0"
+                     Visibility="{Binding HasEntities, Converter={StaticResource BoolToVisible}}">
+                <ItemsControl ItemsSource="{Binding QueuedEntities}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="0,4">
+                                <Ellipse Width="8" Height="8"
+                                         Fill="{Binding DotBrush}"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding Entity.DisplayName}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ui:Card>
+
+            <!-- Last result big number -->
+            <ui:Card Margin="0,12,0,0"
+                     Visibility="{Binding HasResult, Converter={StaticResource BoolToVisible}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding LastResult.TotalRecords, StringFormat='{}{0:N0}'}"
+                               FontSize="36"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="RECORDS CREATED"
+                               FontSize="10"
+                               Opacity="0.5"
+                               Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding LastResult.Elapsed, StringFormat='{}{0:mm}:{0:ss}'}"
+                               FontSize="12"
+                               Opacity="0.6"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </ui:Card>
+
+        </StackPanel>
+    </Grid>
+</Page>

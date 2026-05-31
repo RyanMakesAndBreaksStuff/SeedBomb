@@ -12,6 +12,9 @@ public partial class FieldOverridesControl : UserControl
 {
     private readonly FieldOverridesViewModel _vm = new();
 
+    /// <summary>Gets the underlying ViewModel for parent attachment.</summary>
+    public FieldOverridesViewModel ViewModel => _vm;
+
     /// <summary>Initialises the control.</summary>
     public FieldOverridesControl()
     {

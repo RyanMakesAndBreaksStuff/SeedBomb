@@ -8,6 +8,8 @@
                 <ui:ThemesDictionary Theme="Light" />
                 <ui:ControlsDictionary />
                 <ResourceDictionary Source="/Resources/Shared.xaml" />
+                <ResourceDictionary Source="/Resources/Generate.xaml" />
+                <ResourceDictionary Source="/Resources/History.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

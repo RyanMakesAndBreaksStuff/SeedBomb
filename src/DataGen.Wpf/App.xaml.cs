@@ -6,7 +6,6 @@ using DataGen.Wpf.Services.History;
 using DataGen.Wpf.Services.Settings;
 using DataGen.Wpf.ViewModels;
 using DataGen.Wpf.ViewModels.Controls;
-using DataGen.Wpf.Views.Stubs;
 using DataGen.Wpf.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -106,10 +105,13 @@ public partial class App : Application
         sc.AddTransient<MainWindowViewModel>();
         sc.AddTransient<LoginWindowViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
+        sc.AddTransient<GenerateViewModel>();
+        sc.AddTransient<HistoryViewModel>();
+        sc.AddTransient<SettingsViewModel>();
 
-        // Stub pages — NavigationView resolves these from DI via SetServiceProvider
-        sc.AddTransient<GeneratePage>();
-        sc.AddTransient<HistoryPage>();
-        sc.AddTransient<SettingsPage>();
+        // Real pages — NavigationView resolves these from DI via SetServiceProvider
+        sc.AddTransient<DataGen.Wpf.Views.Pages.GeneratePage>();
+        sc.AddTransient<DataGen.Wpf.Views.Pages.HistoryPage>();
+        sc.AddTransient<DataGen.Wpf.Views.Pages.SettingsPage>();
     }
 }
