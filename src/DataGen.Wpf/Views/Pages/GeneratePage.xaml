@@ -64,11 +64,13 @@
                                        Appearance="Primary"
                                        Height="44"
                                        MinWidth="200"
+                                       AutomationProperties.Name="Generate data"
                                        Command="{Binding GenerateCommand}" />
                             <ui:Button Content="{Binding CancelLabel}"
                                        Appearance="Danger"
                                        Height="44"
                                        Margin="12,0,0,0"
+                                       AutomationProperties.Name="Abort generation"
                                        Command="{Binding AbortCommand}"
                                        Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
                             <ui:ProgressRing IsIndeterminate="True"

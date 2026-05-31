@@ -41,6 +41,7 @@
                            HorizontalAlignment="Stretch"
                            Height="44"
                            Appearance="Primary"
+                           AutomationProperties.Name="Sign in with Microsoft account"
                            Click="OnSignInClick"
                            IsEnabled="{Binding CanLogin}" />
 
@@ -52,7 +53,7 @@
                                  Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}" />
 
                 <TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="#E57373"
+                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                            TextWrapping="Wrap"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"

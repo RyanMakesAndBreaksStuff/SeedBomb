@@ -68,7 +68,7 @@
                                 <Setter Property="Background" Value="#33D32D1C" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Succeeded}" Value="True">
-                                        <Setter Property="Background" Value="#331EBF5E" />
+                                        <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -77,11 +77,11 @@
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="FAILED" />
-                                    <Setter Property="Foreground" Value="#E57373" />
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Succeeded}" Value="True">
                                             <Setter Property="Text" Value="SUCCESS" />
-                                            <Setter Property="Foreground" Value="#4CAF50" />
+                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

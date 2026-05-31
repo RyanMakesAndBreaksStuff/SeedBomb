@@ -50,10 +50,12 @@
                              Margin="0,12,0,0">
                 <StackPanel>
                     <ui:ToggleSwitch Header="Dark theme"
-                                     IsChecked="{Binding DarkTheme, Mode=TwoWay}" />
+                                     IsChecked="{Binding DarkTheme, Mode=TwoWay}"
+                                     AutomationProperties.Name="Toggle dark theme" />
                     <ui:ToggleSwitch Header="Reduce motion"
                                      IsChecked="{Binding ReduceMotion, Mode=TwoWay}"
-                                     Margin="0,8,0,0" />
+                                     Margin="0,8,0,0"
+                                     AutomationProperties.Name="Toggle reduce motion" />
                 </StackPanel>
             </ui:CardExpander>
 
