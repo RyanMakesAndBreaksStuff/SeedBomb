@@ -1,9 +1,11 @@
+using DataGen.Core.Metadata;
 using DataGen.Wpf.Services.Auth;
 using DataGen.Wpf.Services.Dataverse;
 using DataGen.Wpf.Services.Generation;
 using DataGen.Wpf.Services.History;
 using DataGen.Wpf.Services.Settings;
 using DataGen.Wpf.ViewModels;
+using DataGen.Wpf.ViewModels.Controls;
 using DataGen.Wpf.Views.Stubs;
 using DataGen.Wpf.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +19,9 @@ namespace DataGen.Wpf;
 public partial class App : Application
 {
     private IHost? _host;
+
+    /// <summary>Gets the DI container after <see cref="OnStartup"/> has run.</summary>
+    public IServiceProvider Services => _host!.Services;
 
     /// <inheritdoc />
     protected override async void OnStartup(StartupEventArgs e)
@@ -89,6 +94,7 @@ public partial class App : Application
         sc.AddSingleton<ISettingsService, JsonSettingsService>();
         sc.AddSingleton<IAuthService, MsalAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
+        sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
         sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();
 
@@ -99,6 +105,7 @@ public partial class App : Application
         // ViewModels — transient so each window/page gets a fresh instance
         sc.AddTransient<MainWindowViewModel>();
         sc.AddTransient<LoginWindowViewModel>();
+        sc.AddTransient<EntitySelectorViewModel>();
 
         // Stub pages — NavigationView resolves these from DI via SetServiceProvider
         sc.AddTransient<GeneratePage>();

@@ -1,0 +1,61 @@
+<UserControl x:Class="DataGen.Wpf.Views.Controls.EntitySelectorControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             Loaded="OnLoaded">
+
+    <Grid>
+        <!-- Loading spinner -->
+        <ui:ProgressRing IsIndeterminate="True"
+                         Width="36" Height="36"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}" />
+
+        <!-- Error message + retry -->
+        <StackPanel Visibility="{Binding HasError, Converter={StaticResource BoolToVisible}}">
+            <ui:InfoBar IsOpen="True"
+                        Severity="Error"
+                        Message="{Binding ErrorMessage}" />
+            <ui:Button Content="Retry"
+                       Margin="0,8,0,0"
+                       Command="{Binding LoadEntitiesCommand}" />
+        </StackPanel>
+
+        <!-- Entity list (hidden while loading) -->
+        <Expander Header="Select Entities"
+                  IsExpanded="True"
+                  Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisible}}">
+            <ListBox x:Name="EntityList"
+                     ItemsSource="{Binding Entities}"
+                     SelectionMode="Multiple"
+                     MaxHeight="300"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     SelectionChanged="OnSelectionChanged">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding DisplayName}" />
+                            <TextBlock Text=" ●"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       FontSize="10"
+                                       VerticalAlignment="Center"
+                                       Margin="2,0,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCustom}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Expander>
+    </Grid>
+</UserControl>
