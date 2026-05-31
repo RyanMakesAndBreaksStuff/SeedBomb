@@ -98,6 +98,7 @@ public partial class App : Application
 
         // ViewModels — transient so each window/page gets a fresh instance
         sc.AddTransient<MainWindowViewModel>();
+        sc.AddTransient<LoginWindowViewModel>();
 
         // Stub pages — NavigationView resolves these from DI via SetServiceProvider
         sc.AddTransient<GeneratePage>();
