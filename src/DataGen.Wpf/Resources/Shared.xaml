@@ -1,0 +1,22 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:converters="clr-namespace:DataGen.Wpf.Converters">
+
+    <!-- Value converters -->
+    <BooleanToVisibilityConverter x:Key="BoolToVisible" />
+    <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisible" />
+    <converters:NullToVisibilityConverter x:Key="NullToVisible" />
+    <converters:StringToVisibilityConverter x:Key="StringToVisible" />
+
+    <!-- Accent brush (light theme; dark theme overrides in a separate ResourceDictionary) -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#7C3AED" />
+
+    <!-- Step header text style used by wizard step cards -->
+    <Style x:Key="StepHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+
+</ResourceDictionary>
