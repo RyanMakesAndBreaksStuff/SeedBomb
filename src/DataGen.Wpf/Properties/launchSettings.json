@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DataGen.Wpf": {
+      "commandName": "Project",
+      "debugEngines": "native"
+    }
+  }
+}

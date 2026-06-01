@@ -9,8 +9,10 @@ namespace DataGen.Desktop.Services.Auth;
 /// </summary>
 public sealed class MsalAuthService : IAuthService
 {
-    private readonly IPublicClientApplication _pca;
+    private readonly string _clientId;
+    private readonly string _tenantId;
     private readonly string _orgUrl;
+    private IPublicClientApplication? _pca;
     private IAccount? _account;
 
     /// <summary>
@@ -21,13 +23,35 @@ public sealed class MsalAuthService : IAuthService
     {
         // Load synchronously once at startup — settings file is tiny and read-only here.
         var s = settings.LoadAsync().GetAwaiter().GetResult();
+        _clientId = s.ClientId;
+        _tenantId = s.TenantId;
         _orgUrl = s.OrgUrl;
+    }
+
+    private IPublicClientApplication EnsurePca()
+    {
+        if (_pca is not null)
+            return _pca;
+
+        if (string.IsNullOrWhiteSpace(_clientId))
+            throw new InvalidOperationException("Client ID is not configured. Open Settings and enter your Entra ID application ID.");
+
+        if (!Guid.TryParse(_clientId, out _))
+            throw new InvalidOperationException($"Client ID '{_clientId}' is not a valid GUID. Open Settings and correct your Entra ID application ID.");
+
+        if (string.IsNullOrWhiteSpace(_tenantId))
+            throw new InvalidOperationException("Tenant ID is not configured. Open Settings and enter your Entra ID tenant ID.");
+
+        if (!Guid.TryParse(_tenantId, out _))
+            throw new InvalidOperationException($"Tenant ID '{_tenantId}' is not a valid GUID. Open Settings and correct your Entra ID tenant ID.");
 
         _pca = PublicClientApplicationBuilder
-            .Create(s.ClientId)
-            .WithAuthority($"https://login.microsoftonline.com/{s.TenantId}")
+            .Create(_clientId)
+            .WithAuthority($"https://login.microsoftonline.com/{_tenantId}")
             .WithDefaultRedirectUri()
             .Build();
+
+        return _pca;
     }
 
     /// <inheritdoc />
@@ -36,16 +60,21 @@ public sealed class MsalAuthService : IAuthService
     /// <inheritdoc />
     public async Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(_orgUrl))
+            return new AuthResult(false, null, "Organization URL is not configured. Open Settings and enter your Dataverse URL.");
+
         var scopes = new[] { $"{_orgUrl}/.default" };
+        var pca = EnsurePca();
+
         try
         {
             // Try silent acquisition from MSAL token cache first.
-            var accounts = await _pca.GetAccountsAsync().ConfigureAwait(false);
+            var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
             _account = accounts.FirstOrDefault();
 
             if (_account is not null)
             {
-                var silent = await _pca
+                var silent = await pca
                     .AcquireTokenSilent(scopes, _account)
                     .ExecuteAsync(ct)
                     .ConfigureAwait(false);
@@ -57,7 +86,7 @@ public sealed class MsalAuthService : IAuthService
             if (parentHwnd == nint.Zero)
                 return new AuthResult(false, null, "No cached session. Please sign in.");
 
-            var interactive = await _pca
+            var interactive = await pca
                 .AcquireTokenInteractive(scopes)
                 .WithParentActivityOrWindow(parentHwnd)
                 .ExecuteAsync(ct)
@@ -73,7 +102,7 @@ public sealed class MsalAuthService : IAuthService
 
             try
             {
-                var interactive = await _pca
+                var interactive = await pca
                     .AcquireTokenInteractive(scopes)
                     .WithParentActivityOrWindow(parentHwnd)
                     .ExecuteAsync(ct)
@@ -90,12 +119,17 @@ public sealed class MsalAuthService : IAuthService
         {
             return new AuthResult(false, null, ex.Message);
         }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return new AuthResult(false, null, ex.Message);
+        }
     }
 
     /// <inheritdoc />
     public async Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default)
     {
-        var result = await _pca
+        var pca = EnsurePca();
+        var result = await pca
             .AcquireTokenSilent(scopes, _account)
             .ExecuteAsync(ct)
             .ConfigureAwait(false);
@@ -105,7 +139,7 @@ public sealed class MsalAuthService : IAuthService
     /// <inheritdoc />
     public async Task SignOutAsync(CancellationToken ct = default)
     {
-        if (_account is not null)
+        if (_account is not null && _pca is not null)
         {
             await _pca.RemoveAsync(_account).ConfigureAwait(false);
             _account = null;

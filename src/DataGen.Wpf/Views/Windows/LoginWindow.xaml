@@ -5,60 +5,96 @@
                  WindowBackdropType="Mica"
                  ExtendsContentIntoTitleBar="True"
                  Title="DataGen — Sign In"
-                 Width="480"
-                 Height="560"
+                 Width="580"
+                 Height="680"
                  WindowStartupLocation="CenterScreen"
                  ResizeMode="NoResize">
     <Grid>
-        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+        <Grid.RowDefinitions>
+            <!-- Row 0: transparent 32 px drag region that sits behind the WPF UI caption chrome -->
+            <RowDefinition Height="32"/>
+            <!-- Row 1: login card -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Login card — centred in the remaining space -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{StaticResource DG.Light.Border}"
+                BorderThickness="1"
                 CornerRadius="16"
-                Width="360"
+                Width="420"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Padding="32">
+                Padding="32,28,32,32">
             <StackPanel>
+
+                <!-- Logo icon: accent-coloured rounded square with a layers glyph -->
+                <Border Width="48"
+                        Height="48"
+                        CornerRadius="12"
+                        Background="{StaticResource DG.Accent}"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,18">
+                    <Viewbox Width="26" Height="26"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M12,2 L2,7 L12,12 L22,7 Z
+                                        M2,17 L12,22 L22,17
+                                        M2,12 L12,17 L22,12"
+                                  Stroke="White"
+                                  StrokeThickness="1.8"
+                                  StrokeLineJoin="Round"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  Fill="Transparent"/>
+                        </Canvas>
+                    </Viewbox>
+                </Border>
+
+                <!-- App title -->
                 <TextBlock Text="DataGen"
-                           FontSize="28"
+                           FontSize="24"
                            FontWeight="SemiBold"
-                           HorizontalAlignment="Center" />
+                           HorizontalAlignment="Center"
+                           Foreground="{StaticResource DG.Light.Text1}"/>
+
+                <!-- Subtitle -->
                 <TextBlock Text="Synthetic Dataverse record seeder"
                            FontSize="13"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Foreground="{StaticResource DG.Light.Text2}"
                            HorizontalAlignment="Center"
-                           TextWrapping="Wrap"
                            TextAlignment="Center"
-                           Margin="0,4,0,0" />
-                <TextBlock Text="Sign in with your Microsoft account"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           HorizontalAlignment="Center"
                            TextWrapping="Wrap"
-                           TextAlignment="Center"
-                           Margin="0,4,0,28" />
+                           Margin="0,4,0,0"/>
 
+                <!-- Sign-in button -->
                 <ui:Button x:Name="SignInButton"
-                           Content="Sign in with Microsoft"
+                           Content="Sign In"
                            HorizontalAlignment="Stretch"
-                           Height="44"
+                           Height="42"
                            Appearance="Primary"
+                           Margin="0,24,0,0"
                            AutomationProperties.Name="Sign in with Microsoft account"
                            Click="OnSignInClick"
-                           IsEnabled="{Binding CanLogin}" />
+                           IsEnabled="{Binding CanLogin}"/>
 
+                <!-- Loading indicator -->
                 <ui:ProgressRing IsIndeterminate="True"
                                  Width="28"
                                  Height="28"
                                  Margin="0,16,0,0"
                                  HorizontalAlignment="Center"
-                                 Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}" />
+                                 Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}"/>
 
-                <TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                           TextWrapping="Wrap"
-                           HorizontalAlignment="Center"
-                           TextAlignment="Center"
-                           Margin="0,12,0,0"
-                           Visibility="{Binding HasError, Converter={StaticResource BoolToVisible}}" />
+                <!-- Error notification (InfoBar replaces the raw TextBlock) -->
+                <ui:InfoBar IsOpen="{Binding HasError}"
+                            Severity="Error"
+                            Message="{Binding ErrorMessage}"
+                            IsClosable="False"
+                            Margin="0,12,0,0"/>
+
             </StackPanel>
         </Border>
     </Grid>
