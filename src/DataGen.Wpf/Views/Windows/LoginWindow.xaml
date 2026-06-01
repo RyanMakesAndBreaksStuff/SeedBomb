@@ -21,16 +21,44 @@
                            FontSize="28"
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center" />
-                <TextBlock Text="Sign in with your Microsoft account"
+                <TextBlock Text="Synthetic Dataverse record seeder"
                            FontSize="13"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            HorizontalAlignment="Center"
                            TextWrapping="Wrap"
                            TextAlignment="Center"
-                           Margin="0,8,0,24" />
-                <ui:Button Content="Sign in with Microsoft"
+                           Margin="0,4,0,0" />
+                <TextBlock Text="Sign in with your Microsoft account"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="0,4,0,28" />
+
+                <ui:Button x:Name="SignInButton"
+                           Content="Sign in with Microsoft"
                            HorizontalAlignment="Stretch"
-                           Appearance="Primary" />
+                           Height="44"
+                           Appearance="Primary"
+                           AutomationProperties.Name="Sign in with Microsoft account"
+                           Click="OnSignInClick"
+                           IsEnabled="{Binding CanLogin}" />
+
+                <ui:ProgressRing IsIndeterminate="True"
+                                 Width="28"
+                                 Height="28"
+                                 Margin="0,16,0,0"
+                                 HorizontalAlignment="Center"
+                                 Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}" />
+
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           Margin="0,12,0,0"
+                           Visibility="{Binding HasError, Converter={StaticResource BoolToVisible}}" />
             </StackPanel>
         </Border>
     </Grid>
