@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
-using DataGen.Wpf.ViewModels;
+using DataGen.Desktop.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DataGen.Wpf.Views.Pages;
+namespace DataGen.Desktop.Views.Pages;
 
 /// <summary>Displays reverse-chronological generation run history with search and CSV export.</summary>
 public partial class HistoryPage : Page

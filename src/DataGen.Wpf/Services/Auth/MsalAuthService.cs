@@ -1,11 +1,11 @@
-using DataGen.Wpf.Services.Settings;
+using DataGen.Desktop.Services.Settings;
 using Microsoft.Identity.Client;
 
-namespace DataGen.Wpf.Services.Auth;
+namespace DataGen.Desktop.Services.Auth;
 
 /// <summary>
 /// MSAL public-client authentication service. Attempts silent token acquisition first;
-/// falls back to interactive only when <paramref name="parentHwnd"/> is non-zero.
+/// falls back to interactive login when silent acquisition fails.
 /// </summary>
 public sealed class MsalAuthService : IAuthService
 {

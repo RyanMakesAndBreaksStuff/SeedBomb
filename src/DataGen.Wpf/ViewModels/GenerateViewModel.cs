@@ -3,14 +3,14 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
-using DataGen.Wpf.Services.Generation;
-using DataGen.Wpf.Services.History;
-using DataGen.Wpf.ViewModels.Controls;
+using DataGen.Desktop.Services.Generation;
+using DataGen.Desktop.Services.History;
+using DataGen.Desktop.ViewModels.Controls;
 using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui;
 
-namespace DataGen.Wpf.ViewModels;
+namespace DataGen.Desktop.ViewModels;
 
 /// <summary>Step entry in the horizontal stepper strip above the wizard cards.</summary>
 /// <param name="Label">Displayed step label.</param>
@@ -101,19 +101,19 @@ public sealed partial class GenerateViewModel : ViewModelBase
     public bool HasEntities => SelectedEntities.Count > 0;
 
     /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
-    public bool IsGenerating => _isRunning;
+    public bool IsGenerating => IsRunning;
 
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
 
     /// <summary>Gets the label for the Generate button.</summary>
-    public string GenerateLabel => _isRunning ? "GENERATING…" : "GENERATE DATA";
+    public string GenerateLabel => IsRunning ? "GENERATING…" : "GENERATE DATA";
 
     /// <summary>Gets the label for the Abort button.</summary>
-    public string CancelLabel => _isCancelling ? "ABORTING…" : "ABORT";
+    public string CancelLabel => IsCancelling ? "ABORTING…" : "ABORT";
 
     /// <summary>Gets the status panel label.</summary>
-    public string StatusLabel => _isRunning ? "In progress" : (LastResult is null ? "Ready" : "Complete");
+    public string StatusLabel => IsRunning ? "In progress" : (LastResult is null ? "Ready" : "Complete");
 
     /// <summary>Gets the collection of queued entity status dots.</summary>
     public ObservableCollection<QueuedEntityEntry> QueuedEntities { get; } = [];
@@ -130,7 +130,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>
     /// Attaches the <see cref="FieldOverridesViewModel"/> instance owned by the page's
-    /// <see cref="DataGen.Wpf.Views.Controls.FieldOverridesControl"/> so counts can be
+    /// <see cref="DataGen.Desktop.Views.Controls.FieldOverridesControl"/> so counts can be
     /// read at generation time.
     /// </summary>
     /// <param name="vm">The FieldOverrides view-model.</param>
@@ -153,7 +153,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanStartGenerate))]
     private async Task GenerateAsync()
     {
-        _isRunning = true;
+        IsRunning = true;
         CurrentProgress = null;
         LastResult = null;
         IsCancelling = false;
@@ -194,27 +194,27 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 result.Errors.Count));
 
             _snackbar.Show("Success", $"Created {result.TotalRecords:N0} records",
-                Wpf.Ui.Controls.ControlAppearance.Success);
+                Wpf.Ui.Controls.ControlAppearance.Success, null, TimeSpan.FromSeconds(3));
         }
         catch (OperationCanceledException)
         {
             _snackbar.Show("Cancelled", "Generation cancelled",
-                Wpf.Ui.Controls.ControlAppearance.Caution);
+                Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(3));
         }
         catch (MsalUiRequiredException)
         {
             _snackbar.Show("Session expired", "Please sign in again",
-                Wpf.Ui.Controls.ControlAppearance.Danger);
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
         }
         catch (Exception ex)
         {
             _snackbar.Show("Error", "Generation failed — see logs for details",
-                Wpf.Ui.Controls.ControlAppearance.Danger);
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
             _logger.LogError(ex, "Generation failed");
         }
         finally
         {
-            _isRunning = false;
+            IsRunning = false;
             IsCancelling = false;
             _cts?.Dispose();
             _cts = null;
@@ -227,7 +227,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         }
     }
 
-    private bool CanStartGenerate() => !_isRunning && SelectedEntities.Count > 0;
+    private bool CanStartGenerate() => !IsRunning && SelectedEntities.Count > 0;
 
     /// <summary>Cancels a running generation.</summary>
     [RelayCommand]

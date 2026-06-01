@@ -1,6 +1,7 @@
+using System.IO;
 using System.Text.Json;
 
-namespace DataGen.Wpf.Services.History;
+namespace DataGen.Desktop.Services.History;
 
 /// <summary>
 /// Persists run history to <c>%LOCALAPPDATA%\DataGen\history.json</c>.

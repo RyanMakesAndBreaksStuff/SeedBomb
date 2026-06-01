@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
-using DataGen.Wpf.Services.Generation;
+using DataGen.Desktop.Services.Generation;
 
-namespace DataGen.Wpf.Views.Controls;
+namespace DataGen.Desktop.Views.Controls;
 
 /// <summary>
 /// Displays a generation progress snapshot. Bind the <see cref="Progress"/> dependency

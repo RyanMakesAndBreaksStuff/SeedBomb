@@ -1,8 +1,8 @@
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
-using DataGen.Wpf.ViewModels.Controls;
+using DataGen.Desktop.ViewModels.Controls;
 
-namespace DataGen.Wpf.Views.Controls;
+namespace DataGen.Desktop.Views.Controls;
 
 /// <summary>
 /// Displays a <see cref="Wpf.Ui.Controls.NumberBox"/> per selected entity so the user

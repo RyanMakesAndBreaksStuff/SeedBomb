@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Interop;
-using DataGen.Wpf.ViewModels;
+using DataGen.Desktop.ViewModels;
 using Wpf.Ui.Controls;
 
-namespace DataGen.Wpf.Views.Windows;
+namespace DataGen.Desktop.Views.Windows;
 
 /// <summary>
 /// Sign-in window shown when no cached MSAL token is available.

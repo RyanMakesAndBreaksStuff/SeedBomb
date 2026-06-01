@@ -6,16 +6,16 @@ using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
-using DataGen.Wpf.Services.Dataverse;
+using DataGen.Desktop.Services.Dataverse;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace DataGen.Wpf.Services.Generation;
+namespace DataGen.Desktop.Services.Generation;
 
 /// <summary>
 /// Runs the Core/Bulk generation pipeline from a WPF desktop context.
 /// Builds a per-run pipeline inside <see cref="GenerateAsync"/> using a fresh
-/// <see cref="IOrganizationServiceAsync2"/> obtained from <see cref="IDataverseConnectionService"/>.
+/// Dataverse service client obtained from <see cref="IDataverseConnectionService"/>.
 /// Progress is dispatched to the UI thread via <see cref="System.Windows.Application.Current"/> dispatcher.
 /// </summary>
 public sealed class WpfGenerationService : IWpfGenerationService

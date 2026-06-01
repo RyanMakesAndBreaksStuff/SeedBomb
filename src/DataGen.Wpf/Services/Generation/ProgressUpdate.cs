@@ -1,4 +1,4 @@
-namespace DataGen.Wpf.Services.Generation;
+namespace DataGen.Desktop.Services.Generation;
 
 /// <summary>
 /// Immutable progress snapshot reported from the generation pipeline to the WPF UI.

@@ -1,4 +1,4 @@
-namespace DataGen.Wpf.Services.Settings;
+namespace DataGen.Desktop.Services.Settings;
 
 /// <summary>
 /// Persisted application settings.

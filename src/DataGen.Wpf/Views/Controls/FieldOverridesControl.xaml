@@ -1,4 +1,4 @@
-<UserControl x:Class="DataGen.Wpf.Views.Controls.FieldOverridesControl"
+<UserControl x:Class="DataGen.Desktop.Views.Controls.FieldOverridesControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
@@ -11,12 +11,14 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate>
-                <ui:NumberBox Header="{Binding Entity.DisplayName}"
-                              Value="{Binding Count, Mode=TwoWay}"
-                              Minimum="1"
-                              Maximum="100000"
-                              Width="200"
-                              Margin="6" />
+                <StackPanel Width="200" Margin="6">
+                    <TextBlock Text="{Binding Entity.DisplayName}"
+                               FontSize="12"
+                               Margin="0,0,0,2" />
+                    <ui:NumberBox Value="{Binding Count, Mode=TwoWay}"
+                                  Minimum="1"
+                                  Maximum="100000" />
+                </StackPanel>
             </DataTemplate>
         </ItemsControl.ItemTemplate>
     </ItemsControl>

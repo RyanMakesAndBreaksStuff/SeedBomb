@@ -1,5 +1,3 @@
-// Global using aliases to resolve namespace ambiguity between DataGen.Wpf
-// and the Wpf.Ui.* packages. Without this alias, the C# compiler resolves
-// `Wpf.Ui.Controls` as DataGen.Wpf.Ui.Controls because `DataGen` contains
-// a `Wpf` child namespace, shadowing the global Wpf.Ui assembly.
-global using Wpf = global::Wpf;
+// Global using aliases are now generated via MSBuild <Using> item in
+// DataGen.Desktop.csproj so the WPF markup-compilation temporary project
+// also sees the alias (it does not compile this file).

@@ -1,4 +1,4 @@
-namespace DataGen.Wpf.Services.Auth;
+namespace DataGen.Desktop.Services.Auth;
 
 /// <summary>
 /// Provides MSAL-based authentication for the desktop application.

@@ -1,4 +1,4 @@
-namespace DataGen.Wpf.Services.History;
+namespace DataGen.Desktop.Services.History;
 
 /// <summary>
 /// Persists and retrieves generation run history.

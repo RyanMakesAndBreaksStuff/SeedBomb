@@ -1,8 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace DataGen.Wpf.ViewModels;
+namespace DataGen.Desktop.ViewModels;
 
-/// <summary>ViewModel for <see cref="DataGen.Wpf.Views.Windows.MainWindow"/>.</summary>
+/// <summary>ViewModel for <see cref="DataGen.Desktop.Views.Windows.MainWindow"/>.</summary>
 public partial class MainWindowViewModel : ObservableObject
 {
     [ObservableProperty]

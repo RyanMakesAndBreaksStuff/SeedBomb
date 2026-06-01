@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Wpf.Ui.Abstractions.Controls;
 
-namespace DataGen.Wpf.ViewModels;
+namespace DataGen.Desktop.ViewModels;
 
 /// <summary>
 /// Base class for all page view-models. Implements <see cref="INavigationAware"/>
@@ -10,8 +10,8 @@ namespace DataGen.Wpf.ViewModels;
 public abstract class ViewModelBase : ObservableObject, INavigationAware
 {
     /// <inheritdoc />
-    public virtual void OnNavigatedTo() { }
+    public virtual Task OnNavigatedToAsync() => Task.CompletedTask;
 
     /// <inheritdoc />
-    public virtual void OnNavigatedFrom() { }
+    public virtual Task OnNavigatedFromAsync() => Task.CompletedTask;
 }

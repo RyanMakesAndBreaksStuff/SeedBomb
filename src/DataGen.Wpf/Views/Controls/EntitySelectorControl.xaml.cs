@@ -1,10 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
-using DataGen.Wpf.ViewModels.Controls;
+using DataGen.Desktop.ViewModels.Controls;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DataGen.Wpf.Views.Controls;
+namespace DataGen.Desktop.Views.Controls;
 
 /// <summary>
 /// Lists Dataverse user entities with multi-select. Raises

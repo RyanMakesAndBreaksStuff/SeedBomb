@@ -1,4 +1,4 @@
-namespace DataGen.Wpf.Services.Auth;
+namespace DataGen.Desktop.Services.Auth;
 
 /// <summary>
 /// Result returned by <see cref="IAuthService.SignInAsync"/>.

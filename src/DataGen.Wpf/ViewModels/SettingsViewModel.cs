@@ -1,11 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Wpf.Services.Dataverse;
-using DataGen.Wpf.Services.Settings;
+using DataGen.Desktop.Services.Dataverse;
+using DataGen.Desktop.Services.Settings;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui.Appearance;
 
-namespace DataGen.Wpf.ViewModels;
+namespace DataGen.Desktop.ViewModels;
 
 /// <summary>ViewModel for the Settings page.</summary>
 public sealed partial class SettingsViewModel : ViewModelBase
@@ -58,7 +58,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
         ApplicationThemeManager.Apply(value ? ApplicationTheme.Dark : ApplicationTheme.Light);
 
     /// <inheritdoc />
-    public override void OnNavigatedTo() => LoadCommand.Execute(null);
+    public override Task OnNavigatedToAsync()
+    {
+        LoadCommand.Execute(null);
+        return Task.CompletedTask;
+    }
 
     [RelayCommand]
     private async Task LoadAsync()

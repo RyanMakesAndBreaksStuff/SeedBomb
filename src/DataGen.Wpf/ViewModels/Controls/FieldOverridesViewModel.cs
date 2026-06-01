@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DataGen.Core.Contracts;
 
-namespace DataGen.Wpf.ViewModels.Controls;
+namespace DataGen.Desktop.ViewModels.Controls;
 
 /// <summary>Represents a single entity's record-count entry in <see cref="FieldOverridesViewModel"/>.</summary>
 public sealed partial class EntityCountEntry : ObservableObject
@@ -23,7 +23,7 @@ public sealed partial class EntityCountEntry : ObservableObject
     }
 }
 
-/// <summary>ViewModel for <see cref="DataGen.Wpf.Views.Controls.FieldOverridesControl"/>.</summary>
+/// <summary>ViewModel for <see cref="DataGen.Desktop.Views.Controls.FieldOverridesControl"/>.</summary>
 public sealed class FieldOverridesViewModel : ObservableObject
 {
     /// <summary>One entry per selected entity.</summary>

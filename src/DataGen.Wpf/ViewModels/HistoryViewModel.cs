@@ -3,10 +3,10 @@ using System.ComponentModel;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Wpf.Services.History;
+using DataGen.Desktop.Services.History;
 using Microsoft.Extensions.Logging;
 
-namespace DataGen.Wpf.ViewModels;
+namespace DataGen.Desktop.ViewModels;
 
 /// <summary>ViewModel for the History page.</summary>
 public sealed partial class HistoryViewModel : ViewModelBase
@@ -53,7 +53,11 @@ public sealed partial class HistoryViewModel : ViewModelBase
     partial void OnSearchTextChanged(string value) => RunsView.Refresh();
 
     /// <inheritdoc />
-    public override void OnNavigatedTo() => LoadCommand.Execute(null);
+    public override Task OnNavigatedToAsync()
+    {
+        LoadCommand.Execute(null);
+        return Task.CompletedTask;
+    }
 
     /// <summary>Gets a value indicating whether the history list is empty.</summary>
     public bool IsEmpty => !Runs.Any();

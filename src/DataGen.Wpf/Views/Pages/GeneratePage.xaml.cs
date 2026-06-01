@@ -1,10 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
-using DataGen.Wpf.ViewModels;
+using DataGen.Desktop.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DataGen.Wpf.Views.Pages;
+namespace DataGen.Desktop.Views.Pages;
 
 /// <summary>
 /// Three-step wizard page: select entities → configure counts → execute generation.

@@ -1,6 +1,6 @@
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DataGen.Wpf.Services.Dataverse;
+namespace DataGen.Desktop.Services.Dataverse;
 
 /// <summary>
 /// Manages a cached <see cref="IOrganizationServiceAsync2"/> connection to Dataverse.

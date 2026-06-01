@@ -1,6 +1,6 @@
 using DataGen.Core.Contracts;
 
-namespace DataGen.Wpf.Services.Generation;
+namespace DataGen.Desktop.Services.Generation;
 
 /// <summary>
 /// Runs the Core/Bulk generation pipeline from a WPF context.

@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace DataGen.Wpf.Views.Stubs;
+namespace DataGen.Desktop.Views.Stubs;
 
 /// <summary>History page stub — replaced in Wave 2.</summary>
 public partial class HistoryPage : Page

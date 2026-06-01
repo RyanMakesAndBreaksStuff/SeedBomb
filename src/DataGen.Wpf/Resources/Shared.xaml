@@ -1,6 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:converters="clr-namespace:DataGen.Wpf.Converters">
+                    xmlns:converters="clr-namespace:DataGen.Desktop.Converters">
 
     <!-- Value converters -->
     <BooleanToVisibilityConverter x:Key="BoolToVisible" />

@@ -1,8 +1,8 @@
-using DataGen.Wpf.Services.Auth;
-using DataGen.Wpf.Services.Settings;
+using DataGen.Desktop.Services.Auth;
+using DataGen.Desktop.Services.Settings;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DataGen.Wpf.Services.Dataverse;
+namespace DataGen.Desktop.Services.Dataverse;
 
 /// <summary>
 /// Manages a lazily-created, cached <see cref="ServiceClient"/> connection.
@@ -51,7 +51,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
 
             if (!_cached.IsReady)
                 throw new InvalidOperationException(
-                    $"ServiceClient failed to connect: {_cached.LastError?.Message}");
+                    $"ServiceClient failed to connect: {_cached.LastError}");
 
             return _cached;
         }

@@ -1,6 +1,7 @@
+using System.IO;
 using System.Text.Json;
 
-namespace DataGen.Wpf.Services.Settings;
+namespace DataGen.Desktop.Services.Settings;
 
 /// <summary>
 /// Loads and saves <see cref="AppSettings"/> to <c>%LOCALAPPDATA%\DataGen\settings.json</c>.

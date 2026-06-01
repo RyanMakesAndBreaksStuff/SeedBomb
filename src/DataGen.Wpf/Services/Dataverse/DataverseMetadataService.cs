@@ -1,11 +1,11 @@
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
-using DataGen.Wpf.Services.Settings;
+using DataGen.Desktop.Services.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Wpf.Services.Dataverse;
+namespace DataGen.Desktop.Services.Dataverse;
 
 /// <summary>
 /// Singleton <see cref="IMetadataProvider"/> that defers <see cref="DataverseMetadataProvider"/>

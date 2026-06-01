@@ -1,9 +1,9 @@
 using System.Windows;
-using DataGen.Wpf.ViewModels;
+using DataGen.Desktop.ViewModels;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace DataGen.Wpf.Views.Windows;
+namespace DataGen.Desktop.Views.Windows;
 
 /// <summary>
 /// Main application window. Hosts the top-tab <see cref="NavigationView"/>
@@ -44,7 +44,7 @@ public partial class MainWindow : FluentWindow
         {
             foreach (var child in grid.Children.OfType<ContentDialogHost>())
             {
-                _contentDialogService.SetDialogControl(child);
+                _contentDialogService.SetDialogHost(child);
                 break;
             }
         }

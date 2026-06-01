@@ -1,18 +1,18 @@
 using DataGen.Core.Metadata;
-using DataGen.Wpf.Services.Auth;
-using DataGen.Wpf.Services.Dataverse;
-using DataGen.Wpf.Services.Generation;
-using DataGen.Wpf.Services.History;
-using DataGen.Wpf.Services.Settings;
-using DataGen.Wpf.ViewModels;
-using DataGen.Wpf.ViewModels.Controls;
-using DataGen.Wpf.Views.Windows;
+using DataGen.Desktop.Services.Auth;
+using DataGen.Desktop.Services.Dataverse;
+using DataGen.Desktop.Services.Generation;
+using DataGen.Desktop.Services.History;
+using DataGen.Desktop.Services.Settings;
+using DataGen.Desktop.ViewModels;
+using DataGen.Desktop.ViewModels.Controls;
+using DataGen.Desktop.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Windows;
 using Wpf.Ui;
 
-namespace DataGen.Wpf;
+namespace DataGen.Desktop;
 
 /// <summary>WPF application entry point. Hosts the generic host and owns window lifetime.</summary>
 public partial class App : Application
@@ -110,8 +110,8 @@ public partial class App : Application
         sc.AddTransient<SettingsViewModel>();
 
         // Real pages — NavigationView resolves these from DI via SetServiceProvider
-        sc.AddTransient<DataGen.Wpf.Views.Pages.GeneratePage>();
-        sc.AddTransient<DataGen.Wpf.Views.Pages.HistoryPage>();
-        sc.AddTransient<DataGen.Wpf.Views.Pages.SettingsPage>();
+        sc.AddTransient<DataGen.Desktop.Views.Pages.GeneratePage>();
+        sc.AddTransient<DataGen.Desktop.Views.Pages.HistoryPage>();
+        sc.AddTransient<DataGen.Desktop.Views.Pages.SettingsPage>();
     }
 }
