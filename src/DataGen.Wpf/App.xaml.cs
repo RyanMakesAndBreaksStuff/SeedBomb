@@ -1,5 +1,6 @@
 using DataGen.Core.Metadata;
 using DataGen.Desktop.Services.Auth;
+using DataGen.Desktop.Services.Connections;
 using DataGen.Desktop.Services.Dataverse;
 using DataGen.Desktop.Services.Generation;
 using DataGen.Desktop.Services.History;
@@ -91,7 +92,8 @@ public partial class App : Application
 
         // App services — all singleton (one app lifetime)
         sc.AddSingleton<ISettingsService, JsonSettingsService>();
-        sc.AddSingleton<IAuthService, MsalAuthService>();
+        sc.AddSingleton<IConnectionProfileService, JsonConnectionProfileService>();
+        sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
@@ -104,6 +106,7 @@ public partial class App : Application
         // ViewModels — transient so each window/page gets a fresh instance
         sc.AddTransient<MainWindowViewModel>();
         sc.AddTransient<LoginWindowViewModel>();
+        sc.AddTransient<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
         sc.AddTransient<GenerateViewModel>();
         sc.AddTransient<HistoryViewModel>();

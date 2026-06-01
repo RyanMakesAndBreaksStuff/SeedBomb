@@ -1,5 +1,5 @@
 using DataGen.Desktop.Services.Auth;
-using DataGen.Desktop.Services.Settings;
+using DataGen.Desktop.Services.Connections;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
 namespace DataGen.Desktop.Services.Dataverse;
@@ -11,17 +11,18 @@ namespace DataGen.Desktop.Services.Dataverse;
 public sealed class DataverseConnectionService : IDataverseConnectionService, IDisposable
 {
     private readonly IAuthService _auth;
-    private readonly ISettingsService _settings;
+    private readonly IConnectionProfileService _profileService;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cached;
 
     /// <summary>Initialises the service with required dependencies.</summary>
     /// <param name="auth">Auth service used to supply bearer tokens.</param>
-    /// <param name="settings">Settings service supplying the org URL.</param>
-    public DataverseConnectionService(IAuthService auth, ISettingsService settings)
+    /// <param name="profileService">Profile service supplying the environment URL.</param>
+    public DataverseConnectionService(IAuthService auth, IConnectionProfileService profileService)
     {
         _auth = auth;
-        _settings = settings;
+        _profileService = profileService;
+        _profileService.ProfilesChanged += OnProfilesChanged;
     }
 
     /// <inheritdoc />
@@ -36,11 +37,12 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             if (_cached is { IsReady: true })
                 return _cached;
 
-            var s = await _settings.LoadAsync(ct).ConfigureAwait(false);
-            var scopes = new[] { $"{s.OrgUrl}/.default" };
+            var profile = await _profileService.GetLastUsedAsync(ct).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("No connection profile configured.");
+            var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
             _cached = new ServiceClient(
-                instanceUrl: new Uri(s.OrgUrl),
+                instanceUrl: new Uri(profile.EnvironmentUrl),
                 tokenProviderFunction: async _ => await _auth.GetTokenAsync(scopes, ct).ConfigureAwait(false),
                 useUniqueInstance: true);
 
@@ -68,9 +70,12 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         _cached = null;
     }
 
+    private void OnProfilesChanged(object? sender, EventArgs e) => Reset();
+
     /// <inheritdoc />
     public void Dispose()
     {
+        _profileService.ProfilesChanged -= OnProfilesChanged;
         _cached?.Dispose();
         _lock.Dispose();
     }

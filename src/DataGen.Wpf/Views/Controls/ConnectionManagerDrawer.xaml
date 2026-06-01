@@ -1,0 +1,236 @@
+<UserControl x:Class="DataGen.Desktop.Views.Controls.ConnectionManagerDrawer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:conn="clr-namespace:DataGen.Desktop.Services.Connections"
+             xmlns:vm="clr-namespace:DataGen.Desktop.ViewModels"
+             xmlns:converters="clr-namespace:DataGen.Desktop.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             Width="500"
+             d:DataContext="{d:DesignInstance vm:ConnectionManagerViewModel, IsDesignTimeCreatable=False}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisible"/>
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisible"/>
+        <converters:NullToVisibilityConverter x:Key="NullToVisible"/>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,8,0,2"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource ApplicationBackgroundBrush}"
+            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+            BorderThickness="1,0,0,0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Padding="16,12"
+                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid>
+                    <TextBlock Text="Connection Manager"
+                               FontSize="16" FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                    <ui:Button HorizontalAlignment="Right"
+                               Appearance="Transparent"
+                               ToolTip="Close"
+                               Command="{Binding CloseCommand}">
+                        <ui:SymbolIcon Symbol="Dismiss24"/>
+                    </ui:Button>
+                </Grid>
+            </Border>
+
+            <!-- Scrollable content -->
+            <ScrollViewer Grid.Row="1" Padding="16">
+                <StackPanel>
+
+                    <!-- Profile list (hidden while editing) -->
+                    <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisible}}">
+                        <ui:Button Content="+ New Profile"
+                                   Appearance="Secondary"
+                                   HorizontalAlignment="Left"
+                                   Margin="0,0,0,12"
+                                   Command="{Binding NewProfileCommand}"/>
+
+                        <ItemsControl ItemsSource="{Binding Profiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type conn:ConnectionProfile}">
+                                    <Border Margin="0,0,0,6" Padding="10,8"
+                                            CornerRadius="8"
+                                            Background="{DynamicResource ControlFillColorDefaultBrush}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold" FontSize="13"/>
+                                                <TextBlock FontSize="11"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                    <Run Text="{Binding AuthType, Mode=OneWay}"/>
+                                                    <Run Text=" · "/>
+                                                    <Run Text="{Binding EnvironmentType, Mode=OneWay}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                <ui:Button Appearance="Transparent" Margin="0,0,4,0"
+                                                           ToolTip="Edit"
+                                                           Command="{Binding DataContext.EditProfileCommand,
+                                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:SymbolIcon Symbol="Edit24"/>
+                                                </ui:Button>
+                                                <ui:Button Appearance="Transparent"
+                                                           ToolTip="Delete"
+                                                           Command="{Binding DataContext.DeleteProfileAsyncCommand,
+                                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:SymbolIcon Symbol="Delete24"/>
+                                                </ui:Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="No profiles yet. Click '+ New Profile' to create one."
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   Margin="0,8,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Profiles.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Edit form (visible while editing) -->
+                    <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisible}}">
+
+                        <TextBlock Text="Name" Style="{StaticResource FieldLabel}"/>
+                        <ui:TextBox Text="{Binding EditingProfile.Name, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="e.g. Dev, UAT, Prod"/>
+
+                        <TextBlock Text="Environment URL" Style="{StaticResource FieldLabel}"/>
+                        <ui:TextBox Text="{Binding EditingProfile.EnvironmentUrl, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="https://yourorg.crm.dynamics.com"/>
+
+                        <TextBlock Text="Environment Type" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox SelectedItem="{Binding EditingProfile.EnvironmentType}"
+                                  ItemsSource="{Binding Source={x:Static conn:EnvironmentTypeValues.All}}"/>
+
+                        <TextBlock Text="Auth Type" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox SelectedItem="{Binding EditingProfile.AuthType}"
+                                  ItemsSource="{Binding Source={x:Static conn:AuthTypeValues.All}}"/>
+
+                        <!-- Client ID — all auth types -->
+                        <TextBlock Text="Client ID (Application ID)" Style="{StaticResource FieldLabel}"/>
+                        <ui:TextBox Text="{Binding EditingProfile.ClientId, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+
+                        <!-- Tenant ID — all auth types -->
+                        <TextBlock Text="Tenant ID (Directory ID)" Style="{StaticResource FieldLabel}"/>
+                        <ui:TextBox Text="{Binding EditingProfile.TenantId, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+
+                        <!-- Client Secret — ClientSecret only -->
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding EditingProfile.AuthType}"
+                                                     Value="{x:Static conn:AuthType.ClientSecret}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Client Secret" Style="{StaticResource FieldLabel}"/>
+                            <ui:PasswordBox Password="{Binding EditingProfile.ClientSecret, UpdateSourceTrigger=PropertyChanged}"
+                                            PlaceholderText="••••••••"/>
+                        </StackPanel>
+
+                        <!-- Username / Password — UserPassword only -->
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding EditingProfile.AuthType}"
+                                                     Value="{x:Static conn:AuthType.UserPassword}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Username" Style="{StaticResource FieldLabel}"/>
+                            <ui:TextBox Text="{Binding EditingProfile.Username, UpdateSourceTrigger=PropertyChanged}"
+                                        PlaceholderText="user@yourorg.onmicrosoft.com"/>
+                            <TextBlock Text="Password" Style="{StaticResource FieldLabel}"/>
+                            <ui:PasswordBox Password="{Binding EditingProfile.Password, UpdateSourceTrigger=PropertyChanged}"
+                                            PlaceholderText="••••••••"/>
+                        </StackPanel>
+
+                        <!-- Test Connection -->
+                        <ui:Button Content="Test Connection"
+                                   Appearance="Secondary"
+                                   HorizontalAlignment="Left"
+                                   Margin="0,16,0,0"
+                                   Command="{Binding TestConnectionAsyncCommand}"/>
+
+                        <ui:ProgressRing IsIndeterminate="True"
+                                         Width="20" Height="20"
+                                         Margin="0,8,0,0"
+                                         HorizontalAlignment="Left"
+                                         Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisible}}"/>
+
+                        <!-- Test result chip -->
+                        <Border Margin="0,8,0,0" Padding="8,4" CornerRadius="4"
+                                HorizontalAlignment="Left"
+                                Visibility="{Binding TestResult, Converter={StaticResource NullToVisible}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TestSucceeded}" Value="False">
+                                            <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBackgroundBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding TestResult}" FontSize="12" TextWrapping="Wrap"/>
+                        </Border>
+
+                        <!-- Save / Cancel -->
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                            <ui:Button Content="Save"
+                                       Appearance="Primary"
+                                       Margin="0,0,8,0"
+                                       Command="{Binding SaveProfileAsyncCommand}"/>
+                            <ui:Button Content="Cancel"
+                                       Appearance="Secondary"
+                                       Command="{Binding CancelCommand}"/>
+                        </StackPanel>
+
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>
