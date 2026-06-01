@@ -62,42 +62,89 @@
                         <ItemsControl ItemsSource="{Binding Profiles}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type conn:ConnectionProfile}">
-                                    <Border Margin="0,0,0,6" Padding="10,8"
-                                            CornerRadius="8"
-                                            Background="{DynamicResource ControlFillColorDefaultBrush}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}"
-                                                           FontWeight="SemiBold" FontSize="13"/>
-                                                <TextBlock FontSize="11"
-                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}">
-                                                    <Run Text="{Binding AuthType, Mode=OneWay}"/>
-                                                    <Run Text=" · "/>
-                                                    <Run Text="{Binding EnvironmentType, Mode=OneWay}"/>
-                                                </TextBlock>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                <ui:Button Appearance="Transparent" Margin="0,0,4,0"
-                                                           ToolTip="Edit"
-                                                           Command="{Binding DataContext.EditProfileCommand,
-                                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                           CommandParameter="{Binding}">
-                                                    <ui:SymbolIcon Symbol="Edit24"/>
-                                                </ui:Button>
-                                                <ui:Button Appearance="Transparent"
-                                                           ToolTip="Delete"
-                                                           Command="{Binding DataContext.DeleteProfileAsyncCommand,
-                                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                           CommandParameter="{Binding}">
-                                                    <ui:SymbolIcon Symbol="Delete24"/>
-                                                </ui:Button>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
+                                    <!-- Outer transparent button: click card body to set as active profile.
+                                         Inner Edit/Delete buttons consume their own MouseDown (e.Handled=true)
+                                         so they do not trigger this outer command. -->
+                                    <Button HorizontalContentAlignment="Stretch"
+                                            Margin="0,0,0,6"
+                                            Command="{Binding DataContext.SelectProfileCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <ContentPresenter/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                        <Border Padding="10,8" CornerRadius="8">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLastUsed}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource SystemAccentColor3Brush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColorBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontWeight="SemiBold" FontSize="13"/>
+                                                        <ui:SymbolIcon Symbol="CheckmarkCircle16"
+                                                                       Margin="6,0,0,0"
+                                                                       VerticalAlignment="Center"
+                                                                       Foreground="{DynamicResource SystemAccentColorBrush}">
+                                                            <ui:SymbolIcon.Style>
+                                                                <Style TargetType="ui:SymbolIcon">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsLastUsed}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </ui:SymbolIcon.Style>
+                                                        </ui:SymbolIcon>
+                                                    </StackPanel>
+                                                    <TextBlock FontSize="11"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                        <Run Text="{Binding AuthType, Mode=OneWay}"/>
+                                                        <Run Text=" · "/>
+                                                        <Run Text="{Binding EnvironmentType, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                    <ui:Button Appearance="Transparent" Margin="0,0,4,0"
+                                                               ToolTip="Edit"
+                                                               Command="{Binding DataContext.EditProfileCommand,
+                                                                   RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}">
+                                                        <ui:SymbolIcon Symbol="Edit24"/>
+                                                    </ui:Button>
+                                                    <ui:Button Appearance="Transparent"
+                                                               ToolTip="Delete"
+                                                               Command="{Binding DataContext.DeleteProfileCommand,
+                                                                   RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}">
+                                                        <ui:SymbolIcon Symbol="Delete24"/>
+                                                    </ui:Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -192,7 +239,7 @@
                                    Appearance="Secondary"
                                    HorizontalAlignment="Left"
                                    Margin="0,16,0,0"
-                                   Command="{Binding TestConnectionAsyncCommand}"/>
+                                   Command="{Binding TestConnectionCommand}"/>
 
                         <ui:ProgressRing IsIndeterminate="True"
                                          Width="20" Height="20"
@@ -222,7 +269,7 @@
                             <ui:Button Content="Save"
                                        Appearance="Primary"
                                        Margin="0,0,8,0"
-                                       Command="{Binding SaveProfileAsyncCommand}"/>
+                                       Command="{Binding SaveProfileCommand}"/>
                             <ui:Button Content="Cancel"
                                        Appearance="Secondary"
                                        Command="{Binding CancelCommand}"/>

@@ -30,24 +30,41 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty] private string? _testResult;
     [ObservableProperty] private bool _testSucceeded;
 
-    /// <summary>Loads profiles from storage.</summary>
+    /// <summary>Loads profiles from storage and marks the active profile.</summary>
     [RelayCommand]
     internal async Task LoadAsync()
     {
         var all = await _profileService.GetAllAsync().ConfigureAwait(false);
+        var lastUsed = await _profileService.GetLastUsedAsync().ConfigureAwait(false);
         await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             Profiles.Clear();
-            foreach (var p in all) Profiles.Add(p);
+            foreach (var p in all)
+            {
+                p.IsLastUsed = lastUsed?.Id == p.Id;
+                Profiles.Add(p);
+            }
         });
     }
 
-    /// <summary>Starts creating a blank new profile.</summary>
+    /// <summary>Starts creating a blank new profile with OAuth defaults pre-filled.</summary>
     [RelayCommand]
     private void NewProfile()
     {
-        EditingProfile = new ConnectionProfile();
+        EditingProfile = new ConnectionProfile
+        {
+            // Microsoft's well-known public client ID for Dynamics 365 / Power Platform
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+        };
         IsEditing = true;
+    }
+
+    /// <summary>Sets a profile as the active connection for sign-in.</summary>
+    [RelayCommand]
+    private async Task SelectProfileAsync(ConnectionProfile profile)
+    {
+        await _profileService.SetLastUsedAsync(profile.Id).ConfigureAwait(false);
+        await LoadAsync().ConfigureAwait(false);
     }
 
     /// <summary>Starts editing an existing profile.</summary>

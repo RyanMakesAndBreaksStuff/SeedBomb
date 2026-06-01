@@ -2,7 +2,7 @@
   "profiles": {
     "DataGen.Wpf": {
       "commandName": "Project",
-      "debugEngines": "native"
+      "debugEngines": "managed,native"
     }
   }
 }

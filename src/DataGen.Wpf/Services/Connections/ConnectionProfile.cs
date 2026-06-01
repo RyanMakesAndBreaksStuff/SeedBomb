@@ -59,6 +59,9 @@ public sealed class ConnectionProfile
 
     /// <summary>Password (plaintext). Used by <see cref="AuthType.UserPassword"/> only.</summary>
     public string? Password { get; set; }
+
+    /// <summary>Not persisted. Set by the VM to mark the currently active (last-used) profile.</summary>
+    public bool IsLastUsed { get; set; }
 }
 
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>
