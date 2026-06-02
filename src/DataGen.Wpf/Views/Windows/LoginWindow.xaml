@@ -9,7 +9,9 @@
                  Width="580"
                  Height="680"
                  WindowStartupLocation="CenterScreen"
-                 ResizeMode="NoResize">
+                 MinWidth="480"
+                 MinHeight="560"
+                 ResizeMode="CanResize">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>

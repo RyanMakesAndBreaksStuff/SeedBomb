@@ -1,5 +1,6 @@
 using System.Windows;
 using DataGen.Desktop.ViewModels;
+using DataGen.Desktop.Views.Pages;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
@@ -48,5 +49,7 @@ public partial class MainWindow : FluentWindow
                 break;
             }
         }
+
+        RootNavigation.Navigate(typeof(GeneratePage));
     }
 }
