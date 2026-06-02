@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Windows;
 using Wpf.Ui;
+using Wpf.Ui.Appearance;
 
 namespace DataGen.Desktop;
 
@@ -33,6 +34,13 @@ public partial class App : Application
             ConfigureServices(builder.Services);
             _host = builder.Build();
             await _host.StartAsync();
+
+            // Apply saved theme before showing any window so both LoginWindow
+            // and MainWindow render correctly from the first frame.
+            var settings = _host.Services.GetRequiredService<ISettingsService>();
+            var savedSettings = await settings.LoadAsync();
+            if (savedSettings.DarkTheme)
+                ApplicationThemeManager.Apply(ApplicationTheme.Dark);
 
             // Attempt silent token acquisition before showing any window.
             // Pass nint.Zero to suppress any interactive popup — silent-only path.
