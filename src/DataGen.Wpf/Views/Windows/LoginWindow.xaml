@@ -9,7 +9,9 @@
                  Width="580"
                  Height="680"
                  WindowStartupLocation="CenterScreen"
-                 ResizeMode="NoResize">
+                 MinWidth="480"
+                 MinHeight="560"
+                 ResizeMode="CanResize">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>
@@ -19,7 +21,7 @@
         <!-- Login card — centred in the remaining space -->
         <Border Grid.Row="1"
                 Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{StaticResource DG.Light.Border}"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="16"
                 Width="420"
@@ -57,12 +59,12 @@
                            FontSize="24"
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center"
-                           Foreground="{StaticResource DG.Light.Text1}"/>
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
 
                 <!-- Subtitle -->
                 <TextBlock Text="Synthetic Dataverse record seeder"
                            FontSize="13"
-                           Foreground="{StaticResource DG.Light.Text2}"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
