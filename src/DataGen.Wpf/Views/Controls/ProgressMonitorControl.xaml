@@ -33,9 +33,9 @@
         <TextBlock x:Name="EntityText"
                    FontSize="11"
                    Foreground="{DynamicResource DG.Text3}"
-                   Margin="0,2,0,0" />
+                   Margin="0,4,0,0" />
         <ProgressBar x:Name="ProgressBar"
-                     Margin="0,8,0,8"
+                     Margin="0,14,0,12"
                      Style="{StaticResource StudioProgressBarStyle}" />
         <Grid>
             <Grid.ColumnDefinitions>
@@ -61,7 +61,7 @@
         <TextBlock x:Name="BatchSummary"
                    Foreground="{DynamicResource DG.Text3}"
                    FontSize="11"
-                   Margin="0,4,0,0" />
+                   Margin="0,8,0,0" />
     </StackPanel>
 
 </UserControl>

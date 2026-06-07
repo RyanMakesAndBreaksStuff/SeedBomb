@@ -62,6 +62,12 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <summary>Gets a value indicating whether the history list is empty.</summary>
     public bool IsEmpty => !Runs.Any();
 
+    /// <summary>Gets the header summary for the loaded run history.</summary>
+    public string HistorySummary =>
+        Runs.Count == 0
+            ? "No runs yet"
+            : $"{Runs.Count:N0} runs · {Runs.Sum(r => r.TotalRecords):N0} total records created";
+
     [RelayCommand]
     private async Task LoadAsync()
     {
@@ -72,6 +78,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
             foreach (var run in runs)
                 Runs.Add(run);
             OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(HistorySummary));
         }
         catch (Exception ex)
         {
@@ -87,6 +94,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
             await _historyService.ClearAsync();
             Runs.Clear();
             OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(HistorySummary));
         }
         catch (Exception ex)
         {

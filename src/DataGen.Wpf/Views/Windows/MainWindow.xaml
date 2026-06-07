@@ -72,33 +72,6 @@
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
 
-            <ui:NavigationView.PaneFooter>
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            Margin="0,0,20,0">
-                    <Border Width="28"
-                            Height="28"
-                            CornerRadius="14"
-                            Background="{StaticResource DG.Accent}"
-                            Margin="0,0,9,0">
-                        <TextBlock Text="{Binding UserInitials}"
-                                   Foreground="White"
-                                   FontSize="11"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding UserDisplayName}"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource DG.Text1}" />
-                        <TextBlock Text="{Binding OrgHost}"
-                                   FontSize="10"
-                                   Foreground="{DynamicResource DG.Text3}" />
-                    </StackPanel>
-                </StackPanel>
-            </ui:NavigationView.PaneFooter>
-
             <ui:NavigationView.ContentOverlay>
                 <Grid>
                     <ui:SnackbarPresenter x:Name="SnackbarPresenter" />
@@ -106,6 +79,35 @@
             </ui:NavigationView.ContentOverlay>
 
         </ui:NavigationView>
+
+        <StackPanel Grid.Row="1"
+                    Panel.ZIndex="10"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    IsHitTestVisible="False"
+                    Margin="0,8,20,0">
+            <Border Width="28"
+                    Height="28"
+                    CornerRadius="14"
+                    Background="{StaticResource DG.Accent}"
+                    Margin="0,0,9,0">
+                <TextBlock Text="{Binding UserInitials}"
+                           Foreground="White"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="{Binding UserDisplayName}"
+                           FontSize="12"
+                           Foreground="{DynamicResource DG.Text1}" />
+                <TextBlock Text="{Binding OrgHost}"
+                           FontSize="10"
+                           Foreground="{DynamicResource DG.Text3}" />
+            </StackPanel>
+        </StackPanel>
 
         <ui:ContentDialogHost Grid.RowSpan="2" />
     </Grid>

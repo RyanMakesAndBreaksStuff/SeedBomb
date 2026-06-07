@@ -282,7 +282,7 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
-                        <Grid Margin="20,16">
+                        <Grid Margin="20,24">
                             <StackPanel HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         Visibility="{Binding HasProgress, Converter={StaticResource InverseBoolToVisible}}">
@@ -310,9 +310,8 @@
                     </StackPanel>
                 </ui:Card>
 
-                <ui:Card Margin="0,12,0,0"
-                         Padding="0"
-                         Visibility="{Binding HasResult, Converter={StaticResource BoolToVisible}}">
+                <ui:Card Margin="0,16,0,0"
+                         Padding="0">
                     <StackPanel>
                         <Border Padding="20,14"
                                 BorderBrush="{DynamicResource DG.Border}"
@@ -337,7 +336,8 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
-                        <StackPanel Margin="20,16">
+                        <StackPanel Margin="20,18"
+                                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisible}}">
                             <UniformGrid Columns="2" Margin="0,0,0,12">
                                 <Border Background="{DynamicResource DG.Surface1}"
                                         BorderBrush="{DynamicResource DG.Border}"
@@ -384,6 +384,21 @@
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource DG.Success}" />
                             </Border>
+                        </StackPanel>
+                        <StackPanel Margin="20,28"
+                                    HorizontalAlignment="Center"
+                                    Visibility="{Binding HasResult, Converter={StaticResource InverseBoolToVisible}}">
+                            <TextBlock Text="No completed run yet"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource DG.Text2}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Last-run totals and success details will appear here."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource DG.Text3}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Width="220"
+                                       Margin="0,8,0,0" />
                         </StackPanel>
                     </StackPanel>
                 </ui:Card>

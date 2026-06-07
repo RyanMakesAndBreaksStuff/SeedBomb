@@ -11,52 +11,72 @@
         </ResourceDictionary>
     </Page.Resources>
 
-    <Grid Margin="24">
+    <Grid Background="{DynamicResource DG.Bg}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Toolbar: search + actions -->
-        <Grid Grid.Row="0" Margin="0,0,0,16">
+        <Border Grid.Row="0"
+                Padding="28,20,28,16"
+                BorderBrush="{DynamicResource DG.Border}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Run History"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DG.Text1}" />
+                    <TextBlock Text="{Binding HistorySummary}"
+                               FontSize="11"
+                               Foreground="{DynamicResource DG.Text3}"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Top">
+                    <ui:TextBox PlaceholderText="Search runs..."
+                                Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Width="180"
+                                Margin="0,0,8,0" />
+                    <ui:Button Content="Export CSV"
+                               Command="{Binding ExportCsvCommand}"
+                               Padding="14,7"
+                               FontSize="12"
+                               Margin="0,0,8,0" />
+                    <ui:Button Content="Clear All"
+                               Appearance="Danger"
+                               Command="{Binding ClearHistoryCommand}"
+                               Padding="14,7"
+                               FontSize="12" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="28,20,28,24">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
             </Grid.ColumnDefinitions>
 
-            <ui:TextBox Grid.Column="0"
-                        PlaceholderText="Search by entity name…"
-                        Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                        MaxWidth="360"
-                        HorizontalAlignment="Left" />
+            <TextBlock Text="No runs yet — generate some data first."
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Opacity="0.5"
+                       FontSize="14"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisible}}" />
 
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal">
-                <ui:Button Content="Export CSV"
-                           Command="{Binding ExportCsvCommand}"
-                           Margin="0,0,8,0" />
-                <ui:Button Content="Clear All"
-                           Appearance="Danger"
-                           Command="{Binding ClearHistoryCommand}" />
-            </StackPanel>
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          Visibility="{Binding IsEmpty, Converter={StaticResource InverseBoolToVisible}}">
+                <ItemsControl ItemsSource="{Binding RunsView}"
+                              ItemTemplate="{StaticResource RunCardTemplate}" />
+            </ScrollViewer>
         </Grid>
-
-        <!-- Empty-state message -->
-        <TextBlock Grid.Row="1"
-                   Text="No runs yet — generate some data first."
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Opacity="0.5"
-                   FontSize="14"
-                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisible}}" />
-
-        <!-- Run cards list -->
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      Visibility="{Binding IsEmpty, Converter={StaticResource InverseBoolToVisible}}">
-            <ItemsControl ItemsSource="{Binding RunsView}"
-                          ItemTemplate="{StaticResource RunCardTemplate}" />
-        </ScrollViewer>
 
     </Grid>
 </Page>
