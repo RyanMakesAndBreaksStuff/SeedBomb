@@ -30,5 +30,5 @@ public partial class MainWindowViewModel : ObservableObject
     public string OrgHost =>
         Uri.TryCreate(OrgUrl, UriKind.Absolute, out var uri)
             ? uri.Host
-            : OrgUrl;
+            : string.IsNullOrWhiteSpace(OrgUrl) ? "Not connected" : OrgUrl;
 }

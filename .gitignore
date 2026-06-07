@@ -76,3 +76,6 @@ nunit-*.xml
 /AGENTS.md.lean-ctx.bak
 /displayissue.png
 /src/DataGen.Web/wwwroot/appsettings.json
+mocks/mock-1-mica-light.html
+mocks/mock-2-dark-slate.html
+mocks/mock-3-centered-modal.html

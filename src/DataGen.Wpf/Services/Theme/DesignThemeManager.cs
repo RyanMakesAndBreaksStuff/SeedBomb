@@ -50,13 +50,13 @@ public static class DesignThemeManager
         FromRgb(0x9E8EC4));
 
     private static readonly Palette Dark = new(
-        FromRgb(0x090E1A),
-        FromRgb(0x101828),
-        FromRgb(0x1D2A3D),
-        FromRgb(0x253248),
-        FromRgb(0xE8EEF8),
-        FromRgb(0x8DA0C2),
-        FromRgb(0x566B8A));
+        FromRgb(0x0C0A18),
+        FromRgb(0x16122A),
+        FromRgb(0x1C1834),
+        FromRgb(0x38306A),
+        FromRgb(0xEDE8FF),
+        FromRgb(0x9B8EC4),
+        FromRgb(0x5A5080));
 
     private sealed record Palette(
         Color Bg,
