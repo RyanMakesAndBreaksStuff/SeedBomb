@@ -5,6 +5,7 @@ using DataGen.Desktop.Services.Dataverse;
 using DataGen.Desktop.Services.Generation;
 using DataGen.Desktop.Services.History;
 using DataGen.Desktop.Services.Settings;
+using DataGen.Desktop.Services.Theme;
 using DataGen.Desktop.ViewModels;
 using DataGen.Desktop.ViewModels.Controls;
 using DataGen.Desktop.Views.Windows;
@@ -39,8 +40,7 @@ public partial class App : Application
             // and MainWindow render correctly from the first frame.
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             var savedSettings = await settings.LoadAsync();
-            if (savedSettings.DarkTheme)
-                ApplicationThemeManager.Apply(ApplicationTheme.Dark);
+            DesignThemeManager.Apply(savedSettings.DarkTheme);
 
             // Attempt silent token acquisition before showing any window.
             // Pass nint.Zero to suppress any interactive popup — silent-only path.

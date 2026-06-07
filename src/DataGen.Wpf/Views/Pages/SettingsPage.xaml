@@ -6,54 +6,9 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24" MaxWidth="800" HorizontalAlignment="Left">
 
-            <!-- Connection section -->
-            <ui:CardExpander Header="Connection"
-                             IsExpanded="True">
-                <StackPanel>
-                    <TextBlock Text="Organization URL"
-                               FontSize="12"
-                               Margin="0,0,0,2" />
-                    <ui:TextBox PlaceholderText="https://yourorg.crm.dynamics.com"
-                                Text="{Binding OrgUrl, Mode=TwoWay}"
-                                Margin="0,0,0,8" />
-                    <TextBlock Text="Client ID (Application ID)"
-                               FontSize="12"
-                               Margin="0,0,0,2" />
-                    <ui:TextBox x:Name="ClientIdBox"
-                                PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                                Text="{Binding ClientId, Mode=TwoWay}"
-                                Margin="0,0,0,8" />
-                    <TextBlock Text="Tenant ID"
-                               FontSize="12"
-                               Margin="0,0,0,2" />
-                    <ui:TextBox x:Name="TenantIdBox"
-                                PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                                Text="{Binding TenantId, Mode=TwoWay}"
-                                Margin="0,0,0,12" />
-                    <ui:Button Content="Test Connection"
-                               Command="{Binding TestConnectionCommand}" />
-                    <ui:InfoBar IsOpen="True"
-                                Margin="0,12,0,0"
-                                Message="{Binding ConnectionTestResult}"
-                                Visibility="{Binding HasTestResult, Converter={StaticResource BoolToVisible}}">
-                        <ui:InfoBar.Style>
-                            <Style TargetType="ui:InfoBar">
-                                <Setter Property="Severity" Value="Error" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding TestConnectionSucceeded}" Value="True">
-                                        <Setter Property="Severity" Value="Success" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ui:InfoBar.Style>
-                    </ui:InfoBar>
-                </StackPanel>
-            </ui:CardExpander>
-
             <!-- Appearance section -->
             <ui:CardExpander Header="Appearance"
-                             IsExpanded="True"
-                             Margin="0,12,0,0">
+                             IsExpanded="True">
                 <StackPanel>
                     <TextBlock Text="Dark theme"
                                FontSize="12"

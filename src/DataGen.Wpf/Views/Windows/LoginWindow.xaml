@@ -3,8 +3,8 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:local="clr-namespace:DataGen.Desktop.Views.Controls"
-                 WindowBackdropType="Mica"
                  ExtendsContentIntoTitleBar="True"
+                 WindowStyle="SingleBorderWindow"
                  Title="DataGen — Sign In"
                  Width="580"
                  Height="680"
@@ -12,15 +12,30 @@
                  MinWidth="480"
                  MinHeight="560"
                  ResizeMode="CanResize">
-    <Grid>
+    <Grid Background="{DynamicResource DG.Bg}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="32"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <Border Grid.Row="0"
+                Background="{DynamicResource DG.Card}"
+                BorderBrush="{DynamicResource DG.Border}"
+                BorderThickness="0,0,0,1">
+            <ui:TitleBar Title="DataGen"
+                         Height="32"
+                         Background="{DynamicResource DG.Card}"
+                         Foreground="{DynamicResource DG.Text2}"
+                         ButtonsForeground="{DynamicResource DG.Text3}"
+                         Icon="{ui:SymbolIcon DataBarVertical24}"
+                         ShowMinimize="True"
+                         ShowMaximize="True"
+                         ShowClose="True" />
+        </Border>
+
         <!-- Login card — centred in the remaining space -->
-        <Border Grid.Row="1"
-                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                Grid.Row="1"
                 BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="16"

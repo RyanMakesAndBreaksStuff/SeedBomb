@@ -190,10 +190,10 @@
                         <ui:TextBox Text="{Binding EditingProfile.ClientId, UpdateSourceTrigger=PropertyChanged}"
                                     PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
 
-                        <!-- Tenant ID — all auth types -->
+                        <!-- Tenant ID — optional for OAuth, required for others -->
                         <TextBlock Text="Tenant ID (Directory ID)" Style="{StaticResource FieldLabel}"/>
                         <ui:TextBox Text="{Binding EditingProfile.TenantId, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+                                    PlaceholderText="Optional for OAuth; required for ClientSecret / UserPassword"/>
 
                         <!-- Client Secret — ClientSecret only -->
                         <StackPanel>

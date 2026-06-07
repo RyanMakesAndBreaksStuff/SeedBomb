@@ -13,11 +13,12 @@ using Wpf.Ui;
 namespace DataGen.Desktop.ViewModels;
 
 /// <summary>Step entry in the horizontal stepper strip above the wizard cards.</summary>
+/// <param name="Glyph">Displayed circle glyph.</param>
 /// <param name="Label">Displayed step label.</param>
 /// <param name="IsDone">Whether the step has been completed.</param>
 /// <param name="IsActive">Whether the step is the current active step.</param>
 /// <param name="HasNext">Whether a connector line should be drawn after this step.</param>
-public record StepEntry(string Label, bool IsDone, bool IsActive, bool HasNext);
+public record StepEntry(string Glyph, string Label, bool IsDone, bool IsActive, bool HasNext);
 
 /// <summary>Entity queue status entry shown in the right-side queue dot list.</summary>
 public sealed partial class QueuedEntityEntry : ObservableObject
@@ -121,9 +122,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets the current stepper step entries.</summary>
     public IReadOnlyList<StepEntry> Steps =>
     [
-        new("01  Select", CanConfigure, !CanConfigure, true),
-        new("02  Configure", CanExecute && CanConfigure, CanConfigure && !CanExecute, true),
-        new("03  Execute", HasResult, CanExecute, false),
+        new(CanConfigure ? "✓" : "1", "Select", CanConfigure, !CanConfigure, true),
+        new(CanExecute && CanConfigure ? "✓" : "2", "Configure", CanExecute && CanConfigure, CanConfigure && !CanExecute, true),
+        new("3", "Execute", HasResult, CanExecute, false),
     ];
 
     // ── Commands ──────────────────────────────────────────────────────────────

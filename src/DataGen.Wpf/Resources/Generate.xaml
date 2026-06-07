@@ -24,24 +24,44 @@
                 <DataTemplate DataType="{x:Type vm:StepEntry}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Circle -->
-                        <Grid Width="28" Height="28">
+                        <Grid Width="26" Height="26">
                             <Ellipse StrokeThickness="2">
                                 <Ellipse.Style>
                                     <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="Transparent" />
-                                        <Setter Property="Stroke" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                <Setter Property="Fill" Value="{DynamicResource DG.Surface1}" />
+                <Setter Property="Stroke" Value="{DynamicResource DG.Border}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsDone}" Value="True">
-                                                <Setter Property="Fill" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                                <Setter Property="Stroke" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                <Setter Property="Fill" Value="{DynamicResource DG.Success}" />
+                                                <Setter Property="Stroke" Value="{DynamicResource DG.Success}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                <Setter Property="Stroke" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                <Setter Property="Fill" Value="{DynamicResource DG.Accent}" />
+                                                <Setter Property="Stroke" Value="{DynamicResource DG.Accent}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Ellipse.Style>
                             </Ellipse>
+                            <TextBlock Text="{Binding Glyph}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       FontWeight="SemiBold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource DG.Text3}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                <Setter Property="Foreground" Value="White" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                <Setter Property="Foreground" Value="White" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Grid>
                         <!-- Label -->
                         <TextBlock Text="{Binding Label}"
@@ -50,13 +70,16 @@
                                    FontSize="12">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource DG.Text3}" />
                                     <Setter Property="Opacity" Value="0.5" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource DG.Accent}" />
                                             <Setter Property="Opacity" Value="1" />
                                             <Setter Property="FontWeight" Value="SemiBold" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource DG.Success}" />
                                             <Setter Property="Opacity" Value="0.8" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -64,7 +87,7 @@
                             </TextBlock.Style>
                         </TextBlock>
                         <!-- Connector line -->
-                        <Rectangle Width="32" Height="2" Margin="12,0"
+                        <Rectangle Width="32" Height="1" Margin="12,0"
                                    Fill="{DynamicResource DividerStrokeColorDefaultBrush}">
                             <Rectangle.Style>
                                 <Style TargetType="Rectangle">

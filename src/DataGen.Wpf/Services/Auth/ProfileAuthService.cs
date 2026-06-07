@@ -178,9 +178,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         if (_clients.TryGetValue(profile.Id, out var existing) && existing is IPublicClientApplication pca)
             return pca;
 
+        var authority = string.IsNullOrWhiteSpace(profile.TenantId)
+            ? "https://login.microsoftonline.com/common"
+            : $"https://login.microsoftonline.com/{profile.TenantId}";
+
         var newPca = PublicClientApplicationBuilder
             .Create(profile.ClientId)
-            .WithAuthority($"https://login.microsoftonline.com/{profile.TenantId}")
+            .WithAuthority(authority)
             .WithDefaultRedirectUri()
             .Build();
         _clients[profile.Id] = newPca;
@@ -192,9 +196,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         if (_clients.TryGetValue(profile.Id, out var existing) && existing is IConfidentialClientApplication cca)
             return cca;
 
+        var authority = string.IsNullOrWhiteSpace(profile.TenantId)
+            ? "https://login.microsoftonline.com/common"
+            : $"https://login.microsoftonline.com/{profile.TenantId}";
+
         var newCca = ConfidentialClientApplicationBuilder
             .Create(profile.ClientId)
-            .WithAuthority($"https://login.microsoftonline.com/{profile.TenantId}")
+            .WithAuthority(authority)
             .WithClientSecret(profile.ClientSecret!)
             .Build();
         _clients[profile.Id] = newCca;
@@ -212,11 +220,15 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         if (!Guid.TryParse(profile.ClientId, out _))
             throw new InvalidOperationException($"Client ID '{profile.ClientId}' is not a valid GUID.");
 
-        if (string.IsNullOrWhiteSpace(profile.TenantId))
-            throw new InvalidOperationException("Tenant ID is not configured.");
+        // TenantId is optional for OAuth (falls back to /common endpoint)
+        if (profile.AuthType != AuthType.OAuth)
+        {
+            if (string.IsNullOrWhiteSpace(profile.TenantId))
+                throw new InvalidOperationException("Tenant ID is not configured.");
 
-        if (!Guid.TryParse(profile.TenantId, out _))
-            throw new InvalidOperationException($"Tenant ID '{profile.TenantId}' is not a valid GUID.");
+            if (!Guid.TryParse(profile.TenantId, out _))
+                throw new InvalidOperationException($"Tenant ID '{profile.TenantId}' is not a valid GUID.");
+        }
     }
 
     private void OnProfilesChanged(object? sender, EventArgs e)
