@@ -40,31 +40,41 @@
                            IsBackButtonVisible="Collapsed">
 
             <ui:NavigationView.MenuItems>
-                <ui:NavigationViewItem Content="Generate"
-                                       TargetPageType="{x:Type pages:GeneratePage}">
-                    <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="DataBarVertical24" />
-                    </ui:NavigationViewItem.Icon>
+                <ui:NavigationViewItem TargetPageType="{x:Type pages:GeneratePage}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="DataBarVertical24"
+                                       FontSize="16"
+                                       Margin="0,0,8,0" />
+                        <TextBlock Text="Generate"
+                                   FontSize="13"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="History"
-                                       TargetPageType="{x:Type pages:HistoryPage}">
-                    <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="History24" />
-                    </ui:NavigationViewItem.Icon>
+                <ui:NavigationViewItem TargetPageType="{x:Type pages:HistoryPage}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="History24"
+                                       FontSize="16"
+                                       Margin="0,0,8,0" />
+                        <TextBlock Text="History"
+                                   FontSize="13"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Settings"
-                                       TargetPageType="{x:Type pages:SettingsPage}">
-                    <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Settings24" />
-                    </ui:NavigationViewItem.Icon>
+                <ui:NavigationViewItem TargetPageType="{x:Type pages:SettingsPage}">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Settings24"
+                                       FontSize="16"
+                                       Margin="0,0,8,0" />
+                        <TextBlock Text="Settings"
+                                   FontSize="13"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
 
-            <!-- Right-side user info in header region -->
-            <ui:NavigationView.Header>
+            <ui:NavigationView.PaneFooter>
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center"
-                             HorizontalAlignment="Right"
                             Margin="0,0,20,0">
                     <Border Width="28"
                             Height="28"
@@ -87,7 +97,7 @@
                                    Foreground="{DynamicResource DG.Text3}" />
                     </StackPanel>
                 </StackPanel>
-            </ui:NavigationView.Header>
+            </ui:NavigationView.PaneFooter>
 
             <ui:NavigationView.ContentOverlay>
                 <Grid>
