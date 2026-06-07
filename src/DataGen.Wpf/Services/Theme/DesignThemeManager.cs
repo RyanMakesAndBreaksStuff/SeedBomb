@@ -7,6 +7,8 @@ namespace DataGen.Desktop.Services.Theme;
 /// <summary>Applies app design tokens alongside WPF-UI theme resources.</summary>
 public static class DesignThemeManager
 {
+    /// <summary>Applies the selected light or dark visual theme.</summary>
+    /// <param name="isDark">True to apply dark theme resources; false for light.</param>
     public static void Apply(bool isDark)
     {
         ApplicationThemeManager.Apply(isDark ? ApplicationTheme.Dark : ApplicationTheme.Light);

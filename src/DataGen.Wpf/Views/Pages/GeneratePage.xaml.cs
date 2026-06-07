@@ -25,4 +25,13 @@ public partial class GeneratePage : Page
 
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>
         _vm.OnEntitiesChanged(entities);
+
+    private void OnResetClick(object sender, RoutedEventArgs e)
+    {
+        if (!_vm.ResetCommand.CanExecute(null))
+            return;
+
+        EntitySelectorCtrl.ClearSelection();
+        _vm.ResetCommand.Execute(null);
+    }
 }

@@ -5,153 +5,415 @@
       xmlns:controls="clr-namespace:DataGen.Desktop.Views.Controls">
 
     <Grid Background="{DynamicResource DG.Bg}">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="300" />
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <!-- ── Left: stepper + wizard cards ─────────────────────────────── -->
-        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="28,24,20,24">
-
-                <!-- Stepper strip -->
-                <ItemsControl ItemsSource="{Binding Steps}"
-                              Style="{StaticResource StepperStyle}" />
-
-                <!-- Card 01 — Select Entities -->
-                <ui:Card Margin="0,20,0,0">
-                    <StackPanel>
-                        <TextBlock Text="01  SELECT ENTITIES"
-                                   Style="{StaticResource StepHeaderStyle}" />
-                        <controls:EntitySelectorControl x:Name="EntitySelectorCtrl"
-                                                        SelectedEntitiesChanged="OnEntitiesChanged" />
-                    </StackPanel>
-                </ui:Card>
-
-                <!-- Card 02 — Configure (shown once entities are selected) -->
-                <ui:Card Margin="0,12,0,0"
-                         Visibility="{Binding CanConfigure, Converter={StaticResource BoolToVisible}}">
-                    <StackPanel>
-                        <TextBlock Text="02  CONFIGURE"
-                                   Style="{StaticResource StepHeaderStyle}" />
-                        <UniformGrid Columns="3" Margin="0,0,0,12">
-                            <StackPanel Margin="0,0,8,0">
-                                <TextBlock Text="Seed"
-                                           FontSize="12"
-                                           Margin="0,0,0,2" />
-                                <ui:NumberBox Value="{Binding Seed, Mode=TwoWay}"
-                                              Minimum="0" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,8,0">
-                                <TextBlock Text="Batch Size"
-                                           FontSize="12"
-                                           Margin="0,0,0,2" />
-                                <ui:NumberBox Value="{Binding BatchSize, Mode=TwoWay}"
-                                              Minimum="1"
-                                              Maximum="1000" />
-                            </StackPanel>
-                            <StackPanel>
-                                <TextBlock Text="Max Parallelism"
-                                           FontSize="12"
-                                           Margin="0,0,0,2" />
-                                <ui:NumberBox Value="{Binding MaxParallelism, Mode=TwoWay}"
-                                              Minimum="0"
-                                              PlaceholderText="auto" />
-                            </StackPanel>
-                        </UniformGrid>
-                        <controls:FieldOverridesControl x:Name="FieldOverridesCtrl" />
-                    </StackPanel>
-                </ui:Card>
-
-                <!-- Card 03 — Execute (shown once entities are selected) -->
-                <ui:Card Margin="0,12,0,0"
-                         Visibility="{Binding CanExecute, Converter={StaticResource BoolToVisible}}">
-                    <StackPanel>
-                        <TextBlock Text="03  EXECUTE"
-                                   Style="{StaticResource StepHeaderStyle}" />
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
-                            <ui:Button Content="{Binding GenerateLabel}"
-                                       Appearance="Primary"
-                                       Height="44"
-                                       MinWidth="200"
-                                       AutomationProperties.Name="Generate data"
-                                       Command="{Binding GenerateCommand}" />
-                            <ui:Button Content="{Binding CancelLabel}"
-                                       Appearance="Danger"
-                                       Height="44"
-                                       Margin="12,0,0,0"
-                                       AutomationProperties.Name="Abort generation"
-                                       Command="{Binding AbortCommand}"
-                                       Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
-                            <ui:ProgressRing IsIndeterminate="True"
-                                             Width="28" Height="28"
-                                             Margin="12,0,0,0"
-                                             VerticalAlignment="Center"
-                                             Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
-                        </StackPanel>
-                        <TextBlock Text="Waiting for in-flight batches to drain…"
-                                   Opacity="0.5"
-                                   FontSize="11"
-                                   Margin="0,6,0,0"
-                                   Visibility="{Binding IsCancelling, Converter={StaticResource BoolToVisible}}" />
-                    </StackPanel>
-                </ui:Card>
-
-            </StackPanel>
-        </ScrollViewer>
-
-        <!-- ── Right: live status panel ──────────────────────────────────── -->
-        <StackPanel Grid.Column="1" Margin="0,24,28,24">
-
-            <!-- Progress card -->
-            <ui:Card>
+        <Border Grid.Row="0"
+                Padding="28,20,28,16"
+                BorderBrush="{DynamicResource DG.Border}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="{Binding StatusLabel}"
+                    <TextBlock Text="Generate"
+                               FontSize="17"
                                FontWeight="SemiBold"
-                               Margin="0,0,0,12" />
-                    <controls:ProgressMonitorControl Progress="{Binding CurrentProgress}" />
+                               Foreground="{DynamicResource DG.Text1}" />
+                    <TextBlock Text="Create synthetic Dataverse records in bulk"
+                               FontSize="11"
+                               Foreground="{DynamicResource DG.Text3}"
+                               Margin="0,3,0,0" />
                 </StackPanel>
-            </ui:Card>
+                <ui:Button Grid.Column="1"
+                           Content="Reset"
+                           Appearance="Secondary"
+                           Padding="14,7"
+                           FontSize="12"
+                           VerticalAlignment="Top"
+                           Click="OnResetClick" />
+            </Grid>
+        </Border>
 
-            <!-- Entity queue dots -->
-            <ui:Card Margin="0,12,0,0"
-                     Visibility="{Binding HasEntities, Converter={StaticResource BoolToVisible}}">
-                <ItemsControl ItemsSource="{Binding QueuedEntities}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Margin="0,4">
-                                <Ellipse Width="8" Height="8"
-                                         Fill="{Binding DotBrush}"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,8,0" />
-                                <TextBlock Text="{Binding Entity.DisplayName}"
+        <Grid Grid.Row="1" Margin="28,24,28,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="300" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <ItemsControl Grid.ColumnSpan="3"
+                          ItemsSource="{Binding Steps}"
+                          Style="{StaticResource StepperStyle}"
+                          Margin="0,0,0,20" />
+
+            <ScrollViewer Grid.Row="1"
+                          Grid.Column="0"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <ui:Card Padding="0">
+                        <StackPanel>
+                            <Border Padding="20,14"
+                                    BorderBrush="{DynamicResource DG.Border}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="24"
+                                            Height="24"
+                                            CornerRadius="12"
+                                            Background="{StaticResource DG.Accent}"
+                                            Margin="0,0,10,0">
+                                        <TextBlock Text="1"
+                                                   Foreground="White"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Grid.Column="1"
+                                               Text="01 · SELECT ENTITIES"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource DG.Text1}"
+                                               VerticalAlignment="Center" />
+                                    <Border Grid.Column="2"
+                                            Background="{StaticResource DG.AccentSoft}"
+                                            BorderBrush="{StaticResource DG.AccentLight}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Padding="9,2"
+                                            HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding SelectedEntitiesSummary}"
+                                                   FontSize="10"
+                                                   Foreground="{StaticResource DG.AccentLight}" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <StackPanel Margin="20,16">
+                                <controls:EntitySelectorControl x:Name="EntitySelectorCtrl"
+                                                                SelectedEntitiesChanged="OnEntitiesChanged" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+
+                    <ui:Card Margin="0,12,0,0"
+                             Padding="0"
+                             Visibility="{Binding CanConfigure, Converter={StaticResource BoolToVisible}}">
+                        <StackPanel>
+                            <Border Padding="20,14"
+                                    BorderBrush="{DynamicResource DG.Border}"
+                                    BorderThickness="0,0,0,1">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="24"
+                                            Height="24"
+                                            CornerRadius="12"
+                                            Background="{StaticResource DG.Accent}"
+                                            Margin="0,0,10,0">
+                                        <TextBlock Text="2"
+                                                   Foreground="White"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="02 · CONFIGURE"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource DG.Text1}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Margin="20,16">
+                                <UniformGrid Columns="3" Margin="0,0,0,14">
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="SEED"
+                                                   FontSize="9"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource DG.Text3}"
+                                                   Margin="0,0,0,6" />
+                                        <ui:NumberBox Value="{Binding Seed, Mode=TwoWay}"
+                                                      Minimum="0" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="BATCH SIZE"
+                                                   FontSize="9"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource DG.Text3}"
+                                                   Margin="0,0,0,6" />
+                                        <ui:NumberBox Value="{Binding BatchSize, Mode=TwoWay}"
+                                                      Minimum="1"
+                                                      Maximum="1000" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="PARALLELISM"
+                                                   FontSize="9"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource DG.Text3}"
+                                                   Margin="0,0,0,6" />
+                                        <ui:NumberBox Value="{Binding MaxParallelism, Mode=TwoWay}"
+                                                      Minimum="0"
+                                                      PlaceholderText="auto" />
+                                    </StackPanel>
+                                </UniformGrid>
+                                <Border Height="1"
+                                        Background="{DynamicResource DG.Border}"
+                                        Margin="0,0,0,12" />
+                                <controls:FieldOverridesControl x:Name="FieldOverridesCtrl" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+
+                    <ui:Card Margin="0,12,0,0"
+                             Padding="0"
+                             Visibility="{Binding CanExecute, Converter={StaticResource BoolToVisible}}">
+                        <StackPanel>
+                            <Border Padding="20,14"
+                                    BorderBrush="{DynamicResource DG.Border}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="24"
+                                            Height="24"
+                                            CornerRadius="12"
+                                            Background="{DynamicResource DG.Surface1}"
+                                            BorderBrush="{DynamicResource DG.Border}"
+                                            BorderThickness="1.5"
+                                            Margin="0,0,10,0">
+                                        <TextBlock Text="3"
+                                                   Foreground="{DynamicResource DG.Text3}"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Grid.Column="1"
+                                               Text="03 · EXECUTE"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource DG.Text1}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding StatusLabel}"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource DG.Text3}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                            <StackPanel Margin="20,16">
+                                <TextBlock Text="Confirm configuration above, then click Generate."
                                            FontSize="12"
+                                           Foreground="{DynamicResource DG.Text3}"
+                                           Margin="0,0,0,14" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Content="{Binding GenerateLabel}"
+                                               Appearance="Primary"
+                                               Height="38"
+                                               MinWidth="160"
+                                               AutomationProperties.Name="Generate data"
+                                               Command="{Binding GenerateCommand}" />
+                                    <ui:Button Content="{Binding CancelLabel}"
+                                               Appearance="Danger"
+                                               Height="38"
+                                               Margin="9,0,0,0"
+                                               AutomationProperties.Name="Abort generation"
+                                               Command="{Binding AbortCommand}"
+                                               Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
+                                    <ui:ProgressRing IsIndeterminate="True"
+                                                     Width="24"
+                                                     Height="24"
+                                                     Margin="12,0,0,0"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVisible}}" />
+                                </StackPanel>
+                                <TextBlock Text="Waiting for in-flight batches to drain..."
+                                           Opacity="0.5"
+                                           FontSize="11"
+                                           Margin="0,6,0,0"
+                                           Visibility="{Binding IsCancelling, Converter={StaticResource BoolToVisible}}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:Card>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="1"
+                        Grid.Column="2">
+                <ui:Card Padding="0">
+                    <StackPanel>
+                        <Border Padding="20,14"
+                                BorderBrush="{DynamicResource DG.Border}"
+                                BorderThickness="0,0,0,1">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Width="24"
+                                        Height="24"
+                                        CornerRadius="12"
+                                        Background="{StaticResource DG.AccentSoft}"
+                                        BorderBrush="{StaticResource DG.AccentLight}"
+                                        BorderThickness="1.5"
+                                        Margin="0,0,10,0">
+                                    <TextBlock Text="◎"
+                                               Foreground="{StaticResource DG.AccentLight}"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="Live Status"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource DG.Text1}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ui:Card>
+                        </Border>
+                        <Grid Margin="20,16">
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding HasProgress, Converter={StaticResource InverseBoolToVisible}}">
+                                <TextBlock Text="◎"
+                                           FontSize="32"
+                                           Opacity="0.25"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource DG.Text3}" />
+                                <TextBlock Text="No active generation"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource DG.Text2}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,8,0,0" />
+                                <TextBlock Text="Live progress, throughput, and entity queue will appear here."
+                                           FontSize="12"
+                                           Foreground="{DynamicResource DG.Text3}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           Width="220"
+                                           Margin="0,8,0,0" />
+                            </StackPanel>
+                            <controls:ProgressMonitorControl Progress="{Binding CurrentProgress}"
+                                                             Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisible}}" />
+                        </Grid>
+                    </StackPanel>
+                </ui:Card>
 
-            <!-- Last result big number -->
-            <ui:Card Margin="0,12,0,0"
-                     Visibility="{Binding HasResult, Converter={StaticResource BoolToVisible}}">
-                <StackPanel>
-                    <TextBlock Text="{Binding LastResult.TotalRecords, StringFormat='{}{0:N0}'}"
-                               FontSize="36"
-                               FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="RECORDS CREATED"
-                               FontSize="10"
-                               Opacity="0.5"
-                               Margin="0,2,0,0" />
-                    <TextBlock Text="{Binding LastResult.Elapsed, StringFormat='{}{0:mm}:{0:ss}'}"
-                               FontSize="12"
-                               Opacity="0.6"
-                               Margin="0,4,0,0" />
-                </StackPanel>
-            </ui:Card>
+                <ui:Card Margin="0,12,0,0"
+                         Padding="0"
+                         Visibility="{Binding HasResult, Converter={StaticResource BoolToVisible}}">
+                    <StackPanel>
+                        <Border Padding="20,14"
+                                BorderBrush="{DynamicResource DG.Border}"
+                                BorderThickness="0,0,0,1">
+                            <StackPanel Orientation="Horizontal">
+                                <Border Width="24"
+                                        Height="24"
+                                        CornerRadius="12"
+                                        Background="{StaticResource DG.Success}"
+                                        Margin="0,0,10,0">
+                                    <TextBlock Text="✓"
+                                               Foreground="White"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="Last Run"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource DG.Text1}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <StackPanel Margin="20,16">
+                            <UniformGrid Columns="2" Margin="0,0,0,12">
+                                <Border Background="{DynamicResource DG.Surface1}"
+                                        BorderBrush="{DynamicResource DG.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="12,12"
+                                        Margin="0,0,5,0">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding LastResult.TotalRecords, StringFormat='{}{0:N0}'}"
+                                                   FontSize="20"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource DG.Success}" />
+                                        <TextBlock Text="RECORDS"
+                                                   FontSize="9"
+                                                   Foreground="{DynamicResource DG.Text3}"
+                                                   Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="{DynamicResource DG.Surface1}"
+                                        BorderBrush="{DynamicResource DG.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="10"
+                                        Padding="12,12"
+                                        Margin="5,0,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding LastResult.Elapsed, StringFormat='{}{0:mm\\:ss}'}"
+                                                   FontSize="20"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource DG.Text1}" />
+                                        <TextBlock Text="DURATION"
+                                                   FontSize="9"
+                                                   Foreground="{DynamicResource DG.Text3}"
+                                                   Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                            <Border Background="#14059669"
+                                    BorderBrush="#33059669"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="12,10">
+                                <TextBlock Text="All entities succeeded"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource DG.Success}" />
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ui:Card>
 
-        </StackPanel>
+                <ui:Card Margin="0,12,0,0"
+                         Visibility="{Binding HasEntities, Converter={StaticResource BoolToVisible}}">
+                    <ItemsControl ItemsSource="{Binding QueuedEntities}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,7">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Width="6"
+                                             Height="6"
+                                             Fill="{Binding DotBrush}"
+                                             VerticalAlignment="Center"
+                                             Margin="0,0,8,0" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Entity.DisplayName}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource DG.Text2}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ui:Card>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>

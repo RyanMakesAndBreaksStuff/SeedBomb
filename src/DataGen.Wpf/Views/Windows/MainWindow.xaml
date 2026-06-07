@@ -63,15 +63,29 @@
             <!-- Right-side user info in header region -->
             <ui:NavigationView.Header>
                 <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                             HorizontalAlignment="Right"
                             Margin="0,0,20,0">
-                    <TextBlock Text="{Binding OrgUrl}"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               Margin="0,0,12,0" />
-                    <TextBlock Text="{Binding UserDisplayName}"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <Border Width="28"
+                            Height="28"
+                            CornerRadius="14"
+                            Background="{StaticResource DG.Accent}"
+                            Margin="0,0,9,0">
+                        <TextBlock Text="{Binding UserInitials}"
+                                   Foreground="White"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding UserDisplayName}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource DG.Text1}" />
+                        <TextBlock Text="{Binding OrgHost}"
+                                   FontSize="10"
+                                   Foreground="{DynamicResource DG.Text3}" />
+                    </StackPanel>
                 </StackPanel>
             </ui:NavigationView.Header>
 

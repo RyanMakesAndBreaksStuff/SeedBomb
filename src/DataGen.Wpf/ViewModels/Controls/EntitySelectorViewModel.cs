@@ -87,4 +87,14 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
 
         SelectedEntitiesChanged?.Invoke(this, [.. SelectedEntities]);
     }
+
+    /// <summary>Clears all selected entities.</summary>
+    public void ClearSelection()
+    {
+        if (SelectedEntities.Count == 0)
+            return;
+
+        SelectedEntities.Clear();
+        SelectedEntitiesChanged?.Invoke(this, []);
+    }
 }

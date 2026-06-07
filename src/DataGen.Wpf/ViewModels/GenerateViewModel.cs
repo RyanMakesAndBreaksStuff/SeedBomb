@@ -66,13 +66,18 @@ public sealed partial class GenerateViewModel : ViewModelBase
     // ── State ──────────────────────────────────────────────────────────────────
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanConfigure), nameof(CanExecute), nameof(HasEntities))]
+    [NotifyPropertyChangedFor(
+        nameof(CanConfigure),
+        nameof(CanExecute),
+        nameof(HasEntities),
+        nameof(SelectedEntitiesSummary))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     private IReadOnlyList<EntitySummary> _selectedEntities = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
     private bool _isRunning;
 
     [ObservableProperty]
@@ -80,6 +85,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isCancelling;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProgress))]
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
@@ -101,8 +107,18 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets a value indicating whether entities have been selected.</summary>
     public bool HasEntities => SelectedEntities.Count > 0;
 
+    /// <summary>Gets a compact selected-entity summary for step card headers.</summary>
+    public string SelectedEntitiesSummary =>
+        SelectedEntities.Count == 0
+            ? "Waiting"
+            : string.Join(" · ", SelectedEntities.Take(4).Select(e => e.DisplayName)) +
+              (SelectedEntities.Count > 4 ? $" · {SelectedEntities.Count} entities" : string.Empty);
+
     /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
     public bool IsGenerating => IsRunning;
+
+    /// <summary>Gets a value indicating whether live progress is available.</summary>
+    public bool HasProgress => CurrentProgress is not null;
 
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
@@ -148,6 +164,19 @@ public sealed partial class GenerateViewModel : ViewModelBase
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
 
+        OnPropertyChanged(nameof(SelectedEntitiesSummary));
+        OnPropertyChanged(nameof(Steps));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanReset))]
+    private void Reset()
+    {
+        SelectedEntities = [];
+        CurrentProgress = null;
+        LastResult = null;
+        QueuedEntities.Clear();
+        _fieldOverrides?.SetEntities([]);
+        OnPropertyChanged(nameof(StatusLabel));
         OnPropertyChanged(nameof(Steps));
     }
 
@@ -229,6 +258,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
     }
 
     private bool CanStartGenerate() => !IsRunning && SelectedEntities.Count > 0;
+
+    private bool CanReset() => !IsRunning;
 
     /// <summary>Cancels a running generation.</summary>
     [RelayCommand]

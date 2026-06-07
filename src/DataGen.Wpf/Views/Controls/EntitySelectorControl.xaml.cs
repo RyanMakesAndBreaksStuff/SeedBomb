@@ -38,4 +38,11 @@ public partial class EntitySelectorControl : UserControl
         foreach (var item in e.RemovedItems.OfType<DataGen.Core.Contracts.EntitySummary>())
             _vm?.ToggleSelection(item);
     }
+
+    /// <summary>Clears the visible selection and view-model selection.</summary>
+    public void ClearSelection()
+    {
+        EntityList.SelectedItems.Clear();
+        _vm?.ClearSelection();
+    }
 }
