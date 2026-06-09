@@ -25,7 +25,11 @@ public partial class LoginWindow : FluentWindow
         connectionManagerViewModel.DrawerCloseRequested += (_, _) => CloseDrawer();
         viewModel.LoginSucceeded += OnLoginSucceeded;
         viewModel.OpenConnectionManagerRequested += (_, _) => OpenDrawer();
+        Loaded += OnLoaded;
     }
+
+    private async void OnLoaded(object sender, RoutedEventArgs e) =>
+        await _vm.InitializeAsync();
 
     private void OnSignInClick(object sender, RoutedEventArgs e)
     {

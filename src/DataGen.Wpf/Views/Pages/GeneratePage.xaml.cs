@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
 using DataGen.Desktop.ViewModels;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DataGen.Desktop.Views.Pages;
 
@@ -14,9 +13,9 @@ public partial class GeneratePage : Page
     private readonly GenerateViewModel _vm;
 
     /// <summary>Initialises the page and wires the ViewModel.</summary>
-    public GeneratePage()
+    public GeneratePage(GenerateViewModel viewModel)
     {
-        _vm = ((App)Application.Current).Services.GetRequiredService<GenerateViewModel>();
+        _vm = viewModel;
         DataContext = _vm;
         InitializeComponent();
 

@@ -70,12 +70,13 @@ public sealed partial class GenerateViewModel : ViewModelBase
         nameof(CanConfigure),
         nameof(CanExecute),
         nameof(HasEntities),
-        nameof(SelectedEntitiesSummary))]
+        nameof(SelectedEntitiesSummary),
+        nameof(Steps))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     private IReadOnlyList<EntitySummary> _selectedEntities = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel))]
+    [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel), nameof(StatusLabel), nameof(Steps))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
     private bool _isRunning;
@@ -89,7 +90,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasResult))]
+    [NotifyPropertyChangedFor(nameof(HasResult), nameof(StatusLabel), nameof(Steps))]
     private GenerationResult? _lastResult;
 
     [ObservableProperty] private int _seed = 42;
@@ -163,9 +164,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         QueuedEntities.Clear();
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
-
-        OnPropertyChanged(nameof(SelectedEntitiesSummary));
-        OnPropertyChanged(nameof(Steps));
     }
 
     [RelayCommand(CanExecute = nameof(CanReset))]
@@ -176,8 +174,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         LastResult = null;
         QueuedEntities.Clear();
         _fieldOverrides?.SetEntities([]);
-        OnPropertyChanged(nameof(StatusLabel));
-        OnPropertyChanged(nameof(Steps));
     }
 
     [RelayCommand(CanExecute = nameof(CanStartGenerate))]
@@ -187,11 +183,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         CurrentProgress = null;
         LastResult = null;
         IsCancelling = false;
-        OnPropertyChanged(nameof(IsGenerating));
-        OnPropertyChanged(nameof(GenerateLabel));
-        OnPropertyChanged(nameof(StatusLabel));
-        OnPropertyChanged(nameof(Steps));
-
         _cts = new CancellationTokenSource();
 
         var rawCounts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
@@ -248,12 +239,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
             IsCancelling = false;
             _cts?.Dispose();
             _cts = null;
-            OnPropertyChanged(nameof(IsGenerating));
-            OnPropertyChanged(nameof(GenerateLabel));
-            OnPropertyChanged(nameof(CancelLabel));
-            OnPropertyChanged(nameof(HasResult));
-            OnPropertyChanged(nameof(StatusLabel));
-            OnPropertyChanged(nameof(Steps));
         }
     }
 

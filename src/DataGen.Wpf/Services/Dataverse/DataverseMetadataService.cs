@@ -1,6 +1,5 @@
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
-using DataGen.Desktop.Services.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -30,6 +29,7 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
     {
         _conn = conn;
         _innerLogger = innerLogger;
+        _conn.ConnectionReset += OnConnectionReset;
     }
 
     /// <inheritdoc />
@@ -62,9 +62,24 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
         }
     }
 
+    private void OnConnectionReset(object? sender, EventArgs e)
+    {
+        _lock.Wait();
+        try
+        {
+            _inner = null;
+            _cache.Compact(1.0);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
+        _conn.ConnectionReset -= OnConnectionReset;
         _cache.Dispose();
         _lock.Dispose();
     }

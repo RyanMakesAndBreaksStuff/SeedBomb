@@ -34,17 +34,15 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     internal async Task LoadAsync()
     {
-        var all = await _profileService.GetAllAsync().ConfigureAwait(false);
-        var lastUsed = await _profileService.GetLastUsedAsync().ConfigureAwait(false);
-        await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        var all = await _profileService.GetAllAsync();
+        var lastUsed = await _profileService.GetLastUsedAsync();
+
+        Profiles.Clear();
+        foreach (var p in all)
         {
-            Profiles.Clear();
-            foreach (var p in all)
-            {
-                p.IsLastUsed = lastUsed?.Id == p.Id;
-                Profiles.Add(p);
-            }
-        });
+            p.IsLastUsed = lastUsed?.Id == p.Id;
+            Profiles.Add(p);
+        }
     }
 
     /// <summary>Starts creating a blank new profile with OAuth defaults pre-filled.</summary>
@@ -63,8 +61,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private async Task SelectProfileAsync(ConnectionProfile profile)
     {
-        await _profileService.SetLastUsedAsync(profile.Id).ConfigureAwait(false);
-        await LoadAsync().ConfigureAwait(false);
+        await _profileService.SetLastUsedAsync(profile.Id);
+        await LoadAsync();
     }
 
     /// <summary>Starts editing an existing profile.</summary>
@@ -92,8 +90,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private async Task SaveProfileAsync()
     {
         if (EditingProfile is null) return;
-        await _profileService.SaveAsync(EditingProfile).ConfigureAwait(false);
-        await LoadAsync().ConfigureAwait(false);
+        await _profileService.SaveAsync(EditingProfile);
+        await LoadAsync();
         IsEditing = false;
         EditingProfile = null;
     }
@@ -102,8 +100,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private async Task DeleteProfileAsync(ConnectionProfile profile)
     {
-        await _profileService.DeleteAsync(profile.Id).ConfigureAwait(false);
-        await LoadAsync().ConfigureAwait(false);
+        await _profileService.DeleteAsync(profile.Id);
+        await LoadAsync();
     }
 
     /// <summary>Tests the connection for the current editing profile.</summary>
@@ -117,10 +115,10 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         try
         {
             // Save temporarily so the auth service can pick it up
-            await _profileService.SaveAsync(EditingProfile).ConfigureAwait(false);
-            await _profileService.SetLastUsedAsync(EditingProfile.Id).ConfigureAwait(false);
+            await _profileService.SaveAsync(EditingProfile);
+            await _profileService.SetLastUsedAsync(EditingProfile.Id);
 
-            var result = await _authService.SignInAsync(nint.Zero).ConfigureAwait(false);
+            var result = await _authService.SignInAsync(nint.Zero);
             TestSucceeded = result.Succeeded;
             TestResult = result.Succeeded ? $"Connected as {result.DisplayName}" : result.Error ?? "Connection failed.";
         }

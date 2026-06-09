@@ -8,6 +8,11 @@ namespace DataGen.Desktop.Services.Dataverse;
 public interface IDataverseConnectionService
 {
     /// <summary>
+    /// Raised after the cached Dataverse connection has been reset.
+    /// </summary>
+    event EventHandler? ConnectionReset;
+
+    /// <summary>
     /// Returns a ready-to-use <see cref="IOrganizationServiceAsync2"/>, building one if needed.
     /// </summary>
     Task<IOrganizationServiceAsync2> GetOrganizationServiceAsync(CancellationToken ct = default);
