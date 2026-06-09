@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using DataGen.Desktop.ViewModels;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DataGen.Desktop.Views.Pages;
 
@@ -9,9 +8,9 @@ namespace DataGen.Desktop.Views.Pages;
 public partial class SettingsPage : Page
 {
     /// <summary>Initialises the page and wires the ViewModel.</summary>
-    public SettingsPage()
+    public SettingsPage(SettingsViewModel viewModel)
     {
-        DataContext = ((App)Application.Current).Services.GetRequiredService<SettingsViewModel>();
+        DataContext = viewModel;
         InitializeComponent();
     }
 }

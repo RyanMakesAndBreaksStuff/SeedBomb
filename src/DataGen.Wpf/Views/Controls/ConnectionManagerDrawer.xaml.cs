@@ -13,7 +13,7 @@ public partial class ConnectionManagerDrawer : UserControl
         Loaded += async (_, _) =>
         {
             if (DataContext is ConnectionManagerViewModel vm)
-                await vm.LoadAsync().ConfigureAwait(false);
+                await vm.LoadAsync();
         };
     }
 }

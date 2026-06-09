@@ -1,3 +1,5 @@
+using DataGen.Bulk;
+using DataGen.Bulk.Contracts;
 using DataGen.Core.Metadata;
 using DataGen.Desktop.Services.Auth;
 using DataGen.Desktop.Services.Connections;
@@ -104,6 +106,7 @@ public partial class App : Application
         sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
+        sc.AddSingleton<IGenerationPipeline, GenerationPipeline>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
         sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();
 
@@ -111,8 +114,10 @@ public partial class App : Application
         sc.AddSingleton<MainWindow>();
         sc.AddSingleton<LoginWindow>();
 
-        // ViewModels — transient so each window/page gets a fresh instance
-        sc.AddTransient<MainWindowViewModel>();
+        // Window ViewModels — singleton to match singleton window lifetime
+        sc.AddSingleton<MainWindowViewModel>();
+
+        // Page/control ViewModels — transient so each page/control gets a fresh instance
         sc.AddTransient<LoginWindowViewModel>();
         sc.AddTransient<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();

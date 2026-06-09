@@ -1,5 +1,4 @@
 using System.Windows.Controls;
-using DataGen.Core.Contracts;
 using DataGen.Desktop.ViewModels.Controls;
 
 namespace DataGen.Desktop.Views.Controls;
@@ -22,14 +21,4 @@ public partial class FieldOverridesControl : UserControl
         InitializeComponent();
     }
 
-    /// <summary>
-    /// Updates the displayed entries to match <paramref name="entities"/>.
-    /// Existing counts are preserved for entities that remain selected.
-    /// </summary>
-    /// <param name="entities">Currently selected entities.</param>
-    public void SetEntities(IReadOnlyList<EntitySummary> entities) =>
-        _vm.SetEntities(entities);
-
-    /// <summary>Returns the configured record count keyed by entity logical name.</summary>
-    public IReadOnlyDictionary<string, int> GetCounts() => _vm.GetCounts();
 }

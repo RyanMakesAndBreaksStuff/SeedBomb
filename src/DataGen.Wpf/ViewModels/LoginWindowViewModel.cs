@@ -10,6 +10,7 @@ public sealed partial class LoginWindowViewModel : ObservableObject
 {
     private readonly IAuthService _authService;
     private readonly IConnectionProfileService _profileService;
+    private CancellationTokenSource? _activeProfileLoadCts;
 
     /// <summary>Initialises the view-model.</summary>
     public LoginWindowViewModel(IAuthService authService, IConnectionProfileService profileService)
@@ -17,7 +18,6 @@ public sealed partial class LoginWindowViewModel : ObservableObject
         _authService = authService;
         _profileService = profileService;
         _profileService.ProfilesChanged += OnProfilesChanged;
-        LoadActiveProfileAsync();
     }
 
     /// <summary>Raised when MSAL sign-in succeeds; arg is the user's display name.</summary>
@@ -85,14 +85,32 @@ public sealed partial class LoginWindowViewModel : ObservableObject
 
     private bool CanLogin() => !IsLoading && HasProfiles;
 
-    private void LoadActiveProfileAsync()
+    /// <summary>Loads the active profile for initial window display.</summary>
+    public Task InitializeAsync() => RefreshActiveProfileAsync();
+
+    private async Task RefreshActiveProfileAsync()
     {
-        _ = Task.Run(async () =>
+        _activeProfileLoadCts?.Cancel();
+        _activeProfileLoadCts?.Dispose();
+        _activeProfileLoadCts = new CancellationTokenSource();
+        var ct = _activeProfileLoadCts.Token;
+
+        try
         {
-            var profile = await _profileService.GetLastUsedAsync().ConfigureAwait(false);
-            System.Windows.Application.Current.Dispatcher.Invoke(() => ActiveProfile = profile);
-        });
+            var profile = await _profileService.GetLastUsedAsync(ct);
+            if (!ct.IsCancellationRequested)
+                ActiveProfile = profile;
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer refresh superseded this one.
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
     }
 
-    private void OnProfilesChanged(object? sender, EventArgs e) => LoadActiveProfileAsync();
+    private async void OnProfilesChanged(object? sender, EventArgs e) =>
+        await RefreshActiveProfileAsync();
 }

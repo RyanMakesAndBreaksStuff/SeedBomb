@@ -15,6 +15,9 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cached;
 
+    /// <inheritdoc />
+    public event EventHandler? ConnectionReset;
+
     /// <summary>Initialises the service with required dependencies.</summary>
     /// <param name="auth">Auth service used to supply bearer tokens.</param>
     /// <param name="profileService">Profile service supplying the environment URL.</param>
@@ -66,8 +69,20 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     /// <inheritdoc />
     public void Reset()
     {
-        _cached?.Dispose();
-        _cached = null;
+        ServiceClient? cached;
+        _lock.Wait();
+        try
+        {
+            cached = _cached;
+            _cached = null;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        cached?.Dispose();
+        ConnectionReset?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnProfilesChanged(object? sender, EventArgs e) => Reset();

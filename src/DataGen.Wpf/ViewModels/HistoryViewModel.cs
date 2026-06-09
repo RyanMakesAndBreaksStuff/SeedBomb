@@ -122,7 +122,13 @@ public sealed partial class HistoryViewModel : ViewModelBase
                 var entities = string.Join("|", run.EntityNames);
                 var duration = $"{(int)run.Duration.TotalMinutes:00}:{run.Duration.Seconds:00}";
                 var status = run.Succeeded ? "Success" : "Failed";
-                lines.Add($"{run.Timestamp:O},{entities},{run.TotalRecords},{duration},{status},{run.ErrorCount}");
+                lines.Add(string.Join(",",
+                    EscapeCsv(run.Timestamp.ToString("O")),
+                    EscapeCsv(entities),
+                    EscapeCsv(run.TotalRecords.ToString()),
+                    EscapeCsv(duration),
+                    EscapeCsv(status),
+                    EscapeCsv(run.ErrorCount.ToString())));
             }
 
             await System.IO.File.WriteAllLinesAsync(path, lines);
@@ -132,5 +138,13 @@ public sealed partial class HistoryViewModel : ViewModelBase
         {
             _logger.LogError(ex, "Failed to export history CSV");
         }
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        if (!value.Contains(',') && !value.Contains('\"') && !value.Contains('\r') && !value.Contains('\n'))
+            return value;
+
+        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }
