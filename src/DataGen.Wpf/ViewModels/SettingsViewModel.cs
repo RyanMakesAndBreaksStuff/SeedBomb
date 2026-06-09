@@ -12,6 +12,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly ILogger<SettingsViewModel> _logger;
     private AppSettings _loadedSettings = AppSettings.Default;
+    private bool _isLoadingSettings;
 
     /// <summary>Initialises the view-model.</summary>
     /// <param name="settingsService">Settings persistence service.</param>
@@ -37,9 +38,20 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// <summary>Gets the .NET runtime version string.</summary>
     public string DotnetVersion => $".NET {Environment.Version}";
 
-    // Live dark-theme toggle — no save required; takes effect immediately.
-    partial void OnDarkThemeChanged(bool value) =>
+    // Live dark-theme toggle - no save required; takes effect immediately.
+    partial void OnDarkThemeChanged(bool value)
+    {
         DesignThemeManager.Apply(value);
+
+        if (!_isLoadingSettings)
+            _ = SaveAppearanceAsync();
+    }
+
+    partial void OnReduceMotionChanged(bool value)
+    {
+        if (!_isLoadingSettings)
+            _ = SaveAppearanceAsync();
+    }
 
     /// <inheritdoc />
     public override Task OnNavigatedToAsync()
@@ -53,6 +65,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     {
         try
         {
+            _isLoadingSettings = true;
             var s = await _settingsService.LoadAsync();
             _loadedSettings = s;
             DefaultRecordCount = s.DefaultRecordCount;
@@ -64,6 +77,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load settings");
+        }
+        finally
+        {
+            _isLoadingSettings = false;
         }
     }
 
@@ -84,6 +101,24 @@ public sealed partial class SettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save settings");
+        }
+    }
+
+    private async Task SaveAppearanceAsync()
+    {
+        try
+        {
+            _loadedSettings = _loadedSettings with
+            {
+                DarkTheme = DarkTheme,
+                ReduceMotion = ReduceMotion,
+            };
+
+            await _settingsService.SaveAsync(_loadedSettings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save appearance settings");
         }
     }
 }

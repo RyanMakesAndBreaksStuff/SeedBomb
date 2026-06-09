@@ -4,7 +4,10 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24" MaxWidth="800" HorizontalAlignment="Left">
+        <StackPanel Margin="24"
+                    MaxWidth="800"
+                    HorizontalAlignment="Left"
+                    TextElement.Foreground="{DynamicResource DG.Text1}">
 
             <!-- Appearance section -->
             <ui:CardExpander Header="Appearance"
@@ -12,11 +15,13 @@
                 <StackPanel>
                     <TextBlock Text="Dark theme"
                                FontSize="12"
+                               Foreground="{DynamicResource DG.Text1}"
                                Margin="0,0,0,2" />
                     <ui:ToggleSwitch IsChecked="{Binding DarkTheme, Mode=TwoWay}"
                                      AutomationProperties.Name="Toggle dark theme" />
                     <TextBlock Text="Reduce motion"
                                FontSize="12"
+                               Foreground="{DynamicResource DG.Text1}"
                                Margin="0,8,0,2" />
                     <ui:ToggleSwitch IsChecked="{Binding ReduceMotion, Mode=TwoWay}"
                                      AutomationProperties.Name="Toggle reduce motion" />
@@ -30,6 +35,7 @@
                     <StackPanel Margin="0,0,8,0">
                         <TextBlock Text="Default Record Count"
                                    FontSize="12"
+                                   Foreground="{DynamicResource DG.Text1}"
                                    Margin="0,0,0,2" />
                         <ui:NumberBox Value="{Binding DefaultRecordCount, Mode=TwoWay}"
                                       Minimum="1"
@@ -38,6 +44,7 @@
                     <StackPanel Margin="0,0,8,0">
                         <TextBlock Text="Default Batch Size"
                                    FontSize="12"
+                                   Foreground="{DynamicResource DG.Text1}"
                                    Margin="0,0,0,2" />
                         <ui:NumberBox Value="{Binding DefaultBatchSize, Mode=TwoWay}"
                                       Minimum="1"
@@ -46,6 +53,7 @@
                     <StackPanel>
                         <TextBlock Text="Default Max Parallelism"
                                    FontSize="12"
+                                   Foreground="{DynamicResource DG.Text1}"
                                    Margin="0,0,0,2" />
                         <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay}"
                                       Minimum="0"
@@ -69,15 +77,19 @@
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0" Grid.Column="0"
                                    Text="Version"
+                                   Foreground="{DynamicResource DG.Text2}"
                                    Opacity="0.6"
                                    Margin="0,0,16,4" />
                         <TextBlock Grid.Row="0" Grid.Column="1"
-                                   Text="{Binding AppVersion}" />
+                                   Text="{Binding AppVersion}"
+                                   Foreground="{DynamicResource DG.Text1}" />
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Runtime"
+                                   Foreground="{DynamicResource DG.Text2}"
                                    Opacity="0.6" />
                         <TextBlock Grid.Row="1" Grid.Column="1"
-                                   Text="{Binding DotnetVersion}" />
+                                   Text="{Binding DotnetVersion}"
+                                   Foreground="{DynamicResource DG.Text1}" />
                     </Grid>
                 </StackPanel>
             </ui:CardExpander>
