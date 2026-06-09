@@ -16,6 +16,7 @@ public static class DesignThemeManager
         var palette = isDark ? Dark : Light;
         Set("DG.Bg", palette.Bg);
         Set("DG.Surface1", palette.Surface1);
+        Set("DG.Surface2", palette.Surface2);
         Set("DG.Card", palette.Card);
         Set("DG.Border", palette.Border);
         Set("DG.Text1", palette.Text1);
@@ -29,6 +30,8 @@ public static class DesignThemeManager
         Set("ControlFillColorDefaultBrush", palette.Surface1);
         Set("ControlStrokeColorDefaultBrush", palette.Border);
         Set("DividerStrokeColorDefaultBrush", palette.Border);
+        Set("NavigationViewContentBackground", palette.Bg);
+        Set("NavigationViewContentGridBorderBrush", palette.Border);
         Set("TextFillColorPrimaryBrush", palette.Text1);
         Set("TextFillColorSecondaryBrush", palette.Text2);
         Set("TextFillColorTertiaryBrush", palette.Text3);
@@ -43,6 +46,7 @@ public static class DesignThemeManager
     private static readonly Palette Light = new(
         FromRgb(0xF3F0FC),
         FromRgb(0xEDE8FF),
+        FromRgb(0xEDE8FF),
         FromRgb(0xFFFFFF),
         FromRgb(0xDDD5F5),
         FromRgb(0x1A0F3C),
@@ -52,6 +56,7 @@ public static class DesignThemeManager
     private static readonly Palette Dark = new(
         FromRgb(0x0C0A18),
         FromRgb(0x16122A),
+        FromRgb(0x201C3C),
         FromRgb(0x1C1834),
         FromRgb(0x38306A),
         FromRgb(0xEDE8FF),
@@ -61,6 +66,7 @@ public static class DesignThemeManager
     private sealed record Palette(
         Color Bg,
         Color Surface1,
+        Color Surface2,
         Color Card,
         Color Border,
         Color Text1,

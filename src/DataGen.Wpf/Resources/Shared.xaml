@@ -45,6 +45,7 @@
     <!-- Current design tokens. DesignThemeManager swaps these for dark mode. -->
     <SolidColorBrush x:Key="DG.Bg"       Color="#F3F0FC"/>
     <SolidColorBrush x:Key="DG.Surface1" Color="#EDE8FF"/>
+    <SolidColorBrush x:Key="DG.Surface2" Color="#EDE8FF"/>
     <SolidColorBrush x:Key="DG.Card"     Color="#FFFFFF"/>
     <SolidColorBrush x:Key="DG.Border"   Color="#DDD5F5"/>
     <SolidColorBrush x:Key="DG.Text1"    Color="#1A0F3C"/>
@@ -59,6 +60,8 @@
     <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#EDE8FF"/>
     <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#DDD5F5"/>
     <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#DDD5F5"/>
+    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#F3F0FC"/>
+    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#DDD5F5"/>
     <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#1A0F3C"/>
     <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#6B5B8A"/>
     <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#9E8EC4"/>
