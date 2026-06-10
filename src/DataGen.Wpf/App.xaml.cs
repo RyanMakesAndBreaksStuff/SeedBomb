@@ -77,7 +77,9 @@ public partial class App : Application
 
         var settings = _host.Services.GetRequiredService<ISettingsService>();
         var s = settings.LoadAsync().GetAwaiter().GetResult();
-        vm.OrgUrl = s.OrgUrl;
+        var profiles = _host.Services.GetRequiredService<IConnectionProfileService>();
+        var profile = profiles.GetLastUsedAsync().GetAwaiter().GetResult();
+        vm.OrgUrl = profile?.EnvironmentUrl ?? s.OrgUrl;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();

@@ -43,18 +43,9 @@ public partial class EntitySelectorControl : UserControl
         ViewModel.LoadEntitiesCommand.Execute(null);
     }
 
-    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        foreach (var item in e.AddedItems.OfType<DataGen.Core.Contracts.EntitySummary>())
-            ViewModel?.ToggleSelection(item);
-        foreach (var item in e.RemovedItems.OfType<DataGen.Core.Contracts.EntitySummary>())
-            ViewModel?.ToggleSelection(item);
-    }
-
     /// <summary>Clears the visible selection and view-model selection.</summary>
     public void ClearSelection()
     {
-        EntityList.SelectedItems.Clear();
         ViewModel?.ClearSelection();
     }
 }

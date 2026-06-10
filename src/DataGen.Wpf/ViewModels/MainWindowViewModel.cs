@@ -7,6 +7,7 @@ public partial class MainWindowViewModel : ObservableObject
 {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UserInitials))]
+    [NotifyPropertyChangedFor(nameof(OrgHost))]
     private string _userDisplayName = "User";
 
     [ObservableProperty]
@@ -30,5 +31,7 @@ public partial class MainWindowViewModel : ObservableObject
     public string OrgHost =>
         Uri.TryCreate(OrgUrl, UriKind.Absolute, out var uri)
             ? uri.Host
-            : string.IsNullOrWhiteSpace(OrgUrl) ? "Not connected" : OrgUrl;
+            : string.IsNullOrWhiteSpace(OrgUrl)
+                ? string.IsNullOrWhiteSpace(UserDisplayName) || UserDisplayName == "User" ? "Not connected" : "Connected"
+                : OrgUrl;
 }

@@ -27,36 +27,48 @@
         <Expander Header="Select Entities"
                   IsExpanded="True"
                   Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisible}}">
-            <ListBox x:Name="EntityList"
-                     ItemsSource="{Binding Entities}"
-                     SelectionMode="Multiple"
-                     MaxHeight="300"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                     SelectionChanged="OnSelectionChanged">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding DisplayName}" />
-                            <TextBlock Text=" ●"
-                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                       FontSize="10"
-                                       VerticalAlignment="Center"
-                                       Margin="2,0,0,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsCustom}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <Grid Margin="0,12,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <ui:TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                            PlaceholderText="Search entities..."
+                            Margin="12,0,12,10" />
+
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding FilteredEntities}"
+                         MaxHeight="420"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Padding="0,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                    <TextBlock Text=" ●"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                               FontSize="10"
+                                               VerticalAlignment="Center"
+                                               Margin="2,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCustom}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </CheckBox>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
         </Expander>
     </Grid>
 </UserControl>
