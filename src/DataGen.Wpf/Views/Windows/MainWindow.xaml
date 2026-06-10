@@ -91,7 +91,7 @@
             <Border Width="28"
                     Height="28"
                     CornerRadius="14"
-                    Background="{StaticResource DG.Accent}"
+                        Background="{DynamicResource DG.Accent}"
                     Margin="0,0,9,0">
                 <TextBlock Text="{Binding UserInitials}"
                            Foreground="White"

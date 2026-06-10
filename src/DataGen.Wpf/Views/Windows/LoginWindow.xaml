@@ -49,7 +49,7 @@
                 <Border Width="48"
                         Height="48"
                         CornerRadius="12"
-                        Background="{StaticResource DG.Accent}"
+                    Background="{DynamicResource DG.Accent}"
                         HorizontalAlignment="Center"
                         Margin="0,0,0,18">
                     <Viewbox Width="26" Height="26"

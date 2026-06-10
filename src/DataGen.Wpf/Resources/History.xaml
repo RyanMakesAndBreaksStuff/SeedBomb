@@ -82,13 +82,13 @@
                         VerticalAlignment="Center">
                     <Border.Style>
                         <Style TargetType="Border">
-                            <Setter Property="Background" Value="#1FDC2626" />
-                            <Setter Property="BorderBrush" Value="#40DC2626" />
+                            <Setter Property="Background" Value="{DynamicResource DG.ErrorSoft}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource DG.ErrorBorder}" />
                             <Setter Property="BorderThickness" Value="1" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Succeeded}" Value="True">
-                                    <Setter Property="Background" Value="#1A059669" />
-                                    <Setter Property="BorderBrush" Value="#40059669" />
+                                    <Setter Property="Background" Value="{DynamicResource DG.SuccessSoft}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource DG.SuccessBorder}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

@@ -18,6 +18,7 @@
   <Folder Name="/tests/">
     <Project Path="src/DataGen.Bulk.Tests/DataGen.Bulk.Tests.csproj" />
     <Project Path="src/DataGen.Core.Tests/DataGen.Core.Tests.csproj" />
+    <Project Path="src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj" />
     <Project Path="src/DataGen.Web.Tests/DataGen.Web.Tests.csproj" />
     <Project Path="tests/DataGen.Integration.Tests/DataGen.Integration.Tests.csproj" />
   </Folder>
