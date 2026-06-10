@@ -141,7 +141,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     [
         new(CanConfigure ? "✓" : "1", "Select", CanConfigure, !CanConfigure, true),
         new(CanExecute && CanConfigure ? "✓" : "2", "Configure", CanExecute && CanConfigure, CanConfigure && !CanExecute, true),
-        new("3", "Execute", HasResult, CanExecute, false),
+        new(HasResult ? "✓" : "3", "Execute", HasResult, CanExecute && !HasResult, false),
     ];
 
     // ── Commands ──────────────────────────────────────────────────────────────
