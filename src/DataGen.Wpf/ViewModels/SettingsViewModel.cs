@@ -7,31 +7,25 @@ using Microsoft.Extensions.Logging;
 namespace DataGen.Desktop.ViewModels;
 
 /// <summary>ViewModel for the Settings page.</summary>
-public sealed partial class SettingsViewModel : ViewModelBase
+/// <remarks>Initialises the view-model.</remarks>
+/// <param name="settingsService">Settings persistence service.</param>
+/// <param name="logger">Logger.</param>
+public sealed partial class SettingsViewModel(
+    ISettingsService settingsService,
+    ILogger<SettingsViewModel> logger) : ViewModelBase
 {
-    private readonly ISettingsService _settingsService;
-    private readonly ILogger<SettingsViewModel> _logger;
+    private readonly ISettingsService _settingsService = settingsService;
+    private readonly ILogger<SettingsViewModel> _logger = logger;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private CancellationTokenSource? _appearanceSaveCts;
     private Task _appearanceSaveTask = Task.CompletedTask;
-
-    /// <summary>Initialises the view-model.</summary>
-    /// <param name="settingsService">Settings persistence service.</param>
-    /// <param name="logger">Logger.</param>
-    public SettingsViewModel(
-        ISettingsService settingsService,
-        ILogger<SettingsViewModel> logger)
-    {
-        _settingsService = settingsService;
-        _logger = logger;
-    }
-
     [ObservableProperty] private int _defaultRecordCount = 10;
     [ObservableProperty] private int _defaultBatchSize = 500;
     [ObservableProperty] private int _defaultDop;
     [ObservableProperty] private bool _darkTheme;
     [ObservableProperty] private bool _reduceMotion;
+    [ObservableProperty] private string _paletteId = DesignThemeManager.DefaultPaletteId;
 
     /// <summary>Gets the application version string.</summary>
     public string AppVersion =>
@@ -40,10 +34,13 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// <summary>Gets the .NET runtime version string.</summary>
     public string DotnetVersion => $".NET {Environment.Version}";
 
+    /// <summary>Gets the palettes offered in the appearance picker.</summary>
+    public IReadOnlyList<ThemePaletteOption> AvailablePalettes => DesignThemeManager.AvailablePalettes;
+
     // Live dark-theme toggle - no save required; takes effect immediately.
     partial void OnDarkThemeChanged(bool value)
     {
-        DesignThemeManager.Apply(value);
+        DesignThemeManager.Apply(value, PaletteId);
 
         if (!_isLoadingSettings)
             QueueAppearanceSave();
@@ -51,6 +48,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     partial void OnReduceMotionChanged(bool value)
     {
+        if (!_isLoadingSettings)
+            QueueAppearanceSave();
+    }
+
+    // Live palette picker - no save required; takes effect immediately, mirrors dark-theme toggle.
+    partial void OnPaletteIdChanged(string value)
+    {
+        DesignThemeManager.Apply(DarkTheme, value);
+
         if (!_isLoadingSettings)
             QueueAppearanceSave();
     }
@@ -79,6 +85,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             DefaultDop = s.DefaultDop;
             DarkTheme = s.DarkTheme;
             ReduceMotion = s.ReduceMotion;
+            PaletteId = s.PaletteId;
         }
         catch (Exception ex)
         {
@@ -100,7 +107,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
                 _loadedSettings.ClientId,
                 _loadedSettings.TenantId,
                 DefaultRecordCount, DefaultBatchSize, DefaultDop,
-                DarkTheme, ReduceMotion);
+                DarkTheme, ReduceMotion, PaletteId);
 
             CancelPendingAppearanceSave();
             await _settingsService.SaveAsync(settings);
@@ -136,6 +143,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             {
                 DarkTheme = DarkTheme,
                 ReduceMotion = ReduceMotion,
+                PaletteId = PaletteId,
             };
 
             await _settingsService.SaveAsync(settings, ct);

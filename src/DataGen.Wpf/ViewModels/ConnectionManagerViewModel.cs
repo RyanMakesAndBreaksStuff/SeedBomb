@@ -22,6 +22,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Raised when the drawer should close.</summary>
     public event EventHandler? DrawerCloseRequested;
 
+    /// <summary>Raised after a profile is selected and sign-in succeeds.</summary>
+    public event EventHandler<(ConnectionProfile Profile, AuthResult Result)>? ConnectionSwitched;
+
+    /// <summary>HWND of the hosting window, used for interactive sign-in popups. Set by the host on Loaded.</summary>
+    public nint ParentHwnd { get; set; }
+
     [ObservableProperty] private ObservableCollection<ConnectionProfile> _profiles = [];
     [ObservableProperty] private ConnectionProfile? _selectedProfile;
     [ObservableProperty] private ConnectionProfile? _editingProfile;
@@ -29,6 +35,11 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private string? _testResult;
     [ObservableProperty] private bool _testSucceeded;
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SelectProfileCommand))] private bool _isSwitchingConnection;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSwitchError))] private string? _switchError;
+
+    /// <summary>Gets whether the last connection switch failed.</summary>
+    public bool HasSwitchError => SwitchError is not null;
 
     /// <summary>Loads profiles from storage and marks the active profile.</summary>
     [RelayCommand]
@@ -57,13 +68,32 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         IsEditing = true;
     }
 
-    /// <summary>Sets a profile as the active connection for sign-in.</summary>
-    [RelayCommand]
+    /// <summary>Sets a profile as the active connection and re-authenticates against it.</summary>
+    [RelayCommand(CanExecute = nameof(CanSelectProfile))]
     private async Task SelectProfileAsync(ConnectionProfile profile)
     {
-        await _profileService.SetLastUsedAsync(profile.Id);
-        await LoadAsync();
+        IsSwitchingConnection = true;
+        SwitchError = null;
+
+        try
+        {
+            await _profileService.SetLastUsedAsync(profile.Id);
+            var result = await _authService.SignInAsync(ParentHwnd);
+
+            if (result.Succeeded)
+                ConnectionSwitched?.Invoke(this, (profile, result));
+            else
+                SwitchError = result.Error ?? "Sign-in failed.";
+
+            await LoadAsync();
+        }
+        finally
+        {
+            IsSwitchingConnection = false;
+        }
     }
+
+    private bool CanSelectProfile() => !IsSwitchingConnection;
 
     /// <summary>Starts editing an existing profile.</summary>
     [RelayCommand]

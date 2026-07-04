@@ -8,18 +8,13 @@ namespace DataGen.Core.Graph;
 /// Builds a <see cref="DependencyGraph"/> from Dataverse entity metadata by
 /// analyzing lookup relationships between selected entities.
 /// </summary>
-public class GraphBuilder
+/// <remarks>
+/// Initializes a new instance of the <see cref="GraphBuilder"/> class.
+/// </remarks>
+/// <param name="logger">The logger instance.</param>
+public class GraphBuilder(ILogger<GraphBuilder> logger)
 {
-    private readonly ILogger<GraphBuilder> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="GraphBuilder"/> class.
-    /// </summary>
-    /// <param name="logger">The logger instance.</param>
-    public GraphBuilder(ILogger<GraphBuilder> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<GraphBuilder> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// Builds a dependency graph from the given entity metadata.
@@ -32,7 +27,10 @@ public class GraphBuilder
     {
         ArgumentNullException.ThrowIfNull(selectedEntities);
 
-        _logger.LogInformation("Building dependency graph for {EntityCount} entities", selectedEntities.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Building dependency graph for {EntityCount} entities", selectedEntities.Count);
+        }
 
         var graph = new DependencyGraph();
 
@@ -97,11 +95,18 @@ public class GraphBuilder
             }
         }
 
-        _logger.LogInformation(
-            "Dependency graph built: {NodeCount} nodes, {EdgeCount} edges, {SelfRefCount} self-references",
-            graph.Nodes.Count,
-            graph.Edges.Values.Sum(e => e.Count),
-            graph.SelfReferences.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            var nodeCount = graph.Nodes.Count;
+            var edgeCount = graph.Edges.Values.Sum(e => e.Count);
+            var selfRefCount = graph.SelfReferences.Count;
+
+            _logger.LogInformation(
+                "Dependency graph built: {NodeCount} nodes, {EdgeCount} edges, {SelfRefCount} self-references",
+                nodeCount,
+                edgeCount,
+                selfRefCount);
+        }
 
         return graph;
     }

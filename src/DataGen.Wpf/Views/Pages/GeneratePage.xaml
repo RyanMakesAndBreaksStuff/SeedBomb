@@ -14,29 +14,16 @@
                 Padding="28,20,28,16"
                 BorderBrush="{DynamicResource DG.Border}"
                 BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Generate"
-                               FontSize="17"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource DG.Text1}" />
-                    <TextBlock Text="Create synthetic Dataverse records in bulk"
-                               FontSize="11"
-                               Foreground="{DynamicResource DG.Text3}"
-                               Margin="0,3,0,0" />
-                </StackPanel>
-                <ui:Button Grid.Column="1"
-                           Content="Reset"
-                           Appearance="Secondary"
-                           Padding="14,7"
-                           FontSize="12"
-                           VerticalAlignment="Top"
-                           Click="OnResetClick" />
-            </Grid>
+            <StackPanel>
+                <TextBlock Text="Generate"
+                           FontSize="17"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource DG.Text1}" />
+                <TextBlock Text="Create synthetic Dataverse records in bulk"
+                           FontSize="11"
+                           Foreground="{DynamicResource DG.Text3}"
+                           Margin="0,3,0,0" />
+            </StackPanel>
         </Border>
 
         <Grid Grid.Row="1" Margin="28,24,28,24">

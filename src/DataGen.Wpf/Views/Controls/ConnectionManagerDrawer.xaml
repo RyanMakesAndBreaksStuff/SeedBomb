@@ -59,6 +59,18 @@
                                    Margin="0,0,0,12"
                                    Command="{Binding NewProfileCommand}"/>
 
+                        <ui:ProgressRing IsIndeterminate="True"
+                                         Width="20" Height="20"
+                                         Margin="0,0,0,12"
+                                         HorizontalAlignment="Left"
+                                         Visibility="{Binding IsSwitchingConnection, Converter={StaticResource BoolToVisible}}"/>
+
+                        <ui:InfoBar IsOpen="{Binding HasSwitchError}"
+                                    Severity="Error"
+                                    Message="{Binding SwitchError}"
+                                    IsClosable="False"
+                                    Margin="0,0,0,12"/>
+
                         <ItemsControl ItemsSource="{Binding Profiles}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type conn:ConnectionProfile}">
@@ -209,7 +221,7 @@
                                 </Style>
                             </StackPanel.Style>
                             <TextBlock Text="Client Secret" Style="{StaticResource FieldLabel}"/>
-                            <ui:PasswordBox Password="{Binding EditingProfile.ClientSecret, UpdateSourceTrigger=PropertyChanged}"
+                            <ui:PasswordBox Password="{Binding EditingProfile.ClientSecret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                             PlaceholderText="••••••••"/>
                         </StackPanel>
 
@@ -230,7 +242,7 @@
                             <ui:TextBox Text="{Binding EditingProfile.Username, UpdateSourceTrigger=PropertyChanged}"
                                         PlaceholderText="user@yourorg.onmicrosoft.com"/>
                             <TextBlock Text="Password" Style="{StaticResource FieldLabel}"/>
-                            <ui:PasswordBox Password="{Binding EditingProfile.Password, UpdateSourceTrigger=PropertyChanged}"
+                            <ui:PasswordBox Password="{Binding EditingProfile.Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                             PlaceholderText="••••••••"/>
                         </StackPanel>
 

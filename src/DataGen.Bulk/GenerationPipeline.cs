@@ -12,21 +12,14 @@ namespace DataGen.Bulk;
 /// <summary>
 /// Default Core/Bulk orchestration boundary for Dataverse generation runs.
 /// </summary>
-public sealed class GenerationPipeline : IGenerationPipeline
+/// <remarks>Initializes a new instance of the <see cref="GenerationPipeline"/> class.</remarks>
+/// <param name="metadata">Metadata provider reused across runs.</param>
+/// <param name="loggerFactory">Logger factory used for pipeline components.</param>
+public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactory loggerFactory) : IGenerationPipeline
 {
-    private readonly IMetadataProvider _metadata;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly ILogger<GenerationPipeline> _logger;
-
-    /// <summary>Initializes a new instance of the <see cref="GenerationPipeline"/> class.</summary>
-    /// <param name="metadata">Metadata provider reused across runs.</param>
-    /// <param name="loggerFactory">Logger factory used for pipeline components.</param>
-    public GenerationPipeline(IMetadataProvider metadata, ILoggerFactory loggerFactory)
-    {
-        _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-        _logger = loggerFactory.CreateLogger<GenerationPipeline>();
-    }
+    private readonly IMetadataProvider _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
+    private readonly ILoggerFactory _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+    private readonly ILogger<GenerationPipeline> _logger = loggerFactory.CreateLogger<GenerationPipeline>();
 
     /// <inheritdoc />
     public async Task<GenerationResult> GenerateAsync(
@@ -51,7 +44,10 @@ public sealed class GenerationPipeline : IGenerationPipeline
         var cycles = cycleDetector.FindStronglyConnectedComponents(graph);
         if (cycles.Count > 0)
         {
-            _logger.LogWarning("Breaking {Count} dependency cycle(s)", cycles.Count);
+            if (_logger.IsEnabled(LogLevel.Warning))
+            {
+                _logger.LogWarning("Breaking {Count} dependency cycle(s)", cycles.Count);
+            }
             cycleDetector.BreakCycles(graph, cycles, metaDict);
         }
 

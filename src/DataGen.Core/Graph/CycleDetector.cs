@@ -9,18 +9,13 @@ namespace DataGen.Core.Graph;
 /// Detects strongly connected components (cycles) in the dependency graph
 /// using Tarjan's algorithm and breaks them by deferring optional lookup edges.
 /// </summary>
-public class CycleDetector
+/// <remarks>
+/// Initializes a new instance of the <see cref="CycleDetector"/> class.
+/// </remarks>
+/// <param name="logger">The logger instance.</param>
+public class CycleDetector(ILogger<CycleDetector> logger)
 {
-    private readonly ILogger<CycleDetector> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CycleDetector"/> class.
-    /// </summary>
-    /// <param name="logger">The logger instance.</param>
-    public CycleDetector(ILogger<CycleDetector> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<CycleDetector> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// Finds all strongly connected components with more than one node using Tarjan's SCC algorithm.
@@ -51,14 +46,14 @@ public class CycleDetector
             {
                 foreach (var target in targets)
                 {
-                    if (!indices.ContainsKey(target))
+                    if (!indices.TryGetValue(target, out int value))
                     {
                         StrongConnect(target);
                         lowLinks[node] = Math.Min(lowLinks[node], lowLinks[target]);
                     }
                     else if (onStack.Contains(target))
                     {
-                        lowLinks[node] = Math.Min(lowLinks[node], indices[target]);
+                        lowLinks[node] = Math.Min(lowLinks[node], value);
                     }
                 }
             }
@@ -90,7 +85,10 @@ public class CycleDetector
             }
         }
 
-        _logger.LogInformation("Found {CycleCount} cycles in dependency graph", result.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Found {CycleCount} cycles in dependency graph", result.Count);
+        }
         return result.AsReadOnly();
     }
 

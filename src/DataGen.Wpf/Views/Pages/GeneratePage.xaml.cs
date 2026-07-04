@@ -1,4 +1,3 @@
-using System.Windows;
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
 using DataGen.Desktop.ViewModels;
@@ -25,7 +24,8 @@ public partial class GeneratePage : Page
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>
         _vm.OnEntitiesChanged(entities);
 
-    private void OnResetClick(object sender, RoutedEventArgs e)
+    /// <summary>Resets the wizard back to step one. Invoked from the "Reset" nav bar item in <see cref="Windows.MainWindow"/>.</summary>
+    public void Reset()
     {
         if (!_vm.ResetCommand.CanExecute(null))
             return;

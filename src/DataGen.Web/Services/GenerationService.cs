@@ -81,7 +81,10 @@ public sealed class GenerationService
             var cycles = _cycleDetector!.FindStronglyConnectedComponents(graph);
             if (cycles.Count > 0)
             {
-                _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
+                if (_logger.IsEnabled(LogLevel.Warning))
+                {
+                    _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
+                }
                 _cycleDetector.BreakCycles(graph, cycles, metadataDict);
             }
 
@@ -181,7 +184,10 @@ public sealed class GenerationService
             var cycles = cycleDetector.FindStronglyConnectedComponents(graph);
             if (cycles.Count > 0)
             {
-                _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
+                if (_logger.IsEnabled(LogLevel.Warning))
+                {
+                    _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
+                }
                 cycleDetector.BreakCycles(graph, cycles, metadataDict);
             }
 

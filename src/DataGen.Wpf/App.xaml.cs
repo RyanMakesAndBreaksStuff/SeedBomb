@@ -42,7 +42,7 @@ public partial class App : Application
             // and MainWindow render correctly from the first frame.
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             var savedSettings = await settings.LoadAsync();
-            DesignThemeManager.Apply(savedSettings.DarkTheme);
+            DesignThemeManager.Apply(savedSettings.DarkTheme, savedSettings.PaletteId);
 
             // Attempt silent token acquisition before showing any window.
             // Pass nint.Zero to suppress any interactive popup — silent-only path.

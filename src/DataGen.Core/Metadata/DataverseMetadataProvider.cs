@@ -13,28 +13,21 @@ namespace DataGen.Core.Metadata;
 /// <summary>
 /// Retrieves and caches Dataverse entity metadata using the ServiceClient SDK.
 /// </summary>
-public class DataverseMetadataProvider : IMetadataProvider
+/// <remarks>
+/// Initializes a new instance of the <see cref="DataverseMetadataProvider"/> class.
+/// </remarks>
+/// <param name="service">The Dataverse organization service instance.</param>
+/// <param name="cache">The memory cache for metadata.</param>
+/// <param name="logger">The logger instance.</param>
+public class DataverseMetadataProvider(
+    IOrganizationServiceAsync2 service,
+    IMemoryCache cache,
+    ILogger<DataverseMetadataProvider> logger) : IMetadataProvider
 {
-    private readonly IOrganizationServiceAsync2 _service;
-    private readonly IMemoryCache _cache;
-    private readonly ILogger<DataverseMetadataProvider> _logger;
+    private readonly IOrganizationServiceAsync2 _service = service ?? throw new ArgumentNullException(nameof(service));
+    private readonly IMemoryCache _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    private readonly ILogger<DataverseMetadataProvider> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(30);
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DataverseMetadataProvider"/> class.
-    /// </summary>
-    /// <param name="service">The Dataverse organization service instance.</param>
-    /// <param name="cache">The memory cache for metadata.</param>
-    /// <param name="logger">The logger instance.</param>
-    public DataverseMetadataProvider(
-        IOrganizationServiceAsync2 service,
-        IMemoryCache cache,
-        ILogger<DataverseMetadataProvider> logger)
-    {
-        _service = service ?? throw new ArgumentNullException(nameof(service));
-        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <inheritdoc/>
     public async Task<EntityMetadata> GetEntityAsync(string logicalName, CancellationToken ct = default)
@@ -132,7 +125,10 @@ public class DataverseMetadataProvider : IMetadataProvider
                 .AsReadOnly();
 
             _cache.Set(cacheKey, summaries, CacheDuration);
-            _logger.LogInformation("Found {EntityCount} user entities", summaries.Count);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Found {EntityCount} user entities", summaries.Count);
+            }
             return summaries;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

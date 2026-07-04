@@ -3,6 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:pages="clr-namespace:DataGen.Desktop.Views.Pages"
+                 xmlns:local="clr-namespace:DataGen.Desktop.Views.Controls"
                  ExtendsContentIntoTitleBar="True"
                  WindowStyle="SingleBorderWindow"
                  Title="DataGen"
@@ -73,6 +74,22 @@
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
 
+            <ui:NavigationView.FooterMenuItems>
+                <!-- No TargetPageType: NavigationViewItem is a plain ButtonBase here, acts on the
+                     currently displayed page instead of navigating. -->
+                <ui:NavigationViewItem Click="OnResetClick"
+                                       AutomationProperties.Name="Reset">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ArrowReset24"
+                                       FontSize="16"
+                                       Margin="0,0,8,0" />
+                        <TextBlock Text="Reset"
+                                   FontSize="13"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.FooterMenuItems>
+
             <ui:NavigationView.ContentOverlay>
                 <Grid>
                     <ui:SnackbarPresenter x:Name="SnackbarPresenter" />
@@ -81,35 +98,74 @@
 
         </ui:NavigationView>
 
-        <StackPanel Grid.Row="1"
-                    Panel.ZIndex="10"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    IsHitTestVisible="False"
-                    Margin="0,8,20,0">
-            <Border Width="28"
-                    Height="28"
-                    CornerRadius="14"
+        <Border Grid.Row="1"
+                Panel.ZIndex="10"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,7,20,0"
+                Padding="8,4"
+                CornerRadius="6"
+                BorderThickness="0"
+                Cursor="Hand"
+                ToolTip="Switch connection"
+                AutomationProperties.Name="Switch connection"
+                MouseLeftButtonUp="OnConnectionHeaderClick">
+            <Border.Background>
+                <SolidColorBrush Color="Transparent" />
+            </Border.Background>
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="28"
+                        Height="28"
+                        CornerRadius="14"
                         Background="{DynamicResource DG.Accent}"
-                    Margin="0,0,9,0">
-                <TextBlock Text="{Binding UserInitials}"
-                           Foreground="White"
-                           FontSize="11"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center" />
-            </Border>
-            <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="{Binding UserDisplayName}"
-                           FontSize="12"
-                           Foreground="{DynamicResource DG.Text1}" />
-                <TextBlock Text="{Binding OrgHost}"
-                           FontSize="10"
-                           Foreground="{DynamicResource DG.Text3}" />
+                        Margin="0,0,9,0">
+                    <TextBlock Text="{Binding UserInitials}"
+                               Foreground="White"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding UserDisplayName}"
+                               FontSize="12"
+                               Foreground="{DynamicResource DG.Text1}" />
+                    <TextBlock Text="{Binding OrgHost}"
+                               FontSize="10"
+                               Foreground="{DynamicResource DG.Text3}" />
+                </StackPanel>
             </StackPanel>
-        </StackPanel>
+        </Border>
 
         <ui:ContentDialogHost Grid.RowSpan="2" />
+
+        <!-- Scrim overlay (ZIndex 9) -->
+        <Rectangle x:Name="DrawerScrim"
+                   Grid.RowSpan="2"
+                   Fill="#80000000"
+                   Panel.ZIndex="9"
+                   Visibility="Collapsed"
+                   MouseDown="OnScrimClick" />
+
+        <!-- Connection Manager Drawer (ZIndex 10) -->
+        <local:ConnectionManagerDrawer x:Name="DrawerControl"
+                                        Grid.RowSpan="2"
+                                        Panel.ZIndex="10"
+                                        HorizontalAlignment="Right"
+                                        Width="500"
+                                        RenderTransformOrigin="0,0">
+            <local:ConnectionManagerDrawer.RenderTransform>
+                <TranslateTransform X="500" />
+            </local:ConnectionManagerDrawer.RenderTransform>
+        </local:ConnectionManagerDrawer>
     </Grid>
 </ui:FluentWindow>

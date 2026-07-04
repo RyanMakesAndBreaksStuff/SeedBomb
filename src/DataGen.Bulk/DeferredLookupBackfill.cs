@@ -12,31 +12,23 @@ namespace DataGen.Bulk;
 /// Backfills deferred lookup fields and N:N associations after the initial record creation pass.
 /// Deferred lookups arise when a cycle is broken by removing an optional lookup edge.
 /// </summary>
-public class DeferredLookupBackfill
+/// <remarks>
+/// Initializes a new instance of the <see cref="DeferredLookupBackfill"/> class.
+/// </remarks>
+/// <param name="service">The Dataverse organization service.</param>
+/// <param name="messageAvailabilityChecker">Message capability checker.</param>
+/// <param name="throttlePolicy">The throttle retry policy.</param>
+/// <param name="logger">The logger instance.</param>
+public class DeferredLookupBackfill(
+    IOrganizationServiceAsync2 service,
+    MessageAvailabilityChecker messageAvailabilityChecker,
+    ThrottlePolicy throttlePolicy,
+    ILogger<DeferredLookupBackfill> logger)
 {
-    private readonly IOrganizationServiceAsync2 _service;
-    private readonly MessageAvailabilityChecker _messageAvailabilityChecker;
-    private readonly ThrottlePolicy _throttlePolicy;
-    private readonly ILogger<DeferredLookupBackfill> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DeferredLookupBackfill"/> class.
-    /// </summary>
-    /// <param name="service">The Dataverse organization service.</param>
-    /// <param name="messageAvailabilityChecker">Message capability checker.</param>
-    /// <param name="throttlePolicy">The throttle retry policy.</param>
-    /// <param name="logger">The logger instance.</param>
-    public DeferredLookupBackfill(
-        IOrganizationServiceAsync2 service,
-        MessageAvailabilityChecker messageAvailabilityChecker,
-        ThrottlePolicy throttlePolicy,
-        ILogger<DeferredLookupBackfill> logger)
-    {
-        _service = service ?? throw new ArgumentNullException(nameof(service));
-        _messageAvailabilityChecker = messageAvailabilityChecker ?? throw new ArgumentNullException(nameof(messageAvailabilityChecker));
-        _throttlePolicy = throttlePolicy ?? throw new ArgumentNullException(nameof(throttlePolicy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IOrganizationServiceAsync2 _service = service ?? throw new ArgumentNullException(nameof(service));
+    private readonly MessageAvailabilityChecker _messageAvailabilityChecker = messageAvailabilityChecker ?? throw new ArgumentNullException(nameof(messageAvailabilityChecker));
+    private readonly ThrottlePolicy _throttlePolicy = throttlePolicy ?? throw new ArgumentNullException(nameof(throttlePolicy));
+    private readonly ILogger<DeferredLookupBackfill> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// Sends UpdateRequest batches to populate deferred lookup fields.
@@ -68,7 +60,10 @@ public class DeferredLookupBackfill
             return errors.AsReadOnly();
         }
 
-        _logger.LogInformation("Starting deferred lookup backfill for {EntityCount} entities.", graph.DeferredEdges.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Starting deferred lookup backfill for {EntityCount} entities.", graph.DeferredEdges.Count);
+        }
 
         var rng = new Random(seed);
 
@@ -114,7 +109,10 @@ public class DeferredLookupBackfill
             errors.AddRange(batchErrors);
         }
 
-        _logger.LogInformation("Deferred lookup backfill complete. Errors: {ErrorCount}", errors.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Deferred lookup backfill complete. Errors: {ErrorCount}", errors.Count);
+        }
         return errors.AsReadOnly();
     }
 
@@ -177,10 +175,10 @@ public class DeferredLookupBackfill
                     {
                         Target = new EntityReference(rel.Entity1LogicalName, e1Id),
                         Relationship = new Relationship(rel.SchemaName),
-                        RelatedEntities = new EntityReferenceCollection
-                        {
+                        RelatedEntities =
+                        [
                             new EntityReference(rel.Entity2LogicalName, e2Id)
-                        }
+                        ]
                     };
                 }).ToList();
 
@@ -190,7 +188,10 @@ public class DeferredLookupBackfill
             }
         }
 
-        _logger.LogInformation("N:N association pass complete. Errors: {ErrorCount}", errors.Count);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("N:N association pass complete. Errors: {ErrorCount}", errors.Count);
+        }
         return errors.AsReadOnly();
     }
 
@@ -263,7 +264,7 @@ public class DeferredLookupBackfill
                     ContinueOnError = true,
                     ReturnResponses = false
                 },
-                Requests = new OrganizationRequestCollection()
+                Requests = []
             };
             foreach (var req in batch)
                 execMulti.Requests.Add(req);
