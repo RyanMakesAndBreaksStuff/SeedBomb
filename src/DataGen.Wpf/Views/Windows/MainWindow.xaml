@@ -7,7 +7,7 @@
                  ExtendsContentIntoTitleBar="True"
                  WindowStyle="SingleBorderWindow"
                  Title="DataGen"
-                 Icon="pack://application:,,,/Assets/logos/seedbomb.ico"
+                 Icon="/seedbomb.ico"
                  Width="1200"
                  Height="750"
                  MinWidth="960"
@@ -22,12 +22,12 @@
                 Background="{DynamicResource DG.Surface2}"
                 BorderBrush="{DynamicResource DG.Border}"
                 BorderThickness="0,0,0,1">
-            <ui:TitleBar Title="DataGen"
+            <ui:TitleBar Title="SeedBomb - Mock data expplosion"
                          Height="32"
                          Background="{DynamicResource DG.Surface2}"
                          Foreground="{DynamicResource DG.Text2}"
                          ButtonsForeground="{DynamicResource DG.Text3}"
-                         Icon="{ui:ImageIcon 'pack://application:,,,/Assets/logos/seedbomb_32x32.png'}"
+                         Icon="{ui:ImageIcon 'pack://application:,,,/seedbomb_32x32.png'}"
                          ShowMinimize="True"
                          ShowMaximize="True"
                          ShowClose="True" />

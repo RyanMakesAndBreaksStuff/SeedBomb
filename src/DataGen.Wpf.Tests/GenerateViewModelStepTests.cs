@@ -1,6 +1,7 @@
 using DataGen.Core.Contracts;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -40,6 +41,7 @@ public sealed class GenerateViewModelStepTests
         new(
             Mock.Of<IWpfGenerationService>(),
             Mock.Of<IRunHistoryService>(),
+            Mock.Of<ISettingsService>(),
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>());
 }

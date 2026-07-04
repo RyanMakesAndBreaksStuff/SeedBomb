@@ -34,14 +34,15 @@ public sealed class FieldOverridesViewModel : ObservableObject
     /// Existing counts are preserved; entries for deselected entities are removed.
     /// </summary>
     /// <param name="entities">Currently selected entities.</param>
-    public void SetEntities(IReadOnlyList<EntitySummary> entities)
+    /// <param name="defaultCount">Initial count for newly-added entries (the user's configured default record count).</param>
+    public void SetEntities(IReadOnlyList<EntitySummary> entities, int defaultCount = 10)
     {
         var existing = Entries.ToDictionary(e => e.Entity.LogicalName, e => e.Count);
 
         Entries.Clear();
         foreach (var entity in entities)
         {
-            var count = existing.GetValueOrDefault(entity.LogicalName, 10);
+            var count = existing.GetValueOrDefault(entity.LogicalName, defaultCount);
             Entries.Add(new EntityCountEntry(entity, count));
         }
     }

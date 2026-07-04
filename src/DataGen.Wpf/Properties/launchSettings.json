@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "DataGen.Wpf": {
-      "commandName": "Project",
-      "debugEngines": "managed-dotnet"
-    }
-  }
-}

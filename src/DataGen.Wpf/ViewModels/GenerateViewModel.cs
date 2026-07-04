@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Wpf.Ui;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 
 namespace Seedbomb.ViewModels;
@@ -41,27 +42,41 @@ public sealed partial class GenerateViewModel : ViewModelBase
 {
     private readonly IWpfGenerationService _generationService;
     private readonly IRunHistoryService _historyService;
+    private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
     private readonly ILogger<GenerateViewModel> _logger;
 
     private CancellationTokenSource? _cts;
     private FieldOverridesViewModel? _fieldOverrides;
 
+    // Fallback before settings load completes; matches AppSettings.Default.DefaultRecordCount.
+    private int _defaultRecordCount = 10;
+
     /// <summary>Initialises the view-model.</summary>
     /// <param name="generationService">Generation pipeline service.</param>
     /// <param name="historyService">Run history persistence service.</param>
+    /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
     /// <param name="snackbar">Snackbar notification service.</param>
     /// <param name="logger">Logger.</param>
     public GenerateViewModel(
         IWpfGenerationService generationService,
         IRunHistoryService historyService,
+        ISettingsService settingsService,
         ISnackbarService snackbar,
         ILogger<GenerateViewModel> logger)
     {
         _generationService = generationService;
         _historyService = historyService;
+        _settingsService = settingsService;
         _snackbar = snackbar;
         _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public override async Task OnNavigatedToAsync()
+    {
+        var settings = await _settingsService.LoadAsync();
+        _defaultRecordCount = settings.DefaultRecordCount;
     }
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -160,7 +175,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     public void OnEntitiesChanged(IReadOnlyList<EntitySummary> entities)
     {
         SelectedEntities = entities;
-        _fieldOverrides?.SetEntities(entities);
+        _fieldOverrides?.SetEntities(entities, _defaultRecordCount);
 
         QueuedEntities.Clear();
         foreach (var e in entities)
@@ -192,7 +207,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             EntityLogicalNames = [.. SelectedEntities.Select(e => e.LogicalName)],
             RecordCounts = SelectedEntities.ToDictionary(
                 e => e.LogicalName,
-                e => rawCounts.GetValueOrDefault(e.LogicalName, 10)),
+                e => rawCounts.GetValueOrDefault(e.LogicalName, _defaultRecordCount)),
             Seed = Seed,
             BatchSize = BatchSize,
             MaxParallelism = MaxParallelism == 0 ? null : MaxParallelism,

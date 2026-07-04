@@ -8,30 +8,31 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.7" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Identity.Web.MicrosoftGraph" Version="4.9.0" />
-    <PackageVersion Include="Microsoft.PowerPlatform.Dataverse.Client" Version="[1.2.10, 2.0.0)" />
+    <PackageVersion Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.2.26" />
     <!-- WPF Desktop -->
     <PackageVersion Include="WPF-UI" Version="4.3.0" />
-    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.1" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.85.2" />
+    <PackageVersion Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
     <!-- Identity -->
     <PackageVersion Include="Microsoft.Identity.Web" Version="4.9.0" />
     <PackageVersion Include="Microsoft.Identity.Web.UI" Version="4.9.0" />
     <PackageVersion Include="Microsoft.Identity.Web.Azure" Version="4.9.0" />
     <PackageVersion Include="Microsoft.Identity.Web.TokenCache" Version="[4.2.0, 5.0.0)" />
     <!-- UI -->
-    <PackageVersion Include="MudBlazor" Version="9.4.0" />
+    <PackageVersion Include="MudBlazor" Version="9.6.0" />
     <!-- Data Generation -->
     <PackageVersion Include="Bogus" Version="[35.6.5, 36.0.0)" />
     <!-- Testing -->
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="coverlet.MTP" Version="10.0.0" />
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="bunit" Version="2.7.2" />
     <!-- Caching -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.9" />
     <!-- In-memory Dataverse simulation engine for integration tests (targets net8.0; runs on net10 via compat) -->
     <PackageVersion Include="XrmMockup365" Version="1.18.0" />
   </ItemGroup>

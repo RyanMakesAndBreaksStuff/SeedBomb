@@ -17,10 +17,10 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.Identity.Web.MicrosoftGraph" />
-    <PackageReference Include="MudBlazor" />
     <PackageReference Include="Microsoft.Identity.Web" />
     <PackageReference Include="Microsoft.Identity.Web.UI" />
     <PackageReference Include="Microsoft.Identity.Web.Azure" />
+    <PackageReference Include="MudBlazor" />
   </ItemGroup>
 
 </Project>

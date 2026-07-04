@@ -12,8 +12,8 @@ namespace Seedbomb.Services;
 /// </summary>
 public sealed class TrayIconService : IDisposable
 {
-    private const string ColoredIconUri = "pack://application:,,,/Assets/logos/seedbomb_tray_colored.ico";
-    private const string WhiteIconUri = "pack://application:,,,/Assets/logos/seedbomb_tray_white.ico";
+    private const string ColoredIconUri = "pack://application:,,,/seedbomb_tray_colored.ico";
+    private const string WhiteIconUri = "pack://application:,,,/seedbomb_tray_white.ico";
     private const string PersonalizeKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     private readonly TaskbarIcon _trayIcon;
@@ -24,7 +24,7 @@ public sealed class TrayIconService : IDisposable
         _trayIcon = new TaskbarIcon
         {
             IconSource = LoadIconSource(),
-            ToolTipText = "DataGen — Synthetic Dataverse record seeder",
+            ToolTipText = "SeedBomb - Mock Data Explosion",
             ContextMenu = BuildContextMenu(),
         };
         _trayIcon.TrayLeftMouseUp += (_, _) => RestoreMainWindow();
