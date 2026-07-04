@@ -3,14 +3,15 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
-using DataGen.Desktop.Services.Generation;
-using DataGen.Desktop.Services.History;
-using DataGen.Desktop.ViewModels.Controls;
+using Seedbomb.ViewModels.Controls;
 using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui;
+using Seedbomb.Services.Generation;
+using Seedbomb.Services.History;
+using Seedbomb.ViewModels;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
 /// <summary>Step entry in the horizontal stepper strip above the wizard cards.</summary>
 /// <param name="Glyph">Displayed circle glyph.</param>
@@ -148,7 +149,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>
     /// Attaches the <see cref="FieldOverridesViewModel"/> instance owned by the page's
-    /// <see cref="DataGen.Desktop.Views.Controls.FieldOverridesControl"/> so counts can be
+    /// <see cref="Seedbomb.Views.Controls.FieldOverridesControl"/> so counts can be
     /// read at generation time.
     /// </summary>
     /// <param name="vm">The FieldOverrides view-model.</param>

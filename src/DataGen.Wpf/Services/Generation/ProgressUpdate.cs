@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Generation;
+namespace Seedbomb.Services.Generation;
 
 /// <summary>
 /// Immutable progress snapshot reported from the generation pipeline to the WPF UI.

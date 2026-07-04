@@ -3,10 +3,11 @@ using System.ComponentModel;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Desktop.Services.History;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Services.History;
+using Seedbomb.ViewModels;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
 /// <summary>ViewModel for the History page.</summary>
 public sealed partial class HistoryViewModel : ViewModelBase

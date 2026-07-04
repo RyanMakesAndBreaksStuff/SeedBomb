@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
-using DataGen.Desktop.Services.Dataverse;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Services.Dataverse;
 
-namespace DataGen.Desktop.Services.Generation;
+namespace Seedbomb.Services.Generation;
 
 /// <summary>
 /// Runs the Bulk/Core generation pipeline from a WPF desktop context.

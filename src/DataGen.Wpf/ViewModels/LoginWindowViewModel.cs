@@ -1,11 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Desktop.Services.Auth;
-using DataGen.Desktop.Services.Connections;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
-/// <summary>ViewModel for <see cref="DataGen.Desktop.Views.Windows.LoginWindow"/>.</summary>
+/// <summary>ViewModel for <see cref="Seedbomb.Views.Windows.LoginWindow"/>.</summary>
 public sealed partial class LoginWindowViewModel : ObservableObject
 {
     private readonly IAuthService _authService;

@@ -1,7 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                    xmlns:conn="clr-namespace:DataGen.Desktop.Services.Connections">
+                    xmlns:conn="clr-namespace:Seedbomb.Services.Connections">
 
     <!-- Profile list item template -->
     <DataTemplate x:Key="ProfileListItemTemplate" DataType="{x:Type conn:ConnectionProfile}">

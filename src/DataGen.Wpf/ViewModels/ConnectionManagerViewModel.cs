@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Desktop.Services.Auth;
-using DataGen.Desktop.Services.Connections;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
 /// <summary>ViewModel for the Connection Manager drawer.</summary>
 public sealed partial class ConnectionManagerViewModel : ObservableObject

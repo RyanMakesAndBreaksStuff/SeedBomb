@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Wpf.Ui.Abstractions.Controls;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
 /// <summary>
 /// Base class for all page view-models. Implements <see cref="INavigationAware"/>

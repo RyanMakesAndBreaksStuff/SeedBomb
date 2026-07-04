@@ -2,14 +2,14 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using DataGen.Desktop.Services.Auth;
-using DataGen.Desktop.Services.Connections;
-using DataGen.Desktop.ViewModels;
-using DataGen.Desktop.Views.Pages;
+using Seedbomb.ViewModels;
+using Seedbomb.Views.Pages;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace DataGen.Desktop.Views.Windows;
+namespace Seedbomb.Views.Windows;
 
 /// <summary>
 /// Main application window. Hosts the top-tab <see cref="NavigationView"/>

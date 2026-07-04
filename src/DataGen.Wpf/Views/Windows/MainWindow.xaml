@@ -1,12 +1,13 @@
-<ui:FluentWindow x:Class="DataGen.Desktop.Views.Windows.MainWindow"
+<ui:FluentWindow x:Class="Seedbomb.Views.Windows.MainWindow"
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                 xmlns:pages="clr-namespace:DataGen.Desktop.Views.Pages"
-                 xmlns:local="clr-namespace:DataGen.Desktop.Views.Controls"
+                 xmlns:pages="clr-namespace:Seedbomb.Views.Pages"
+                 xmlns:local="clr-namespace:Seedbomb.Views.Controls"
                  ExtendsContentIntoTitleBar="True"
                  WindowStyle="SingleBorderWindow"
                  Title="DataGen"
+                 Icon="pack://application:,,,/Assets/logos/seedbomb.ico"
                  Width="1200"
                  Height="750"
                  MinWidth="960"
@@ -26,7 +27,7 @@
                          Background="{DynamicResource DG.Surface2}"
                          Foreground="{DynamicResource DG.Text2}"
                          ButtonsForeground="{DynamicResource DG.Text3}"
-                         Icon="{ui:SymbolIcon DataBarVertical24}"
+                         Icon="{ui:ImageIcon 'pack://application:,,,/Assets/logos/seedbomb_32x32.png'}"
                          ShowMinimize="True"
                          ShowMaximize="True"
                          ShowClose="True" />
@@ -72,9 +73,6 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </ui:NavigationViewItem>
-            </ui:NavigationView.MenuItems>
-
-            <ui:NavigationView.FooterMenuItems>
                 <!-- No TargetPageType: NavigationViewItem is a plain ButtonBase here, acts on the
                      currently displayed page instead of navigating. -->
                 <ui:NavigationViewItem Click="OnResetClick"
@@ -88,7 +86,7 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </ui:NavigationViewItem>
-            </ui:NavigationView.FooterMenuItems>
+            </ui:NavigationView.MenuItems>
 
             <ui:NavigationView.ContentOverlay>
                 <Grid>

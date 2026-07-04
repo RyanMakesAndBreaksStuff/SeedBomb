@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Auth;
+namespace Seedbomb.Services.Auth;
 
 /// <summary>
 /// Result returned by <see cref="IAuthService.SignInAsync"/>.

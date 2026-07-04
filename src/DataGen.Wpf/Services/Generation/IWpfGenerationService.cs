@@ -1,6 +1,6 @@
 using DataGen.Core.Contracts;
 
-namespace DataGen.Desktop.Services.Generation;
+namespace Seedbomb.Services.Generation;
 
 /// <summary>
 /// Runs the Core/Bulk generation pipeline from a WPF context.

@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Connections;
+namespace Seedbomb.Services.Connections;
 
 /// <summary>Authentication mechanism for a connection profile.</summary>
 public enum AuthType

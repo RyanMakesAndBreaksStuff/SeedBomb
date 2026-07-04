@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Auth;
+namespace Seedbomb.Services.Auth;
 
 /// <summary>
 /// Provides MSAL-based authentication for the desktop application.

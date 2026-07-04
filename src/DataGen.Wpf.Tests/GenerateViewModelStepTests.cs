@@ -1,7 +1,7 @@
 using DataGen.Core.Contracts;
-using DataGen.Desktop.Services.Generation;
-using DataGen.Desktop.Services.History;
-using DataGen.Desktop.ViewModels;
+using Seedbomb.Services.Generation;
+using Seedbomb.Services.History;
+using Seedbomb.ViewModels;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Wpf.Ui;

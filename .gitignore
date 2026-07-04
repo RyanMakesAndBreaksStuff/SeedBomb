@@ -55,6 +55,7 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 /.vs
+.agent/*
 /src/DataGen.Web/appsettings.json
 /supervisor
 /teamplan.md
@@ -81,3 +82,4 @@ mocks/mock-2-dark-slate.html
 mocks/mock-3-centered-modal.html
 /Assets/updated__dark_mode_palette_collection.html
 /Assets/updated__light_mode_palette_collection_vol1.html
+/Assets/logos

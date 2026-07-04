@@ -1,8 +1,8 @@
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
-using DataGen.Desktop.ViewModels;
+using Seedbomb.ViewModels;
 
-namespace DataGen.Desktop.Views.Pages;
+namespace Seedbomb.Views.Pages;
 
 /// <summary>
 /// Three-step wizard page: select entities → configure counts → execute generation.

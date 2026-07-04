@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.History;
+namespace Seedbomb.Services.History;
 
 /// <summary>
 /// Persisted record of a completed generation run.

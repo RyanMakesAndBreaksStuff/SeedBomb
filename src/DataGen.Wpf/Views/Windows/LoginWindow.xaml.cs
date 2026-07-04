@@ -2,10 +2,10 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using DataGen.Desktop.ViewModels;
+using Seedbomb.ViewModels;
 using Wpf.Ui.Controls;
 
-namespace DataGen.Desktop.Views.Windows;
+namespace Seedbomb.Views.Windows;
 
 /// <summary>Sign-in window with Connection Manager drawer.</summary>
 public partial class LoginWindow : FluentWindow

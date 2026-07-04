@@ -1,8 +1,8 @@
-using DataGen.Desktop.Services.Auth;
-using DataGen.Desktop.Services.Connections;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
 
-namespace DataGen.Desktop.Services.Dataverse;
+namespace Seedbomb.Services.Dataverse;
 
 /// <summary>
 /// Manages a lazily-created, cached <see cref="ServiceClient"/> connection.

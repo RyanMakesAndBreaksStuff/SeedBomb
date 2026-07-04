@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
-/// <summary>ViewModel for <see cref="DataGen.Desktop.Views.Windows.MainWindow"/>.</summary>
+/// <summary>ViewModel for <see cref="Seedbomb.Views.Windows.MainWindow"/>.</summary>
 public partial class MainWindowViewModel : ObservableObject
 {
     /// <summary>Raised when the header's connection display is clicked.</summary>

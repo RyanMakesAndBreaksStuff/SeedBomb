@@ -1,4 +1,4 @@
-<UserControl x:Class="DataGen.Desktop.Views.Controls.EntitySelectorControl"
+<UserControl x:Class="Seedbomb.Views.Controls.EntitySelectorControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -47,6 +47,11 @@
                                       Padding="0,4">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{Binding DisplayName}" />
+                                    <TextBlock Text="{Binding LogicalName, StringFormat=' ({0})'}"
+                                               Foreground="{DynamicResource DG.Text3}"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               Margin="4,0,0,0" />
                                     <TextBlock Text=" ●"
                                                Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
                                                FontSize="10"

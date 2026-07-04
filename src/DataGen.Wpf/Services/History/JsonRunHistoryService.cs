@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace DataGen.Desktop.Services.History;
+namespace Seedbomb.Services.History;
 
 /// <summary>
 /// Persists run history to <c>%LOCALAPPDATA%\DataGen\history.json</c>.

@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
-using DataGen.Desktop.Services.Generation;
+using Seedbomb.Services.Generation;
 
-namespace DataGen.Desktop.Views.Controls;
+namespace Seedbomb.Views.Controls;
 
 /// <summary>
 /// Displays a generation progress snapshot. Bind the <see cref="Progress"/> dependency

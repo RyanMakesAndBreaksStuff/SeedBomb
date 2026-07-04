@@ -1,8 +1,8 @@
-<Page x:Class="DataGen.Desktop.Views.Pages.GeneratePage"
+<Page x:Class="Seedbomb.Views.Pages.GeneratePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      xmlns:controls="clr-namespace:DataGen.Desktop.Views.Controls">
+      xmlns:controls="clr-namespace:Seedbomb.Views.Controls">
 
     <Grid Background="{DynamicResource DG.Bg}">
         <Grid.RowDefinitions>

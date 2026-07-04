@@ -69,6 +69,7 @@ public class BulkCreator : IBulkCreator
 
         var pool = new DataverseRecordPool();
         await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
+        await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
 
         var sortedEntities = _topologicalSort.Sort(graph);
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
@@ -520,6 +521,38 @@ public class BulkCreator : IBulkCreator
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to query transactioncurrency pool — money fields may be skipped");
+        }
+    }
+
+    // Custom lookups pointing at systemuser (approver/manager/requested-by style fields) are never
+    // part of the generation graph — DataGen doesn't create fake users — so without this pre-seed
+    // LookupFieldGenerator.Generate finds an empty pool for "systemuser" and silently leaves the
+    // field null. Mirrors PopulateCurrencyPoolAsync above.
+    private async Task PopulateSystemUserPoolAsync(DataverseRecordPool pool, CancellationToken ct)
+    {
+        try
+        {
+            var query = new QueryExpression("systemuser")
+            {
+                ColumnSet = new ColumnSet("systemuserid"),
+                TopCount = 25
+            };
+            query.Criteria.AddCondition("isdisabled", ConditionOperator.Equal, false);
+
+            var result = await _service.RetrieveMultipleAsync(query, ct).ConfigureAwait(false);
+            if (result.Entities.Count > 0)
+            {
+                pool.Add("systemuser", result.Entities.Select(e => e.Id));
+                _logger.LogInformation("Loaded {Count} systemuser record(s) into pool", result.Entities.Count);
+            }
+            else
+            {
+                _logger.LogWarning("No enabled systemuser records found — systemuser lookups will be skipped");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to query systemuser pool — systemuser lookups may be skipped");
         }
     }
 

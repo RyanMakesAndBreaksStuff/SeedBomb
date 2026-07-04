@@ -4,7 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Desktop.Services.Dataverse;
+namespace Seedbomb.Services.Dataverse;
 
 /// <summary>
 /// Singleton <see cref="IMetadataProvider"/> that defers <see cref="DataverseMetadataProvider"/>

@@ -1,6 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:history="clr-namespace:DataGen.Desktop.Services.History">
+                    xmlns:history="clr-namespace:Seedbomb.Services.History">
 
     <DataTemplate x:Key="RunCardTemplate" DataType="{x:Type history:RunRecord}">
         <Border Background="{DynamicResource DG.Card}"

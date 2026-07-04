@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace DataGen.Desktop.Converters;
+namespace Seedbomb.Converters;
 
 /// <summary>
 /// Returns <see cref="Visibility.Collapsed"/> when the value is <c>true</c>,

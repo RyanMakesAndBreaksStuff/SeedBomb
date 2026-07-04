@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace DataGen.Desktop.Services.Settings;
+namespace Seedbomb.Services.Settings;
 
 /// <summary>
 /// Loads and saves <see cref="AppSettings"/> to <c>%LOCALAPPDATA%\DataGen\settings.json</c>.

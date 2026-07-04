@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
-using DataGen.Desktop.ViewModels;
+using Seedbomb.ViewModels;
 
-namespace DataGen.Desktop.Views.Pages;
+namespace Seedbomb.Views.Pages;
 
 /// <summary>Displays reverse-chronological generation run history with search and CSV export.</summary>
 public partial class HistoryPage : Page

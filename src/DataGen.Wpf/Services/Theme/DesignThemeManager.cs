@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Media;
 using Wpf.Ui.Appearance;
 
-namespace DataGen.Desktop.Services.Theme;
+namespace Seedbomb.Services.Theme;
 
 /// <summary>A selectable named color palette, offered in each light and dark variant.</summary>
 /// <param name="Id">Stable identifier persisted in settings.</param>

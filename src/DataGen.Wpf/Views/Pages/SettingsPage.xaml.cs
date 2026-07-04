@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
-using DataGen.Desktop.ViewModels;
+using Seedbomb.ViewModels;
 
-namespace DataGen.Desktop.Views.Pages;
+namespace Seedbomb.Views.Pages;
 
 /// <summary>Settings page with Connection, Appearance, Generation Defaults, and About sections.</summary>
 public partial class SettingsPage : Page

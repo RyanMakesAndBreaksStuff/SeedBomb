@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Connections;
+namespace Seedbomb.Services.Connections;
 
 /// <summary>Persists and retrieves Dataverse connection profiles.</summary>
 public interface IConnectionProfileService

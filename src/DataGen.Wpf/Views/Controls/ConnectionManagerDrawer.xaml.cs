@@ -1,7 +1,7 @@
-using DataGen.Desktop.ViewModels;
+using Seedbomb.ViewModels;
 using System.Windows.Controls;
 
-namespace DataGen.Desktop.Views.Controls;
+namespace Seedbomb.Views.Controls;
 
 /// <summary>Slide-in Connection Manager drawer.</summary>
 public partial class ConnectionManagerDrawer : UserControl

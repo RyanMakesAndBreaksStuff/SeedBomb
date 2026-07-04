@@ -1,7 +1,7 @@
-using DataGen.Desktop.Services.Connections;
 using Microsoft.Identity.Client;
+using Seedbomb.Services.Connections;
 
-namespace DataGen.Desktop.Services.Auth;
+namespace Seedbomb.Services.Auth;
 
 /// <summary>
 /// <see cref="IAuthService"/> implementation that authenticates against the

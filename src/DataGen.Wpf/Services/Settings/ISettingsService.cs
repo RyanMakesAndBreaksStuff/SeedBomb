@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Settings;
+namespace Seedbomb.Services.Settings;
 
 /// <summary>
 /// Loads and saves application settings to local storage.

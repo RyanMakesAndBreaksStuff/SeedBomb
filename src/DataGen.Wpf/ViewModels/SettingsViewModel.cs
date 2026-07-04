@@ -1,10 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Desktop.Services.Settings;
-using DataGen.Desktop.Services.Theme;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Services.Settings;
+using Seedbomb.Services.Theme;
+using Seedbomb.ViewModels;
 
-namespace DataGen.Desktop.ViewModels;
+namespace Seedbomb.ViewModels;
 
 /// <summary>ViewModel for the Settings page.</summary>
 /// <remarks>Initialises the view-model.</remarks>

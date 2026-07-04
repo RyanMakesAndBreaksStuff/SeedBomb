@@ -1,23 +1,24 @@
 using DataGen.Bulk;
 using DataGen.Bulk.Contracts;
 using DataGen.Core.Metadata;
-using DataGen.Desktop.Services.Auth;
-using DataGen.Desktop.Services.Connections;
-using DataGen.Desktop.Services.Dataverse;
-using DataGen.Desktop.Services.Generation;
-using DataGen.Desktop.Services.History;
-using DataGen.Desktop.Services.Settings;
-using DataGen.Desktop.Services.Theme;
-using DataGen.Desktop.ViewModels;
-using DataGen.Desktop.ViewModels.Controls;
-using DataGen.Desktop.Views.Windows;
+using Seedbomb.ViewModels;
+using Seedbomb.ViewModels.Controls;
+using Seedbomb.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Seedbomb.Services;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
+using Seedbomb.Services.Dataverse;
+using Seedbomb.Services.Generation;
+using Seedbomb.Services.History;
+using Seedbomb.Services.Settings;
+using Seedbomb.Services.Theme;
 using System.Windows;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
 
-namespace DataGen.Desktop;
+namespace Seedbomb;
 
 /// <summary>WPF application entry point. Hosts the generic host and owns window lifetime.</summary>
 public partial class App : Application
@@ -37,6 +38,10 @@ public partial class App : Application
             ConfigureServices(builder.Services);
             _host = builder.Build();
             await _host.StartAsync();
+
+            // Resolving (not just registering) creates the singleton now; its Dispose() runs
+            // automatically when the host's ServiceProvider is disposed in OnExit.
+            _host.Services.GetRequiredService<TrayIconService>();
 
             // Apply saved theme before showing any window so both LoginWindow
             // and MainWindow render correctly from the first frame.
@@ -101,6 +106,7 @@ public partial class App : Application
         // WPF UI framework services
         sc.AddSingleton<ISnackbarService, SnackbarService>();
         sc.AddSingleton<IContentDialogService, ContentDialogService>();
+        sc.AddSingleton<TrayIconService>();
 
         // App services — all singleton (one app lifetime)
         sc.AddSingleton<ISettingsService, JsonSettingsService>();
@@ -128,8 +134,8 @@ public partial class App : Application
         sc.AddTransient<SettingsViewModel>();
 
         // Real pages — NavigationView resolves these from DI via SetServiceProvider
-        sc.AddTransient<DataGen.Desktop.Views.Pages.GeneratePage>();
-        sc.AddTransient<DataGen.Desktop.Views.Pages.HistoryPage>();
-        sc.AddTransient<DataGen.Desktop.Views.Pages.SettingsPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.GeneratePage>();
+        sc.AddTransient<Seedbomb.Views.Pages.HistoryPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.SettingsPage>();
     }
 }

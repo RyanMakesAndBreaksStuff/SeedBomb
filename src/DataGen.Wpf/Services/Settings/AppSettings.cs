@@ -1,4 +1,4 @@
-namespace DataGen.Desktop.Services.Settings;
+namespace Seedbomb.Services.Settings;
 
 /// <summary>
 /// Persisted application settings.

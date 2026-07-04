@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DataGen.Desktop.Services.Connections;
+namespace Seedbomb.Services.Connections;
 
 /// <summary>
 /// JSON-backed implementation of <see cref="IConnectionProfileService"/>.

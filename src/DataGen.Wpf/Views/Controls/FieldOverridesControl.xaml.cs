@@ -1,7 +1,7 @@
 using System.Windows.Controls;
-using DataGen.Desktop.ViewModels.Controls;
+using Seedbomb.ViewModels.Controls;
 
-namespace DataGen.Desktop.Views.Controls;
+namespace Seedbomb.Views.Controls;
 
 /// <summary>
 /// Displays a <see cref="Wpf.Ui.Controls.NumberBox"/> per selected entity so the user
