@@ -35,4 +35,13 @@ public record GenerationConfig
     /// </summary>
     public int MaxRetries { get; init; } = 3;
 
+    /// <summary>
+    /// Per-table field rules keyed by [entityLogicalName][attributeLogicalName].
+    /// Null or missing table/column ⇒ legacy inference, byte-identically (spec S7).
+    /// Rules must be pre-validated via <see cref="Rules.RuleValidator"/> before a run.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, Rules.FieldRule>>? FieldRules { get; init; }
+
+    /// <summary>Run stamp substituted for the {runId} pattern token. Never auto-injected into data (D4).</summary>
+    public string RunId { get; init; } = "";
 }

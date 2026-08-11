@@ -5,6 +5,7 @@ using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
+using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Crm.Sdk.Messages;
@@ -218,12 +219,45 @@ public class BulkCreator : IBulkCreator
         var faker = DeterministicFaker.Create(config.Seed, entityIndex);
         var entities = new List<Entity>(recordCount);
 
+        // Task 6 preflight: resolve + validate every configured field rule for this table once,
+        // before any row is built. RuleEligibility can't see entity.Keys, so alternate-key targets
+        // are rejected here explicitly; everything else routes through the one-path RuleValidator.
+        var tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+        if (config.FieldRules is not null && config.FieldRules.TryGetValue(entityName, out var configuredRules))
+        {
+            foreach (var (logicalName, rule) in configuredRules)
+            {
+                var ruleAttr = meta.Attributes?.FirstOrDefault(a =>
+                    string.Equals(a.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase));
+                if (ruleAttr is null)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule targets unknown attribute '{logicalName}'.");
+
+                var handling = _edgeCaseValidator.Validate(ruleAttr, meta);
+                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == "AlternateKeyUniqueness")
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
+
+                var validation = RuleValidator.Validate(rule, ruleAttr, recordCount, config.RunId);
+                if (!validation.IsValid)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule for '{logicalName}' is invalid — " +
+                        string.Join(" ", validation.Messages.Select(m => m.Text)));
+
+                tableRules[logicalName] = validation.EffectiveRule!;
+            }
+        }
+
         for (int i = 0; i < recordCount; i++)
         {
             var entity = new Entity(entityName);
             foreach (var attr in attributesToGenerate)
             {
-                var value = _generatorFactory.Generate(attr, faker, pool);
+                var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
+                if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
+                    value = RuleValueGenerator.Evaluate(rule, attr, config.Seed, entityName, i, config.RunId);
+                if (ReferenceEquals(value, RuleValueGenerator.Omit))
+                    continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
                     entity[attr.LogicalName!] = value;
             }
@@ -231,7 +265,11 @@ public class BulkCreator : IBulkCreator
             // Special handling attrs that route to generators (DateTime, MultiSelect, PolymorphicLookup, RichText, Money)
             foreach (var attr in specialHandlingAttrs)
             {
-                var value = _generatorFactory.Generate(attr, faker, pool);
+                var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
+                if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
+                    value = RuleValueGenerator.Evaluate(rule, attr, config.Seed, entityName, i, config.RunId);
+                if (ReferenceEquals(value, RuleValueGenerator.Omit))
+                    continue;
                 if (value is not null)
                     entity[attr.LogicalName!] = value;
             }
