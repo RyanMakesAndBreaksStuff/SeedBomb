@@ -99,8 +99,11 @@ public partial class FieldRulesControl : UserControl
     /// <summary>Initialises the control.</summary>
     public FieldRulesControl()
     {
-        DataContext = _vm;
         InitializeComponent();
+        // Set VM on content root only — not on the UserControl itself.
+        // Parent DP bindings (Tables/Seed/RunId/…) must keep resolving against GenerateViewModel.
+        if (Content is FrameworkElement root)
+            root.DataContext = _vm;
         _vm.DraftChanged += (_, _) => RefreshTabs();
     }
 
@@ -145,7 +148,16 @@ public partial class FieldRulesControl : UserControl
 
         var editorVm = new RuleEditorViewModel(meta, DefaultRecordCount, Seed, RunId);
         if (existing is not null)
+        {
             editorVm.SelectedColumn = editorVm.SettableColumns.FirstOrDefault(c => c.LogicalName == existing.Column);
+            // Restore op + params — otherwise edit always lands on the type-default op (constant).
+            editorVm.ApplyExistingRule(existing.Rule);
+        }
+        else if (editorVm.SettableColumns.Count > 0)
+        {
+            // Pre-select first settable column so default op chips (incl. null/platform default) are immediately usable.
+            editorVm.SelectedColumn = editorVm.SettableColumns[0];
+        }
 
         var dialogService = ((App)Application.Current).Services.GetRequiredService<IContentDialogService>();
         var dialog = new RuleEditorDialog(editorVm, isEditMode: existing is not null);

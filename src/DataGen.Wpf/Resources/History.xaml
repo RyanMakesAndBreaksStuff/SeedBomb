@@ -18,12 +18,14 @@
                     <ColumnDefinition Width="88" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0"
-                           Text="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd\&#x0a;hh:mm tt}'}"
-                           FontSize="11"
-                           LineHeight="17"
-                           Foreground="{DynamicResource DG.Text3}"
-                           VerticalAlignment="Center" />
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Timestamp, StringFormat={}{0:yyyy-MM-dd}}"
+                               FontSize="11"
+                               Foreground="{DynamicResource DG.Text3}" />
+                    <TextBlock Text="{Binding Timestamp, StringFormat={}{0:hh:mm tt}}"
+                               FontSize="11"
+                               Foreground="{DynamicResource DG.Text3}" />
+                </StackPanel>
 
                 <StackPanel Grid.Column="1"
                             VerticalAlignment="Center">
@@ -69,7 +71,7 @@
                 </StackPanel>
 
                 <TextBlock Grid.Column="3"
-                           Text="{Binding Duration, StringFormat='{}{0:m\\m\ ss\\s}'}"
+                           Text="{Binding Duration, StringFormat={}{0:m\\m\\ ss\\s}}"
                            FontSize="12"
                            Foreground="{DynamicResource DG.Text3}"
                            HorizontalAlignment="Right"

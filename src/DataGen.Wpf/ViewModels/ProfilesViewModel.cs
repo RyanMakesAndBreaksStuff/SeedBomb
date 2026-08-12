@@ -56,6 +56,10 @@ public sealed partial class ProfilesViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowManager))]
     [NotifyCanExecuteChangedFor(nameof(OpenInBoardCommand))]
     [NotifyCanExecuteChangedFor(nameof(DiscardImportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     private bool _showImportSummary;
 
     /// <summary>Manager list visible when not showing an import summary.</summary>
@@ -130,6 +134,12 @@ public sealed partial class ProfilesViewModel : ObservableObject
 
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
+
+    /// <summary>
+    /// Raised when the host dialog should close and return to the Field Rules board
+    /// (Open in board applied a pending import).
+    /// </summary>
+    public event EventHandler? CloseRequested;
 
     /// <summary>Reloads the profile list from the store.</summary>
     [RelayCommand]
@@ -341,17 +351,18 @@ public sealed partial class ProfilesViewModel : ObservableObject
         return report;
     }
 
-    /// <summary>Commits the pending import for the host to push onto the board.</summary>
+    /// <summary>Commits the pending import for the host to push onto the board, then closes back to rules.</summary>
     [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
     private void OpenInBoard()
     {
         if (PendingImport is null) return;
         AppliedToBoard = true;
         ShowImportSummary = false;
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Drops the pending import without touching the board.</summary>
-    [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
+    /// <summary>Drops the pending import / schema-error pane and returns to the profile list.</summary>
+    [RelayCommand(CanExecute = nameof(CanLeaveImportSummary))]
     private void DiscardImport()
     {
         PendingImport = null;
@@ -367,6 +378,8 @@ public sealed partial class ProfilesViewModel : ObservableObject
     private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;
 
     private bool CanOpenInBoard() => ShowImportSummary && PendingImport is not null && SchemaErrorMessage is null;
+
+    private bool CanLeaveImportSummary() => ShowImportSummary;
 
     private void SetStatus(string message)
     {

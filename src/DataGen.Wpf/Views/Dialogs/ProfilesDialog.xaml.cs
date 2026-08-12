@@ -14,6 +14,8 @@ public partial class ProfilesDialog : ContentDialog
     {
         DataContext = viewModel;
         InitializeComponent();
+        // Open-in-board applies import then returns to the Field Rules card.
+        viewModel.CloseRequested += (_, _) => Hide(ContentDialogResult.Primary);
     }
 
     /// <summary>Bound view-model.</summary>

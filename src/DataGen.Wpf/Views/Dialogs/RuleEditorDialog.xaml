@@ -104,26 +104,70 @@
                                Foreground="{DynamicResource DG.Text1}"
                                Margin="0,0,0,8" />
 
-                    <ListBox ItemsSource="{Binding AvailableOps}"
-                             SelectedItem="{Binding SelectedOp, Mode=TwoWay}"
+                    <TextBlock Text="Operation"
+                               FontSize="11"
+                               Foreground="{DynamicResource DG.Text3}"
+                               Margin="0,0,0,6" />
+                    <ListBox ItemsSource="{Binding AvailableOpOptions}"
+                             SelectedValue="{Binding SelectedOp, Mode=TwoWay}"
+                             SelectedValuePath="Op"
                              BorderThickness="0"
                              Background="Transparent"
-                             Margin="0,0,0,12">
+                             Margin="0,0,0,12"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.Name="Rule operation">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />
                             </ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,6,6" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Bd"
+                                                    Background="{DynamicResource DG.Surface1}"
+                                                    BorderBrush="{DynamicResource DG.Border}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Padding="10,6"
+                                                    SnapsToDevicePixels="True">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.AccentLight}" />
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.AccentSoft}" />
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
+                                                    <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{DynamicResource DG.Surface1}"
-                                        BorderBrush="{DynamicResource DG.Border}"
-                                        BorderThickness="1"
-                                        CornerRadius="4"
-                                        Padding="10,4"
-                                        Margin="0,0,6,6">
-                                    <TextBlock Text="{Binding}" Foreground="{DynamicResource DG.Text1}" />
-                                </Border>
+                                <StackPanel MinWidth="96">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource DG.Text1}" />
+                                    <TextBlock Text="{Binding Hint}"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource DG.Text3}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

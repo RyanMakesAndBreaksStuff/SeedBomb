@@ -3,10 +3,10 @@
                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                    Title="Profiles"
-                   PrimaryButtonText=""
+                   PrimaryButtonText="Back to rules"
                    SecondaryButtonText=""
                    CloseButtonText="Close"
-                   IsPrimaryButtonEnabled="False"
+                   IsPrimaryButtonEnabled="True"
                    IsSecondaryButtonEnabled="False"
                    DialogWidth="640"
                    DialogHeight="520">
@@ -168,7 +168,7 @@
                             Margin="0,0,0,12" />
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <ui:Button Content="Discard import"
+                    <ui:Button Content="← Back to list"
                                Appearance="Secondary"
                                Margin="0,0,8,0"
                                Command="{Binding DiscardImportCommand}" />

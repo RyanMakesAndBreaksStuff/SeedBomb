@@ -16,6 +16,12 @@ namespace Seedbomb.ViewModels;
 public sealed record PickerColumn(string LogicalName, string DisplayName, string TypeLabel,
     bool IsSelectable, string? DisabledReason);
 
+/// <summary>One selectable operation chip in the rule editor (Mock F2 op cards).</summary>
+/// <param name="Op">Wire op id (<c>constant</c>, <c>oneOf</c>, …).</param>
+/// <param name="Title">Short label shown on the card.</param>
+/// <param name="Hint">One-line description under the title.</param>
+public sealed record OpOption(string Op, string Title, string Hint);
+
 /// <summary>One checkable option for a Choice/Two-Options <c>oneOf</c> rule.</summary>
 public sealed partial class OptionChoice : ObservableObject
 {
@@ -137,6 +143,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(AvailableOps));
+        OnPropertyChanged(nameof(AvailableOpOptions));
         SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
         Revalidate();
     }
@@ -146,6 +153,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         SelectedColumn is not null && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
             ? OpsFor(attr)
             : NoOps;
+
+    /// <summary>Op cards for the editor UI — same set as <see cref="AvailableOps"/> with display copy.</summary>
+    public IReadOnlyList<OpOption> AvailableOpOptions => AvailableOps.Select(ToOpOption).ToList();
 
     // ── Op selection + typed parameters ──────────────────────────────────────
 
@@ -207,6 +217,86 @@ public sealed partial class RuleEditorViewModel : ObservableObject
 
     /// <summary>Returns the last-validated effective rule (clamped range, etc.), or null if nothing valid is drafted.</summary>
     public FieldRule? BuildRule() => _effectiveRule;
+
+    /// <summary>
+    /// Loads an existing board rule into the editor after <see cref="SelectedColumn"/> is set.
+    /// Restores op + typed parameters so edit mode does not always fall back to the default op.
+    /// </summary>
+    public void ApplyExistingRule(FieldRule rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+
+        switch (rule)
+        {
+            case ConstantRule c:
+                SelectedOp = "constant";
+                ConstantText = JsonElementToEditorText(c.Value);
+                break;
+            case OneOfRule o:
+                SelectedOp = "oneOf";
+                Pick = o.Pick;
+                ApplyOneOfValues(o.Values);
+                break;
+            case RangeRule r:
+                SelectedOp = "range";
+                MinText = JsonElementToEditorText(r.Min);
+                MaxText = JsonElementToEditorText(r.Max);
+                break;
+            case PatternRule p:
+                SelectedOp = "pattern";
+                Template = p.Template;
+                break;
+            case SequenceRule s:
+                SelectedOp = "sequence";
+                StartText = s.Start.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                StepText = s.Step.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                break;
+            case NullRule:
+                SelectedOp = "null";
+                break;
+        }
+    }
+
+    private void ApplyOneOfValues(IReadOnlyList<JsonElement> values)
+    {
+        if (Options.Count > 0)
+        {
+            var wanted = values
+                .Select(v => v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i
+                    : v.ValueKind == JsonValueKind.True ? 1
+                    : v.ValueKind == JsonValueKind.False ? 0
+                    : (int?)null)
+                .Where(i => i.HasValue)
+                .Select(i => i!.Value)
+                .ToHashSet();
+            foreach (var opt in Options)
+                opt.IsChecked = wanted.Contains(opt.Value);
+            return;
+        }
+
+        // Non-choice: comma-separated literal list reuses ConstantText.
+        ConstantText = string.Join(", ", values.Select(JsonElementToEditorText));
+    }
+
+    private static string JsonElementToEditorText(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.String => el.GetString() ?? string.Empty,
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        JsonValueKind.Number => el.GetRawText(),
+        _ => el.GetRawText(),
+    };
+
+    private static OpOption ToOpOption(string op) => op switch
+    {
+        "constant" => new("constant", "constant", "fixed value on every row"),
+        "oneOf" => new("oneOf", "one-of", "subset of options / literals"),
+        "range" => new("range", "range", "uniform pick within bounds"),
+        "pattern" => new("pattern", "pattern", "text template with tokens"),
+        "sequence" => new("sequence", "sequence", "start + step per row"),
+        "null" => new("null", "null", "leave unset (platform default)"),
+        _ => new(op, op, string.Empty),
+    };
 
     private void Revalidate()
     {

@@ -217,6 +217,13 @@ public sealed class ProfileImportFlowTests : IDisposable
         Assert.Contains("not a valid profile", vm.SchemaErrorMessage!, StringComparison.OrdinalIgnoreCase);
         Assert.Null(vm.PendingImport);
         Assert.False(vm.HasImportApplied);
+
+        // Schema-error summary must still offer a way back to the manager list (then Close → rules).
+        Assert.True(vm.ShowImportSummary);
+        Assert.True(vm.DiscardImportCommand.CanExecute(null));
+        vm.DiscardImportCommand.Execute(null);
+        Assert.False(vm.ShowImportSummary);
+        Assert.True(vm.ShowManager);
     }
 
     [Fact]

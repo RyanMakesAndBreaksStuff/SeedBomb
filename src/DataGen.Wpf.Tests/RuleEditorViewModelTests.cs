@@ -144,4 +144,35 @@ public sealed class RuleEditorViewModelTests
 
         Assert.Equal(expected, vm.PreviewValues);
     }
+
+    // 6. null (platform default) is an available op for text columns and is saveable with no params.
+    [Fact]
+    public void Null_op_is_available_and_saveable_for_optional_text_column()
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 1, runId: "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+
+        Assert.Contains("null", vm.AvailableOps);
+        Assert.Contains(vm.AvailableOpOptions, o => o.Op == "null" && o.Hint.Contains("default", StringComparison.OrdinalIgnoreCase));
+
+        vm.SelectedOp = "null";
+
+        Assert.True(vm.CanSave);
+        Assert.IsType<NullRule>(vm.BuildRule());
+    }
+
+    // 7. Edit mode restores the existing rule op instead of always defaulting to constant.
+    [Fact]
+    public void ApplyExistingRule_restores_pattern_op_and_template()
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 1, runId: "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        Assert.Equal("constant", vm.SelectedOp); // type default after column select
+
+        vm.ApplyExistingRule(new PatternRule("ACME-{seq:0000}"));
+
+        Assert.Equal("pattern", vm.SelectedOp);
+        Assert.Equal("ACME-{seq:0000}", vm.Template);
+        Assert.True(vm.CanSave);
+    }
 }
