@@ -26,6 +26,11 @@ public class FieldRuleSerializationTests
             JsonSerializer.Deserialize<FieldRule>("""{"op":"script","body":"x"}""", Options));
 
     [Fact]
+    public void Unknown_property_is_hard_error()
+        => Assert.ThrowsAny<JsonException>(() =>
+            JsonSerializer.Deserialize<FieldRule>("""{"op":"null","unexpected":true}""", Options));
+
+    [Fact]
     public void Round_trip_is_idempotent()
     {
         var rule = new OneOfRule([JsonDocument.Parse("1").RootElement, JsonDocument.Parse("2").RootElement], OneOfPick.Cycle);

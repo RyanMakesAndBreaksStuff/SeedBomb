@@ -19,7 +19,11 @@ public abstract record FieldRule
 {
     /// <summary>Serializer options shared by profiles and config plumbing.</summary>
     public static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web) { WriteIndented = true };
+        new(JsonSerializerDefaults.Web)
+        {
+            WriteIndented = true,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
 }
 
 /// <summary>Fixed value on every row. Value is typed per column at validation time (§3.1).</summary>
