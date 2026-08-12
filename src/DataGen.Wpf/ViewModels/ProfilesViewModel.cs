@@ -1,0 +1,382 @@
+using System.IO;
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DataGen.Core.Rules;
+using Microsoft.Xrm.Sdk.Metadata;
+using Seedbomb.Services.Profiles;
+
+namespace Seedbomb.ViewModels;
+
+/// <summary>One row in the Profiles manager list (Mock F5 left pane).</summary>
+/// <param name="Name">Profile display name (file stem source).</param>
+public sealed record ProfileListItem(string Name);
+
+/// <summary>
+/// Profiles manager + visual-only import (Mock F5). Schema stage via
+/// <see cref="IProfileService"/>; metadata stage via <see cref="ProfileImport"/>.
+/// Never renders profile JSON — only list rows and InfoBar summaries.
+/// </summary>
+public sealed partial class ProfilesViewModel : ObservableObject
+{
+    private readonly IProfileService _profiles;
+
+    /// <summary>Initialises the view-model.</summary>
+    public ProfilesViewModel(IProfileService profiles)
+    {
+        _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
+    }
+
+    /// <summary>Saved profiles (excludes autosave draft).</summary>
+    public ObservableCollection<ProfileListItem> Items { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
+    private ProfileListItem? _selectedItem;
+
+    [ObservableProperty]
+    private string _newProfileName = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
+    private string? _statusMessage;
+
+    /// <summary>Whether the status InfoBar should show.</summary>
+    public bool HasStatusMessage => !string.IsNullOrEmpty(StatusMessage);
+
+    [ObservableProperty]
+    private bool _hasError;
+
+    // ── Import summary pane (Mock F5 right) ───────────────────────────────────
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowManager))]
+    [NotifyCanExecuteChangedFor(nameof(OpenInBoardCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DiscardImportCommand))]
+    private bool _showImportSummary;
+
+    /// <summary>Manager list visible when not showing an import summary.</summary>
+    public bool ShowManager => !ShowImportSummary;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasImportApplied))]
+    private string? _importAppliedMessage;
+
+    /// <summary>Whether the applied InfoBar should show.</summary>
+    public bool HasImportApplied => !string.IsNullOrEmpty(ImportAppliedMessage);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasImportAdjusted))]
+    private string? _importAdjustedMessage;
+
+    /// <summary>Whether the adjusted InfoBar should show.</summary>
+    public bool HasImportAdjusted => !string.IsNullOrEmpty(ImportAdjustedMessage);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasImportNotImported))]
+    private string? _importNotImportedMessage;
+
+    /// <summary>Whether the not-imported InfoBar should show.</summary>
+    public bool HasImportNotImported => !string.IsNullOrEmpty(ImportNotImportedMessage);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasImportInfo))]
+    private string? _importInfoMessage;
+
+    /// <summary>Whether the info InfoBar should show.</summary>
+    public bool HasImportInfo => !string.IsNullOrEmpty(ImportInfoMessage);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSchemaError))]
+    private string? _schemaErrorMessage;
+
+    /// <summary>Whether the schema-error InfoBar should show.</summary>
+    public bool HasSchemaError => !string.IsNullOrEmpty(SchemaErrorMessage);
+
+    /// <summary>Pending import waiting for Open in board / Discard.</summary>
+    public ProfileImportReport? PendingImport { get; private set; }
+
+    /// <summary>True when the caller applied the pending import to the board.</summary>
+    public bool AppliedToBoard { get; private set; }
+
+    // ── Host callbacks (wired by GenerateViewModel before ShowAsync) ──────────
+
+    /// <summary>Snapshots the current wizard state as a profile (Save current).</summary>
+    public Func<string, Profile>? CaptureCurrent { get; set; }
+
+    /// <summary>True when the field-rules draft is dirty (Load confirm).</summary>
+    public Func<bool>? IsBoardDirty { get; set; }
+
+    /// <summary>Live entity metadata for import/load validation (same path as Task 9).</summary>
+    public Func<IReadOnlyDictionary<string, EntityMetadata>>? GetMetadata { get; set; }
+
+    /// <summary>Current run id for pattern worst-case length during import validation.</summary>
+    public Func<string>? GetRunId { get; set; }
+
+    /// <summary>Optional confirm: return true to proceed overwriting a dirty board.</summary>
+    public Func<string, bool>? ConfirmOverwrite { get; set; }
+
+    /// <summary>File picker: open path for import, or null if cancelled.</summary>
+    public Func<string?>? PickImportPath { get; set; }
+
+    /// <summary>File picker: export destination, or null if cancelled.</summary>
+    public Func<string, string?>? PickExportPath { get; set; }
+
+    /// <summary>Prompt for a new profile name (Save / Duplicate); null = cancel.</summary>
+    public Func<string, string?>? PromptName { get; set; }
+
+    /// <summary>Confirm delete; true = delete.</summary>
+    public Func<string, bool>? ConfirmDelete { get; set; }
+
+    /// <summary>Reloads the profile list from the store.</summary>
+    [RelayCommand]
+    public async Task RefreshAsync()
+    {
+        var names = await _profiles.ListAsync();
+        Items.Clear();
+        foreach (var name in names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
+            Items.Add(new ProfileListItem(name));
+    }
+
+    /// <summary>Loads the selected (or parameter) profile into the pending-import slot (then Open in board).</summary>
+    [RelayCommand]
+    private async Task LoadAsync(ProfileListItem? item)
+    {
+        if (item is not null)
+            SelectedItem = item;
+        if (SelectedItem is null) return;
+
+        if (IsBoardDirty?.Invoke() == true)
+        {
+            var ok = ConfirmOverwrite?.Invoke(
+                "The rules board has unsaved changes. Load this profile and overwrite the draft?") ?? true;
+            if (!ok) return;
+        }
+
+        try
+        {
+            var profile = await _profiles.LoadAsync(SelectedItem.Name);
+            PresentImport(profile, sourceLabel: SelectedItem.Name);
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+        }
+    }
+
+    /// <summary>Exports the selected profile to a user-chosen path.</summary>
+    [RelayCommand(CanExecute = nameof(CanMutateSelected))]
+    private async Task ExportAsync()
+    {
+        if (SelectedItem is null) return;
+        var dest = PickExportPath?.Invoke(SelectedItem.Name);
+        if (string.IsNullOrWhiteSpace(dest)) return;
+
+        try
+        {
+            await _profiles.ExportAsync(SelectedItem.Name, dest);
+            SetStatus($"Exported “{SelectedItem.Name}”.");
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+        }
+    }
+
+    /// <summary>Duplicates the selected profile under a new name.</summary>
+    [RelayCommand(CanExecute = nameof(CanMutateSelected))]
+    private async Task DuplicateAsync()
+    {
+        if (SelectedItem is null) return;
+        var newName = PromptName?.Invoke($"{SelectedItem.Name} copy")
+            ?? $"{SelectedItem.Name} copy";
+        if (string.IsNullOrWhiteSpace(newName)) return;
+
+        try
+        {
+            await _profiles.DuplicateAsync(SelectedItem.Name, newName.Trim());
+            await RefreshAsync();
+            SelectedItem = Items.FirstOrDefault(i =>
+                string.Equals(i.Name, newName.Trim(), StringComparison.OrdinalIgnoreCase));
+            SetStatus($"Duplicated as “{newName.Trim()}”.");
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+        }
+    }
+
+    /// <summary>Deletes the selected profile after confirm.</summary>
+    [RelayCommand(CanExecute = nameof(CanMutateSelected))]
+    private async Task DeleteAsync()
+    {
+        if (SelectedItem is null) return;
+        var ok = ConfirmDelete?.Invoke(SelectedItem.Name) ?? false;
+        if (!ok) return;
+
+        try
+        {
+            await _profiles.DeleteAsync(SelectedItem.Name);
+            await RefreshAsync();
+            SelectedItem = null;
+            SetStatus("Profile deleted.");
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+        }
+    }
+
+    /// <summary>Snapshots the current board as a new named profile.</summary>
+    [RelayCommand]
+    private async Task SaveCurrentAsNewAsync()
+    {
+        if (CaptureCurrent is null)
+        {
+            SetError("No current board is available to save.");
+            return;
+        }
+
+        var name = !string.IsNullOrWhiteSpace(NewProfileName)
+            ? NewProfileName.Trim()
+            : PromptName?.Invoke("new-profile");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            SetError("Enter a name for the new profile.");
+            return;
+        }
+
+        try
+        {
+            var profile = CaptureCurrent(name.Trim());
+            await _profiles.SaveAsync(profile);
+            NewProfileName = "";
+            await RefreshAsync();
+            SelectedItem = Items.FirstOrDefault(i =>
+                string.Equals(i.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
+            SetStatus($"Saved “{profile.Name}”.");
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Import from file: schema stage (Task 10) then metadata stage → visual summary only.
+    /// </summary>
+    [RelayCommand]
+    private async Task ImportFromFileAsync()
+    {
+        var path = PickImportPath?.Invoke();
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        await ImportFromPathAsync(path);
+    }
+
+    /// <summary>
+    /// Test/UI entry: run schema import then metadata validation for <paramref name="sourcePath"/>.
+    /// </summary>
+    public async Task ImportFromPathAsync(string sourcePath, CancellationToken ct = default)
+    {
+        SchemaErrorMessage = null;
+        StatusMessage = null;
+        HasError = false;
+
+        var (profile, error) = await _profiles.ImportAsync(sourcePath, ct);
+        if (profile is null)
+        {
+            SchemaErrorMessage = error ?? "not a valid profile";
+            ShowImportSummary = true;
+            ImportAppliedMessage = null;
+            ImportAdjustedMessage = null;
+            ImportNotImportedMessage = null;
+            ImportInfoMessage = null;
+            PendingImport = null;
+            return;
+        }
+
+        await RefreshAsync();
+        PresentImport(profile, sourceLabel: System.IO.Path.GetFileName(sourcePath));
+    }
+
+    /// <summary>
+    /// Test entry: metadata-validate an already-parsed profile (after <see cref="IProfileService.ImportAsync"/>).
+    /// </summary>
+    public ProfileImportReport PresentImport(Profile profile, string sourceLabel)
+    {
+        var metadata = GetMetadata?.Invoke()
+            ?? throw new InvalidOperationException("Metadata provider not wired for profile import.");
+        var runId = GetRunId?.Invoke() ?? "";
+
+        var report = ProfileImport.ValidateAgainstMetadata(profile, metadata, runId);
+        PendingImport = report;
+        AppliedToBoard = false;
+        SchemaErrorMessage = null;
+        ShowImportSummary = true;
+
+        ImportAppliedMessage = report.AppliedRuleCount > 0 || report.AppliedTableSummaries.Count > 0
+            ? $"Applied — {report.AppliedRuleCount} rule(s) across {report.AppliedTableSummaries.Count} table(s). "
+              + string.Join(", ", report.AppliedTableSummaries)
+              + ". Record counts adopted from the profile."
+            : null;
+
+        ImportAdjustedMessage = report.Adjusted.Count > 0
+            ? "Adjusted — " + report.Adjusted.Count + " rule(s) clamped.\n"
+              + string.Join("\n", report.Adjusted.Select(a => "· " + a))
+            : null;
+
+        ImportNotImportedMessage = report.NotImported.Count > 0
+            ? "Not imported — " + report.NotImported.Count + " rule(s).\n"
+              + string.Join("\n", report.NotImported.Select(n => "· " + n))
+            : null;
+
+        ImportInfoMessage =
+            $"Profile “{sourceLabel}” was validated against schema v1 and this environment's live metadata. "
+            + "The app has no JSON or schema editor — imported content appears as rules, counts, and these messages.";
+
+        return report;
+    }
+
+    /// <summary>Commits the pending import for the host to push onto the board.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
+    private void OpenInBoard()
+    {
+        if (PendingImport is null) return;
+        AppliedToBoard = true;
+        ShowImportSummary = false;
+    }
+
+    /// <summary>Drops the pending import without touching the board.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
+    private void DiscardImport()
+    {
+        PendingImport = null;
+        AppliedToBoard = false;
+        ShowImportSummary = false;
+        ImportAppliedMessage = null;
+        ImportAdjustedMessage = null;
+        ImportNotImportedMessage = null;
+        ImportInfoMessage = null;
+        SchemaErrorMessage = null;
+    }
+
+    private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;
+
+    private bool CanOpenInBoard() => ShowImportSummary && PendingImport is not null && SchemaErrorMessage is null;
+
+    private void SetStatus(string message)
+    {
+        HasError = false;
+        StatusMessage = message;
+    }
+
+    private void SetError(string message)
+    {
+        HasError = true;
+        StatusMessage = message;
+    }
+}

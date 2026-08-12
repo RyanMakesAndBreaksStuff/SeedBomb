@@ -4,6 +4,7 @@ using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
@@ -191,7 +192,9 @@ public sealed class GenerateViewModelStepTests
             Mock.Of<ISettingsService>(),
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),
-            metadataMock.Object);
+            metadataMock.Object,
+            Mock.Of<IProfileService>(),
+            Mock.Of<IContentDialogService>());
     }
 
     /// <summary>Builds a view-model with metadata already loaded and the board attached, ready for SetRule + Review.</summary>

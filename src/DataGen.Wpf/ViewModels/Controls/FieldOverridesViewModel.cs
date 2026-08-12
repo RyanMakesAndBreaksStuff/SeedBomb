@@ -50,4 +50,13 @@ public sealed class FieldOverridesViewModel : ObservableObject
     /// <summary>Returns the configured record count keyed by entity logical name.</summary>
     public IReadOnlyDictionary<string, int> GetCounts() =>
         Entries.ToDictionary(e => e.Entity.LogicalName, e => e.Count);
+
+    /// <summary>Sets the count for a selected entity (profile Load/Import). No-op if unknown.</summary>
+    public void SetCount(string logicalName, int count)
+    {
+        var entry = Entries.FirstOrDefault(e =>
+            string.Equals(e.Entity.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase));
+        if (entry is not null)
+            entry.Count = count;
+    }
 }

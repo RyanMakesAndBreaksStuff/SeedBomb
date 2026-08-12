@@ -23,6 +23,9 @@ public sealed partial class FieldRulesViewModel : ObservableObject
     /// <summary>Changes after every draft mutation; Review snapshot is valid only for matching value.</summary>
     public long Revision { get; private set; }
 
+    /// <summary>True when draft differs from the last committed snapshot (Load/dirty confirm).</summary>
+    public bool IsDirty { get; private set; }
+
     /// <summary>Raised after a draft mutation so GenerateViewModel can invalidate preflight state.</summary>
     public event EventHandler? DraftChanged;
 
@@ -67,14 +70,41 @@ public sealed partial class FieldRulesViewModel : ObservableObject
             StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Promotes the draft to committed (Start pressed — the first committing action, S2).</summary>
-    public void Commit() => _committed = Clone(_draft);
+    public void Commit()
+    {
+        _committed = Clone(_draft);
+        IsDirty = false;
+    }
 
     /// <summary>Discards the draft and restores the previously committed configuration verbatim (S2).</summary>
-    public void DiscardDraft() { _draft = Clone(_committed); MarkChanged(); RebuildRows(); }
+    public void DiscardDraft()
+    {
+        _draft = Clone(_committed);
+        IsDirty = false;
+        Revision++;
+        DraftChanged?.Invoke(this, EventArgs.Empty);
+        RebuildRows();
+    }
+
+    /// <summary>
+    /// Replaces the entire draft with <paramref name="rules"/> (Load / Import → board).
+    /// One revision bump; board receives <c>EffectiveRule</c> values only.
+    /// </summary>
+    public void ReplaceDraft(IReadOnlyDictionary<string, Dictionary<string, RuleDraftEntry>> rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        _draft = rules.ToDictionary(
+            table => table.Key,
+            table => new Dictionary<string, RuleDraftEntry>(table.Value, StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+        MarkChanged();
+        RebuildRows();
+    }
 
     private void MarkChanged()
     {
         Revision++;
+        IsDirty = true;
         DraftChanged?.Invoke(this, EventArgs.Empty);
     }
 

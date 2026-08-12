@@ -12,6 +12,7 @@ using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.Services.Theme;
 using System.Windows;
@@ -117,6 +118,7 @@ public partial class App : Application
         sc.AddSingleton<IGenerationPipeline, GenerationPipeline>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
         sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();
+        sc.AddSingleton<IProfileService, JsonProfileService>();
 
         // Windows — singleton so only one instance exists at a time
         sc.AddSingleton<MainWindow>();
@@ -130,6 +132,7 @@ public partial class App : Application
         sc.AddTransient<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
         sc.AddTransient<GenerateViewModel>();
+        sc.AddTransient<ProfilesViewModel>();
         sc.AddTransient<HistoryViewModel>();
         sc.AddTransient<SettingsViewModel>();
 

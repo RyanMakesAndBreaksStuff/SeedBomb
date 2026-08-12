@@ -12,8 +12,10 @@ using Microsoft.Extensions.Logging;
 using Wpf.Ui;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
+using Seedbomb.Views.Dialogs;
 
 namespace Seedbomb.ViewModels;
 
@@ -55,10 +57,14 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
     private readonly IMetadataProvider _metadataProvider;
+    private readonly IProfileService _profileService;
+    private readonly IContentDialogService _contentDialogService;
     private readonly ILogger<GenerateViewModel> _logger;
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _rulesCts;
+    private CancellationTokenSource? _draftSaveCts;
+    private Profile? _restoredDraft;
     private FieldOverridesViewModel? _fieldOverrides;
     private FieldRulesViewModel? _fieldRules;
     private Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> _entityMetadata =
@@ -80,7 +86,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
         ISettingsService settingsService,
         ISnackbarService snackbar,
         ILogger<GenerateViewModel> logger,
-        IMetadataProvider metadataProvider)
+        IMetadataProvider metadataProvider,
+        IProfileService profileService,
+        IContentDialogService contentDialogService)
     {
         _generationService = generationService;
         _historyService = historyService;
@@ -88,6 +96,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _snackbar = snackbar;
         _logger = logger;
         _metadataProvider = metadataProvider;
+        _profileService = profileService;
+        _contentDialogService = contentDialogService;
     }
 
     /// <inheritdoc />
@@ -95,6 +105,19 @@ public sealed partial class GenerateViewModel : ViewModelBase
     {
         var settings = await _settingsService.LoadAsync();
         _defaultRecordCount = settings.DefaultRecordCount;
+
+        // §07 draft: restore autosave when the wizard is entered (applied after metadata loads).
+        try
+        {
+            _restoredDraft = await _profileService.LoadDraftAsync();
+            if (_restoredDraft?.Seed is int seed)
+                Seed = seed;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Draft profile load skipped");
+            _restoredDraft = null;
+        }
     }
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -252,6 +275,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
+        ScheduleDraftAutosave();
     }
 
     /// <summary>Called by the page when entity selection changes.</summary>
@@ -300,6 +324,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             RunId = $"run-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
             IsRulesLoaded = true;
             _fieldRules?.SelectTable(SelectedEntities.FirstOrDefault()?.LogicalName ?? string.Empty);
+            TryApplyRestoredDraft();
         }
         catch (OperationCanceledException)
         {
@@ -444,6 +469,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _cts = new CancellationTokenSource();
 
         _fieldRules?.Commit();
+        // §07: Start promotes draft (Commit) and persists the promoted snapshot.
+        _ = PersistDraftAsync();
 
         var rawCounts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
         var config = new GenerationConfig
@@ -513,6 +540,176 @@ public sealed partial class GenerateViewModel : ViewModelBase
         && ReviewedDraftRevision == _fieldRules.Revision;
 
     private bool CanReset() => !IsRunning;
+
+    /// <summary>Opens the Profiles manager dialog (Mock F5) and applies Open-in-board results.</summary>
+    [RelayCommand]
+    private async Task OpenProfilesAsync()
+    {
+        var vm = new ProfilesViewModel(_profileService)
+        {
+            CaptureCurrent = name => BuildProfileSnapshot(name),
+            IsBoardDirty = () => _fieldRules?.IsDirty == true,
+            GetMetadata = () => _entityMetadata,
+            GetRunId = () => RunId,
+            ConfirmOverwrite = msg =>
+                System.Windows.MessageBox.Show(msg, "Load profile",
+                    MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
+            ConfirmDelete = name =>
+                System.Windows.MessageBox.Show(
+                    $"Delete profile '{name}'? This cannot be undone.",
+                    "Delete profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
+            PickImportPath = () =>
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "Profile (*.profile.json)|*.profile.json|JSON (*.json)|*.json|All files|*.*",
+                    Title = "Import profile",
+                };
+                return dlg.ShowDialog() == true ? dlg.FileName : null;
+            },
+            PickExportPath = name =>
+            {
+                var dlg = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "Profile (*.profile.json)|*.profile.json",
+                    FileName = $"{name}.profile.json",
+                    Title = "Export profile",
+                };
+                return dlg.ShowDialog() == true ? dlg.FileName : null;
+            },
+        };
+
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        var dialog = new ProfilesDialog(vm);
+        await _contentDialogService.ShowAsync(dialog, CancellationToken.None);
+
+        if (vm.AppliedToBoard && vm.PendingImport is { } report)
+            ApplyImportReport(report);
+    }
+
+    /// <summary>Builds a profile snapshot of the current wizard selection, counts, rules, and seed.</summary>
+    public Profile BuildProfileSnapshot(string name)
+    {
+        var counts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
+        var rules = _fieldRules?.GetRules()
+            ?? new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
+
+        var tables = new List<ProfileTable>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entity in SelectedEntities)
+        {
+            seen.Add(entity.LogicalName);
+            Dictionary<string, FieldRule>? cols = null;
+            if (rules.TryGetValue(entity.LogicalName, out var r) && r.Count > 0)
+                cols = new Dictionary<string, FieldRule>(r, StringComparer.OrdinalIgnoreCase);
+            tables.Add(new ProfileTable(
+                entity.LogicalName,
+                counts.GetValueOrDefault(entity.LogicalName, _defaultRecordCount),
+                cols));
+        }
+
+        foreach (var (table, cols) in rules)
+        {
+            if (seen.Contains(table) || cols.Count == 0) continue;
+            tables.Add(new ProfileTable(
+                table,
+                counts.GetValueOrDefault(table, _defaultRecordCount),
+                new Dictionary<string, FieldRule>(cols, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        if (tables.Count == 0)
+            tables.Add(new ProfileTable("account", _defaultRecordCount, null));
+
+        return new Profile(1, name, Description: null, Seed, tables);
+    }
+
+    /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
+    public void ApplyImportReport(ProfileImportReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        if (report.Seed is int seed)
+            Seed = seed;
+
+        foreach (var (table, count) in report.TableCounts)
+            _fieldOverrides?.SetCount(table, count);
+
+        if (_fieldRules is null)
+            return;
+
+        var draft = new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (table, columns) in report.BoardRules)
+        {
+            _entityMetadata.TryGetValue(table, out var meta);
+            var attrs = (meta?.Attributes ?? [])
+                .Where(a => a.LogicalName is not null)
+                .ToDictionary(a => a.LogicalName!, StringComparer.OrdinalIgnoreCase);
+
+            var tableDraft = new Dictionary<string, RuleDraftEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (column, rule) in columns)
+            {
+                var display = column;
+                if (attrs.TryGetValue(column, out var attr))
+                    display = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
+                tableDraft[column] = new RuleDraftEntry(rule, display, "");
+            }
+
+            if (tableDraft.Count > 0)
+                draft[table] = tableDraft;
+        }
+
+        _fieldRules.ReplaceDraft(draft);
+        if (SelectedEntities.Count > 0)
+            _fieldRules.SelectTable(SelectedEntities[0].LogicalName);
+    }
+
+    private void TryApplyRestoredDraft()
+    {
+        if (_restoredDraft is null || _fieldRules is null || _entityMetadata.Count == 0)
+            return;
+
+        var report = ProfileImport.ValidateAgainstMetadata(_restoredDraft, _entityMetadata, RunId);
+        ApplyImportReport(report);
+        _restoredDraft = null;
+    }
+
+    private void ScheduleDraftAutosave()
+    {
+        _draftSaveCts?.Cancel();
+        _draftSaveCts?.Dispose();
+        _draftSaveCts = new CancellationTokenSource();
+        var ct = _draftSaveCts.Token;
+        _ = DebouncedSaveDraftAsync(ct);
+    }
+
+    private async Task DebouncedSaveDraftAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(400, ct);
+            await PersistDraftAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // coalesced
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Draft autosave failed");
+        }
+    }
+
+    private async Task PersistDraftAsync(CancellationToken ct = default)
+    {
+        if (SelectedEntities.Count == 0 && (_fieldRules is null || _fieldRules.GetRules().Count == 0))
+            return;
+
+        var profile = BuildProfileSnapshot("draft");
+        await _profileService.SaveDraftAsync(profile, ct);
+    }
+
 
     /// <summary>Cancels a running generation.</summary>
     [RelayCommand]

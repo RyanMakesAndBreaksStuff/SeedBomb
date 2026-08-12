@@ -58,7 +58,8 @@ public static class FieldFilter
     /// <param name="logicalName">The attribute logical name.</param>
     /// <returns>True if the field is a base currency field.</returns>
     public static bool IsBaseCurrencyField(string? logicalName)
-        => logicalName?.EndsWith("_base", StringComparison.Ordinal) == true;
+        => logicalName?.EndsWith("_base", StringComparison.Ordinal) == true
+        || string.Equals(logicalName, "exchangerate", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Determines whether the attribute is a file or image column requiring chunked upload.
