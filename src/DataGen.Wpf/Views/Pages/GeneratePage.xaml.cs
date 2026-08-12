@@ -5,7 +5,7 @@ using Seedbomb.ViewModels;
 namespace Seedbomb.Views.Pages;
 
 /// <summary>
-/// Three-step wizard page: select entities → configure counts → execute generation.
+/// Five-step wizard page: select entities → configure counts → field rules → review → execute.
 /// </summary>
 public partial class GeneratePage : Page
 {
@@ -19,6 +19,7 @@ public partial class GeneratePage : Page
         InitializeComponent();
 
         _vm.AttachFieldOverrides(FieldOverridesCtrl.ViewModel);
+        _vm.AttachFieldRules(FieldRulesCtrl.ViewModel);
     }
 
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>

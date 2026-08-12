@@ -3,6 +3,9 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
+using DataGen.Core.Metadata;
+using DataGen.Core.Rules;
+using Microsoft.Xrm.Sdk;
 using Seedbomb.ViewModels.Controls;
 using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
@@ -37,6 +40,13 @@ public sealed partial class QueuedEntityEntry : ObservableObject
     public QueuedEntityEntry(EntitySummary entity) => Entity = entity;
 }
 
+/// <summary>Review-card preview: first five <see cref="RuleValueGenerator"/> outputs for one ruled column.</summary>
+/// <param name="Table">Owning table logical name.</param>
+/// <param name="Column">Column logical name.</param>
+/// <param name="DisplayName">Column display name.</param>
+/// <param name="Values">Up to five formatted preview values (row 0..4).</param>
+public sealed record ReviewPreviewRow(string Table, string Column, string DisplayName, IReadOnlyList<string> Values);
+
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase
 {
@@ -44,10 +54,15 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
+    private readonly IMetadataProvider _metadataProvider;
     private readonly ILogger<GenerateViewModel> _logger;
 
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _rulesCts;
     private FieldOverridesViewModel? _fieldOverrides;
+    private FieldRulesViewModel? _fieldRules;
+    private Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> _entityMetadata =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // Fallback before settings load completes; matches AppSettings.Default.DefaultRecordCount.
     private int _defaultRecordCount = 10;
@@ -58,18 +73,21 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
     /// <param name="snackbar">Snackbar notification service.</param>
     /// <param name="logger">Logger.</param>
+    /// <param name="metadataProvider">Metadata provider — supplies full <c>EntityMetadata</c> for the Rules step and preflight.</param>
     public GenerateViewModel(
         IWpfGenerationService generationService,
         IRunHistoryService historyService,
         ISettingsService settingsService,
         ISnackbarService snackbar,
-        ILogger<GenerateViewModel> logger)
+        ILogger<GenerateViewModel> logger,
+        IMetadataProvider metadataProvider)
     {
         _generationService = generationService;
         _historyService = historyService;
         _settingsService = settingsService;
         _snackbar = snackbar;
         _logger = logger;
+        _metadataProvider = metadataProvider;
     }
 
     /// <inheritdoc />
@@ -92,7 +110,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private IReadOnlyList<EntitySummary> _selectedEntities = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel), nameof(StatusLabel), nameof(Steps))]
+    [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel), nameof(StatusLabel), nameof(Steps), nameof(HasStarted))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
     private bool _isRunning;
@@ -106,12 +124,40 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasResult), nameof(StatusLabel), nameof(Steps))]
+    [NotifyPropertyChangedFor(nameof(HasResult), nameof(StatusLabel), nameof(Steps), nameof(HasStarted))]
     private GenerationResult? _lastResult;
 
     [ObservableProperty] private int _seed = 42;
     [ObservableProperty] private int _batchSize = 500;
     [ObservableProperty] private int _maxParallelism;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Steps))]
+    private bool _isRulesLoaded;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Steps))]
+    private bool _isReviewOpen;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Steps), nameof(ReviewedRuleCount))]
+    [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
+    private Dictionary<string, Dictionary<string, FieldRule>>? _reviewedRules;
+
+    [ObservableProperty]
+    private IReadOnlyList<RuleMessage> _reviewMessages = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
+    private bool _reviewHasErrors;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
+    private long? _reviewedDraftRevision;
+
+    [ObservableProperty] private string _runId = "";
+
+    [ObservableProperty] private IReadOnlyList<ReviewPreviewRow> _reviewPreviewRows = [];
 
     // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -140,6 +186,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
 
+    /// <summary>Gets a value indicating whether generation has started (running or complete) — gates the Execute status card.</summary>
+    public bool HasStarted => IsRunning || HasResult;
+
     /// <summary>Gets the label for the Generate button.</summary>
     public string GenerateLabel => IsRunning ? "GENERATING…" : "GENERATE DATA";
 
@@ -152,12 +201,23 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets the collection of queued entity status dots.</summary>
     public ObservableCollection<QueuedEntityEntry> QueuedEntities { get; } = [];
 
+    /// <summary>Full live entity metadata for selected entities, loaded when advancing to Rules.</summary>
+    public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadataMap => _entityMetadata;
+
+    /// <summary>Configured default record count, used as the Rules-editor preview record count.</summary>
+    public int DefaultRecordCount => _defaultRecordCount;
+
+    /// <summary>Total active rule count across every table in the reviewed snapshot (Review summary).</summary>
+    public int ReviewedRuleCount => ReviewedRules?.Sum(t => t.Value.Count) ?? 0;
+
     /// <summary>Gets the current stepper step entries.</summary>
     public IReadOnlyList<StepEntry> Steps =>
     [
         new(CanConfigure ? "✓" : "1", "Select", CanConfigure, !CanConfigure, true),
-        new(CanExecute && CanConfigure ? "✓" : "2", "Configure", CanExecute && CanConfigure, CanConfigure && !CanExecute, true),
-        new(HasResult ? "✓" : "3", "Execute", HasResult, CanExecute && !HasResult, false),
+        new(IsRulesLoaded ? "✓" : "2", "Configure", IsRulesLoaded, CanConfigure && !IsRulesLoaded, true),
+        new(ReviewedRules is not null ? "✓" : "3", "Rules", ReviewedRules is not null, IsRulesLoaded && ReviewedRules is null, true),
+        new(HasResult ? "✓" : "4", "Review", HasResult, ReviewedRules is not null && !HasResult, true),
+        new(HasResult ? "✓" : "5", "Execute", HasResult, CanStartGenerate() && !HasResult, false),
     ];
 
     // ── Commands ──────────────────────────────────────────────────────────────
@@ -170,6 +230,30 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="vm">The FieldOverrides view-model.</param>
     public void AttachFieldOverrides(FieldOverridesViewModel vm) => _fieldOverrides = vm;
 
+    /// <summary>
+    /// Attaches the <see cref="FieldRulesViewModel"/> instance owned by the page's
+    /// <see cref="Seedbomb.Views.Controls.FieldRulesControl"/> so the wizard can preflight
+    /// the draft and gate Start on a matching reviewed snapshot.
+    /// </summary>
+    /// <param name="vm">The FieldRules board view-model.</param>
+    public void AttachFieldRules(FieldRulesViewModel vm)
+    {
+        if (_fieldRules is not null)
+            _fieldRules.DraftChanged -= OnFieldRulesDraftChanged;
+        _fieldRules = vm;
+        _fieldRules.DraftChanged += OnFieldRulesDraftChanged;
+    }
+
+    // Any draft mutation invalidates the reviewed snapshot — Start stays locked until preflight reruns.
+    private void OnFieldRulesDraftChanged(object? sender, EventArgs e)
+    {
+        ReviewedRules = null;
+        ReviewMessages = [];
+        ReviewHasErrors = false;
+        ReviewedDraftRevision = null;
+        ReviewPreviewRows = [];
+    }
+
     /// <summary>Called by the page when entity selection changes.</summary>
     /// <param name="entities">Newly selected entities.</param>
     public void OnEntitiesChanged(IReadOnlyList<EntitySummary> entities)
@@ -180,6 +264,153 @@ public sealed partial class GenerateViewModel : ViewModelBase
         QueuedEntities.Clear();
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
+
+        IsRulesLoaded = false;
+        IsReviewOpen = false;
+        ReviewedRules = null;
+        ReviewMessages = [];
+        ReviewHasErrors = false;
+        ReviewedDraftRevision = null;
+        ReviewPreviewRows = [];
+
+        if (entities.Count > 0)
+            _ = GoToRulesCommand.ExecuteAsync(null);
+    }
+
+    /// <summary>
+    /// Advances to the Rules step: loads full live metadata for the selected entities
+    /// (S3 — UI command path, reuses the injected provider's cache) and stamps this run's id.
+    /// </summary>
+    [RelayCommand]
+    private async Task GoToRulesAsync()
+    {
+        _rulesCts?.Cancel();
+        _rulesCts?.Dispose();
+        _rulesCts = new CancellationTokenSource();
+        var ct = _rulesCts.Token;
+
+        try
+        {
+            var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
+            var list = await _metadataProvider.GetEntitiesAsync(names, ct);
+            _entityMetadata = list.Where(m => m.LogicalName is not null)
+                .ToDictionary(m => m.LogicalName!, StringComparer.OrdinalIgnoreCase);
+            OnPropertyChanged(nameof(EntityMetadataMap));
+
+            RunId = $"run-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+            IsRulesLoaded = true;
+            _fieldRules?.SelectTable(SelectedEntities.FirstOrDefault()?.LogicalName ?? string.Empty);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("Rules metadata load cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load metadata for the Rules step");
+        }
+    }
+
+    /// <summary>
+    /// Runs preflight (Task 4 <see cref="RuleValidator"/>, one-path with BulkCreator's own gate) over
+    /// every draft rule, writes the immutable effective-rule snapshot Start will use verbatim, and
+    /// renders the first-five <see cref="RuleValueGenerator"/> preview values for active rules.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanGoToReview))]
+    private void GoToReview()
+    {
+        if (_fieldRules is null)
+            return;
+
+        var rawCounts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
+        var draft = _fieldRules.GetRules();
+        var reviewed = new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
+        var messages = new List<RuleMessage>();
+        var previewRows = new List<ReviewPreviewRow>();
+        var hasErrors = false;
+
+        foreach (var (table, columns) in draft)
+        {
+            if (!_entityMetadata.TryGetValue(table, out var meta))
+            {
+                messages.Add(new RuleMessage(RuleMessageSeverity.Error,
+                    $"Metadata for '{table}' is unavailable — its rules were not reviewed."));
+                hasErrors = true;
+                continue;
+            }
+
+            var recordCount = rawCounts.GetValueOrDefault(table, _defaultRecordCount);
+            var tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (column, rule) in columns)
+            {
+                var attr = meta.Attributes?.FirstOrDefault(a =>
+                    string.Equals(a.LogicalName, column, StringComparison.OrdinalIgnoreCase));
+                if (attr is null)
+                {
+                    messages.Add(new RuleMessage(RuleMessageSeverity.Error,
+                        $"Column '{column}' was not found on '{table}'."));
+                    hasErrors = true;
+                    continue;
+                }
+
+                var result = RuleValidator.Validate(rule, attr, recordCount, RunId);
+                messages.AddRange(result.Messages);
+                if (result.Messages.Any(m => m.Severity == RuleMessageSeverity.Error))
+                    hasErrors = true;
+                if (result.IsValid && result.EffectiveRule is not null)
+                {
+                    tableRules[column] = result.EffectiveRule;
+
+                    var values = new List<string>(5);
+                    for (var row = 0; row < 5; row++)
+                        values.Add(FormatPreview(RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId)));
+
+                    var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
+                    previewRows.Add(new ReviewPreviewRow(table, column, displayName, values));
+                }
+            }
+
+            if (tableRules.Count > 0)
+                reviewed[table] = tableRules;
+        }
+
+        ReviewedRules = reviewed;
+        ReviewMessages = messages;
+        ReviewHasErrors = hasErrors;
+        ReviewedDraftRevision = _fieldRules.Revision;
+        ReviewPreviewRows = previewRows;
+        IsReviewOpen = true;
+    }
+
+    private bool CanGoToReview() => IsRulesLoaded && !IsRunning;
+
+    private static string FormatPreview(object? value)
+    {
+        if (value is null) return "(null)";
+        if (ReferenceEquals(value, RuleValueGenerator.Omit)) return "(omitted)";
+        return value switch
+        {
+            OptionSetValue osv => osv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            Money m => m.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty,
+        };
+    }
+
+    /// <summary>Returns to the Rules step without discarding the draft.</summary>
+    [RelayCommand]
+    private void BackToRules() => IsReviewOpen = false;
+
+    /// <summary>
+    /// Discards the draft and restores the previously committed configuration (S2).
+    /// Never starts generation.
+    /// </summary>
+    [RelayCommand]
+    private void CancelDraft()
+    {
+        _fieldRules?.DiscardDraft();
+        IsReviewOpen = false;
     }
 
     [RelayCommand(CanExecute = nameof(CanReset))]
@@ -190,6 +421,17 @@ public sealed partial class GenerateViewModel : ViewModelBase
         LastResult = null;
         QueuedEntities.Clear();
         _fieldOverrides?.SetEntities([]);
+
+        _entityMetadata = new(StringComparer.OrdinalIgnoreCase);
+        OnPropertyChanged(nameof(EntityMetadataMap));
+        IsRulesLoaded = false;
+        IsReviewOpen = false;
+        ReviewedRules = null;
+        ReviewMessages = [];
+        ReviewHasErrors = false;
+        ReviewedDraftRevision = null;
+        ReviewPreviewRows = [];
+        RunId = "";
     }
 
     [RelayCommand(CanExecute = nameof(CanStartGenerate))]
@@ -201,6 +443,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IsCancelling = false;
         _cts = new CancellationTokenSource();
 
+        _fieldRules?.Commit();
+
         var rawCounts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
         var config = new GenerationConfig
         {
@@ -211,6 +455,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
             Seed = Seed,
             BatchSize = BatchSize,
             MaxParallelism = MaxParallelism == 0 ? null : MaxParallelism,
+            FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
+            RunId = RunId,
         };
 
         var progress = new Progress<ProgressUpdate>(update =>
@@ -258,7 +504,13 @@ public sealed partial class GenerateViewModel : ViewModelBase
         }
     }
 
-    private bool CanStartGenerate() => !IsRunning && SelectedEntities.Count > 0;
+    private bool CanStartGenerate() =>
+        !IsRunning
+        && SelectedEntities.Count > 0
+        && ReviewedRules is not null
+        && !ReviewHasErrors
+        && _fieldRules is not null
+        && ReviewedDraftRevision == _fieldRules.Revision;
 
     private bool CanReset() => !IsRunning;
 
