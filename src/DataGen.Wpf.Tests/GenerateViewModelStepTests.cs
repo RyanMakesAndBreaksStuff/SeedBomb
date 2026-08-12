@@ -195,7 +195,7 @@ public sealed class GenerateViewModelStepTests
     }
 
     /// <summary>Builds a view-model with metadata already loaded and the board attached, ready for SetRule + Review.</summary>
-    private static async Task<GenerateViewModel> CreateReadyForRulesAsync(
+    private static Task<GenerateViewModel> CreateReadyForRulesAsync(
         out FieldRulesViewModel fieldRules,
         out Mock<IWpfGenerationService> generationMock,
         out Mock<IMetadataProvider> metadataMock,
@@ -211,10 +211,15 @@ public sealed class GenerateViewModelStepTests
         viewModel.AttachFieldRules(fieldRules);
 
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        await viewModel.GoToRulesCommand.ExecutionTask!;
-        Assert.True(viewModel.IsRulesLoaded);
+        return AwaitRulesLoaded();
 
-        return viewModel;
+        // async methods can't have out params -- the await moves into this local function instead.
+        async Task<GenerateViewModel> AwaitRulesLoaded()
+        {
+            await viewModel.GoToRulesCommand.ExecutionTask!;
+            Assert.True(viewModel.IsRulesLoaded);
+            return viewModel;
+        }
     }
 
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
