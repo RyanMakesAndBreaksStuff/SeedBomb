@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Seedbomb.Services.Theme;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -93,6 +94,16 @@ public sealed class ThemePaletteConfigurationTests
         "#14059669",
         "#33059669",
     ];
+
+    [Fact]
+    public void DrawerAnimationDurationIsZeroWhenReduceMotion()
+    {
+        DesignThemeManager.ReduceMotion = true;
+        Assert.Equal(TimeSpan.Zero, DesignThemeManager.DrawerAnimationDuration);
+
+        DesignThemeManager.ReduceMotion = false;
+        Assert.Equal(TimeSpan.FromMilliseconds(250), DesignThemeManager.DrawerAnimationDuration);
+    }
 
     [Fact]
     public void SharedResourcesDefineSlateSteelLightDefaults()

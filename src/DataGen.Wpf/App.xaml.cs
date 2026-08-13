@@ -52,6 +52,7 @@ public partial class App : Application
             // and MainWindow render correctly from the first frame.
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             var savedSettings = await settings.LoadAsync();
+            DesignThemeManager.ReduceMotion = savedSettings.ReduceMotion;
             DesignThemeManager.Apply(savedSettings.DarkTheme, savedSettings.PaletteId);
 
             // Attempt silent token acquisition before showing any window.
@@ -72,9 +73,7 @@ public partial class App : Application
             }
 
             if (result.Succeeded)
-            {
-                ShowMainWindow(result.DisplayName ?? string.Empty);
-            }
+                await ShowMainWindow(result.DisplayName ?? string.Empty);
             else
             {
                 // W1-A will wire LoginWindow.LoginSucceeded → ShowMainWindow.
@@ -102,19 +101,20 @@ public partial class App : Application
 
     /// <summary>Shows the main window and populates header user info.</summary>
     /// <param name="displayName">The signed-in user's display name.</param>
-    internal void ShowMainWindow(string displayName)
+    internal async Task ShowMainWindow(string displayName)
     {
         var vm = _host!.Services.GetRequiredService<MainWindowViewModel>();
         vm.UserDisplayName = displayName;
 
         var settings = _host.Services.GetRequiredService<ISettingsService>();
-        var s = settings.LoadAsync().GetAwaiter().GetResult();
+        var s = await settings.LoadAsync();
         var profiles = _host.Services.GetRequiredService<IConnectionProfileService>();
-        var profile = profiles.GetLastUsedAsync().GetAwaiter().GetResult();
+        var profile = await profiles.GetLastUsedAsync();
         vm.OrgUrl = profile?.EnvironmentUrl ?? s.OrgUrl;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
+        Current.MainWindow = mainWindow;
     }
 
     /// <inheritdoc />

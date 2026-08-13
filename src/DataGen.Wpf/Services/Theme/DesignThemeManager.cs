@@ -17,6 +17,13 @@ public static class DesignThemeManager
     /// <summary>Palette ID applied when none is configured.</summary>
     public const string DefaultPaletteId = "slate-steel";
 
+    /// <summary>When true, chrome animations use zero duration.</summary>
+    public static bool ReduceMotion { get; set; }
+
+    /// <summary>Drawer slide duration honoring <see cref="ReduceMotion"/>.</summary>
+    public static TimeSpan DrawerAnimationDuration =>
+        ReduceMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(250);
+
     /// <summary>All palettes available for selection, in display order.</summary>
     // ponytail: property (not a field initializer) so it can read the `Palettes` dictionary
     // declared further down the file without fighting static field init order.

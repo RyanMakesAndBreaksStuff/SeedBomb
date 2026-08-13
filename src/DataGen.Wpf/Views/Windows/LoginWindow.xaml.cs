@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Seedbomb.Services.Theme;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Controls;
 
@@ -37,10 +38,10 @@ public partial class LoginWindow : FluentWindow
         _vm.LoginCommand.Execute(hwnd);
     }
 
-    private void OnLoginSucceeded(object? sender, string displayName)
+    private async void OnLoginSucceeded(object? sender, string displayName)
     {
         if (Application.Current is App app)
-            app.ShowMainWindow(displayName);
+            await app.ShowMainWindow(displayName);
         Close();
     }
 
@@ -54,7 +55,7 @@ public partial class LoginWindow : FluentWindow
         _drawerOpen = true;
         DrawerScrim.Visibility = Visibility.Visible;
 
-        var anim = new DoubleAnimation(0, TimeSpan.FromMilliseconds(250))
+        var anim = new DoubleAnimation(0, DesignThemeManager.DrawerAnimationDuration)
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
@@ -67,7 +68,7 @@ public partial class LoginWindow : FluentWindow
         if (!_drawerOpen) return;
         _drawerOpen = false;
 
-        var anim = new DoubleAnimation(500, TimeSpan.FromMilliseconds(250))
+        var anim = new DoubleAnimation(500, DesignThemeManager.DrawerAnimationDuration)
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };

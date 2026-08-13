@@ -49,6 +49,7 @@ public sealed partial class SettingsViewModel(
 
     partial void OnReduceMotionChanged(bool value)
     {
+        DesignThemeManager.ReduceMotion = value;
         if (!_isLoadingSettings)
             QueueAppearanceSave();
     }
