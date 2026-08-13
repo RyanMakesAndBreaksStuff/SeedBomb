@@ -6,7 +6,7 @@
                  ExtendsContentIntoTitleBar="True"
                  WindowStyle="SingleBorderWindow"
                  Title="DataGen — Sign In"
-                 Icon="pack://application:,,,/Assets/logos/seedbomb.ico"
+                 Icon="/seedbomb.ico"
                  Width="580"
                  Height="680"
                  WindowStartupLocation="CenterScreen"
@@ -28,7 +28,7 @@
                          Background="{DynamicResource DG.Card}"
                          Foreground="{DynamicResource DG.Text2}"
                          ButtonsForeground="{DynamicResource DG.Text3}"
-                         Icon="{ui:ImageIcon 'pack://application:,,,/Assets/logos/seedbomb_32x32.png'}"
+                         Icon="{ui:ImageIcon 'pack://application:,,,/seedbomb_32x32.png'}"
                          ShowMinimize="True"
                          ShowMaximize="True"
                          ShowClose="True" />

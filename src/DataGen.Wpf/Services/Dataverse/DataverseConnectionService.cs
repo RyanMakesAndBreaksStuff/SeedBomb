@@ -81,7 +81,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             _lock.Release();
         }
 
-        cached?.Dispose();
+        SafeDispose(cached);
         ConnectionReset?.Invoke(this, EventArgs.Empty);
     }
 
@@ -91,7 +91,34 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     public void Dispose()
     {
         _profileService.ProfilesChanged -= OnProfilesChanged;
-        _cached?.Dispose();
+        ServiceClient? cached;
+        _lock.Wait();
+        try
+        {
+            cached = _cached;
+            _cached = null;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        SafeDispose(cached);
         _lock.Dispose();
+    }
+
+    // ServiceClient.Dispose talks to gRPC/HTTP channels; on process exit those often surface
+    // first-chance RPC/COM failures (0x6BA / 0x71A / 0xE0434352) that are not actionable.
+    private static void SafeDispose(ServiceClient? client)
+    {
+        if (client is null) return;
+        try
+        {
+            client.Dispose();
+        }
+        catch
+        {
+            // Intentionally ignored — connection is already gone.
+        }
     }
 }

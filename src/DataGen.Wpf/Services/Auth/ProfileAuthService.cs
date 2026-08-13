@@ -129,6 +129,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             return new AuthResult(false, null, ex.Message);
         }
+        catch (System.Runtime.InteropServices.COMException ex)
+        {
+            // WAM/broker RPC (0x6BA / 0x71A) when account service is unavailable — treat as no session.
+            return new AuthResult(false, null, ex.Message);
+        }
     }
 
     private async Task<AuthResult> SignInClientSecretAsync(ConnectionProfile profile, CancellationToken ct)

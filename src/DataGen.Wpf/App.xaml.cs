@@ -35,6 +35,10 @@ public partial class App : Application
         base.OnStartup(e);
         try
         {
+#if DEBUG
+            // Host.CreateApplicationBuilder defaults to Production when DOTNET_ENVIRONMENT is unset.
+            Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Development");
+#endif
             var builder = Host.CreateApplicationBuilder();
             ConfigureServices(builder.Services);
             _host = builder.Build();
@@ -52,8 +56,20 @@ public partial class App : Application
 
             // Attempt silent token acquisition before showing any window.
             // Pass nint.Zero to suppress any interactive popup — silent-only path.
+            // MSAL may emit first-chance RPC/COM exceptions (0x6BA/0x71A) against WAM; those
+            // are handled inside SignInAsync and must not crash startup.
             var auth = _host.Services.GetRequiredService<IAuthService>();
-            var result = await auth.SignInAsync(nint.Zero);
+            AuthResult result;
+            try
+            {
+                result = await auth.SignInAsync(nint.Zero);
+            }
+            catch (Exception ex) when (ex is Microsoft.Identity.Client.MsalException
+                or System.Runtime.InteropServices.COMException
+                or InvalidOperationException)
+            {
+                result = new AuthResult(false, null, ex.Message);
+            }
 
             if (result.Succeeded)
             {
@@ -68,7 +84,17 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Startup failed: {ex.Message}", "DataGen",
+            try
+            {
+                var path = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DataGen", "startup-error.log");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+                System.IO.File.WriteAllText(path, ex.ToString());
+            }
+            catch { /* best-effort diagnostic */ }
+
+            MessageBox.Show($"Startup failed: {ex}", "DataGen",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
@@ -96,8 +122,25 @@ public partial class App : Application
     {
         if (_host is not null)
         {
-            _host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
-            _host.Dispose();
+            try
+            {
+                _host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Hosted services may already be tearing down; continue to Dispose.
+            }
+
+            try
+            {
+                _host.Dispose();
+            }
+            catch
+            {
+                // ServiceClient / tray / MSAL dispose often throw first-chance RPC/COM on exit.
+            }
+
+            _host = null;
         }
         base.OnExit(e);
     }
