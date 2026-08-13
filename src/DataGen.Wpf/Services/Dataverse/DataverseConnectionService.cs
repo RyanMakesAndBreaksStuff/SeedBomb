@@ -46,7 +46,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
 
             _cached = new ServiceClient(
                 instanceUrl: new Uri(profile.EnvironmentUrl),
-                tokenProviderFunction: async _ => await _auth.GetTokenAsync(scopes, ct).ConfigureAwait(false),
+                tokenProviderFunction: CreateTokenProvider(scopes),
                 useUniqueInstance: true);
 
             // Disable built-in retries — BulkCreator's ThrottlePolicy owns retry logic.
@@ -65,6 +65,9 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             _lock.Release();
         }
     }
+
+    internal Func<string, Task<string>> CreateTokenProvider(string[] scopes) =>
+        async _ => await _auth.GetTokenAsync(scopes, CancellationToken.None).ConfigureAwait(false);
 
     /// <inheritdoc />
     public void Reset()
