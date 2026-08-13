@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
+using Seedbomb.Services.Dataverse;
 
 namespace Seedbomb.ViewModels;
 
@@ -11,12 +12,17 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 {
     private readonly IConnectionProfileService _profileService;
     private readonly IAuthService _authService;
+    private readonly IDataverseConnectionService _connectionService;
 
     /// <summary>Initialises the view-model.</summary>
-    public ConnectionManagerViewModel(IConnectionProfileService profileService, IAuthService authService)
+    public ConnectionManagerViewModel(
+        IConnectionProfileService profileService,
+        IAuthService authService,
+        IDataverseConnectionService connectionService)
     {
         _profileService = profileService;
         _authService = authService;
+        _connectionService = connectionService;
     }
 
     /// <summary>Raised when the drawer should close.</summary>
@@ -45,14 +51,21 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     internal async Task LoadAsync()
     {
-        var all = await _profileService.GetAllAsync();
-        var lastUsed = await _profileService.GetLastUsedAsync();
-
-        Profiles.Clear();
-        foreach (var p in all)
+        try
         {
-            p.IsLastUsed = lastUsed?.Id == p.Id;
-            Profiles.Add(p);
+            var all = await _profileService.GetAllAsync();
+            var lastUsed = await _profileService.GetLastUsedAsync();
+
+            Profiles.Clear();
+            foreach (var p in all)
+            {
+                p.IsLastUsed = lastUsed?.Id == p.Id;
+                Profiles.Add(p);
+            }
+        }
+        catch (Exception ex)
+        {
+            SwitchError = ex.Message;
         }
     }
 
@@ -81,11 +94,18 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             var result = await _authService.SignInAsync(ParentHwnd);
 
             if (result.Succeeded)
+            {
+                _connectionService.Reset();
                 ConnectionSwitched?.Invoke(this, (profile, result));
+            }
             else
                 SwitchError = result.Error ?? "Sign-in failed.";
 
             await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            SwitchError = ex.Message;
         }
         finally
         {
@@ -120,18 +140,34 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private async Task SaveProfileAsync()
     {
         if (EditingProfile is null) return;
-        await _profileService.SaveAsync(EditingProfile);
-        await LoadAsync();
-        IsEditing = false;
-        EditingProfile = null;
+        SwitchError = null;
+        try
+        {
+            await _profileService.SaveAsync(EditingProfile);
+            await LoadAsync();
+            IsEditing = false;
+            EditingProfile = null;
+        }
+        catch (Exception ex)
+        {
+            SwitchError = ex.Message;
+        }
     }
 
     /// <summary>Deletes a profile.</summary>
     [RelayCommand]
     private async Task DeleteProfileAsync(ConnectionProfile profile)
     {
-        await _profileService.DeleteAsync(profile.Id);
-        await LoadAsync();
+        SwitchError = null;
+        try
+        {
+            await _profileService.DeleteAsync(profile.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            SwitchError = ex.Message;
+        }
     }
 
     /// <summary>Tests the connection for the current editing profile.</summary>
@@ -144,11 +180,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
         try
         {
-            // Save temporarily so the auth service can pick it up
-            await _profileService.SaveAsync(EditingProfile);
-            await _profileService.SetLastUsedAsync(EditingProfile.Id);
-
-            var result = await _authService.SignInAsync(nint.Zero);
+            var result = await _authService.TryConnectAsync(EditingProfile, ParentHwnd);
             TestSucceeded = result.Succeeded;
             TestResult = result.Succeeded ? $"Connected as {result.DisplayName}" : result.Error ?? "Connection failed.";
         }

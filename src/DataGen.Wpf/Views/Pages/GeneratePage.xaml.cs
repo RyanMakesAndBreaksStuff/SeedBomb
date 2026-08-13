@@ -34,4 +34,16 @@ public partial class GeneratePage : Page
         EntitySelectorCtrl.ClearSelection();
         _vm.ResetCommand.Execute(null);
     }
+
+    /// <summary>Resets the wizard and reloads the entity picker after an org switch.</summary>
+    public void ReloadForConnectionSwitch()
+    {
+        if (_vm.ResetCommand.CanExecute(null))
+        {
+            EntitySelectorCtrl.ClearSelection();
+            _vm.ResetCommand.Execute(null);
+        }
+
+        EntitySelectorCtrl.ViewModel?.LoadEntitiesCommand.Execute(null);
+    }
 }

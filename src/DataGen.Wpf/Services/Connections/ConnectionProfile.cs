@@ -68,7 +68,7 @@ public sealed class ConnectionProfile
 public static class AuthTypeValues
 {
     /// <summary>All authentication type options.</summary>
-    public static readonly AuthType[] All = [AuthType.OAuth, AuthType.ClientSecret, AuthType.UserPassword];
+    public static readonly AuthType[] All = [AuthType.OAuth, AuthType.ClientSecret];
 }
 
 /// <summary>Provides all <see cref="EnvironmentType"/> values for binding to ComboBox.</summary>

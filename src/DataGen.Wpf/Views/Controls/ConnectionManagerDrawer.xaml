@@ -205,7 +205,7 @@
                         <!-- Tenant ID — optional for OAuth, required for others -->
                         <TextBlock Text="Tenant ID (Directory ID)" Style="{StaticResource FieldLabel}"/>
                         <ui:TextBox Text="{Binding EditingProfile.TenantId, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="Optional for OAuth; required for ClientSecret / UserPassword"/>
+                                    PlaceholderText="Optional for OAuth; required for Client Secret"/>
 
                         <!-- Client Secret — ClientSecret only -->
                         <StackPanel>
@@ -222,27 +222,6 @@
                             </StackPanel.Style>
                             <TextBlock Text="Client Secret" Style="{StaticResource FieldLabel}"/>
                             <ui:PasswordBox Password="{Binding EditingProfile.ClientSecret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            PlaceholderText="••••••••"/>
-                        </StackPanel>
-
-                        <!-- Username / Password — UserPassword only -->
-                        <StackPanel>
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding EditingProfile.AuthType}"
-                                                     Value="{x:Static conn:AuthType.UserPassword}">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </StackPanel.Style>
-                            <TextBlock Text="Username" Style="{StaticResource FieldLabel}"/>
-                            <ui:TextBox Text="{Binding EditingProfile.Username, UpdateSourceTrigger=PropertyChanged}"
-                                        PlaceholderText="user@yourorg.onmicrosoft.com"/>
-                            <TextBlock Text="Password" Style="{StaticResource FieldLabel}"/>
-                            <ui:PasswordBox Password="{Binding EditingProfile.Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                             PlaceholderText="••••••••"/>
                         </StackPanel>
 

@@ -1,4 +1,6 @@
+using System.IO;
 using Microsoft.Identity.Client;
+using Microsoft.Identity.Client.Extensions.Msal;
 using Seedbomb.Services.Connections;
 
 namespace Seedbomb.Services.Auth;
@@ -14,6 +16,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private readonly Dictionary<Guid, object> _clients = [];
     private IAccount? _account;
     private Guid? _activeProfileId;
+    private MsalCacheHelper? _cacheHelper;
 
     /// <summary>Initialises the service and subscribes to profile changes.</summary>
     public ProfileAuthService(IConnectionProfileService profiles)
@@ -24,6 +27,48 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     /// <inheritdoc />
     public string? CurrentUserDisplayName => _account?.Username;
+
+    internal static bool ShouldDropSession(Guid? activeProfileId, IEnumerable<Guid> remainingIds) =>
+        activeProfileId is Guid id && remainingIds.All(x => x != id);
+
+    internal static StorageCreationProperties CreateCacheProperties()
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DataGen");
+        return new StorageCreationPropertiesBuilder("msal_cache.bin", dir).Build();
+    }
+
+    private async Task<MsalCacheHelper?> GetCacheHelperAsync()
+    {
+        if (_cacheHelper is not null)
+            return _cacheHelper;
+
+        try
+        {
+            _cacheHelper = await MsalCacheHelper.CreateAsync(CreateCacheProperties()).ConfigureAwait(false);
+            return _cacheHelper;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<AuthResult> TryConnectAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        try
+        {
+            ValidateProfile(profile);
+            return await AuthenticateCoreAsync(profile, parentHwnd, commitSession: false, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return new AuthResult(false, null, ex.Message);
+        }
+    }
 
     /// <inheritdoc />
     public async Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default)
@@ -36,20 +81,29 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             ValidateProfile(profile);
             await _profiles.SetLastUsedAsync(profile.Id, ct).ConfigureAwait(false);
-            _activeProfileId = profile.Id;
-
-            return profile.AuthType switch
-            {
-                AuthType.OAuth        => await SignInOAuthAsync(profile, parentHwnd, ct).ConfigureAwait(false),
-                AuthType.ClientSecret => await SignInClientSecretAsync(profile, ct).ConfigureAwait(false),
-                AuthType.UserPassword => await SignInUserPasswordAsync(profile, ct).ConfigureAwait(false),
-                _                     => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}")
-            };
+            return await AuthenticateCoreAsync(profile, parentHwnd, commitSession: true, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
             return new AuthResult(false, null, ex.Message);
         }
+    }
+
+    private async Task<AuthResult> AuthenticateCoreAsync(
+        ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)
+    {
+        var result = profile.AuthType switch
+        {
+            AuthType.OAuth => await SignInOAuthAsync(profile, parentHwnd, commitSession, ct).ConfigureAwait(false),
+            AuthType.ClientSecret => await SignInClientSecretAsync(profile, commitSession, ct).ConfigureAwait(false),
+            AuthType.UserPassword => await SignInUserPasswordAsync(profile, commitSession, ct).ConfigureAwait(false),
+            _ => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"),
+        };
+
+        if (result.Succeeded && commitSession)
+            _activeProfileId = profile.Id;
+
+        return result;
     }
 
     /// <inheritdoc />
@@ -81,20 +135,23 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         _account = null;
     }
 
-    private async Task<AuthResult> SignInOAuthAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct)
+    private async Task<AuthResult> SignInOAuthAsync(
+        ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)
     {
-        var pca = GetOrCreatePca(profile);
+        var pca = await GetOrCreatePca(profile, commitSession).ConfigureAwait(false);
         var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
         try
         {
             var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
-            _account = accounts.FirstOrDefault();
+            IAccount? account = accounts.FirstOrDefault();
 
-            if (_account is not null)
+            if (account is not null)
             {
-                var silent = await pca.AcquireTokenSilent(scopes, _account).ExecuteAsync(ct).ConfigureAwait(false);
-                _account = silent.Account;
+                var silent = await pca.AcquireTokenSilent(scopes, account).ExecuteAsync(ct).ConfigureAwait(false);
+                account = silent.Account;
+                if (commitSession)
+                    _account = account;
                 return new AuthResult(true, silent.Account.Username, null);
             }
 
@@ -104,7 +161,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             var interactive = await pca.AcquireTokenInteractive(scopes)
                 .WithParentActivityOrWindow(parentHwnd)
                 .ExecuteAsync(ct).ConfigureAwait(false);
-            _account = interactive.Account;
+            account = interactive.Account;
+            if (commitSession)
+                _account = account;
             return new AuthResult(true, interactive.Account.Username, null);
         }
         catch (MsalUiRequiredException)
@@ -117,7 +176,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
                 var interactive = await pca.AcquireTokenInteractive(scopes)
                     .WithParentActivityOrWindow(parentHwnd)
                     .ExecuteAsync(ct).ConfigureAwait(false);
-                _account = interactive.Account;
+                if (commitSession)
+                    _account = interactive.Account;
                 return new AuthResult(true, interactive.Account.Username, null);
             }
             catch (MsalException ex2)
@@ -136,12 +196,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private async Task<AuthResult> SignInClientSecretAsync(ConnectionProfile profile, CancellationToken ct)
+    private async Task<AuthResult> SignInClientSecretAsync(
+        ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(profile.ClientSecret))
             return new AuthResult(false, null, "Client Secret is not configured for this profile.");
 
-        var cca = GetOrCreateCca(profile);
+        var cca = await GetOrCreateCca(profile, commitSession).ConfigureAwait(false);
         var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
         try
@@ -155,33 +216,23 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private async Task<AuthResult> SignInUserPasswordAsync(ConnectionProfile profile, CancellationToken ct)
+    private Task<AuthResult> SignInUserPasswordAsync(ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(profile.Username) || string.IsNullOrWhiteSpace(profile.Password))
-            return new AuthResult(false, null, "Username or Password is not configured for this profile.");
-
-        var pca = GetOrCreatePca(profile);
-        var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
-
-        try
-        {
-#pragma warning disable CS0618 // AcquireTokenByUsernamePassword deprecated — intentional ROPC support
-            var result = await pca.AcquireTokenByUsernamePassword(scopes, profile.Username, profile.Password)
-                .ExecuteAsync(ct).ConfigureAwait(false);
-#pragma warning restore CS0618
-            _account = result.Account;
-            return new AuthResult(true, result.Account.Username, null);
-        }
-        catch (MsalException ex)
-        {
-            return new AuthResult(false, null, ex.Message);
-        }
+        _ = (profile, commitSession, ct);
+        return Task.FromResult(new AuthResult(
+            false,
+            null,
+            "Username and password sign-in is no longer supported. Switch this profile to OAuth or Client Secret."));
     }
 
-    private IPublicClientApplication GetOrCreatePca(ConnectionProfile profile)
+    private async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)
     {
-        if (_clients.TryGetValue(profile.Id, out var existing) && existing is IPublicClientApplication pca)
+        if (commitSession
+            && _clients.TryGetValue(profile.Id, out var existing)
+            && existing is IPublicClientApplication pca)
+        {
             return pca;
+        }
 
         var authority = string.IsNullOrWhiteSpace(profile.TenantId)
             ? "https://login.microsoftonline.com/common"
@@ -192,14 +243,24 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             .WithAuthority(authority)
             .WithDefaultRedirectUri()
             .Build();
-        _clients[profile.Id] = newPca;
+
+        var helper = await GetCacheHelperAsync().ConfigureAwait(false);
+        helper?.RegisterCache(newPca.UserTokenCache);
+
+        if (commitSession)
+            _clients[profile.Id] = newPca;
+
         return newPca;
     }
 
-    private IConfidentialClientApplication GetOrCreateCca(ConnectionProfile profile)
+    private async Task<IConfidentialClientApplication> GetOrCreateCca(ConnectionProfile profile, bool commitSession)
     {
-        if (_clients.TryGetValue(profile.Id, out var existing) && existing is IConfidentialClientApplication cca)
+        if (commitSession
+            && _clients.TryGetValue(profile.Id, out var existing)
+            && existing is IConfidentialClientApplication cca)
+        {
             return cca;
+        }
 
         var authority = string.IsNullOrWhiteSpace(profile.TenantId)
             ? "https://login.microsoftonline.com/common"
@@ -210,7 +271,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             .WithAuthority(authority)
             .WithClientSecret(profile.ClientSecret!)
             .Build();
-        _clients[profile.Id] = newCca;
+
+        var helper = await GetCacheHelperAsync().ConfigureAwait(false);
+        helper?.RegisterCache(newCca.AppTokenCache);
+
+        if (commitSession)
+            _clients[profile.Id] = newCca;
+
         return newCca;
     }
 
@@ -236,8 +303,26 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private void OnProfilesChanged(object? sender, EventArgs e)
+    private void OnProfilesChanged(object? sender, EventArgs e) =>
+        _ = ReconcileSessionAsync();
+
+    private async Task ReconcileSessionAsync()
     {
+        var active = _activeProfileId;
+        if (active is null)
+            return;
+
+        try
+        {
+            var remaining = await _profiles.GetAllAsync().ConfigureAwait(false);
+            if (!ShouldDropSession(active, remaining.Select(p => p.Id)))
+                return;
+        }
+        catch
+        {
+            return;
+        }
+
         _clients.Clear();
         _account = null;
         _activeProfileId = null;

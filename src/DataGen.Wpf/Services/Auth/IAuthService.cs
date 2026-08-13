@@ -1,3 +1,5 @@
+using Seedbomb.Services.Connections;
+
 namespace Seedbomb.Services.Auth;
 
 /// <summary>
@@ -10,6 +12,12 @@ public interface IAuthService
     /// Pass <c>nint.Zero</c> for silent-only (no interactive popup).
     /// </summary>
     Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default);
+
+    /// <summary>
+    /// Authenticates <paramref name="profile"/> without persisting last-used and without
+    /// replacing the live MSAL session. Pass <c>nint.Zero</c> for silent-only.
+    /// </summary>
+    Task<AuthResult> TryConnectAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default);
 
     /// <summary>Removes the cached account token.</summary>
     Task SignOutAsync(CancellationToken ct = default);

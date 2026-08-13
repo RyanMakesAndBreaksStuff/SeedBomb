@@ -47,11 +47,15 @@
     <ProjectReference Include="..\DataGen.Bulk\DataGen.Bulk.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DataGen.Wpf.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" />
     <PackageReference Include="WPF-UI" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
   </ItemGroup>
 
   <ItemGroup>

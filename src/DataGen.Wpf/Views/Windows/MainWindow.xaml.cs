@@ -6,6 +6,7 @@ using Seedbomb.ViewModels;
 using Seedbomb.Views.Pages;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
+using Seedbomb.Services.Theme;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
@@ -97,6 +98,8 @@ public partial class MainWindow : FluentWindow
 
         _vm.UserDisplayName = e.Result.DisplayName ?? _vm.UserDisplayName;
         _vm.OrgUrl = e.Profile.EnvironmentUrl;
+        if (_currentPageContent is GeneratePage page)
+            page.ReloadForConnectionSwitch();
         CloseDrawer();
     }
 
@@ -107,7 +110,7 @@ public partial class MainWindow : FluentWindow
         _drawerOpen = true;
         DrawerScrim.Visibility = Visibility.Visible;
 
-        var anim = new DoubleAnimation(0, TimeSpan.FromMilliseconds(250))
+        var anim = new DoubleAnimation(0, DesignThemeManager.DrawerAnimationDuration)
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
@@ -120,7 +123,7 @@ public partial class MainWindow : FluentWindow
         if (!_drawerOpen) return;
         _drawerOpen = false;
 
-        var anim = new DoubleAnimation(500, TimeSpan.FromMilliseconds(250))
+        var anim = new DoubleAnimation(500, DesignThemeManager.DrawerAnimationDuration)
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
