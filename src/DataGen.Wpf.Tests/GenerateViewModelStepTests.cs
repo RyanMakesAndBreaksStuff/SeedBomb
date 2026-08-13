@@ -1,3 +1,4 @@
+using System.Windows.Media;
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
@@ -11,6 +12,7 @@ using Seedbomb.ViewModels.Controls;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -51,6 +53,50 @@ public sealed class GenerateViewModelStepTests
         Assert.Equal(
             ["Select", "Configure", "Rules", "Review", "Execute"],
             viewModel.Steps.Select(s => s.Label).ToArray());
+    }
+
+    [Fact]
+    public async Task GoToReviewCommandBecomesExecutableAfterRulesLoad()
+    {
+        var meta = BuildAccountMetadata();
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        var tcs = new TaskCompletionSource<IReadOnlyList<EntityMetadata>>();
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .Returns(tcs.Task);
+
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        Assert.False(viewModel.IsRulesLoaded);
+        Assert.False(viewModel.GoToReviewCommand.CanExecute(null));
+
+        tcs.SetResult([meta]);
+        await viewModel.GoToRulesCommand.ExecutionTask!;
+
+        Assert.True(viewModel.IsRulesLoaded);
+        Assert.True(viewModel.GoToReviewCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task GoToRulesFailureShowsDangerSnackbar()
+    {
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _, out var snackbarMock);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("org unreachable"));
+
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoToRulesCommand.ExecutionTask!;
+
+        Assert.False(viewModel.IsRulesLoaded);
+        snackbarMock.Verify(
+            s => s.Show(
+                "Rules metadata failed",
+                "org unreachable",
+                ControlAppearance.Danger,
+                null,
+                It.IsAny<TimeSpan>()),
+            Times.Once);
     }
 
     [Fact]
@@ -156,6 +202,124 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task OnNavigatedToAppliesSettingsAndNotifiesDefaultRecordCount()
+    {
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock
+            .Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AppSettings(
+                OrgUrl: string.Empty,
+                ClientId: string.Empty,
+                TenantId: string.Empty,
+                DefaultRecordCount: 25,
+                DefaultBatchSize: 250,
+                DefaultDop: 4));
+
+        var viewModel = new GenerateViewModel(
+            Mock.Of<IWpfGenerationService>(),
+            Mock.Of<IRunHistoryService>(),
+            settingsMock.Object,
+            Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(),
+            Mock.Of<IMetadataProvider>(),
+            Mock.Of<IProfileService>(),
+            Mock.Of<IContentDialogService>());
+
+        var notified = new List<string>();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is not null)
+                notified.Add(e.PropertyName);
+        };
+
+        await viewModel.OnNavigatedToAsync();
+
+        Assert.Equal(25, viewModel.DefaultRecordCount);
+        Assert.Equal(250, viewModel.BatchSize);
+        Assert.Equal(4, viewModel.MaxParallelism);
+        Assert.Contains(nameof(GenerateViewModel.DefaultRecordCount), notified);
+    }
+
+    [Fact]
+    public void QueueDotBrushFollowsProgressAndErrors()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.OnEntitiesChanged(
+        [
+            new EntitySummary("account", "Account", false),
+            new EntitySummary("contact", "Contact", false),
+        ]);
+
+        Assert.All(viewModel.QueuedEntities, e => Assert.Equal(Brushes.LightGray, e.DotBrush));
+
+        viewModel.CurrentProgress = new ProgressUpdate(
+            "Generating", "account", 1, 10, 1, 2, 0, TimeSpan.Zero);
+
+        var accountDot = Assert.Single(viewModel.QueuedEntities, e => e.Entity.LogicalName == "account");
+        Assert.NotEqual(Brushes.LightGray, accountDot.DotBrush);
+
+        viewModel.LastResult = new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [Guid.NewGuid()],
+            },
+            Errors = [new BatchError("contact", 0, "failed", null)],
+        };
+
+        Assert.NotEqual(Brushes.LightGray, viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "account").DotBrush);
+        Assert.NotEqual(Brushes.LightGray, viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "contact").DotBrush);
+        Assert.NotEqual(
+            viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "account").DotBrush,
+            viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "contact").DotBrush);
+    }
+
+    [Fact]
+    public void LastRunStatusTextReportsErrorsWhenPresent()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.LastResult = new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [Guid.NewGuid()],
+            },
+            Errors =
+            [
+                new BatchError("account", 0, "plugin failed", 123),
+            ],
+        };
+
+        Assert.True(viewModel.LastRunHasErrors);
+        Assert.Contains("plugin failed", viewModel.LastRunStatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateSnackbarUsesCautionWhenResultHasErrors()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out _, out var generationMock, out _, out _, out var snackbarMock);
+        viewModel.GoToReviewCommand.Execute(null);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Errors = [new BatchError("account", 0, "plugin failed", null)],
+            });
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        snackbarMock.Verify(
+            s => s.Show(
+                "Completed with errors",
+                It.Is<string>(m => m.Contains("1", StringComparison.Ordinal)),
+                ControlAppearance.Caution,
+                null,
+                It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CancelDiscardsDraftAndNeverCallsGenerate()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
@@ -180,22 +344,30 @@ public sealed class GenerateViewModelStepTests
     private static GenerateViewModel CreateViewModel(
         out Mock<IWpfGenerationService> generationMock,
         out Mock<IMetadataProvider> metadataMock,
-        out Mock<IRunHistoryService> historyMock)
+        out Mock<IRunHistoryService> historyMock,
+        out Mock<ISnackbarService> snackbarMock)
     {
         generationMock = new Mock<IWpfGenerationService>();
         metadataMock = new Mock<IMetadataProvider>();
         historyMock = new Mock<IRunHistoryService>();
+        snackbarMock = new Mock<ISnackbarService>();
 
         return new GenerateViewModel(
             generationMock.Object,
             historyMock.Object,
             Mock.Of<ISettingsService>(),
-            Mock.Of<ISnackbarService>(),
+            snackbarMock.Object,
             Mock.Of<ILogger<GenerateViewModel>>(),
             metadataMock.Object,
             Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>());
     }
+
+    private static GenerateViewModel CreateViewModel(
+        out Mock<IWpfGenerationService> generationMock,
+        out Mock<IMetadataProvider> metadataMock,
+        out Mock<IRunHistoryService> historyMock)
+        => CreateViewModel(out generationMock, out metadataMock, out historyMock, out _);
 
     /// <summary>Builds a view-model with metadata already loaded and the board attached, ready for SetRule + Review.</summary>
     private static Task<GenerateViewModel> CreateReadyForRulesAsync(
@@ -203,16 +375,23 @@ public sealed class GenerateViewModelStepTests
         out Mock<IWpfGenerationService> generationMock,
         out Mock<IMetadataProvider> metadataMock,
         out Mock<IRunHistoryService> historyMock)
+        => CreateReadyForRulesAsync(out fieldRules, out generationMock, out metadataMock, out historyMock, out _);
+
+    private static Task<GenerateViewModel> CreateReadyForRulesAsync(
+        out FieldRulesViewModel fieldRules,
+        out Mock<IWpfGenerationService> generationMock,
+        out Mock<IMetadataProvider> metadataMock,
+        out Mock<IRunHistoryService> historyMock,
+        out Mock<ISnackbarService> snackbarMock)
     {
         var meta = BuildAccountMetadata();
-        var viewModel = CreateViewModel(out generationMock, out metadataMock, out historyMock);
+        var viewModel = CreateViewModel(out generationMock, out metadataMock, out historyMock, out snackbarMock);
         metadataMock
             .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
 
         fieldRules = new FieldRulesViewModel();
         viewModel.AttachFieldRules(fieldRules);
-
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         return AwaitRulesLoaded();
 

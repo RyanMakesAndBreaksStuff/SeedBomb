@@ -571,11 +571,24 @@
                                     BorderBrush="{DynamicResource DG.SuccessBorder}"
                                     BorderThickness="1"
                                     CornerRadius="10"
-                                    Padding="12,10">
-                                <TextBlock Text="All entities succeeded"
+                                    Padding="12,10"
+                                    Visibility="{Binding LastRunHasErrors, Converter={StaticResource InverseBoolToVisible}}">
+                                <TextBlock Text="{Binding LastRunStatusText}"
                                            FontSize="12"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource DG.Success}" />
+                            </Border>
+                            <Border Background="{DynamicResource DG.WarningSoft}"
+                                    BorderBrush="{DynamicResource DG.WarningBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="12,10"
+                                    Visibility="{Binding LastRunHasErrors, Converter={StaticResource BoolToVisible}}">
+                                <TextBlock Text="{Binding LastRunStatusText}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource DG.Warning}"
+                                           TextWrapping="Wrap" />
                             </Border>
                         </StackPanel>
                         <StackPanel Margin="20,28"

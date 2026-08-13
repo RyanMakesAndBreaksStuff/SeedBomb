@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
@@ -63,6 +64,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _rulesCts;
+    private readonly HashSet<string> _queueCompletedEntities = new(StringComparer.OrdinalIgnoreCase);
+    private string? _queueCurrentEntity;
     private CancellationTokenSource? _draftSaveCts;
     private Profile? _restoredDraft;
     private FieldOverridesViewModel? _fieldOverrides;
@@ -70,7 +73,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> _entityMetadata =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // Fallback before settings load completes; matches AppSettings.Default.DefaultRecordCount.
+    [ObservableProperty]
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
@@ -104,7 +107,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
     public override async Task OnNavigatedToAsync()
     {
         var settings = await _settingsService.LoadAsync();
-        _defaultRecordCount = settings.DefaultRecordCount;
+        DefaultRecordCount = settings.DefaultRecordCount;
+        BatchSize = settings.DefaultBatchSize;
+        MaxParallelism = settings.DefaultDop;
 
         // §07 draft: restore autosave when the wizard is entered (applied after metadata loads).
         try
@@ -136,6 +141,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel), nameof(StatusLabel), nameof(Steps), nameof(HasStarted))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
+    [NotifyCanExecuteChangedFor(nameof(GoToReviewCommand))]
     private bool _isRunning;
 
     [ObservableProperty]
@@ -147,7 +153,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasResult), nameof(StatusLabel), nameof(Steps), nameof(HasStarted))]
+    [NotifyPropertyChangedFor(
+        nameof(HasResult), nameof(StatusLabel), nameof(Steps), nameof(HasStarted),
+        nameof(LastRunHasErrors), nameof(LastRunStatusText))]
     private GenerationResult? _lastResult;
 
     [ObservableProperty] private int _seed = 42;
@@ -156,6 +164,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Steps))]
+    [NotifyCanExecuteChangedFor(nameof(GoToReviewCommand))]
     private bool _isRulesLoaded;
 
     [ObservableProperty]
@@ -209,6 +218,17 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
 
+    public bool LastRunHasErrors => LastResult is { Errors.Count: > 0 };
+
+    public string LastRunStatusText =>
+        LastResult is null
+            ? string.Empty
+            : LastResult.Errors.Count == 0
+                ? "All entities succeeded"
+                : LastResult.Errors.Count == 1
+                    ? LastResult.Errors[0].ErrorMessage
+                    : $"{LastResult.Errors.Count} batch errors";
+
     /// <summary>Gets a value indicating whether generation has started (running or complete) — gates the Execute status card.</summary>
     public bool HasStarted => IsRunning || HasResult;
 
@@ -226,9 +246,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>Full live entity metadata for selected entities, loaded when advancing to Rules.</summary>
     public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadataMap => _entityMetadata;
-
-    /// <summary>Configured default record count, used as the Rules-editor preview record count.</summary>
-    public int DefaultRecordCount => _defaultRecordCount;
 
     /// <summary>Total active rule count across every table in the reviewed snapshot (Review summary).</summary>
     public int ReviewedRuleCount => ReviewedRules?.Sum(t => t.Value.Count) ?? 0;
@@ -286,6 +303,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _fieldOverrides?.SetEntities(entities, _defaultRecordCount);
 
         QueuedEntities.Clear();
+        _queueCompletedEntities.Clear();
+        _queueCurrentEntity = null;
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
 
@@ -300,6 +319,52 @@ public sealed partial class GenerateViewModel : ViewModelBase
         if (entities.Count > 0)
             _ = GoToRulesCommand.ExecuteAsync(null);
     }
+
+    partial void OnCurrentProgressChanged(ProgressUpdate? value)
+    {
+        if (value is null || string.IsNullOrEmpty(value.EntityName))
+            return;
+
+        if (_queueCurrentEntity is not null
+            && !string.Equals(_queueCurrentEntity, value.EntityName, StringComparison.OrdinalIgnoreCase))
+        {
+            _queueCompletedEntities.Add(_queueCurrentEntity);
+        }
+
+        _queueCurrentEntity = value.EntityName;
+        ApplyQueueDots();
+    }
+
+    partial void OnLastResultChanged(GenerationResult? value) => ApplyQueueDots();
+
+    private void ApplyQueueDots()
+    {
+        foreach (var entry in QueuedEntities)
+        {
+            var name = entry.Entity.LogicalName;
+            if (LastResult?.Errors.Any(err =>
+                    string.Equals(err.EntityLogicalName, name, StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                entry.DotBrush = ThemeBrush("DG.Error", Brushes.IndianRed);
+            }
+            else if (LastResult?.CreatedRecords.ContainsKey(name) == true
+                     || _queueCompletedEntities.Contains(name))
+            {
+                entry.DotBrush = ThemeBrush("DG.Success", Brushes.ForestGreen);
+            }
+            else if (string.Equals(name, CurrentProgress?.EntityName, StringComparison.OrdinalIgnoreCase))
+            {
+                entry.DotBrush = ThemeBrush("DG.Accent", Brushes.DodgerBlue);
+            }
+            else
+            {
+                entry.DotBrush = Brushes.LightGray;
+            }
+        }
+    }
+
+    private static Brush ThemeBrush(string key, Brush fallback) =>
+        Application.Current?.TryFindResource(key) as Brush ?? fallback;
 
     /// <summary>
     /// Advances to the Rules step: loads full live metadata for the selected entities
@@ -333,6 +398,12 @@ public sealed partial class GenerateViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load metadata for the Rules step");
+            _snackbar.Show(
+                "Rules metadata failed",
+                ex.Message,
+                Wpf.Ui.Controls.ControlAppearance.Danger,
+                null,
+                TimeSpan.FromSeconds(5));
         }
     }
 
@@ -445,6 +516,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         CurrentProgress = null;
         LastResult = null;
         QueuedEntities.Clear();
+        _queueCompletedEntities.Clear();
+        _queueCurrentEntity = null;
         _fieldOverrides?.SetEntities([]);
 
         _entityMetadata = new(StringComparer.OrdinalIgnoreCase);
@@ -503,8 +576,24 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 result.Errors.Count == 0,
                 result.Errors.Count));
 
-            _snackbar.Show("Success", $"Created {result.TotalRecords:N0} records",
-                Wpf.Ui.Controls.ControlAppearance.Success, null, TimeSpan.FromSeconds(3));
+            if (result.Errors.Count == 0)
+            {
+                _snackbar.Show(
+                    "Success",
+                    $"Created {result.TotalRecords:N0} records",
+                    Wpf.Ui.Controls.ControlAppearance.Success,
+                    null,
+                    TimeSpan.FromSeconds(3));
+            }
+            else
+            {
+                _snackbar.Show(
+                    "Completed with errors",
+                    $"Created {result.TotalRecords:N0} records with {result.Errors.Count} error(s)",
+                    Wpf.Ui.Controls.ControlAppearance.Caution,
+                    null,
+                    TimeSpan.FromSeconds(5));
+            }
         }
         catch (OperationCanceledException)
         {
