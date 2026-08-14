@@ -36,6 +36,14 @@ public sealed class ThemePaletteConfigurationTests
         "SystemFillColorSuccessBackgroundBrush",
     ];
 
+    private static readonly string[] RequiredSharedKeys =
+    [
+        "DG.TitleBar", "DG.OnAccent", "DG.AccentLight", "DG.Info", "DG.InfoSoft",
+        "DG.SuccessSoft", "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
+        "DG.Pad.RowTall", "DG.Size.NavPane", "DG.PrimaryButton", "DG.Cell",
+        "BoolToVisible", "BoolToVisibilityConverter",
+    ];
+
     [Fact]
     public void DrawerAnimationDurationIsZeroWhenReduceMotion()
     {
@@ -90,6 +98,17 @@ public sealed class ThemePaletteConfigurationTests
     {
         DesignThemeManager.Apply(true, "violet-ink");
         DesignThemeManager.Apply(false, "graphite");
+    }
+
+    [Fact]
+    public void SharedResourcesDefineVioletInkKeysAndConverterAliases()
+    {
+        var shared = ReadRepoFile("src/DataGen.Wpf/Resources/Shared.xaml");
+        Assert.Contains("#A79CF1", shared, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#7160E8", shared, StringComparison.OrdinalIgnoreCase);
+        foreach (var key in RequiredSharedKeys)
+            Assert.Contains($"x:Key=\"{key}\"", shared, StringComparison.Ordinal);
+        Assert.DoesNotContain("#3E6FA8", shared, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")
