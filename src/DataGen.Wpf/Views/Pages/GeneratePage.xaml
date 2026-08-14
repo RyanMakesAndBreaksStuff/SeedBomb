@@ -157,21 +157,18 @@
 
                         <StackPanel Grid.Column="0">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Seed"/>
-                            <ui:NumberBox Value="{Binding Seed}" Minimum="0"
-                                          Height="{DynamicResource DG.Size.Control}"
-                                          SpinButtonPlacementMode="Inline"/>
+                            <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
+                                          Value="{Binding Seed}" Minimum="0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Batch size"/>
-                            <ui:NumberBox Value="{Binding BatchSize}" Minimum="1" Maximum="1000"
-                                          Height="{DynamicResource DG.Size.Control}"
-                                          SpinButtonPlacementMode="Inline"/>
+                            <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
+                                          Value="{Binding BatchSize}" Minimum="1" Maximum="1000"/>
                         </StackPanel>
                         <StackPanel Grid.Column="4">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Parallelism"/>
-                            <ui:NumberBox Value="{Binding MaxParallelism}" Minimum="1" Maximum="16"
-                                          Height="{DynamicResource DG.Size.Control}"
-                                          SpinButtonPlacementMode="Inline"/>
+                            <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
+                                          Value="{Binding MaxParallelism}" Minimum="1" Maximum="16"/>
                         </StackPanel>
                     </Grid>
 

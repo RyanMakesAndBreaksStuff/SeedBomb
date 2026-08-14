@@ -13,9 +13,11 @@
             <DataTemplate>
                 <StackPanel Width="200" Margin="6">
                     <TextBlock Text="{Binding Entity.DisplayName}"
-                               FontSize="{DynamicResource DG.Type.Caption}"
+                               Style="{DynamicResource DG.Body}"
+                               FontWeight="SemiBold"
                                Margin="0,0,0,2" />
-                    <ui:NumberBox Value="{Binding Count, Mode=TwoWay}"
+                    <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
+                                  Value="{Binding Count, Mode=TwoWay}"
                                   Minimum="1"
                                   Maximum="100000" />
                 </StackPanel>

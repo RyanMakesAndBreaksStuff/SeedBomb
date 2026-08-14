@@ -281,9 +281,9 @@
     </Style>
     <!-- The all-caps group label used above every field group and table header. -->
     <Style x:Key="DG.GroupLabel" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Micro}"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
         <Setter Property="Typography.Capitals" Value="AllSmallCaps"/>
         <Setter Property="Margin" Value="0,0,0,8"/>
     </Style>
@@ -469,6 +469,34 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style x:Key="DG.NumberBox" TargetType="ui:NumberBox">
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
+        <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}"/>
+        <Setter Property="Padding" Value="11,0,36,0"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource DG.Text1}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="SpinButtonPlacementMode" Value="Compact"/>
+    </Style>
+
+    <Style x:Key="DG.ComboBox" TargetType="ComboBox">
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
+        <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}"/>
+        <Setter Property="Padding" Value="11,0,28,0"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
     </Style>
 
     <!-- Mono editor surface: template box, log block, preview rows. -->

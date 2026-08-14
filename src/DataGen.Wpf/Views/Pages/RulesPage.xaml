@@ -50,9 +50,9 @@
                 <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Rules"/>
             </StackPanel>
 
-            <ComboBox Grid.Column="1" VerticalAlignment="Bottom" Margin="16,0,8,0"
+            <ComboBox Grid.Column="1" Style="{DynamicResource DG.ComboBox}"
+                      VerticalAlignment="Bottom" Margin="16,0,8,0"
                       MinWidth="180"
-                      Height="{DynamicResource DG.Size.Control}"
                       ItemsSource="{Binding Tables}"
                       SelectedItem="{Binding SelectedTable}"
                       DisplayMemberPath="DisplayName"/>
@@ -258,7 +258,7 @@
                         <StackPanel>
                             <StackPanel Margin="0,0,0,16">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Operation"/>
-                                <ComboBox Height="{DynamicResource DG.Size.Control}"
+                                <ComboBox Style="{DynamicResource DG.ComboBox}"
                                           ItemsSource="{Binding AvailableOperations}"
                                           SelectedItem="{Binding SelectedOperation}"/>
                             </StackPanel>
@@ -419,9 +419,9 @@
                                 <TextBlock Style="{DynamicResource DG.Tertiary}"
                                            Text="Or comma-separated values for non-choice columns"
                                            Margin="0,4,0,0"/>
-                                <ComboBox ItemsSource="{Binding Source={StaticResource OneOfPickValues}}"
+                                <ComboBox Style="{DynamicResource DG.ComboBox}"
+                                          ItemsSource="{Binding Source={StaticResource OneOfPickValues}}"
                                           SelectedItem="{Binding Pick}"
-                                          Height="{DynamicResource DG.Size.Control}"
                                           HorizontalAlignment="Left"
                                           MinWidth="120"
                                           Margin="0,8,0,0"/>
@@ -450,13 +450,13 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
                                     <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="On collision"/>
-                                    <ComboBox Height="{DynamicResource DG.Size.Control}"
+                                    <ComboBox Style="{DynamicResource DG.ComboBox}"
                                               ItemsSource="{Binding CollisionStrategies}"
                                               SelectedItem="{Binding SelectedCollisionStrategy}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Case"/>
-                                    <ComboBox Height="{DynamicResource DG.Size.Control}"
+                                    <ComboBox Style="{DynamicResource DG.ComboBox}"
                                               ItemsSource="{Binding CaseTransforms}"
                                               SelectedItem="{Binding SelectedCaseTransform}"/>
                                 </StackPanel>
