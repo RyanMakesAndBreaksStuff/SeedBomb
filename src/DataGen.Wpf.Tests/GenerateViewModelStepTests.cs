@@ -360,6 +360,32 @@ public sealed class GenerateViewModelStepTests
             Times.Never);
     }
 
+    [Fact]
+    public void SelectedTableRows_uses_default_count_per_table()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.DefaultRecordCount = 50;
+        viewModel.OnEntitiesChanged(
+        [
+            new EntitySummary("account", "Account", false),
+            new EntitySummary("contact", "Contact", false),
+        ]);
+
+        Assert.Equal(2, viewModel.SelectedTableRows.Count);
+        Assert.Equal("Account", viewModel.SelectedTableRows[0].DisplayName);
+        Assert.Equal(50, viewModel.SelectedTableRows[0].Count);
+        Assert.Equal(100, viewModel.PlannedTotal);
+        Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
+    }
+
+    [Fact]
+    public void ProfileSummaryLine_includes_rule_count_and_seed()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.Seed = 40719;
+        Assert.Contains("seed 40719", viewModel.ProfileSummaryLine, StringComparison.Ordinal);
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────────
 
     private static GenerateViewModel CreateViewModel(

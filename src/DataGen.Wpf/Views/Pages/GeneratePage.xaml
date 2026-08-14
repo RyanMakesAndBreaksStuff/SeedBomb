@@ -100,33 +100,113 @@
         <Grid Grid.Row="2" Margin="32,20,32,0">
 
             <!-- Step 1 · Tables -->
-            <Border Style="{DynamicResource DG.CardBorder}"
-                    Visibility="{Binding CurrentStep, Converter={StaticResource StepVisibilityConverter},
-                                 ConverterParameter=0}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+            <Grid Visibility="{Binding CurrentStep, Converter={StaticResource StepVisibilityConverter},
+                               ConverterParameter=0}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Row="0" Margin="20,18,20,0">
-                        <TextBlock Style="{DynamicResource DG.CardTitle}" Text="Choose tables"/>
-                        <TextBlock Style="{DynamicResource DG.Secondary}"
-                                   Text="Pick the tables to populate. Related tables are written in dependency order."
-                                   Margin="0,4,0,0"/>
-                    </StackPanel>
+                <Border Grid.Column="0" Style="{DynamicResource DG.CardBorder}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                    <controls:EntitySelectorControl x:Name="EntitySelectorCtrl"
-                                                    Grid.Row="1"
-                                                    Margin="20,16,20,0"
-                                                    SelectedEntitiesChanged="OnEntitiesChanged"/>
+                        <StackPanel Grid.Row="0" Margin="20,18,20,0">
+                            <TextBlock Style="{DynamicResource DG.CardTitle}" Text="Select tables"/>
+                            <TextBlock Style="{DynamicResource DG.Secondary}"
+                                       Text="Pick the tables to populate. Metadata is read live from this environment."
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
 
-                    <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}" Padding="20,11">
-                        <TextBlock Style="{DynamicResource DG.Tertiary}" Text="{Binding EntitiesSummary}"/>
+                        <controls:EntitySelectorControl x:Name="EntitySelectorCtrl"
+                                                        Grid.Row="1"
+                                                        Margin="20,16,20,0"
+                                                        SelectedEntitiesChanged="OnEntitiesChanged"/>
+
+                        <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}" Padding="20,11">
+                            <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                       Text="{Binding ViewModel.FooterLabel, ElementName=EntitySelectorCtrl}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="2" Width="{DynamicResource DG.Size.AsidePane}">
+                    <Border Style="{DynamicResource DG.CardBorder}" Padding="18,16" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Selected"/>
+                            <ItemsControl ItemsSource="{Binding SelectedTableRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Style="{DynamicResource DG.Body}"
+                                                       Text="{Binding DisplayName}"/>
+                                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
+                                                       Text="{Binding Count, StringFormat='{}{0:N0} rows'}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Style="{DynamicResource DG.CardFooter}" Padding="0,10,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{DynamicResource DG.Body}"
+                                               FontWeight="SemiBold" Text="Total"/>
+                                    <TextBlock Grid.Column="1" Style="{DynamicResource DG.Body}"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding PlannedTotal, StringFormat='{}{0:N0} rows'}"/>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
                     </Border>
-                </Grid>
-            </Border>
+
+                    <Border Style="{DynamicResource DG.CardBorder}" Padding="18,16" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Profile"/>
+                            <TextBlock Style="{DynamicResource DG.Body}" FontWeight="SemiBold"
+                                       Text="{Binding ActiveProfileName}"/>
+                            <TextBlock Style="{DynamicResource DG.Secondary}"
+                                       Text="{Binding ProfileSummaryLine}" Margin="0,2,0,12"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{DynamicResource DG.Button}"
+                                        Command="{Binding ChangeProfileCommand}"
+                                        Content="Change profile" Margin="0,0,8,0"/>
+                                <Button Style="{DynamicResource DG.Button}"
+                                        Command="{Binding EditRulesCommand}"
+                                        Content="Edit rules"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{DynamicResource DG.InfoBanner}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Grid.Column="0" Symbol="Info24"
+                                           FontSize="{DynamicResource DG.Type.Icon}"
+                                           Foreground="{DynamicResource DG.Accent}"
+                                           VerticalAlignment="Top"/>
+                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
+                                       Foreground="{DynamicResource DG.TextBody}"
+                                       Text="Nothing is written until you press Start on step 4. You can leave and come back — the draft is kept."
+                                       Margin="12,0,0,0" TextWrapping="Wrap" LineHeight="18"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
 
             <!-- Step 2 · Volume & rules -->
             <Border Style="{DynamicResource DG.CardBorder}"
@@ -340,17 +420,21 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
                            Text="{Binding StepProgressLabel}" VerticalAlignment="Center"/>
 
                 <Button Grid.Column="2" Style="{DynamicResource DG.Button}"
+                        Command="{Binding ResetCommand}" Content="Reset" Margin="0,0,10,0"/>
+
+                <Button Grid.Column="3" Style="{DynamicResource DG.Button}"
                         Command="{Binding GoBackCommand}"
                         Content="Back" Margin="0,0,10,0"/>
 
                 <!-- Next becomes Start on the last step; the VM owns the label. -->
-                <Button Grid.Column="3" Style="{DynamicResource DG.PrimaryButton}"
+                <Button Grid.Column="4" Style="{DynamicResource DG.PrimaryButton}"
                         Command="{Binding GoNextCommand}"
                         Content="{Binding NextButtonLabel}"/>
             </Grid>

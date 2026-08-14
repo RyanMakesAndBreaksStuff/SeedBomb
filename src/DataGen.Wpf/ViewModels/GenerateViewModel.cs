@@ -30,6 +30,9 @@ namespace Seedbomb.ViewModels;
 /// <param name="HasNext">Whether a connector line should be drawn after this step.</param>
 public record StepEntry(string Glyph, string Label, bool IsDone, bool IsActive, bool HasNext);
 
+/// <summary>One selected table in the step-1 aside.</summary>
+public sealed record SelectedTableRow(string DisplayName, string LogicalName, int Count);
+
 /// <summary>Entity queue status entry shown in the right-side queue dot list.</summary>
 public sealed partial class QueuedEntityEntry : ObservableObject
 {
@@ -83,6 +86,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedTableRows), nameof(PlannedTotal))]
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
@@ -157,6 +161,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         nameof(EntitiesSummary),
         nameof(Steps),
         nameof(PlannedTotal),
+        nameof(SelectedTableRows),
+        nameof(ProfileSummaryLine),
         nameof(RunConfirmationLine),
         nameof(RunPlanStats))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
@@ -188,7 +194,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private GenerationResult? _lastResult;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RunConfirmationLine), nameof(RunPlanStats))]
+    [NotifyPropertyChangedFor(nameof(RunConfirmationLine), nameof(RunPlanStats), nameof(ProfileSummaryLine))]
     private int _seed = 42;
     [ObservableProperty] private int _batchSize = 500;
     [ObservableProperty] private int _maxParallelism;
@@ -207,7 +213,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private int _currentStep;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Steps), nameof(ReviewedRuleCount), nameof(RulesLinkLabel), nameof(RunPlanStats))]
+    [NotifyPropertyChangedFor(nameof(Steps), nameof(ReviewedRuleCount), nameof(RulesLinkLabel), nameof(RunPlanStats), nameof(ProfileSummaryLine))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
@@ -295,6 +301,30 @@ public sealed partial class GenerateViewModel : ViewModelBase
         string.Join(
             Environment.NewLine,
             ReviewMessages.Where(m => m.Severity == RuleMessageSeverity.Error).Select(m => m.Text));
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProfileSummaryLine))]
+    private string _activeProfileName = "No profile loaded";
+
+    /// <summary>Step-1 SELECTED rows. Counts come from FieldOverrides when attached, else <see cref="DefaultRecordCount"/>.</summary>
+    public IReadOnlyList<SelectedTableRow> SelectedTableRows
+    {
+        get
+        {
+            var counts = _fieldOverrides?.GetCounts();
+            return [.. SelectedEntities.Select(e => new SelectedTableRow(
+                e.DisplayName,
+                e.LogicalName,
+                counts is not null && counts.TryGetValue(e.LogicalName, out var n) ? n : DefaultRecordCount))];
+        }
+    }
+
+    /// <summary>PROFILE card second line.</summary>
+    public string ProfileSummaryLine =>
+        $"{ReviewedRuleCount} rules · seed {Seed}";
+
+    /// <summary>Handoff alias used by the mock Change profile button.</summary>
+    public IRelayCommand ChangeProfileCommand => OpenProfilesCommand;
 
     /// <summary>Sum of per-table record counts.</summary>
     public int PlannedTotal
@@ -449,6 +479,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     {
         SelectedEntities = entities;
         _fieldOverrides?.SetEntities(entities, _defaultRecordCount);
+        OnPropertyChanged(nameof(SelectedTableRows));
 
         QueuedEntities.Clear();
         _queueCompletedEntities.Clear();
