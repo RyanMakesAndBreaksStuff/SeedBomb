@@ -273,6 +273,21 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     }
 
     /// <inheritdoc />
+    public async Task ClearDraftAsync(CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (File.Exists(DraftPath))
+                File.Delete(DraftPath);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
     public void Dispose() => _lock.Dispose();
 
     /// <summary>

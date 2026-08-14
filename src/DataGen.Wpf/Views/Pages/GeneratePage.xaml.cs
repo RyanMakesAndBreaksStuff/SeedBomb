@@ -34,20 +34,15 @@ public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
     {
         if (!_vm.ResetCommand.CanExecute(null))
             return;
-
         EntitySelectorCtrl.ClearSelection();
-        _vm.ResetCommand.Execute(null);
+        _ = _vm.ResetCommand.ExecuteAsync(null);
     }
 
     /// <summary>Resets the wizard and reloads the entity picker after an org switch.</summary>
     public void ReloadForConnectionSwitch()
     {
-        if (_vm.ResetCommand.CanExecute(null))
-        {
-            EntitySelectorCtrl.ClearSelection();
-            _vm.ResetCommand.Execute(null);
-        }
-
+        EntitySelectorCtrl.ClearSelection();
+        _ = _vm.ResetWithoutPromptAsync();
         EntitySelectorCtrl.ViewModel?.LoadEntitiesCommand.Execute(null);
     }
 }

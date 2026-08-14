@@ -424,6 +424,41 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task Reset_clears_tables_rules_seed_and_draft()
+    {
+        var profiles = new Mock<IProfileService>();
+        var viewModel = new GenerateViewModel(
+            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
+            profiles.Object, Mock.Of<IContentDialogService>(),
+            new RunViewModel(Mock.Of<IWpfGenerationService>()))
+        {
+            ConfirmReset = () => Task.FromResult(true),
+        };
+
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        fieldRules.SelectTable("account");
+        fieldRules.SetRule("account", "name",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+        Assert.NotEmpty(fieldRules.Rows);
+        viewModel.Seed = 99;
+        viewModel.CurrentStep = 1;
+        viewModel.ActiveProfileName = "acme-sales-scenario";
+
+        await viewModel.ResetCommand.ExecuteAsync(null);
+
+        Assert.Empty(viewModel.SelectedEntities);
+        Assert.Equal(0, viewModel.CurrentStep);
+        Assert.Empty(fieldRules.Rows);
+        Assert.Equal(42, viewModel.Seed);
+        Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
+        profiles.Verify(p => p.ClearDraftAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public void SelectedTableRows_uses_default_count_per_table()
     {
         var viewModel = CreateViewModel(out _, out _, out _);

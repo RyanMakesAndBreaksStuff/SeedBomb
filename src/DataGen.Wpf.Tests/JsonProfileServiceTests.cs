@@ -222,6 +222,19 @@ public sealed class JsonProfileServiceTests : IDisposable
         Assert.StartsWith("not a valid profile:", error);
     }
 
+    [Fact]
+    public async Task ClearDraftAsync_removes_draft_and_is_idempotent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = NewService(out var root);
+        await svc.SaveDraftAsync(new Profile(1, "Working Draft", null, 9, [new ProfileTable("account", 1, null)]), ct);
+        Assert.True(File.Exists(Path.Combine(root, "draft.profile.json")));
+
+        await svc.ClearDraftAsync(ct);
+        Assert.Null(await svc.LoadDraftAsync(ct));
+        await svc.ClearDraftAsync(ct);
+    }
+
     // 9. draft.profile.json is excluded from ListAsync.
     [Fact]
     public async Task Draft_is_excluded_from_list()

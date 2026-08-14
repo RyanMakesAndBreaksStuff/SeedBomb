@@ -11,6 +11,7 @@ using Seedbomb.ViewModels.Controls;
 using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui;
+using Wpf.Ui.Extensions;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
@@ -716,8 +717,35 @@ public sealed partial class GenerateViewModel : ViewModelBase
         CurrentStep = 0;
     }
 
+    /// <summary>Tests set this to skip the content dialog.</summary>
+    internal Func<Task<bool>>? ConfirmReset { get; set; }
+
+    private async Task<bool> ConfirmHardResetAsync()
+    {
+        if (ConfirmReset is not null)
+            return await ConfirmReset();
+        var result = await _contentDialogService.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+        {
+            Title = "Reset wizard",
+            Content = "Clear selected tables, rules, counts, seed, and the saved draft? This cannot be undone.",
+            PrimaryButtonText = "Reset",
+            CloseButtonText = "Cancel",
+        });
+        return result == Wpf.Ui.Controls.ContentDialogResult.Primary;
+    }
+
     [RelayCommand(CanExecute = nameof(CanReset))]
-    private void Reset()
+    private async Task ResetAsync()
+    {
+        if (!await ConfirmHardResetAsync())
+            return;
+        await WipeWizardAsync();
+    }
+
+    /// <summary>Used by org-switch reload. No prompt.</summary>
+    public Task ResetWithoutPromptAsync() => WipeWizardAsync();
+
+    private async Task WipeWizardAsync()
     {
         SelectedEntities = [];
         CurrentProgress = null;
@@ -726,6 +754,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _queueCompletedEntities.Clear();
         _queueCurrentEntity = null;
         _fieldOverrides?.SetEntities([]);
+        OnPropertyChanged(nameof(SelectedTableRows));
 
         _entityMetadata = new(StringComparer.OrdinalIgnoreCase);
         OnPropertyChanged(nameof(EntityMetadataMap));
@@ -737,6 +766,21 @@ public sealed partial class GenerateViewModel : ViewModelBase
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
         RunId = "";
+        Seed = 42;
+        ActiveProfileName = "No profile loaded";
+        _restoredDraft = null;
+        _fieldRules?.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase));
+
+        _rulesRequest?.Clear();
+
+        try
+        {
+            await _profileService.ClearDraftAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Draft clear skipped");
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanStartGenerate))]

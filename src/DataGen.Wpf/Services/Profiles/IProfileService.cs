@@ -39,4 +39,7 @@ public interface IProfileService
 
     /// <summary>Loads the autosaved draft, or <see langword="null"/> if absent or unreadable.</summary>
     Task<Profile?> LoadDraftAsync(CancellationToken ct = default);
+
+    /// <summary>Deletes <c>draft.profile.json</c> if present. No-op when absent.</summary>
+    Task ClearDraftAsync(CancellationToken ct = default);
 }
