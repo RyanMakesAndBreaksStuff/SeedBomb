@@ -1,153 +1,266 @@
+<!--
+    Settings — restyle pass over the existing page. Structure and every binding are unchanged
+    (PaletteId, DarkTheme, ReduceMotion, DefaultRecordCount, DefaultBatchSize, DefaultDop,
+    AppVersion, DotnetVersion, SaveCommand); this only moves it onto 1a's vocabulary.
+
+    Changes: page header added to match the other destinations; literal FontSize="12" and
+    Opacity="0.6" replaced with DG type styles; field labels use DG.GroupLabel; CardExpander
+    swapped for plain DG.CardBorder sections (there are only three, so accordions cost a click
+    for nothing); palette picker promoted from a combo to a swatch row; Save moved into the
+    footer bar the other pages use.
+-->
 <Page x:Class="Seedbomb.Views.Pages.SettingsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:vm="clr-namespace:Seedbomb.ViewModels"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
+      mc:Ignorable="d"
+      Background="{DynamicResource DG.Surface1}">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="24"
-                    MaxWidth="800"
-                    HorizontalAlignment="Left"
-                    TextElement.Foreground="{DynamicResource DG.Text1}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-            <!-- Appearance section -->
-            <ui:CardExpander Header="Appearance"
-                             IsExpanded="True">
-                <StackPanel>
-                    <TextBlock Text="Color palette"
-                               FontSize="12"
-                               Foreground="{DynamicResource DG.Text1}"
-                               Margin="0,0,0,2" />
-                    <ComboBox ItemsSource="{Binding AvailablePalettes}"
-                              SelectedValuePath="Id"
-                              SelectedValue="{Binding PaletteId, Mode=TwoWay}"
-                              HorizontalAlignment="Left"
-                              MinWidth="220"
-                              AutomationProperties.Name="Color palette">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
+        <StackPanel Grid.Row="0" Margin="32,22,32,0">
+            <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Settings"/>
+            <TextBlock Style="{DynamicResource DG.PageSubtitle}"
+                       Text="Appearance and the defaults new runs start from"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,20,0,0">
+            <StackPanel Margin="32,0,32,24" MaxWidth="860" HorizontalAlignment="Left">
+
+                <!-- ── Appearance ────────────────────────────────────── -->
+                <Border Style="{DynamicResource DG.CardBorder}">
+                    <StackPanel Margin="20,18">
+                        <TextBlock Style="{DynamicResource DG.CardTitle}" Text="Appearance"/>
+
+                        <TextBlock Style="{DynamicResource DG.GroupLabel}"
+                                   Text="Color palette" Margin="0,16,0,8"/>
+
+                        <!--
+                            Four palettes now, so they fit as a swatch row. Each tile shows the
+                            light and dark accent side by side — the pair is the actual choice,
+                            and a dropdown hid it behind a click.
+                        -->
+                        <ItemsControl ItemsSource="{Binding AvailablePalettes}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <RadioButton GroupName="Palette"
+                                                 Margin="0,0,10,0"
+                                                 Cursor="Hand"
+                                                 Command="{Binding DataContext.SelectPaletteCommand,
+                                                           RelativeSource={RelativeSource AncestorType=Page}}"
+                                                 CommandParameter="{Binding Id}">
+                                        <RadioButton.IsChecked>
+                                            <MultiBinding Converter="{StaticResource EqualityToBoolConverter}" Mode="OneWay">
+                                                <Binding Path="Id"/>
+                                                <Binding Path="DataContext.PaletteId"
+                                                         RelativeSource="{RelativeSource AncestorType=Page}"/>
+                                            </MultiBinding>
+                                        </RadioButton.IsChecked>
+                                        <RadioButton.Template>
+                                            <ControlTemplate TargetType="RadioButton">
+                                                <Border x:Name="Bd"
+                                                        Background="{DynamicResource DG.CardSunken}"
+                                                        BorderBrush="{DynamicResource DG.ControlBorder}"
+                                                        BorderThickness="1"
+                                                        CornerRadius="{DynamicResource DG.Radius.Panel}"
+                                                        Padding="12,10">
+                                                    <StackPanel>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Border Width="22" Height="22"
+                                                                    CornerRadius="{DynamicResource DG.Radius.Small}"
+                                                                    Background="{Binding LightSwatch}"
+                                                                    BorderBrush="{DynamicResource DG.ControlBorder}"
+                                                                    BorderThickness="1"
+                                                                    ToolTip="Light"/>
+                                                            <Border Width="22" Height="22"
+                                                                    CornerRadius="{DynamicResource DG.Radius.Small}"
+                                                                    Background="{Binding DarkSwatch}"
+                                                                    BorderBrush="{DynamicResource DG.ControlBorder}"
+                                                                    BorderThickness="1"
+                                                                    Margin="5,0,0,0"
+                                                                    ToolTip="Dark"/>
+                                                        </StackPanel>
+                                                        <TextBlock Style="{DynamicResource DG.Cell}"
+                                                                   Text="{Binding DisplayName}"
+                                                                   Margin="0,9,0,0"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background"
+                                                                Value="{DynamicResource DG.ControlHover}"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background"
+                                                                Value="{DynamicResource DG.AccentSoft}"/>
+                                                        <Setter TargetName="Bd" Property="BorderBrush"
+                                                                Value="{DynamicResource DG.Accent}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </RadioButton.Template>
+                                    </RadioButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Selection anchor for the swatch comparison above. -->
+                        <TextBlock x:Name="PaletteSelection" Text="{Binding PaletteId}"
+                                   Visibility="Collapsed"/>
+
+                        <Border BorderBrush="{DynamicResource DG.Divider}" BorderThickness="0,1,0,0"
+                                Margin="0,18,0,0" Padding="0,16,0,0">
+                            <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding DisplayName}"
-                                               VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                Margin="12,0,0,0">
-                                        <Border Width="14" Height="14" CornerRadius="3"
-                                                Background="{Binding LightSwatch}"
-                                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                                                BorderThickness="1"
-                                                ToolTip="Light" />
-                                        <Border Width="14" Height="14" CornerRadius="3"
-                                                Background="{Binding DarkSwatch}"
-                                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
-                                                BorderThickness="1"
-                                                Margin="4,0,0,0"
-                                                ToolTip="Dark" />
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <TextBlock Style="{DynamicResource DG.Body}" Text="Dark theme"/>
+                                        <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                                   Text="The design of record. Light is derived from the same palette."
+                                                   Margin="0,2,0,0"/>
                                     </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="1"
+                                                     IsChecked="{Binding DarkTheme, Mode=TwoWay}"
+                                                     VerticalAlignment="Center"
+                                                     AutomationProperties.Name="Toggle dark theme"/>
                                 </Grid>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <TextBlock Text="Dark theme"
-                               FontSize="12"
-                               Foreground="{DynamicResource DG.Text1}"
-                               Margin="0,8,0,2" />
-                    <ui:ToggleSwitch IsChecked="{Binding DarkTheme, Mode=TwoWay}"
-                                     AutomationProperties.Name="Toggle dark theme" />
-                    <TextBlock Text="Reduce motion"
-                               FontSize="12"
-                               Foreground="{DynamicResource DG.Text1}"
-                               Margin="0,8,0,2" />
-                    <ui:ToggleSwitch IsChecked="{Binding ReduceMotion, Mode=TwoWay}"
-                                     AutomationProperties.Name="Toggle reduce motion" />
-                </StackPanel>
-            </ui:CardExpander>
 
-            <!-- Generation Defaults section -->
-            <ui:CardExpander Header="Generation Defaults"
-                             Margin="0,12,0,0">
-                <UniformGrid Columns="3">
-                    <StackPanel Margin="0,0,8,0">
-                        <TextBlock Text="Default Record Count"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource DG.Text1}"
-                                   Margin="0,0,0,2" />
-                        <ui:NumberBox Value="{Binding DefaultRecordCount, Mode=TwoWay}"
-                                      Minimum="1"
-                                      Maximum="100000" />
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <TextBlock Style="{DynamicResource DG.Body}" Text="Reduce motion"/>
+                                        <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                                   Text="Stops the progress ring and page transitions from animating."
+                                                   Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Grid.Column="1"
+                                                     IsChecked="{Binding ReduceMotion, Mode=TwoWay}"
+                                                     VerticalAlignment="Center"
+                                                     AutomationProperties.Name="Toggle reduce motion"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                    <StackPanel Margin="0,0,8,0">
-                        <TextBlock Text="Default Batch Size"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource DG.Text1}"
-                                   Margin="0,0,0,2" />
-                        <ui:NumberBox Value="{Binding DefaultBatchSize, Mode=TwoWay}"
-                                      Minimum="1"
-                                      Maximum="1000" />
+                </Border>
+
+                <!-- ── Generation defaults ───────────────────────────── -->
+                <Border Style="{DynamicResource DG.CardBorder}" Margin="0,14,0,0">
+                    <StackPanel Margin="20,18">
+                        <TextBlock Style="{DynamicResource DG.CardTitle}" Text="Generation defaults"/>
+                        <TextBlock Style="{DynamicResource DG.Secondary}"
+                                   Text="Starting values for a new run. Any run can override them."
+                                   Margin="0,4,0,0"/>
+
+                        <Grid Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Record count"/>
+                                <ui:NumberBox Value="{Binding DefaultRecordCount, Mode=TwoWay}"
+                                              Minimum="1" Maximum="100000"
+                                              Height="{DynamicResource DG.Size.Control}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Batch size"/>
+                                <ui:NumberBox Value="{Binding DefaultBatchSize, Mode=TwoWay}"
+                                              Minimum="1" Maximum="1000"
+                                              Height="{DynamicResource DG.Size.Control}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max parallelism"/>
+                                <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay}"
+                                              Minimum="0" PlaceholderText="auto"
+                                              Height="{DynamicResource DG.Size.Control}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                   Text="Leave parallelism at 0 to let SeedBomb pick based on the environment's throttling response."
+                                   Margin="0,10,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="Default Max Parallelism"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource DG.Text1}"
-                                   Margin="0,0,0,2" />
-                        <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay}"
-                                      Minimum="0"
-                                      PlaceholderText="auto" />
+                </Border>
+
+                <!-- ── About ─────────────────────────────────────────── -->
+                <Border Style="{DynamicResource DG.CardBorder}" Margin="0,14,0,0">
+                    <StackPanel Margin="20,18">
+                        <TextBlock Style="{DynamicResource DG.CardTitle}" Text="About"/>
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
+                                       Text="Created by" Margin="0,0,24,6"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Style="{DynamicResource DG.Cell}"
+                                       Text="Ryan Rettinger" Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
+                                       Text="Version" Margin="0,0,24,6"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Style="{DynamicResource DG.Mono}"
+                                       Foreground="{DynamicResource DG.TextBody}"
+                                       Text="{Binding AppVersion}" Margin="0,0,0,6"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
+                                       Text="Runtime" Margin="0,0,24,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Style="{DynamicResource DG.Mono}"
+                                       Foreground="{DynamicResource DG.TextBody}"
+                                       Text="{Binding DotnetVersion}"/>
+                        </Grid>
                     </StackPanel>
-                </UniformGrid>
-            </ui:CardExpander>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
 
-            <!-- About section -->
-            <ui:CardExpander Header="About"
-                             Margin="0,12,0,0">
-                <StackPanel>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition />
-                            <RowDefinition />
-                            <RowDefinition />
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                   Text="Created By"
-                                   Foreground="{DynamicResource DG.Text2}"
-                                   Opacity="0.6"
-                                   Margin="0,0,16,4" />
-                        <TextBlock Grid.Row="0" Grid.Column="1"
-                                   Text="Ryan Rettinger"
-                                   Foreground="{DynamicResource DG.Text1}" />
-                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                   Text="Version"
-                                   Foreground="{DynamicResource DG.Text2}"
-                                   Opacity="0.6"
-                                   Margin="0,0,16,4" />
-                        <TextBlock Grid.Row="1" Grid.Column="1"
-                                   Text="{Binding AppVersion}"
-                                   Foreground="{DynamicResource DG.Text1}" />
-                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                   Text="Runtime"
-                                   Foreground="{DynamicResource DG.Text2}"
-                                   Opacity="0.6" />
-                        <TextBlock Grid.Row="2" Grid.Column="1"
-                                   Text="{Binding DotnetVersion}"
-                                   Foreground="{DynamicResource DG.Text1}" />
-                    </Grid>
-                </StackPanel>
-            </ui:CardExpander>
-
-            <!-- Save button -->
-            <ui:Button Content="Save Settings"
-                       Appearance="Primary"
-                       Margin="0,20,0,0"
-                       Command="{Binding SaveCommand}" />
-
-        </StackPanel>
-    </ScrollViewer>
+        <!-- Appearance saves itself on change; this commits the defaults. -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource DG.Surface2}"
+                BorderBrush="{DynamicResource DG.Border}"
+                BorderThickness="0,1,0,0"
+                Padding="32,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
+                           Text="Appearance changes apply immediately."
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Style="{DynamicResource DG.PrimaryButton}"
+                        Command="{Binding SaveCommand}"
+                        Content="Save settings"/>
+            </Grid>
+        </Border>
+    </Grid>
 </Page>

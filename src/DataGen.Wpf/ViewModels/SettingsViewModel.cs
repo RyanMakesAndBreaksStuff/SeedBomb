@@ -20,6 +20,7 @@ public sealed partial class SettingsViewModel(
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private CancellationTokenSource? _appearanceSaveCts;
+    private CancellationTokenSource? _navCts;
     private Task _appearanceSaveTask = Task.CompletedTask;
     [ObservableProperty] private int _defaultRecordCount = 10;
     [ObservableProperty] private int _defaultBatchSize = 500;
@@ -66,28 +67,45 @@ public sealed partial class SettingsViewModel(
     /// <inheritdoc />
     public override Task OnNavigatedToAsync()
     {
-        LoadCommand.Execute(null);
-        return Task.CompletedTask;
+        _navCts?.Cancel();
+        _navCts?.Dispose();
+        _navCts = new CancellationTokenSource();
+        return LoadAsync(_navCts.Token);
     }
 
     /// <inheritdoc />
-    public override async Task OnNavigatedFromAsync() =>
+    public override async Task OnNavigatedFromAsync()
+    {
+        _navCts?.Cancel();
         await _appearanceSaveTask;
+    }
 
     [RelayCommand]
-    private async Task LoadAsync()
+    private void SelectPalette(string? paletteId)
+    {
+        if (string.IsNullOrWhiteSpace(paletteId))
+            return;
+        PaletteId = DesignThemeManager.ResolvePaletteId(paletteId);
+    }
+
+    [RelayCommand]
+    private async Task LoadAsync(CancellationToken ct)
     {
         try
         {
             _isLoadingSettings = true;
-            var s = await _settingsService.LoadAsync();
+            var s = await _settingsService.LoadAsync(ct);
             _loadedSettings = s;
             DefaultRecordCount = s.DefaultRecordCount;
             DefaultBatchSize = s.DefaultBatchSize;
             DefaultDop = s.DefaultDop;
             DarkTheme = s.DarkTheme;
             ReduceMotion = s.ReduceMotion;
-            PaletteId = s.PaletteId;
+            PaletteId = DesignThemeManager.ResolvePaletteId(s.PaletteId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigation cancelled the load.
         }
         catch (Exception ex)
         {
@@ -109,7 +127,7 @@ public sealed partial class SettingsViewModel(
                 _loadedSettings.ClientId,
                 _loadedSettings.TenantId,
                 DefaultRecordCount, DefaultBatchSize, DefaultDop,
-                DarkTheme, ReduceMotion, PaletteId);
+                DarkTheme, ReduceMotion, PaletteId, _loadedSettings.KeepRunSheetOpen);
 
             CancelPendingAppearanceSave();
             await _settingsService.SaveAsync(settings);
