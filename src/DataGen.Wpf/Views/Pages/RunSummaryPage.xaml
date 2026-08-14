@@ -1,6 +1,227 @@
+<!--
+    Run summary — 3d. The summary owns the errors; there is no error dialog.
+    Rejected rows group by cause, each group is checkable, and Retry scopes to the selection.
+-->
 <Page x:Class="Seedbomb.Views.Pages.RunSummaryPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Title="Run summary">
-    <TextBlock Text="Run summary" />
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:vm="clr-namespace:Seedbomb.ViewModels"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      d:DataContext="{d:DesignInstance Type=vm:RunViewModel}"
+      mc:Ignorable="d"
+      Background="{DynamicResource DG.Surface1}">
+
+    <Grid Margin="{DynamicResource DG.Pad.Page}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Run summary"/>
+            <TextBlock Style="{DynamicResource DG.PageSubtitle}" Text="{Binding RunMetaLine}"/>
+        </StackPanel>
+
+        <!--
+            Outcome banner. Warning variant when rejections exist; the success variant swaps
+            style + glyph via the same slot. "Nothing was rolled back" is load-bearing copy —
+            it is the first question every user asks.
+        -->
+        <Border Grid.Row="1" Margin="0,20,0,0"
+                Style="{Binding OutcomeBannerStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <ui:SymbolIcon Grid.Column="0" Symbol="{Binding OutcomeGlyph}" FontSize="16"
+                               Foreground="{Binding OutcomeBrush}" VerticalAlignment="Center"/>
+
+                <StackPanel Grid.Column="1" Margin="14,0,14,0">
+                    <TextBlock Style="{DynamicResource DG.CardTitle}"
+                               FontSize="{DynamicResource DG.Type.Subtitle}"
+                               Text="{Binding OutcomeHeadline}"/>
+                    <TextBlock Style="{DynamicResource DG.Secondary}"
+                               Foreground="{DynamicResource DG.WarningText}"
+                               Text="{Binding OutcomeDetail}"
+                               LineHeight="18" Margin="0,3,0,0"/>
+                </StackPanel>
+
+                <Button Grid.Column="2" Style="{DynamicResource DG.PrimaryButton}"
+                        Command="{Binding RetrySelectedCommand}"
+                        Content="{Binding RetryButtonLabel}"
+                        VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                <Button Grid.Column="3" Style="{DynamicResource DG.Button}"
+                        Command="{Binding ExportRejectedCsvCommand}"
+                        Content="Export CSV" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- Stat tiles -->
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding SummaryStats}" Margin="0,16,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Rows="1"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{DynamicResource DG.CardBorder}" Padding="16,13" Margin="0,0,14,0">
+                        <StackPanel>
+                            <TextBlock Style="{DynamicResource DG.GroupLabel}" Margin="0"
+                                       Text="{Binding Label}"/>
+                            <TextBlock Style="{DynamicResource DG.Stat}"
+                                       Foreground="{Binding ValueBrush}"
+                                       Text="{Binding Value}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Rejected rows, grouped by cause -->
+        <Border Grid.Row="3" Style="{DynamicResource DG.CardBorder}" Margin="0,16,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
+                        BorderThickness="0,0,0,1" Padding="16,13">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{DynamicResource DG.CardTitle}"
+                                   FontSize="{DynamicResource DG.Type.Subtitle}"
+                                   Text="Rejected rows" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{DynamicResource DG.Tertiary}"
+                                   Text="grouped by cause" Margin="12,0,0,0"
+                                   VerticalAlignment="Center"/>
+
+                        <ComboBox Grid.Column="3" Height="28" MinWidth="110" Margin="0,0,8,0"
+                                  ItemsSource="{Binding TableFilters}"
+                                  SelectedItem="{Binding SelectedTableFilter}"/>
+
+                        <ToggleButton Grid.Column="4" Style="{DynamicResource DG.Button}"
+                                      Height="28" Padding="11,0"
+                                      IsChecked="{Binding RetryableOnly}"
+                                      Content="Retryable only"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="1" Style="{DynamicResource DG.TableHeader}" Padding="16,9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="1" Style="{DynamicResource DG.TableHeaderText}" Text="Cause" Margin="12,0,0,0"/>
+                        <TextBlock Grid.Column="2" Style="{DynamicResource DG.TableHeaderText}" Text="Table" Margin="12,0,0,0"/>
+                        <TextBlock Grid.Column="3" Style="{DynamicResource DG.TableHeaderText}" Text="Rows"
+                                   HorizontalAlignment="Right" Margin="12,0,0,0"/>
+                        <TextBlock Grid.Column="4" Style="{DynamicResource DG.TableHeaderText}" Text="Disposition" Margin="12,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <ItemsControl Grid.Row="2" ItemsSource="{Binding RejectionGroups}">
+                    <ItemsControl.Template>
+                        <ControlTemplate TargetType="ItemsControl">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsPresenter/>
+                            </ScrollViewer>
+                        </ControlTemplate>
+                    </ItemsControl.Template>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{DynamicResource DG.TableRowTall}" Padding="16,9">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!--
+                                        Only retryable groups are checkable. IsEnabled=IsRetryable is
+                                        what makes "Retry N selected" honest: a fix-first group can
+                                        never be silently included in the retry scope.
+                                    -->
+                                    <CheckBox Grid.Column="0"
+                                              IsChecked="{Binding IsSelectedForRetry}"
+                                              IsEnabled="{Binding IsRetryable}"
+                                              VerticalAlignment="Center"/>
+
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                        <TextBlock Style="{DynamicResource DG.Cell}"
+                                                   Foreground="{DynamicResource DG.Text1}"
+                                                   Text="{Binding CauseText}"/>
+                                        <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                                   FontSize="{DynamicResource DG.Type.Micro}"
+                                                   Text="{Binding CauseHint}"
+                                                   TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="2" Style="{DynamicResource DG.Cell}"
+                                               Foreground="{DynamicResource DG.Text2}"
+                                               Text="{Binding TableName}" Margin="12,0,0,0"/>
+
+                                    <TextBlock Grid.Column="3" Style="{DynamicResource DG.Mono}"
+                                               Foreground="{DynamicResource DG.TextBody}"
+                                               Text="{Binding RowCount}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+
+                                    <TextBlock Grid.Column="4" Style="{DynamicResource DG.Tertiary}"
+                                               Foreground="{Binding DispositionBrush}"
+                                               Text="{Binding DispositionLabel}"
+                                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border Grid.Row="3" Style="{DynamicResource DG.CardFooter}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
+                                   Text="{Binding RejectionFooterLabel}"/>
+                        <Button Grid.Column="2" Style="{DynamicResource DG.LinkButton}"
+                                Command="{Binding ShowFullLogCommand}"
+                                Content="View full log" Margin="16,0,16,0"/>
+                        <Button Grid.Column="3" Style="{DynamicResource DG.LinkButton}"
+                                Command="{Binding OpenInHistoryCommand}"
+                                Content="Open in History"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
 </Page>

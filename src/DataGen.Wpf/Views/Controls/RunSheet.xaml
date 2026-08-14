@@ -1,4 +1,207 @@
+<!--
+    Run in progress — 3c. A content-blocking sheet, NOT a separate window: the wizard stays
+    visible behind the scrim so the user keeps their place. Host this as an overlay child of
+    GeneratePage's root Grid, visibility bound to RunViewModel.IsRunning.
+
+    Usage in GeneratePage.xaml:
+        <views:RunSheet Grid.RowSpan="99" DataContext="{Binding Run}"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}"/>
+-->
 <UserControl x:Class="Seedbomb.Views.Controls.RunSheet"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vm="clr-namespace:Seedbomb.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance Type=vm:RunViewModel}"
+             mc:Ignorable="d">
+
+    <Grid>
+        <!-- Scrim. Swallows input so the page behind is visible but inert. -->
+        <Border Style="{DynamicResource DG.Scrim.Style}" Focusable="False"/>
+
+        <Border Style="{DynamicResource DG.Sheet}"
+                Width="{DynamicResource DG.Size.SheetWidth}"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- ── Ring + headline stats ─────────────────────────── -->
+                <Grid Grid.Row="0" Margin="26,24,26,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!--
+                        Overall progress only. Per-table state lives in the rows below — one ring
+                        trying to express both was the thing that made the old dialog unreadable.
+                    -->
+                    <Grid Grid.Column="0"
+                          Width="{DynamicResource DG.Size.ProgressRing}"
+                          Height="{DynamicResource DG.Size.ProgressRing}">
+                        <ui:ProgressRing Progress="{Binding OverallPercent}"
+                                         IsIndeterminate="{Binding IsIndeterminate}"
+                                         Width="{DynamicResource DG.Size.ProgressRing}"
+                                         Height="{DynamicResource DG.Size.ProgressRing}"
+                                         Foreground="{DynamicResource DG.Accent}"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding OverallPercentLabel}"
+                                           FontSize="21" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource DG.Text1}"/>
+                                <TextBlock Text="%" FontSize="{DynamicResource DG.Type.Caption}"
+                                           Foreground="{DynamicResource DG.Text2}"
+                                           VerticalAlignment="Bottom" Margin="1,0,0,2"/>
+                            </StackPanel>
+                            <TextBlock Style="{DynamicResource DG.Mono}"
+                                       FontSize="{DynamicResource DG.Type.Label}"
+                                       Text="{Binding RowsWrittenLabel}"
+                                       HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Grid.Column="1" Margin="22,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Style="{DynamicResource DG.CardTitle}"
+                                   FontSize="{DynamicResource DG.Type.SheetTitle}"
+                                   Text="{Binding StatusHeadline}"/>
+                        <TextBlock Style="{DynamicResource DG.Secondary}"
+                                   Text="{Binding RunDescription}"
+                                   LineHeight="19" Margin="0,5,0,0"/>
+
+                        <ItemsControl ItemsSource="{Binding Metrics}" Margin="0,12,0,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,20,0">
+                                        <TextBlock Style="{DynamicResource DG.GroupLabel}"
+                                                   Margin="0"
+                                                   Text="{Binding Label}"/>
+                                        <TextBlock Style="{DynamicResource DG.Mono}"
+                                                   FontSize="{DynamicResource DG.Type.Subtitle}"
+                                                   Foreground="{Binding ValueBrush}"
+                                                   Text="{Binding Value}"
+                                                   Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ── Per-table progress ────────────────────────────── -->
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding Tables}" Margin="26,0,26,18">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,11">
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Style="{DynamicResource DG.Cell}"
+                                               Text="{Binding TableName}"
+                                               FontWeight="{Binding NameWeight}"
+                                               Foreground="{Binding NameBrush}"/>
+                                    <TextBlock Grid.Column="1" Style="{DynamicResource DG.Mono}"
+                                               Text="{Binding ProgressLabel}"
+                                               Foreground="{Binding StateBrush}"
+                                               Margin="8,0,8,0"/>
+                                    <TextBlock Grid.Column="2" Style="{DynamicResource DG.Tertiary}"
+                                               Text="{Binding StateLabel}"
+                                               Foreground="{Binding StateBrush}"/>
+                                </Grid>
+                                <ProgressBar Style="{DynamicResource DG.ProgressBar}"
+                                             Value="{Binding Percent}" Maximum="100"
+                                             Foreground="{Binding StateBrush}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- ── Activity log ──────────────────────────────────── -->
+                <Grid Grid.Row="2" Margin="26,0,26,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
+                            BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Style="{DynamicResource DG.GroupLabel}"
+                                       Margin="0" Text="Activity" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Style="{DynamicResource DG.LinkButton}"
+                                    Command="{Binding ShowFullLogCommand}"
+                                    Content="Show all"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Tail only; the full log opens in its own window. -->
+                    <Border Grid.Row="1" Style="{DynamicResource DG.CodeBox}"
+                            Padding="11,9" Margin="0,8,0,0">
+                        <ItemsControl ItemsSource="{Binding RecentActivity}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Style="{DynamicResource DG.Mono}"
+                                               Foreground="{Binding SeverityBrush}"
+                                               Text="{Binding Line}"
+                                               LineHeight="17"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+                </Grid>
+
+                <!-- ── Command bar ───────────────────────────────────── -->
+                <Border Grid.Row="4"
+                        Background="{DynamicResource DG.Surface2}"
+                        BorderBrush="{DynamicResource DG.Border}"
+                        BorderThickness="0,1,0,0"
+                        CornerRadius="0,0,9,9"
+                        Padding="26,14" Margin="0,18,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <CheckBox Grid.Column="0"
+                                  IsChecked="{Binding KeepWindowOpen}"
+                                  VerticalAlignment="Center">
+                            <TextBlock Style="{DynamicResource DG.Cell}"
+                                       Text="Keep window open until finished"/>
+                        </CheckBox>
+
+                        <Button Grid.Column="1" Style="{DynamicResource DG.Button}"
+                                Command="{Binding PauseCommand}"
+                                Content="{Binding PauseButtonLabel}"
+                                Margin="0,0,10,0"/>
+
+                        <Button Grid.Column="2" Style="{DynamicResource DG.DangerButton}"
+                                Command="{Binding CancelCommand}"
+                                Content="Cancel run"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

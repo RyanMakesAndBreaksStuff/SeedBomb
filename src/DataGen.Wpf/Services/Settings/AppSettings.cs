@@ -12,6 +12,7 @@ namespace Seedbomb.Services.Settings;
 /// <param name="DarkTheme">Whether dark theme is enabled.</param>
 /// <param name="ReduceMotion">Whether animations should be suppressed.</param>
 /// <param name="PaletteId">Selected color palette; see <see cref="Theme.DesignThemeManager.AvailablePalettes"/>.</param>
+/// <param name="KeepRunSheetOpen">When true, the run sheet stays up until the run finishes.</param>
 public record AppSettings(
     string OrgUrl,
     string ClientId,
@@ -21,7 +22,8 @@ public record AppSettings(
     int DefaultDop = 0,
     bool DarkTheme = false,
     bool ReduceMotion = false,
-    string PaletteId = Theme.DesignThemeManager.DefaultPaletteId)
+    string PaletteId = Theme.DesignThemeManager.DefaultPaletteId,
+    bool KeepRunSheetOpen = true)
 {
     /// <summary>Returns a default settings instance with empty credentials.</summary>
     public static AppSettings Default => new(
