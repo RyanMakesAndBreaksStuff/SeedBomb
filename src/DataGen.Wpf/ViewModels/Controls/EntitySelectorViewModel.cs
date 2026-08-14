@@ -41,7 +41,22 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
     public ObservableCollection<EntitySummary> SelectedEntities { get; } = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FooterLabel))]
     private string _filterText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FooterLabel))]
+    private bool _showCustomOnly;
+
+    /// <summary>Footer copy: "218 tables · 3 selected · custom".</summary>
+    public string FooterLabel
+    {
+        get
+        {
+            var customMark = ShowCustomOnly || SelectedEntities.Any(e => e.IsCustom) ? " · custom" : "";
+            return $"{Entities.Count} tables · {SelectedEntities.Count} selected{customMark}";
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
@@ -77,6 +92,7 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
             }
 
             RefreshFilter();
+            OnPropertyChanged(nameof(FooterLabel));
         }
         catch (OperationCanceledException)
         {
@@ -126,7 +142,17 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         }
 
         SelectedEntitiesChanged?.Invoke(this, []);
+        ClearCheckedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(FooterLabel));
     }
+
+    [RelayCommand]
+    private void ToggleCustomOnly() => ShowCustomOnly = !ShowCustomOnly;
+
+    [RelayCommand(CanExecute = nameof(CanClearSelection))]
+    private void ClearChecked() => ClearSelection();
+
+    private bool CanClearSelection() => SelectedEntities.Count > 0;
 
     private void ToggleSelectedEntity(EntitySummary entity)
     {
@@ -136,6 +162,8 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
             SelectedEntities.Add(entity);
 
         SelectedEntitiesChanged?.Invoke(this, [.. SelectedEntities]);
+        ClearCheckedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(FooterLabel));
     }
 
     private void SetSelectedEntity(EntitySummary entity, bool isSelected)
@@ -157,9 +185,13 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
             return;
 
         SelectedEntitiesChanged?.Invoke(this, [.. SelectedEntities]);
+        ClearCheckedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(FooterLabel));
     }
 
     partial void OnFilterTextChanged(string value) => RefreshFilter();
+
+    partial void OnShowCustomOnlyChanged(bool value) => RefreshFilter();
 
     private void AddItem(EntitySummary entity)
     {
@@ -182,12 +214,14 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
     {
         FilteredEntities.Clear();
         var filter = FilterText.Trim();
-        foreach (var item in EntityItems.Where(item => MatchesFilter(item.Entity, filter)))
+        foreach (var item in EntityItems.Where(item => MatchesFilter(item.Entity, filter, ShowCustomOnly)))
             FilteredEntities.Add(item);
     }
 
-    private static bool MatchesFilter(EntitySummary entity, string filter)
+    private static bool MatchesFilter(EntitySummary entity, string filter, bool customOnly)
     {
+        if (customOnly && !entity.IsCustom)
+            return false;
         if (string.IsNullOrWhiteSpace(filter))
             return true;
 
