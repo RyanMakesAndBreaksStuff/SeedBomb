@@ -12,6 +12,7 @@ namespace Seedbomb.Views.Windows;
 public partial class LoginWindow : FluentWindow
 {
     private readonly LoginWindowViewModel _vm;
+    private readonly ConnectionManagerViewModel _connections;
     private bool _drawerOpen;
     private TranslateTransform DrawerTranslate => (TranslateTransform)DrawerControl.RenderTransform;
 
@@ -23,10 +24,20 @@ public partial class LoginWindow : FluentWindow
         InitializeComponent();
 
         DrawerControl.DataContext = connectionManagerViewModel;
-        connectionManagerViewModel.DrawerCloseRequested += (_, _) => CloseDrawer();
+        _connections = connectionManagerViewModel;
+        _connections.DrawerCloseRequested += OnDrawerCloseRequested;
         viewModel.LoginSucceeded += OnLoginSucceeded;
         viewModel.OpenConnectionManagerRequested += (_, _) => OpenDrawer();
         Loaded += OnLoaded;
+        Closed += OnClosed;
+    }
+
+    private void OnDrawerCloseRequested(object? sender, EventArgs e) => CloseDrawer();
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        _connections.DrawerCloseRequested -= OnDrawerCloseRequested;
+        Closed -= OnClosed;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e) =>

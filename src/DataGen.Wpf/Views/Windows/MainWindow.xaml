@@ -1,169 +1,154 @@
+<!--
+    Shell — replaces Views/Windows/MainWindow.xaml.
+    Nav order and geometry from 1a. All values via DynamicResource DG.*; no literals.
+-->
 <ui:FluentWindow x:Class="Seedbomb.Views.Windows.MainWindow"
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:pages="clr-namespace:Seedbomb.Views.Pages"
-                 xmlns:local="clr-namespace:Seedbomb.Views.Controls"
+                 Title="SeedBomb — Mock data explosion"
+                 Width="1180" Height="780" MinWidth="1024" MinHeight="640"
+                 Background="{DynamicResource DG.Bg}"
                  ExtendsContentIntoTitleBar="True"
-                 WindowStyle="SingleBorderWindow"
-                 Title="DataGen"
-                 Icon="/seedbomb.ico"
-                 Width="1200"
-                 Height="750"
-                 MinWidth="960"
-                 MinHeight="640">
-    <Grid Background="{DynamicResource DG.Bg}">
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round"
+                 WindowStartupLocation="CenterScreen">
+
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Background="{DynamicResource DG.Surface2}"
-                BorderBrush="{DynamicResource DG.Border}"
-                BorderThickness="0,0,0,1">
-            <ui:TitleBar Title="SeedBomb - Mock data expplosion"
-                         Height="32"
-                         Background="{DynamicResource DG.Surface2}"
-                         Foreground="{DynamicResource DG.Text2}"
-                         ButtonsForeground="{DynamicResource DG.Text3}"
-                         Icon="{ui:ImageIcon 'pack://application:,,,/seedbomb_32x32.png'}"
-                         ShowMinimize="True"
-                         ShowMaximize="True"
-                         ShowClose="True" />
-        </Border>
+        <ui:TitleBar Grid.Row="0"
+                     Height="{DynamicResource DG.Size.TitleBar}"
+                     Background="{DynamicResource DG.TitleBar}"
+                     Title="SeedBomb — Mock data explosion"
+                     ShowMaximize="True" ShowMinimize="True">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/seedbomb.ico" Width="16" Height="16"/>
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
 
+        <!--
+            NavigationView owns the 260px pane. Footer holds Settings, and the account block
+            sits below the footer as PaneFooter content so it pins to the bottom of the pane.
+        -->
         <ui:NavigationView x:Name="RootNavigation"
                            Grid.Row="1"
-                           Background="{DynamicResource DG.Surface2}"
-                           Foreground="{DynamicResource DG.Text2}"
-                           BorderBrush="{DynamicResource DG.Border}"
-                           PaneDisplayMode="Top"
-                           IsTopSeparatorVisible="True"
-                           IsBackButtonVisible="Collapsed">
+                           OpenPaneLength="{DynamicResource DG.Size.NavPane}"
+                           IsPaneToggleVisible="True"
+                           IsBackButtonVisible="Collapsed"
+                           PaneDisplayMode="Left"
+                           FrameMargin="0"
+                           Background="{DynamicResource DG.Surface1}">
+
+            <ui:NavigationView.AutoSuggestBox>
+                <ui:AutoSuggestBox PlaceholderText="Find a setting or table"
+                                   Margin="8,6,8,12">
+                    <ui:AutoSuggestBox.Icon>
+                        <ui:SymbolIcon Symbol="Search24"/>
+                    </ui:AutoSuggestBox.Icon>
+                </ui:AutoSuggestBox>
+            </ui:NavigationView.AutoSuggestBox>
 
             <ui:NavigationView.MenuItems>
-                <ui:NavigationViewItem TargetPageType="{x:Type pages:GeneratePage}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="DataBarVertical24"
-                                       FontSize="16"
-                                       Margin="0,0,8,0" />
-                        <TextBlock Text="Generate"
-                                   FontSize="13"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+                <ui:NavigationViewItem Content="Generate"
+                                       TargetPageType="{x:Type pages:GeneratePage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Flash24"/>
+                    </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem TargetPageType="{x:Type pages:HistoryPage}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="History24"
-                                       FontSize="16"
-                                       Margin="0,0,8,0" />
-                        <TextBlock Text="History"
-                                   FontSize="13"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+
+                <!-- Rules is a first-class destination in 1a, not a dialog off Generate. -->
+                <ui:NavigationViewItem Content="Rules"
+                                       TargetPageType="{x:Type pages:RulesPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Options24"/>
+                    </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem TargetPageType="{x:Type pages:SettingsPage}">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Settings24"
-                                       FontSize="16"
-                                       Margin="0,0,8,0" />
-                        <TextBlock Text="Settings"
-                                   FontSize="13"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+
+                <ui:NavigationViewItem Content="Profiles"
+                                       TargetPageType="{x:Type pages:ProfilesPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Layer24"/>
+                    </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
-                <!-- No TargetPageType: NavigationViewItem is a plain ButtonBase here, acts on the
-                     currently displayed page instead of navigating. -->
-                <ui:NavigationViewItem Click="OnResetClick"
-                                       AutomationProperties.Name="Reset">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="ArrowReset24"
-                                       FontSize="16"
-                                       Margin="0,0,8,0" />
-                        <TextBlock Text="Reset"
-                                   FontSize="13"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
+
+                <ui:NavigationViewItem Content="History"
+                                       TargetPageType="{x:Type pages:HistoryPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="History24"/>
+                    </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
 
-            <ui:NavigationView.ContentOverlay>
-                <Grid>
-                    <ui:SnackbarPresenter x:Name="SnackbarPresenter" />
-                </Grid>
-            </ui:NavigationView.ContentOverlay>
+            <ui:NavigationView.FooterMenuItems>
+                <!--
+                    Connections is config, so it sits with Settings rather than in MenuItems.
+                    The account block below is a shortcut to the same page, not the only route.
+                -->
+                <ui:NavigationViewItem Content="Connections"
+                                       TargetPageType="{x:Type pages:ConnectionsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="PlugConnected24"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
 
+                <ui:NavigationViewItem Content="Settings"
+                                       TargetPageType="{x:Type pages:SettingsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Settings24"/>
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+            </ui:NavigationView.FooterMenuItems>
+
+            <!-- Account + environment. Click opens the connection manager. -->
+            <ui:NavigationView.PaneFooter>
+                <Button Style="{DynamicResource DG.LinkButton}"
+                        Command="{Binding OpenConnectionsCommand}"
+                        HorizontalContentAlignment="Stretch"
+                        Margin="8,8,8,4">
+                    <Border BorderBrush="{DynamicResource DG.Border}"
+                            BorderThickness="0,1,0,0"
+                            Padding="4,10,4,2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14"
+                                    Background="{DynamicResource DG.Accent}" Margin="0,0,10,0">
+                                <TextBlock Text="{Binding UserInitials}"
+                                           FontSize="{DynamicResource DG.Type.Micro}"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource DG.OnAccent}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding UserDisplayName}"
+                                           FontSize="{DynamicResource DG.Type.Caption}"
+                                           Foreground="{DynamicResource DG.TextNav}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding EnvironmentHost}"
+                                           FontSize="{DynamicResource DG.Type.Label}"
+                                           Foreground="{DynamicResource DG.Text3}"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Button>
+            </ui:NavigationView.PaneFooter>
         </ui:NavigationView>
 
-        <Border Grid.Row="1"
-                Panel.ZIndex="10"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,7,20,0"
-                Padding="8,4"
-                CornerRadius="6"
-                BorderThickness="0"
-                Cursor="Hand"
-                ToolTip="Switch connection"
-                AutomationProperties.Name="Switch connection"
-                MouseLeftButtonUp="OnConnectionHeaderClick">
-            <Border.Background>
-                <SolidColorBrush Color="Transparent" />
-            </Border.Background>
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <StackPanel Orientation="Horizontal">
-                <Border Width="28"
-                        Height="28"
-                        CornerRadius="14"
-                        Background="{DynamicResource DG.Accent}"
-                        Margin="0,0,9,0">
-                    <TextBlock Text="{Binding UserInitials}"
-                               Foreground="White"
-                               FontSize="11"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding UserDisplayName}"
-                               FontSize="12"
-                               Foreground="{DynamicResource DG.Text1}" />
-                    <TextBlock Text="{Binding OrgHost}"
-                               FontSize="10"
-                               Foreground="{DynamicResource DG.Text3}" />
-                </StackPanel>
-            </StackPanel>
-        </Border>
+        <!-- Snackbar host sits above the frame so run notifications float over any page. -->
+        <ui:SnackbarPresenter Grid.Row="1" x:Name="SnackbarPresenter"
+                              VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                              Margin="0,0,0,24"/>
 
         <ui:ContentDialogHost Grid.RowSpan="2" />
-
-        <!-- Scrim overlay (ZIndex 9) -->
-        <Rectangle x:Name="DrawerScrim"
-                   Grid.RowSpan="2"
-                   Fill="#80000000"
-                   Panel.ZIndex="9"
-                   Visibility="Collapsed"
-                   MouseDown="OnScrimClick" />
-
-        <!-- Connection Manager Drawer (ZIndex 10) -->
-        <local:ConnectionManagerDrawer x:Name="DrawerControl"
-                                        Grid.RowSpan="2"
-                                        Panel.ZIndex="10"
-                                        HorizontalAlignment="Right"
-                                        Width="500"
-                                        RenderTransformOrigin="0,0">
-            <local:ConnectionManagerDrawer.RenderTransform>
-                <TranslateTransform X="500" />
-            </local:ConnectionManagerDrawer.RenderTransform>
-        </local:ConnectionManagerDrawer>
     </Grid>
 </ui:FluentWindow>

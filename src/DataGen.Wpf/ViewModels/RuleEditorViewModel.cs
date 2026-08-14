@@ -106,6 +106,18 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>DI constructor for the Rules page. Call <c>LoadForProfileAsync</c> on navigate.</summary>
+    public RuleEditorViewModel()
+    {
+        _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
+        _allSettable = [];
+        _allExcluded = [];
+        _table = string.Empty;
+        _recordCount = 0;
+        _seed = 0;
+        _runId = string.Empty;
+    }
+
     // ── Picker ────────────────────────────────────────────────────────────────
 
     /// <summary>Eligible rule targets (RuleEligibility.Classify == Settable), filtered by <see cref="SearchText"/>.</summary>

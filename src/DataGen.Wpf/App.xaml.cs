@@ -14,6 +14,7 @@ using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
+using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Theme;
 using System.Windows;
 using Wpf.Ui;
@@ -165,23 +166,37 @@ public partial class App : Application
 
         // Windows — singleton so only one instance exists at a time
         sc.AddSingleton<MainWindow>();
-        sc.AddSingleton<LoginWindow>();
+        sc.AddSingleton<LoginWindow>(sp =>
+        {
+            var loginVm = ActivatorUtilities.CreateInstance<LoginWindowViewModel>(sp);
+            var loginConnections = ActivatorUtilities.CreateInstance<ConnectionManagerViewModel>(sp);
+            return new LoginWindow(loginVm, loginConnections);
+        });
 
         // Window ViewModels — singleton to match singleton window lifetime
         sc.AddSingleton<MainWindowViewModel>();
 
         // Page/control ViewModels — transient so each page/control gets a fresh instance
         sc.AddTransient<LoginWindowViewModel>();
-        sc.AddTransient<ConnectionManagerViewModel>();
+        sc.AddSingleton<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
         sc.AddTransient<GenerateViewModel>();
         sc.AddTransient<ProfilesViewModel>();
         sc.AddTransient<HistoryViewModel>();
         sc.AddTransient<SettingsViewModel>();
 
+        sc.AddSingleton<IAppNavigator, NavigationViewNavigator>();
+        sc.AddSingleton<RulesNavigationRequest>();
+        sc.AddSingleton<RunViewModel>();
+        sc.AddTransient<RuleEditorViewModel>();
+
         // Real pages — NavigationView resolves these from DI via SetServiceProvider
         sc.AddTransient<Seedbomb.Views.Pages.GeneratePage>();
         sc.AddTransient<Seedbomb.Views.Pages.HistoryPage>();
         sc.AddTransient<Seedbomb.Views.Pages.SettingsPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.ProfilesPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.RulesPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.RunSummaryPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.ConnectionsPage>();
     }
 }
