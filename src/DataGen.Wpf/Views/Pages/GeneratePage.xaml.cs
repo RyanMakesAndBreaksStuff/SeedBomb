@@ -1,15 +1,19 @@
 using System.Windows.Controls;
 using DataGen.Core.Contracts;
 using Seedbomb.ViewModels;
+using Wpf.Ui.Abstractions.Controls;
 
 namespace Seedbomb.Views.Pages;
 
 /// <summary>
 /// Four-step wizard page: tables → volume &amp; rules → review → run.
 /// </summary>
-public partial class GeneratePage : Page
+public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
 {
     private readonly GenerateViewModel _vm;
+
+    /// <inheritdoc />
+    public GenerateViewModel ViewModel => _vm;
 
     /// <summary>Initialises the page and wires the ViewModel.</summary>
     public GeneratePage(GenerateViewModel viewModel)

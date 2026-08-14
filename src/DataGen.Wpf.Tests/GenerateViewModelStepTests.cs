@@ -5,10 +5,12 @@ using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
+using Seedbomb.Views.Pages;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Wpf.Ui;
@@ -358,6 +360,67 @@ public sealed class GenerateViewModelStepTests
         generationMock.Verify(
             g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task OnNavigatedTo_does_not_overwrite_batch_when_tables_already_selected()
+    {
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AppSettings("", "", "", 10, 250, 4));
+        var viewModel = new GenerateViewModel(
+            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            settingsMock.Object, Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
+            Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
+            new RunViewModel(Mock.Of<IWpfGenerationService>()));
+
+        await viewModel.OnNavigatedToAsync();
+        viewModel.BatchSize = 900;
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        viewModel.CurrentStep = 1;
+
+        await viewModel.OnNavigatedToAsync();
+
+        Assert.Equal(900, viewModel.BatchSize);
+        Assert.Equal(1, viewModel.CurrentStep);
+        Assert.Single(viewModel.SelectedEntities);
+    }
+
+    [Fact]
+    public void OnEntitiesChanged_same_set_does_not_reset_step()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        var account = new EntitySummary("account", "Account", false);
+        viewModel.OnEntitiesChanged([account]);
+        viewModel.CurrentStep = 2;
+        viewModel.IsRulesLoaded = true;
+
+        viewModel.OnEntitiesChanged([account]);
+
+        Assert.Equal(2, viewModel.CurrentStep);
+        Assert.True(viewModel.IsRulesLoaded);
+    }
+
+    [Fact]
+    public async Task OnNavigatedFrom_writes_working_set_request()
+    {
+        var request = new RulesNavigationRequest();
+        var viewModel = new GenerateViewModel(
+            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
+            Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
+            new RunViewModel(Mock.Of<IWpfGenerationService>()),
+            request,
+            Mock.Of<IAppNavigator>());
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.OnNavigatedFromAsync();
+
+        Assert.NotNull(request.Profile);
+        Assert.Equal(typeof(GeneratePage), request.ReturnPage);
+        Assert.NotNull(request.OnSaved);
     }
 
     [Fact]

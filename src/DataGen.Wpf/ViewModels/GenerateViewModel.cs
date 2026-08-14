@@ -133,10 +133,17 @@ public sealed partial class GenerateViewModel : ViewModelBase
     {
         var settings = await _settingsService.LoadAsync();
         DefaultRecordCount = settings.DefaultRecordCount;
-        BatchSize = settings.DefaultBatchSize;
-        MaxParallelism = settings.DefaultDop;
 
-        // §07 draft: restore autosave when the wizard is entered (applied after metadata loads).
+        var wizardDirty = SelectedEntities.Count > 0 || CurrentStep > 0;
+        if (!wizardDirty)
+        {
+            BatchSize = settings.DefaultBatchSize;
+            MaxParallelism = settings.DefaultDop;
+        }
+
+        if (wizardDirty)
+            return;
+
         try
         {
             _restoredDraft = await _profileService.LoadDraftAsync();
@@ -148,6 +155,23 @@ public sealed partial class GenerateViewModel : ViewModelBase
             _logger.LogDebug(ex, "Draft profile load skipped");
             _restoredDraft = null;
         }
+    }
+
+    /// <inheritdoc />
+    public override Task OnNavigatedFromAsync()
+    {
+        if (_rulesRequest is not null && SelectedEntities.Count > 0)
+        {
+            _rulesRequest.Profile = BuildProfileSnapshot(
+                string.Equals(ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
+                    ? "working-set"
+                    : ActiveProfileName);
+            _rulesRequest.TableName = SelectedEntities[0].LogicalName;
+            _rulesRequest.OnSaved = ApplySavedRulesProfile;
+            _rulesRequest.ReturnPage = typeof(GeneratePage);
+        }
+
+        return Task.CompletedTask;
     }
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -477,6 +501,10 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="entities">Newly selected entities.</param>
     public void OnEntitiesChanged(IReadOnlyList<EntitySummary> entities)
     {
+        var incoming = entities.Select(e => e.LogicalName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var current = SelectedEntities.Select(e => e.LogicalName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var sameSet = incoming.SetEquals(current);
+
         SelectedEntities = entities;
         _fieldOverrides?.SetEntities(entities, _defaultRecordCount);
         OnPropertyChanged(nameof(SelectedTableRows));
@@ -486,6 +514,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _queueCurrentEntity = null;
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
+
+        if (sameSet)
+            return;
 
         IsRulesLoaded = false;
         CurrentStep = 0;
@@ -824,6 +855,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     private void ApplySavedRulesProfile(Profile profile)
     {
+        ActiveProfileName = profile.Name;
         if (_entityMetadata.Count > 0)
         {
             var report = ProfileImport.ValidateAgainstMetadata(profile, _entityMetadata, RunId);

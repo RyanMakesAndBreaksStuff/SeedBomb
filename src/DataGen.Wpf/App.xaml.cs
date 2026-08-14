@@ -180,7 +180,7 @@ public partial class App : Application
         sc.AddTransient<LoginWindowViewModel>();
         sc.AddSingleton<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
-        sc.AddTransient<GenerateViewModel>();
+        sc.AddSingleton<GenerateViewModel>();
         sc.AddTransient<ProfilesViewModel>();
         sc.AddTransient<HistoryViewModel>();
         sc.AddTransient<SettingsViewModel>();
@@ -191,7 +191,7 @@ public partial class App : Application
         sc.AddTransient<RuleEditorViewModel>();
 
         // Real pages — NavigationView resolves these from DI via SetServiceProvider
-        sc.AddTransient<Seedbomb.Views.Pages.GeneratePage>();
+        sc.AddSingleton<Seedbomb.Views.Pages.GeneratePage>();
         sc.AddTransient<Seedbomb.Views.Pages.HistoryPage>();
         sc.AddTransient<Seedbomb.Views.Pages.SettingsPage>();
         sc.AddTransient<Seedbomb.Views.Pages.ProfilesPage>();
