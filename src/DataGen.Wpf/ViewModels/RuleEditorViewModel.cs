@@ -1,9 +1,17 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Text.Json;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
+using Seedbomb.Services.Navigation;
+using Seedbomb.Services.Profiles;
+using Seedbomb.Views.Pages;
 
 namespace Seedbomb.ViewModels;
 
@@ -14,13 +22,46 @@ namespace Seedbomb.ViewModels;
 /// <param name="IsSelectable">True = eligible rule target.</param>
 /// <param name="DisabledReason">Copy shown when <paramref name="IsSelectable"/> is false; null when selectable.</param>
 public sealed record PickerColumn(string LogicalName, string DisplayName, string TypeLabel,
-    bool IsSelectable, string? DisabledReason);
+    bool IsSelectable, string? DisabledReason)
+{
+    /// <summary>Handoff alias for <see cref="DisplayName"/>.</summary>
+    public string Name => DisplayName;
+
+    /// <summary>Handoff alias for <see cref="TypeLabel"/>.</summary>
+    public string TypeDetail => TypeLabel;
+
+    /// <summary>Mapped / Unmapped / Required / Disabled. XAML maps to DG.* — no Brush.</summary>
+    public string StateKey { get; init; } = "Unmapped";
+
+    /// <summary>CollectionView group: Mapped, Unmapped · required, or Unmapped.</summary>
+    public string GroupName { get; init; } = "Unmapped";
+}
 
 /// <summary>One selectable operation chip in the rule editor (Mock F2 op cards).</summary>
 /// <param name="Op">Wire op id (<c>constant</c>, <c>oneOf</c>, …).</param>
 /// <param name="Title">Short label shown on the card.</param>
 /// <param name="Hint">One-line description under the title.</param>
 public sealed record OpOption(string Op, string Title, string Hint);
+
+/// <summary>Chip for Mapped / Required / All column filters.</summary>
+/// <param name="Key">Mapped, Required, or All.</param>
+/// <param name="Label">Chip label including count.</param>
+/// <param name="Count">Columns in this chip.</param>
+public sealed record ColumnFilterMode(string Key, string Label, int Count);
+
+/// <summary>One table in the Rules header switcher.</summary>
+/// <param name="LogicalName">Table logical name.</param>
+/// <param name="DisplayName">Label shown in the combo (logical name until metadata loads).</param>
+public sealed record RuleTableOption(string LogicalName, string DisplayName);
+
+/// <summary>One preview sample row. <see cref="ValueKind"/> is Blank or Value — no brush.</summary>
+/// <param name="DisplayValue">Rendered sample, or <c>— blank —</c>.</param>
+/// <param name="ValueKind">Blank or Value. XAML maps to DG.* — no Brush.</param>
+public sealed record PreviewRow(string DisplayValue, string ValueKind);
+
+/// <summary>Insertable pattern token chip.</summary>
+/// <param name="Name">Token text appended to the template, e.g. <c>{seq}</c>.</param>
+public sealed record TokenChip(string Name);
 
 /// <summary>One checkable option for a Choice/Two-Options <c>oneOf</c> rule.</summary>
 public sealed partial class OptionChoice : ObservableObject
@@ -61,10 +102,22 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     private readonly Dictionary<string, AttributeMetadata> _byName;
     private readonly List<PickerColumn> _allSettable;
     private readonly List<PickerColumn> _allExcluded;
-    private readonly string _table;
-    private readonly int _recordCount;
-    private readonly int _seed;
-    private readonly string _runId;
+    private readonly Dictionary<string, EntityMetadata> _entities = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IMetadataProvider? _metadata;
+    private readonly IProfileService? _profiles;
+    private readonly IAppNavigator? _navigator;
+    private readonly RulesNavigationRequest? _request;
+
+    private string _table;
+    private int _recordCount;
+    private int _seed;
+    private string _runId;
+    private string _filterKey = "All";
+    private int _previewSalt;
+    private bool _suppressTableChange;
+    private Profile? _profile;
+    private Action<Profile>? _onSaved;
+    private Type? _returnPage;
 
     private IReadOnlyList<RuleMessage> _messages = [];
     private IReadOnlyList<string> _previewValues = [];
@@ -80,43 +133,116 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(meta);
         ArgumentNullException.ThrowIfNull(runId);
 
-        _table = meta.LogicalName ?? string.Empty;
-        _recordCount = recordCount;
-        _seed = seed;
-        _runId = runId;
-
-        var attrs = meta.Attributes ?? [];
-        _byName = attrs.Where(a => a.LogicalName is not null)
-            .ToDictionary(a => a.LogicalName!, StringComparer.OrdinalIgnoreCase);
-
-        // Alternate-key membership isn't visible to RuleEligibility.Classify (single-attribute
-        // signature — see DataGen.Bulk.Tests/RuledGenerationTests.cs). BulkCreator rejects rules on
-        // these columns unconditionally at preflight, so the picker excludes them too rather than
-        // letting users configure a rule that can never be saved to a run.
-        var altKeyAttrs = (meta.Keys ?? [])
-            .SelectMany(k => k.KeyAttributes ?? [])
-            .ToHashSet(StringComparer.Ordinal);
-
-        _allSettable = [];
-        _allExcluded = [];
-        foreach (var attr in attrs)
-        {
-            var column = BuildPickerColumn(attr, altKeyAttrs);
-            (column.IsSelectable ? _allSettable : _allExcluded).Add(column);
-        }
-    }
-
-    /// <summary>DI constructor for the Rules page. Call <c>LoadForProfileAsync</c> on navigate.</summary>
-    public RuleEditorViewModel()
-    {
         _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
         _allSettable = [];
         _allExcluded = [];
         _table = string.Empty;
-        _recordCount = 0;
-        _seed = 0;
-        _runId = string.Empty;
+        _recordCount = recordCount;
+        _seed = seed;
+        _runId = runId;
+        ResetFromMetadata(meta);
     }
+
+    /// <summary>DI constructor for the Rules page. Call <see cref="LoadForProfileAsync"/> on navigate.</summary>
+    [ActivatorUtilitiesConstructor]
+    public RuleEditorViewModel(
+        IMetadataProvider metadata,
+        IProfileService profiles,
+        IAppNavigator navigator,
+        RulesNavigationRequest request)
+    {
+        _metadata = metadata;
+        _profiles = profiles;
+        _navigator = navigator;
+        _request = request;
+        _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
+        _allSettable = [];
+        _allExcluded = [];
+        _table = string.Empty;
+        _recordCount = 10;
+        _seed = 42;
+        _runId = "rules-preview";
+    }
+
+    // ── Handoff aliases (lock 22) ────────────────────────────────────────────
+
+    /// <summary>Handoff alias for <see cref="SearchText"/>.</summary>
+    public string ColumnFilter
+    {
+        get => SearchText;
+        set => SearchText = value;
+    }
+
+    /// <summary>Handoff alias for <see cref="AvailableOps"/>.</summary>
+    public IReadOnlyList<string> AvailableOperations => AvailableOps;
+
+    /// <summary>Handoff alias for <see cref="SelectedOp"/>.</summary>
+    public string SelectedOperation
+    {
+        get => SelectedOp;
+        set => SelectedOp = value;
+    }
+
+    /// <summary>Handoff alias for <see cref="Template"/>.</summary>
+    public string TemplateExpression
+    {
+        get => Template;
+        set => Template = value;
+    }
+
+    /// <summary>True when the selected op is <c>pattern</c> — shows the template block.</summary>
+    public bool IsTemplateOperation => SelectedOp == "pattern";
+
+    // ── Page-scoped surface ──────────────────────────────────────────────────
+
+    [ObservableProperty]
+    private string _profileName = "Untitled";
+
+    [ObservableProperty]
+    private RuleTableOption? _selectedTable;
+
+    /// <summary>Tables in the current profile (header switcher).</summary>
+    public ObservableCollection<RuleTableOption> Tables { get; } = [];
+
+    /// <summary>Mapped / Required / All chips.</summary>
+    public ObservableCollection<ColumnFilterMode> ColumnFilterModes { get; } = [];
+
+    /// <summary>Live preview rows mapped from <see cref="PreviewValues"/>.</summary>
+    public ObservableCollection<PreviewRow> PreviewRows { get; } = [];
+
+    /// <summary>Insertable pattern tokens.</summary>
+    public ObservableCollection<TokenChip> AvailableTokens { get; } = [new("{seq}"), new("{runId}"), new("{n}")];
+
+    /// <summary>Collision strategies. Bind-only — Core has no FieldRule member (lock 16).</summary>
+    public IReadOnlyList<string> CollisionStrategies { get; } = ["Keep first"];
+
+    /// <summary>Case transforms. Bind-only — Core has no FieldRule member (lock 16).</summary>
+    public IReadOnlyList<string> CaseTransforms { get; } = ["None"];
+
+    [ObservableProperty]
+    private string _selectedCollisionStrategy = "Keep first";
+
+    [ObservableProperty]
+    private string _selectedCaseTransform = "None";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BlankRateLabel))]
+    private bool _allowBlanks;
+
+    /// <summary>Derived AllowBlanks copy. Bind-only — no Core effect (lock 16).</summary>
+    public string BlankRateLabel => AllowBlanks ? "Leave blank for some rows" : "Never leave blank";
+
+    [ObservableProperty]
+    private bool _hasDependencyNote;
+
+    [ObservableProperty]
+    private string _dependencyNote = "";
+
+    /// <summary>Preview pane footer — sampled from the table's planned row count.</summary>
+    public string PreviewFooterLabel => $"Sampled from {_recordCount:N0} rows";
+
+    /// <summary>Grouped view. Null after the metadata ctor — tests must not touch it.</summary>
+    public ICollectionView? ColumnsView { get; private set; }
 
     // ── Picker ────────────────────────────────────────────────────────────────
 
@@ -131,8 +257,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject
 
     partial void OnSearchTextChanged(string value)
     {
+        OnPropertyChanged(nameof(ColumnFilter));
         OnPropertyChanged(nameof(SettableColumns));
         OnPropertyChanged(nameof(ExcludedColumns));
+        ColumnsView?.Refresh();
     }
 
     [ObservableProperty]
@@ -156,7 +284,15 @@ public sealed partial class RuleEditorViewModel : ObservableObject
 
         OnPropertyChanged(nameof(AvailableOps));
         OnPropertyChanged(nameof(AvailableOpOptions));
+        OnPropertyChanged(nameof(AvailableOperations));
         SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
+        if (value is not null
+            && TryGetProfileColumns(out var cols)
+            && cols.TryGetValue(value.LogicalName, out var existing))
+        {
+            ApplyExistingRule(existing);
+        }
+
         Revalidate();
     }
 
@@ -174,7 +310,12 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedOp = string.Empty;
 
-    partial void OnSelectedOpChanged(string value) => Revalidate();
+    partial void OnSelectedOpChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedOperation));
+        OnPropertyChanged(nameof(IsTemplateOperation));
+        Revalidate();
+    }
 
     [ObservableProperty]
     private string _constantText = string.Empty;
@@ -182,7 +323,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject
 
     [ObservableProperty]
     private string _template = string.Empty;
-    partial void OnTemplateChanged(string value) => Revalidate();
+    partial void OnTemplateChanged(string value)
+    {
+        OnPropertyChanged(nameof(TemplateExpression));
+        Revalidate();
+    }
 
     [ObservableProperty]
     private string _minText = string.Empty;
@@ -200,7 +345,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     private string _stepText = string.Empty;
     partial void OnStepTextChanged(string value) => Revalidate();
 
-    /// <summary>Checkable option subset for Choice/Two-Options <c>oneOf</c> rules.</summary>
+    /// <summary>Checkable option subset for Choice/Two-Options <c>oneOf</c> rule.</summary>
     public ObservableCollection<OptionChoice> Options { get; } = [];
 
     [ObservableProperty]
@@ -269,6 +414,218 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>True when <paramref name="column"/> passes the active search + chip filter.</summary>
+    public bool MatchesColumnFilter(PickerColumn column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        if (!string.IsNullOrWhiteSpace(SearchText)
+            && !column.LogicalName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+            && !column.DisplayName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return _filterKey switch
+        {
+            "Required" => IsRequired(column),
+            // Metadata ctor has no profile: keep settable columns visible so required-unmapped
+            // (and the rest of the picker) stay testable without a ColumnsView.
+            "Mapped" => IsMapped(column) || IsRequired(column) || _profile is null,
+            _ => true,
+        };
+    }
+
+    /// <summary>
+    /// Reads <see cref="RulesNavigationRequest"/>, then loads tables + metadata.
+    /// Creates <see cref="ColumnsView"/> only on this path (lock 24).
+    /// </summary>
+    public async Task LoadForProfileAsync(CancellationToken ct = default)
+    {
+        _onSaved = _request?.OnSaved;
+        _returnPage = _request?.ReturnPage;
+        var profile = _request?.Profile;
+        var tableName = _request?.TableName;
+        _request?.Clear();
+
+        if (profile is null)
+        {
+            _profile = null;
+            _onSaved = null;
+            ProfileName = "No profile selected";
+            _suppressTableChange = true;
+            try
+            {
+                Tables.Clear();
+                SelectedTable = null;
+            }
+            finally
+            {
+                _suppressTableChange = false;
+            }
+
+            SelectedColumn = null;
+            _allSettable.Clear();
+            _allExcluded.Clear();
+            OnPropertyChanged(nameof(SettableColumns));
+            OnPropertyChanged(nameof(ExcludedColumns));
+            ColumnFilterModes.Clear();
+            ColumnsView = null;
+            OnPropertyChanged(nameof(ColumnsView));
+            SaveProfileCommand.NotifyCanExecuteChanged();
+            return;
+        }
+
+        ct.ThrowIfCancellationRequested();
+
+        _profile = profile;
+        ProfileName = string.IsNullOrWhiteSpace(profile.Name) ? "Untitled" : profile.Name;
+        if (profile.Seed is int seed)
+            _seed = seed;
+
+        _suppressTableChange = true;
+        try
+        {
+            Tables.Clear();
+            foreach (var table in profile.Tables)
+                Tables.Add(new RuleTableOption(table.Table, table.Table));
+
+            SelectedTable = Tables.FirstOrDefault(t =>
+                    string.Equals(t.LogicalName, tableName, StringComparison.OrdinalIgnoreCase))
+                ?? Tables.FirstOrDefault();
+        }
+        finally
+        {
+            _suppressTableChange = false;
+        }
+
+        if (SelectedTable is null || _metadata is null)
+        {
+            SaveProfileCommand.NotifyCanExecuteChanged();
+            return;
+        }
+
+        ApplyTableCounts(SelectedTable.LogicalName);
+
+        var names = Tables.Select(t => t.LogicalName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var list = await _metadata.GetEntitiesAsync(names, ct);
+        _entities.Clear();
+        foreach (var entity in list)
+        {
+            if (entity.LogicalName is not null)
+                _entities[entity.LogicalName] = entity;
+        }
+
+        if (!_entities.TryGetValue(SelectedTable.LogicalName, out var meta))
+        {
+            SaveProfileCommand.NotifyCanExecuteChanged();
+            return;
+        }
+
+        ResetFromMetadata(meta);
+
+        ColumnsView = CollectionViewSource.GetDefaultView(_allSettable);
+        ColumnsView.Filter = o => o is PickerColumn c && MatchesColumnFilter(c);
+        if (ColumnsView is CollectionView view)
+        {
+            using (view.DeferRefresh())
+            {
+                view.GroupDescriptions.Clear();
+                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
+            }
+        }
+
+        OnPropertyChanged(nameof(ColumnsView));
+        SaveProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSelectedTableChanged(RuleTableOption? value)
+    {
+        if (_suppressTableChange || value is null)
+            return;
+
+        ApplyTableCounts(value.LogicalName);
+        if (!_entities.TryGetValue(value.LogicalName, out var meta))
+            return;
+
+        ResetFromMetadata(meta);
+        ColumnsView?.Refresh();
+        OnPropertyChanged(nameof(PreviewFooterLabel));
+    }
+
+    [RelayCommand]
+    private void SetColumnFilterMode(ColumnFilterMode? mode)
+    {
+        if (mode is null || string.IsNullOrWhiteSpace(mode.Key))
+            return;
+
+        _filterKey = mode.Key;
+        if (ColumnsView is CollectionView view)
+        {
+            using (view.DeferRefresh())
+            {
+                view.GroupDescriptions.Clear();
+                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
+            }
+        }
+
+        ColumnsView?.Refresh();
+    }
+
+    [RelayCommand]
+    private void InsertToken(TokenChip? token)
+    {
+        if (token is null)
+            return;
+        Template += token.Name;
+    }
+
+    [RelayCommand]
+    private void RerollPreview()
+    {
+        _previewSalt++;
+        Revalidate();
+    }
+
+    [RelayCommand]
+    private void NavigateToProfiles() => _navigator?.Navigate(_returnPage ?? typeof(ProfilesPage));
+
+    private bool CanSaveProfile() => _profiles is not null && _profile is not null && CanSave;
+
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
+    private async Task SaveProfileAsync(CancellationToken ct)
+    {
+        if (_profiles is null || _profile is null || SelectedColumn is null)
+            return;
+
+        var rule = BuildRule();
+        if (rule is null)
+            return;
+
+        var tables = _profile.Tables.ToList();
+        var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
+        if (idx < 0)
+            return;
+
+        var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+        cols[SelectedColumn.LogicalName] = rule;
+        tables[idx] = tables[idx] with { Columns = cols };
+        _profile = _profile with { Tables = tables };
+
+        // Generate working-set snapshots are not in the store — callback only, no disk write.
+        var names = await _profiles.ListAsync(ct);
+        if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+            await _profiles.SaveAsync(_profile, ct);
+
+        _onSaved?.Invoke(_profile);
+
+        if (_entities.TryGetValue(_table, out var meta))
+        {
+            ResetFromMetadata(meta);
+            ColumnsView?.Refresh();
+        }
+    }
+
     private void ApplyOneOfValues(IReadOnlyList<JsonElement> values)
     {
         if (Options.Count > 0)
@@ -332,9 +689,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject
                 if (result.IsValid && result.EffectiveRule is not null)
                 {
                     _effectiveRule = result.EffectiveRule;
+                    var previewSeed = _seed + _previewSalt;
                     for (var row = 0; row < 3; row++)
                     {
-                        var value = RuleValueGenerator.Evaluate(result.EffectiveRule, attr, _seed, _table, row, _runId);
+                        var value = RuleValueGenerator.Evaluate(result.EffectiveRule, attr, previewSeed, _table, row, _runId);
                         preview.Add(FormatPreview(value));
                     }
                 }
@@ -343,13 +701,31 @@ public sealed partial class RuleEditorViewModel : ObservableObject
 
         _messages = messages;
         _previewValues = preview;
+        RebuildPreviewRows();
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(HasMessages));
         OnPropertyChanged(nameof(InfoBarMessage));
         OnPropertyChanged(nameof(InfoBarIsError));
         OnPropertyChanged(nameof(PreviewValues));
         OnPropertyChanged(nameof(CanSave));
+        SaveProfileCommand.NotifyCanExecuteChanged();
     }
+
+    private void RebuildPreviewRows()
+    {
+        PreviewRows.Clear();
+        foreach (var value in _previewValues)
+        {
+            if (IsBlankPreview(value))
+                PreviewRows.Add(new PreviewRow("— blank —", "Blank"));
+            else
+                PreviewRows.Add(new PreviewRow(value, "Value"));
+        }
+    }
+
+    private static bool IsBlankPreview(string value) =>
+        string.IsNullOrWhiteSpace(value)
+        || value is "(null)" or "(omitted)";
 
     private FieldRule? TryBuildDraft(AttributeMetadata attr, string op) => op switch
     {
@@ -437,16 +813,106 @@ public sealed partial class RuleEditorViewModel : ObservableObject
 
     // ── Picker copy (§3.2) ───────────────────────────────────────────────────
 
-    private static PickerColumn BuildPickerColumn(AttributeMetadata attr, ISet<string> altKeyAttrs)
+    private void ResetFromMetadata(EntityMetadata meta)
+    {
+        _table = meta.LogicalName ?? string.Empty;
+        var attrs = meta.Attributes ?? [];
+        _byName.Clear();
+        foreach (var attr in attrs.Where(a => a.LogicalName is not null))
+            _byName[attr.LogicalName!] = attr;
+
+        var altKeyAttrs = (meta.Keys ?? [])
+            .SelectMany(k => k.KeyAttributes ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+
+        _allSettable.Clear();
+        _allExcluded.Clear();
+        foreach (var attr in attrs)
+        {
+            var column = BuildPickerColumn(attr, altKeyAttrs);
+            (column.IsSelectable ? _allSettable : _allExcluded).Add(column);
+        }
+
+        RebuildFilterChips();
+        OnPropertyChanged(nameof(SettableColumns));
+        OnPropertyChanged(nameof(ExcludedColumns));
+        OnPropertyChanged(nameof(PreviewFooterLabel));
+    }
+
+    private PickerColumn BuildPickerColumn(AttributeMetadata attr, ISet<string> altKeyAttrs)
     {
         var name = attr.LogicalName ?? string.Empty;
         var display = attr.DisplayName?.UserLocalizedLabel?.Label ?? name;
         var eligibility = RuleEligibility.Classify(attr);
 
-        if (eligibility.IsSettable && altKeyAttrs.Contains(name))
-            return new PickerColumn(name, display, TypeLabelFor(attr), false, "Alternate key — rejected before generation begins.");
+        var selectable = eligibility.IsSettable && !altKeyAttrs.Contains(name);
+        var disabledReason = eligibility.IsSettable && altKeyAttrs.Contains(name)
+            ? "Alternate key — rejected before generation begins."
+            : ReasonText(eligibility.Reason);
 
-        return new PickerColumn(name, display, TypeLabelFor(attr), eligibility.IsSettable, ReasonText(eligibility.Reason));
+        var required = IsRequiredLevel(attr);
+        var mapped = selectable && IsMappedName(name);
+        var (stateKey, groupName) = ResolveState(selectable, mapped, required);
+
+        return new PickerColumn(name, display, TypeLabelFor(attr), selectable, disabledReason)
+        {
+            StateKey = stateKey,
+            GroupName = groupName,
+        };
+    }
+
+    private static (string StateKey, string GroupName) ResolveState(bool selectable, bool mapped, bool required)
+    {
+        if (!selectable)
+            return ("Disabled", "Disabled");
+        if (mapped)
+            return ("Mapped", "Mapped");
+        if (required)
+            return ("Required", "Unmapped · required");
+        return ("Unmapped", "Unmapped");
+    }
+
+    private void RebuildFilterChips()
+    {
+        var mapped = _allSettable.Count(c => c.GroupName == "Mapped");
+        var required = _allSettable.Count(IsRequired);
+        var all = _allSettable.Count;
+        ColumnFilterModes.Clear();
+        ColumnFilterModes.Add(new ColumnFilterMode("Mapped", $"Mapped ({mapped})", mapped));
+        ColumnFilterModes.Add(new ColumnFilterMode("Required", $"Required ({required})", required));
+        ColumnFilterModes.Add(new ColumnFilterMode("All", $"All ({all})", all));
+    }
+
+    private void ApplyTableCounts(string tableName)
+    {
+        var table = _profile?.Tables.FirstOrDefault(t =>
+            string.Equals(t.Table, tableName, StringComparison.OrdinalIgnoreCase));
+        if (table is not null)
+            _recordCount = table.Count;
+        OnPropertyChanged(nameof(PreviewFooterLabel));
+    }
+
+    private bool IsRequired(PickerColumn column) =>
+        _byName.TryGetValue(column.LogicalName, out var attr) && IsRequiredLevel(attr);
+
+    private static bool IsRequiredLevel(AttributeMetadata attr) =>
+        attr.RequiredLevel?.Value is AttributeRequiredLevel.SystemRequired
+            or AttributeRequiredLevel.ApplicationRequired;
+
+    private bool IsMapped(PickerColumn column) => IsMappedName(column.LogicalName);
+
+    private bool IsMappedName(string logicalName) =>
+        TryGetProfileColumns(out var cols) && cols.ContainsKey(logicalName);
+
+    private bool TryGetProfileColumns(out Dictionary<string, FieldRule> cols)
+    {
+        cols = [];
+        var table = _profile?.Tables.FirstOrDefault(t =>
+            string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
+        if (table?.Columns is null)
+            return false;
+        cols = table.Columns;
+        return true;
     }
 
     // Reason copy sourced verbatim from the XML doc comments on EligibilityReason

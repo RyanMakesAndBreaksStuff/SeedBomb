@@ -175,4 +175,40 @@ public sealed class RuleEditorViewModelTests
         Assert.Equal("ACME-{seq:0000}", vm.Template);
         Assert.True(vm.CanSave);
     }
+
+    [Fact]
+    public void TemplateExpressionAliasesTemplate()
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), 10, 1, "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOperation = "pattern";
+        vm.TemplateExpression = "dg{seq}";
+        Assert.Equal("dg{seq}", vm.Template);
+        Assert.True(vm.IsTemplateOperation);
+    }
+
+    [Fact]
+    public void TemplateExpressionNotifiesOnTemplateChange()
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), 10, 1, "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOperation = "pattern";
+        string? last = null;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.TemplateExpression))
+                last = vm.TemplateExpression;
+        };
+        vm.Template = "dg{seq}";
+        Assert.Equal("dg{seq}", last);
+    }
+
+    [Fact]
+    public void MappedFilterPredicateKeepsRequiredUnmappedVisible()
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), 10, 1, "r1");
+        vm.SetColumnFilterModeCommand.Execute(vm.ColumnFilterModes.Single(m => m.Key == "Mapped"));
+        Assert.Null(vm.ColumnsView);
+        Assert.Contains(vm.SettableColumns.Where(vm.MatchesColumnFilter), c => c.LogicalName == "name");
+    }
 }

@@ -14,11 +14,15 @@ public sealed class RulesNavigationRequest
     /// <summary>Invoked after a successful Save on the Rules page (Generate draft sync).</summary>
     public Action<Profile>? OnSaved { get; set; }
 
+    /// <summary>Page to navigate after breadcrumb Back. Null means ProfilesPage.</summary>
+    public Type? ReturnPage { get; set; }
+
     /// <summary>Clears the payload after the page reads it.</summary>
     public void Clear()
     {
         Profile = null;
         TableName = null;
         OnSaved = null;
+        ReturnPage = null;
     }
 }
