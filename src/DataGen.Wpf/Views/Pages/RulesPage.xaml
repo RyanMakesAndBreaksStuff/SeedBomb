@@ -42,7 +42,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                     <Button Style="{DynamicResource DG.LinkButton}"
                             Command="{Binding NavigateToProfilesCommand}"
-                            Content="Profiles"/>
+                            Content="{Binding BreadcrumbRootLabel}"/>
                     <TextBlock Style="{DynamicResource DG.Tertiary}" Text=" › " />
                     <TextBlock Style="{DynamicResource DG.Tertiary}"
                                Text="{Binding ProfileName}"/>

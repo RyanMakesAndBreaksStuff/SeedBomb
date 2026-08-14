@@ -1,6 +1,11 @@
+using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
+using Moq;
+using Seedbomb.Services.Navigation;
+using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels;
+using Seedbomb.Views.Pages;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -210,5 +215,34 @@ public sealed class RuleEditorViewModelTests
         vm.SetColumnFilterModeCommand.Execute(vm.ColumnFilterModes.Single(m => m.Key == "Mapped"));
         Assert.Null(vm.ColumnsView);
         Assert.Contains(vm.SettableColumns.Where(vm.MatchesColumnFilter), c => c.LogicalName == "name");
+    }
+
+    [Fact]
+    public async Task LoadForProfile_from_generate_sets_breadcrumb_and_save_navigates_back()
+    {
+        var navigator = new Mock<IAppNavigator>();
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(1, "working-set", null, 42,
+                [new ProfileTable("account", 50, null)]),
+            TableName = "account",
+            ReturnPage = typeof(GeneratePage),
+        };
+        var metadata = new Mock<IMetadataProvider>();
+        metadata
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<Microsoft.Xrm.Sdk.Metadata.EntityMetadata>());
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<string>());
+
+        var vm = new RuleEditorViewModel(metadata.Object, profiles.Object, navigator.Object, request);
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("Generate", vm.BreadcrumbRootLabel);
+        Assert.Equal("working-set", vm.ProfileName);
+
+        vm.NavigateToProfilesCommand.Execute(null);
+        navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
     }
 }

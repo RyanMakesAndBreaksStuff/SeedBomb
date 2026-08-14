@@ -198,6 +198,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _profileName = "Untitled";
 
+    /// <summary>Breadcrumb root. Generate when opened from the wizard; Profiles otherwise.</summary>
+    public string BreadcrumbRootLabel =>
+        _returnPage == typeof(GeneratePage) ? "Generate" : "Profiles";
+
     [ObservableProperty]
     private RuleTableOption? _selectedTable;
 
@@ -444,6 +448,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     {
         _onSaved = _request?.OnSaved;
         _returnPage = _request?.ReturnPage;
+        OnPropertyChanged(nameof(BreadcrumbRootLabel));
         var profile = _request?.Profile;
         var tableName = _request?.TableName;
         _request?.Clear();
@@ -618,6 +623,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject
             await _profiles.SaveAsync(_profile, ct);
 
         _onSaved?.Invoke(_profile);
+
+        if (_returnPage is not null)
+            _navigator?.Navigate(_returnPage);
 
         if (_entities.TryGetValue(_table, out var meta))
         {
