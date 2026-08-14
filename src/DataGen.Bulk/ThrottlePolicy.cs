@@ -134,8 +134,9 @@ public class ThrottlePolicy
             else
                 retryAfter = TimeSpan.Zero;
 
-            // Use Retry-After as floor; exponential is the minimum we'll wait regardless
-            return TimeSpan.FromTicks(Math.Max(exponential.Ticks, retryAfter.Ticks)) + jitter;
+            // Retry-After and exponential are floors. Jitter may add wait, never subtract below either.
+            var floor = TimeSpan.FromTicks(Math.Max(exponential.Ticks, retryAfter.Ticks));
+            return floor + TimeSpan.FromMilliseconds(Math.Max(0, jitter.TotalMilliseconds));
         }
 
         return exponential + jitter;
