@@ -27,11 +27,11 @@
 
     <StackPanel>
         <TextBlock x:Name="PhaseText"
-                   FontSize="12"
+                   FontSize="{DynamicResource DG.Type.Caption}"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource DG.Text1}" />
         <TextBlock x:Name="EntityText"
-                   FontSize="11"
+                   FontSize="{DynamicResource DG.Type.Micro}"
                    Foreground="{DynamicResource DG.Text3}"
                    Margin="0,4,0,0" />
         <ProgressBar x:Name="ProgressBar"
@@ -45,22 +45,22 @@
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="RecordsSummary"
                        Grid.Column="0"
-                       FontSize="12"
+                       FontSize="{DynamicResource DG.Type.Caption}"
                        Foreground="{DynamicResource DG.Text2}" />
             <TextBlock x:Name="RecordsPerMin"
                        Grid.Column="1"
-                       FontSize="12"
+                       FontSize="{DynamicResource DG.Type.Caption}"
                        Foreground="{DynamicResource DG.Text2}"
                        HorizontalAlignment="Center" />
             <TextBlock x:Name="ElapsedText"
                        Grid.Column="2"
-                       FontSize="12"
+                       FontSize="{DynamicResource DG.Type.Caption}"
                        Foreground="{DynamicResource DG.Text2}"
                        HorizontalAlignment="Right" />
         </Grid>
         <TextBlock x:Name="BatchSummary"
                    Foreground="{DynamicResource DG.Text3}"
-                   FontSize="11"
+                   FontSize="{DynamicResource DG.Type.Micro}"
                    Margin="0,8,0,0" />
     </StackPanel>
 

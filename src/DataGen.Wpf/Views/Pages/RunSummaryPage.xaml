@@ -41,7 +41,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <ui:SymbolIcon Grid.Column="0" Symbol="{Binding OutcomeGlyph}" FontSize="16"
+                <ui:SymbolIcon Grid.Column="0" Symbol="{Binding OutcomeGlyph}" FontSize="{DynamicResource DG.Type.IconLg}"
                                Foreground="{Binding OutcomeBrush}" VerticalAlignment="Center"/>
 
                 <StackPanel Grid.Column="1" Margin="14,0,14,0">

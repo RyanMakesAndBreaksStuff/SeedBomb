@@ -15,7 +15,7 @@
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisible"/>
         <converters:NullToVisibilityConverter x:Key="NullToVisible"/>
         <Style x:Key="FieldLabel" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
             <Setter Property="Margin" Value="0,8,0,2"/>
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
         </Style>
@@ -36,7 +36,7 @@
                     BorderThickness="0,0,0,1">
                 <Grid>
                     <TextBlock Text="Connection Manager"
-                               FontSize="16" FontWeight="SemiBold"
+                               FontSize="{DynamicResource DG.Type.IconLg}" FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
                     <ui:Button HorizontalAlignment="Right"
                                Appearance="Transparent"
@@ -114,7 +114,7 @@
                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                     <StackPanel Orientation="Horizontal">
                                                         <TextBlock Text="{Binding Name}"
-                                                                   FontWeight="SemiBold" FontSize="13"/>
+                                                                   FontWeight="SemiBold" FontSize="{DynamicResource DG.Type.Subtitle}"/>
                                                         <ui:SymbolIcon Symbol="CheckmarkCircle16"
                                                                        Margin="6,0,0,0"
                                                                        VerticalAlignment="Center"
@@ -131,7 +131,7 @@
                                                             </ui:SymbolIcon.Style>
                                                         </ui:SymbolIcon>
                                                     </StackPanel>
-                                                    <TextBlock FontSize="11"
+                                                    <TextBlock FontSize="{DynamicResource DG.Type.Micro}"
                                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}">
                                                         <Run Text="{Binding AuthType, Mode=OneWay}"/>
                                                         <Run Text=" · "/>
@@ -163,7 +163,7 @@
 
                         <TextBlock Text="No profiles yet. Click '+ New Profile' to create one."
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   FontSize="12" TextWrapping="Wrap"
+                                   FontSize="{DynamicResource DG.Type.Caption}" TextWrapping="Wrap"
                                    Margin="0,8,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -252,7 +252,7 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <TextBlock Text="{Binding TestResult}" FontSize="12" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding TestResult}" FontSize="{DynamicResource DG.Type.Caption}" TextWrapping="Wrap"/>
                         </Border>
 
                         <!-- Save / Cancel -->

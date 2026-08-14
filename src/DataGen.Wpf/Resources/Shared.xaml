@@ -234,15 +234,20 @@
     <FontFamily x:Key="DG.Font.Mono">Consolas, Cascadia Mono</FontFamily>
 
     <sys:Double x:Key="DG.Type.PageTitle">26</sys:Double>
+    <sys:Double x:Key="DG.Type.Splash">24</sys:Double>
+    <sys:Double x:Key="DG.Type.Hero">21</sys:Double>
+    <sys:Double x:Key="DG.Type.Stat">19</sys:Double>
     <sys:Double x:Key="DG.Type.SheetTitle">17</sys:Double>
+    <sys:Double x:Key="DG.Type.IconLg">16</sys:Double>
     <sys:Double x:Key="DG.Type.CardTitle">15</sys:Double>
+    <sys:Double x:Key="DG.Type.Icon">14</sys:Double>
     <sys:Double x:Key="DG.Type.Subtitle">13</sys:Double>
     <sys:Double x:Key="DG.Type.Body">12.5</sys:Double>
     <sys:Double x:Key="DG.Type.Caption">12</sys:Double>
     <sys:Double x:Key="DG.Type.Small">11.5</sys:Double>
     <sys:Double x:Key="DG.Type.Micro">11</sys:Double>
     <sys:Double x:Key="DG.Type.Label">10.5</sys:Double>
-    <sys:Double x:Key="DG.Type.Stat">19</sys:Double>
+    <sys:Double x:Key="DG.Type.Tiny">10</sys:Double>
 
     <Style x:Key="DG.PageTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Display}"/>

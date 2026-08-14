@@ -489,7 +489,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <ui:SymbolIcon Grid.Column="0" Symbol="Info24"
-                                                   FontSize="{DynamicResource DG.Type.Body}"
+                                                   FontSize="{DynamicResource DG.Type.Icon}"
                                                    Foreground="{DynamicResource DG.Accent}"
                                                    VerticalAlignment="Top"/>
                                     <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
@@ -528,7 +528,7 @@
                                     Command="{Binding RerollPreviewCommand}">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Symbol="ArrowSync24"
-                                                   FontSize="{DynamicResource DG.Type.Small}"
+                                                   FontSize="{DynamicResource DG.Type.Caption}"
                                                    Margin="0,0,6,0"/>
                                     <TextBlock Text="Reroll" FontSize="{DynamicResource DG.Type.Small}"/>
                                 </StackPanel>

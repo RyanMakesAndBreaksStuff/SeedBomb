@@ -24,7 +24,7 @@
             <TextBlock Grid.Row="0"
                        TextWrapping="Wrap"
                        Foreground="{DynamicResource DG.Text3}"
-                       FontSize="12"
+                       FontSize="{DynamicResource DG.Type.Caption}"
                        Margin="0,0,0,10"
                        Text="Saved locally in %LOCALAPPDATA%\DataGen\profiles — plain files, no secrets. Credentials stay DPAPI-encrypted exactly as today." />
 
@@ -82,7 +82,7 @@
 
             <StackPanel Grid.Row="2" Margin="0,10,0,0">
                 <TextBlock Text="New profile name"
-                           FontSize="11"
+                           FontSize="{DynamicResource DG.Type.Micro}"
                            Foreground="{DynamicResource DG.Text3}"
                            Margin="0,0,0,4" />
                 <ui:TextBox Text="{Binding NewProfileName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -97,7 +97,7 @@
                                Command="{Binding ImportFromFileCommand}" />
                 </StackPanel>
                 <TextBlock Text="📂 Load · ⤒ Export · ⧉ Duplicate · 🗑 Delete. Loading renders the profile on the Field Rules board — no text or schema view."
-                           FontSize="11"
+                           FontSize="{DynamicResource DG.Type.Micro}"
                            Foreground="{DynamicResource DG.Text3}"
                            TextWrapping="Wrap"
                            Margin="0,8,0,0" />
@@ -128,7 +128,7 @@
             <StackPanel>
                 <TextBlock TextWrapping="Wrap"
                            Foreground="{DynamicResource DG.Text3}"
-                           FontSize="12"
+                           FontSize="{DynamicResource DG.Type.Caption}"
                            Margin="0,0,0,10"
                            Text="Validated against schema v1 and this environment's live metadata. Results are applied visually — nothing here is editable text." />
 

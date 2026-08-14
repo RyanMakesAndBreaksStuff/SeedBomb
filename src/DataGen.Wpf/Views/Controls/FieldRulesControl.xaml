@@ -47,7 +47,7 @@
                                 </Style>
                             </Border.Style>
                             <TextBlock Text="{Binding RuleCount}"
-                                       FontSize="10"
+                                       FontSize="{DynamicResource DG.Type.Tiny}"
                                        Foreground="{DynamicResource DG.AccentLight}" />
                         </Border>
                     </Grid>
@@ -83,7 +83,7 @@
                 </Border.Style>
                 <TextBlock Text="This table is fully automatic — no rules configured. Columns without a rule keep generating the same way they always have."
                            Foreground="{DynamicResource DG.Text3}"
-                           FontSize="12"
+                           FontSize="{DynamicResource DG.Type.Caption}"
                            TextWrapping="Wrap" />
             </Border>
 
@@ -124,19 +124,19 @@
                                                 Padding="6,1"
                                                 Margin="6,0,0,0">
                                             <TextBlock Text="{Binding OpBadge}"
-                                                       FontSize="10"
+                                                       FontSize="{DynamicResource DG.Type.Tiny}"
                                                        Foreground="{DynamicResource DG.AccentLight}" />
                                         </Border>
                                     </StackPanel>
                                     <TextBlock Text="{Binding ParameterSummary}"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource DG.Type.Micro}"
                                                Foreground="{DynamicResource DG.Text3}"
                                                Margin="0,3,0,0" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Preview}"
                                            FontFamily="Consolas"
-                                           FontSize="11"
+                                           FontSize="{DynamicResource DG.Type.Micro}"
                                            Foreground="{DynamicResource DG.Text2}"
                                            VerticalAlignment="Center" />
                             </Grid>

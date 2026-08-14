@@ -60,7 +60,7 @@
                             <Path Data="M12,2 L2,7 L12,12 L22,7 Z
                                         M2,17 L12,22 L22,17
                                         M2,12 L12,17 L22,12"
-                                  Stroke="White"
+                                  Stroke="{DynamicResource DG.OnAccent}"
                                   StrokeThickness="1.8"
                                   StrokeLineJoin="Round"
                                   StrokeStartLineCap="Round"
@@ -72,14 +72,14 @@
 
                 <!-- App title -->
                 <TextBlock Text="DataGen"
-                           FontSize="24"
+                           FontSize="{DynamicResource DG.Type.Splash}"
                            FontWeight="SemiBold"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
 
                 <!-- Subtitle -->
                 <TextBlock Text="Synthetic Dataverse record seeder"
-                           FontSize="13"
+                           FontSize="{DynamicResource DG.Type.Subtitle}"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            HorizontalAlignment="Center"
                            TextAlignment="Center"
@@ -132,7 +132,7 @@
         <!-- Scrim overlay (ZIndex 9) -->
         <Rectangle x:Name="DrawerScrim"
                    Grid.RowSpan="2"
-                   Fill="#80000000"
+                   Fill="{DynamicResource DG.Scrim}"
                    Panel.ZIndex="9"
                    Visibility="Collapsed"
                    MouseDown="OnScrimClick"/>

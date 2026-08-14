@@ -46,7 +46,7 @@
                                     <TextBlock Text="{Binding DisplayName}"
                                                Foreground="{DynamicResource DG.Text1}" />
                                     <TextBlock Text="{Binding TypeLabel}"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource DG.Type.Micro}"
                                                Foreground="{DynamicResource DG.Text3}" />
                                 </StackPanel>
                             </DataTemplate>
@@ -80,11 +80,11 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
-                                            <TextBlock Text="v2" FontSize="10" Foreground="{DynamicResource DG.AccentLight}" />
+                                            <TextBlock Text="v2" FontSize="{DynamicResource DG.Type.Tiny}" Foreground="{DynamicResource DG.AccentLight}" />
                                         </Border>
                                     </StackPanel>
                                     <TextBlock Text="{Binding DisabledReason}"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource DG.Type.Micro}"
                                                Foreground="{DynamicResource DG.Text3}"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -105,7 +105,7 @@
                                Margin="0,0,0,8" />
 
                     <TextBlock Text="Operation"
-                               FontSize="11"
+                               FontSize="{DynamicResource DG.Type.Micro}"
                                Foreground="{DynamicResource DG.Text3}"
                                Margin="0,0,0,6" />
                     <ListBox ItemsSource="{Binding AvailableOpOptions}"
@@ -164,7 +164,7 @@
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource DG.Text1}" />
                                     <TextBlock Text="{Binding Hint}"
-                                               FontSize="10"
+                                               FontSize="{DynamicResource DG.Type.Tiny}"
                                                Foreground="{DynamicResource DG.Text3}"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -184,7 +184,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Text="Value" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                        <TextBlock Text="Value" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                         <ui:TextBox Text="{Binding ConstantText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
 
@@ -200,7 +200,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Text="Template" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                        <TextBlock Text="Template" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                         <ui:TextBox Text="{Binding Template, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
 
@@ -218,11 +218,11 @@
                         </StackPanel.Style>
                         <Grid ColumnDefinitions="*,*">
                             <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                                <TextBlock Text="Min" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                                <TextBlock Text="Min" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                                 <ui:TextBox Text="{Binding MinText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                <TextBlock Text="Max" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                                <TextBlock Text="Max" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                                 <ui:TextBox Text="{Binding MaxText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Grid>
@@ -242,11 +242,11 @@
                         </StackPanel.Style>
                         <Grid ColumnDefinitions="*,*">
                             <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                                <TextBlock Text="Start" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                                <TextBlock Text="Start" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                                 <ui:TextBox Text="{Binding StartText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                                <TextBlock Text="Step" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                                <TextBlock Text="Step" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                                 <ui:TextBox Text="{Binding StepText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
                         </Grid>
@@ -264,7 +264,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Text="Values" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                        <TextBlock Text="Values" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                         <ItemsControl ItemsSource="{Binding Options}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -299,7 +299,7 @@
                         </ui:InfoBar.Style>
                     </ui:InfoBar>
 
-                    <TextBlock Text="Preview (rows 0-2)" FontSize="11" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
+                    <TextBlock Text="Preview (rows 0-2)" FontSize="{DynamicResource DG.Type.Micro}" Foreground="{DynamicResource DG.Text3}" Margin="0,0,0,4" />
                     <ItemsControl ItemsSource="{Binding PreviewValues}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>

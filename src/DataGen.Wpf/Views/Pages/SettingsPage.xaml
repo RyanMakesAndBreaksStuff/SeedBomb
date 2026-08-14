@@ -3,8 +3,8 @@
     (PaletteId, DarkTheme, ReduceMotion, DefaultRecordCount, DefaultBatchSize, DefaultDop,
     AppVersion, DotnetVersion, SaveCommand); this only moves it onto 1a's vocabulary.
 
-    Changes: page header added to match the other destinations; literal FontSize="12" and
-    Opacity="0.6" replaced with DG type styles; field labels use DG.GroupLabel; CardExpander
+    Changes: page header added to match the other destinations; leftover type sizes and
+    Opacity 0.6 replaced with DG type styles; field labels use DG.GroupLabel; CardExpander
     swapped for plain DG.CardBorder sections (there are only three, so accordions cost a click
     for nothing); palette picker promoted from a combo to a swatch row; Save moved into the
     footer bar the other pages use.

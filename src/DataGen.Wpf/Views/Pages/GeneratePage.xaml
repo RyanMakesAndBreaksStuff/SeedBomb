@@ -225,7 +225,7 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <ui:SymbolIcon Grid.Column="0" Symbol="Warning24" FontSize="16"
+                            <ui:SymbolIcon Grid.Column="0" Symbol="Warning24" FontSize="{DynamicResource DG.Type.IconLg}"
                                            Foreground="{DynamicResource DG.Warning}"
                                            VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
@@ -318,7 +318,7 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <ui:SymbolIcon Grid.Column="0" Symbol="Info24" FontSize="14"
+                            <ui:SymbolIcon Grid.Column="0" Symbol="Info24" FontSize="{DynamicResource DG.Type.Icon}"
                                            Foreground="{DynamicResource DG.Accent}"
                                            VerticalAlignment="Top"/>
                             <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
