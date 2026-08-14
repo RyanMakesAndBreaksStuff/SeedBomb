@@ -47,14 +47,18 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Gets whether the last connection switch failed.</summary>
     public bool HasSwitchError => SwitchError is not null;
 
+    /// <summary>Handoff alias for <see cref="CancelCommand"/>.</summary>
+    public IRelayCommand CancelEditCommand => CancelCommand;
+
     /// <summary>Loads profiles from storage and marks the active profile.</summary>
     [RelayCommand]
-    internal async Task LoadAsync()
+    internal async Task LoadAsync(CancellationToken ct = default)
     {
         try
         {
-            var all = await _profileService.GetAllAsync();
-            var lastUsed = await _profileService.GetLastUsedAsync();
+            var all = await _profileService.GetAllAsync(ct);
+            var lastUsed = await _profileService.GetLastUsedAsync(ct);
+            ct.ThrowIfCancellationRequested();
 
             Profiles.Clear();
             foreach (var p in all)
@@ -63,7 +67,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                 Profiles.Add(p);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             SwitchError = ex.Message;
         }
@@ -143,8 +147,15 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         SwitchError = null;
         try
         {
-            await _profileService.SaveAsync(EditingProfile);
+            var savedInstance = EditingProfile;
+            await _profileService.SaveAsync(savedInstance);
             await LoadAsync();
+            if (ReferenceEquals(EditingProfile, savedInstance))
+            {
+                var saved = Profiles.FirstOrDefault(p => p.Id == savedInstance.Id);
+                if (saved is not null)
+                    await SelectProfileAsync(saved);
+            }
             IsEditing = false;
             EditingProfile = null;
         }
@@ -156,8 +167,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     /// <summary>Deletes a profile.</summary>
     [RelayCommand]
-    private async Task DeleteProfileAsync(ConnectionProfile profile)
+    private async Task DeleteProfileAsync(ConnectionProfile? profile)
     {
+        if (profile is null) return;
         SwitchError = null;
         try
         {
@@ -204,7 +216,22 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         TestResult = null;
     }
 
+    /// <summary>Writes Microsoft's well-known public client ID into the editing profile.</summary>
+    [RelayCommand]
+    private void UseDefaultClientId()
+    {
+        if (EditingProfile is null) return;
+        EditingProfile.ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
+        OnPropertyChanged(nameof(EditingProfile));
+    }
+
     /// <summary>Requests the drawer to close.</summary>
     [RelayCommand]
     private void Close() => DrawerCloseRequested?.Invoke(this, EventArgs.Empty);
+
+    partial void OnSelectedProfileChanged(ConnectionProfile? value)
+    {
+        if (value is not null)
+            EditProfile(value);
+    }
 }

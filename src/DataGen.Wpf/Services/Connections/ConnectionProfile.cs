@@ -62,6 +62,13 @@ public sealed class ConnectionProfile
 
     /// <summary>Not persisted. Set by the VM to mark the currently active (last-used) profile.</summary>
     public bool IsLastUsed { get; set; }
+
+    /// <summary>Handoff alias for <see cref="IsLastUsed"/>.</summary>
+    public bool IsActive
+    {
+        get => IsLastUsed;
+        set => IsLastUsed = value;
+    }
 }
 
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>

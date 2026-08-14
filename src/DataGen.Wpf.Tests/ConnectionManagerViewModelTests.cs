@@ -88,4 +88,38 @@ public sealed class ConnectionManagerViewModelTests
         connection.Verify(c => c.Reset(), Times.Once);
         profiles.Verify(p => p.SetLastUsedAsync(profile.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public void IsActiveAliasesIsLastUsed()
+    {
+        var profile = new ConnectionProfile { IsLastUsed = true };
+        Assert.True(profile.IsActive);
+        profile.IsActive = false;
+        Assert.False(profile.IsLastUsed);
+    }
+
+    [Fact]
+    public void UseDefaultClientIdWritesWellKnownPublicClient()
+    {
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(),
+            Mock.Of<IAuthService>(),
+            Mock.Of<IDataverseConnectionService>())
+        {
+            EditingProfile = new ConnectionProfile { ClientId = "old" },
+        };
+
+        vm.UseDefaultClientIdCommand.Execute(null);
+        Assert.Equal("51f81489-12ee-4a9e-aaae-a2591f45987d", vm.EditingProfile!.ClientId);
+    }
+
+    [Fact]
+    public void CancelEditCommandIsCancelCommand()
+    {
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(),
+            Mock.Of<IAuthService>(),
+            Mock.Of<IDataverseConnectionService>());
+        Assert.Same(vm.CancelCommand, vm.CancelEditCommand);
+    }
 }

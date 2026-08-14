@@ -4,9 +4,11 @@ using Wpf.Ui.Abstractions.Controls;
 
 namespace Seedbomb.Views.Pages;
 
-/// <summary>Connection profiles page. Footer nav destination; shares the MainWindow singleton VM.</summary>
-public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerViewModel>
+/// <summary>Connection profiles as a footer destination.</summary>
+public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerViewModel>, INavigationAware
 {
+    private CancellationTokenSource? _loadCts;
+
     /// <inheritdoc />
     public ConnectionManagerViewModel ViewModel { get; }
 
@@ -16,5 +18,28 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+    }
+
+    /// <inheritdoc />
+    public async Task OnNavigatedToAsync()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        try
+        {
+            // RelayCommand special-cases CancellationToken — ExecuteAsync(object) will not forward it.
+            await ViewModel.LoadAsync(_loadCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <inheritdoc />
+    public Task OnNavigatedFromAsync()
+    {
+        _loadCts?.Cancel();
+        return Task.CompletedTask;
     }
 }
