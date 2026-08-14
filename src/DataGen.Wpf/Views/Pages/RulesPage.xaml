@@ -121,8 +121,21 @@
                         Grouped by mapping state: mapped / unmapped-required / unmapped.
                         The leading dot carries the state color; the group header is DG.GroupLabel.
                     -->
-                    <ListBox Grid.Row="1"
-                             ItemsSource="{Binding ColumnsView}"
+                    <Grid Grid.Row="1">
+                    <TextBlock Text="No columns for this table"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Secondary}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ColumnsView.IsEmpty, TargetNullValue=True}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <ListBox ItemsSource="{Binding ColumnsView}"
                              SelectedItem="{Binding SelectedColumn}"
                              Background="Transparent" BorderThickness="0" Padding="6"
                              HorizontalContentAlignment="Stretch"
@@ -213,6 +226,7 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    </Grid>
                 </Grid>
             </Border>
 

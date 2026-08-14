@@ -43,7 +43,16 @@ public partial class MainWindow : FluentWindow
         viewModel.OpenConnectionManagerRequested += (_, _) =>
             _navigator.Navigate(typeof(ConnectionsPage));
 
-        RootNavigation.Navigated += (_, e) => _currentPageContent = e.Page;
+        RootNavigation.Navigated += (_, e) =>
+        {
+            _currentPageContent = e.Page;
+            SyncFirstRunOverlay();
+        };
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainWindowViewModel.HasConnection))
+                SyncFirstRunOverlay();
+        };
         Loaded += OnWindowLoaded;
     }
 
@@ -76,5 +85,16 @@ public partial class MainWindow : FluentWindow
         _vm.HasConnection = true;
         if (_currentPageContent is GeneratePage page)
             page.ReloadForConnectionSwitch();
+        SyncFirstRunOverlay();
+    }
+
+    private void SyncFirstRunOverlay()
+    {
+        var show = !_vm.HasConnection
+            && _currentPageContent is not ConnectionsPage
+            && _currentPageContent is not SettingsPage;
+        FirstRunOverlay.SetCurrentValue(
+            VisibilityProperty,
+            show ? Visibility.Visible : Visibility.Collapsed);
     }
 }

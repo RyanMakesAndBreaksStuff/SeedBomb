@@ -87,8 +87,21 @@
                         </Grid>
                     </Border>
 
-                    <ListBox Grid.Row="1"
-                             ItemsSource="{Binding VisibleItems}"
+                    <Grid Grid.Row="1">
+                    <TextBlock Text="No profiles yet"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Secondary}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <ListBox ItemsSource="{Binding VisibleItems}"
                              SelectedItem="{Binding SelectedItem}"
                              Background="Transparent" BorderThickness="0"
                              Padding="6"
@@ -150,6 +163,7 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    </Grid>
 
                     <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}">
                         <TextBlock Style="{DynamicResource DG.Tertiary}" Text="{Binding CountLabel}"/>

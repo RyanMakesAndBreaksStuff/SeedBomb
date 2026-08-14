@@ -73,7 +73,7 @@ public sealed partial class RunViewModel : ObservableObject
         _navigator = navigator;
     }
 
-    /// <summary>Id of the live or hydrated run. History uses this to reopen the live summary.</summary>
+    /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
 
     /// <summary>When true the generate overlay sheet is visible.</summary>
@@ -289,13 +289,12 @@ public sealed partial class RunViewModel : ObservableObject
         AppendActivity($"Finished — {written:N0} written, {rejected:N0} rejected");
     }
 
-    /// <summary>History hydration: stats only, no rejection rows, retry disabled.</summary>
+    /// <summary>History hydration: stats only, no rejection rows, retry disabled. Does not change <see cref="CurrentRunId"/>.</summary>
     public void HydrateFrom(RunRecord run)
     {
         ArgumentNullException.ThrowIfNull(run);
 
         _lastConfig = null;
-        CurrentRunId = run.Id;
         IsRunning = false;
         IsIndeterminate = false;
         _environmentHost = "";

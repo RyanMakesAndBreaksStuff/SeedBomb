@@ -55,7 +55,8 @@
 
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Generate"
-                                       TargetPageType="{x:Type pages:GeneratePage}">
+                                       TargetPageType="{x:Type pages:GeneratePage}"
+                                       IsEnabled="{Binding HasConnection}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Flash24"/>
                     </ui:NavigationViewItem.Icon>
@@ -63,21 +64,24 @@
 
                 <!-- Rules is a first-class destination in 1a, not a dialog off Generate. -->
                 <ui:NavigationViewItem Content="Rules"
-                                       TargetPageType="{x:Type pages:RulesPage}">
+                                       TargetPageType="{x:Type pages:RulesPage}"
+                                       IsEnabled="{Binding HasConnection}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Options24"/>
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
                 <ui:NavigationViewItem Content="Profiles"
-                                       TargetPageType="{x:Type pages:ProfilesPage}">
+                                       TargetPageType="{x:Type pages:ProfilesPage}"
+                                       IsEnabled="{Binding HasConnection}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Layer24"/>
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
                 <ui:NavigationViewItem Content="History"
-                                       TargetPageType="{x:Type pages:HistoryPage}">
+                                       TargetPageType="{x:Type pages:HistoryPage}"
+                                       IsEnabled="{Binding HasConnection}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="History24"/>
                     </ui:NavigationViewItem.Icon>
@@ -150,5 +154,19 @@
                               Margin="0,0,0,24"/>
 
         <ui:ContentDialogHost Grid.RowSpan="2" />
+
+        <Border x:Name="FirstRunOverlay" Grid.Row="1" Style="{DynamicResource DG.Scrim.Style}"
+                Visibility="{Binding HasConnection, Converter={StaticResource InverseBoolToVisible}}">
+            <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Connect an environment"/>
+                    <TextBlock Style="{DynamicResource DG.PageSubtitle}"
+                               Text="SeedBomb needs a Dataverse connection before it can generate data."/>
+                    <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
+                            Command="{Binding OpenConnectionsCommand}" Content="Add connection"/>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </ui:FluentWindow>
