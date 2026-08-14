@@ -37,7 +37,7 @@ public sealed class GenerateViewModelStepTests
             Elapsed = TimeSpan.FromSeconds(1),
         };
 
-        var executeStep = Assert.Single(viewModel.Steps, step => step.Label == "Execute");
+        var executeStep = Assert.Single(viewModel.Steps, step => step.Label == "Run");
 
         Assert.Equal("✓", executeStep.Glyph);
         Assert.True(executeStep.IsDone);
@@ -45,14 +45,32 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public void StepsHasFiveEntriesWithExpectedLabels()
+    public void StepsHasFourEntriesWithExpectedLabels()
     {
         var viewModel = CreateViewModel(out _, out _, out _);
 
-        Assert.Equal(5, viewModel.Steps.Count);
+        Assert.Equal(4, viewModel.Steps.Count);
         Assert.Equal(
-            ["Select", "Configure", "Rules", "Review", "Execute"],
+            ["Tables", "Volume & rules", "Review", "Run"],
             viewModel.Steps.Select(s => s.Label).ToArray());
+    }
+
+    [Fact]
+    public void GoNextOnEmptyTablesDoesNotAdvance()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        Assert.Equal(0, viewModel.CurrentStep);
+        Assert.False(viewModel.GoNextCommand.CanExecute(null));
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        Assert.True(viewModel.GoNextCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task GoNextFromTablesLoadsMetadataAndAdvances()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out _, out _, out _, out _);
+        Assert.True(viewModel.IsRulesLoaded);
+        Assert.Equal(1, viewModel.CurrentStep);
     }
 
     [Fact]
@@ -66,12 +84,13 @@ public sealed class GenerateViewModelStepTests
             .Returns(tcs.Task);
 
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        var loadTask = viewModel.GoToRulesCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsRulesLoaded);
         Assert.False(viewModel.GoToReviewCommand.CanExecute(null));
 
         tcs.SetResult([meta]);
-        await viewModel.GoToRulesCommand.ExecutionTask!;
+        await loadTask;
 
         Assert.True(viewModel.IsRulesLoaded);
         Assert.True(viewModel.GoToReviewCommand.CanExecute(null));
@@ -86,7 +105,7 @@ public sealed class GenerateViewModelStepTests
             .ThrowsAsync(new InvalidOperationException("org unreachable"));
 
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        await viewModel.GoToRulesCommand.ExecutionTask!;
+        await viewModel.GoToRulesCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsRulesLoaded);
         snackbarMock.Verify(
@@ -111,7 +130,7 @@ public sealed class GenerateViewModelStepTests
             .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
 
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        await viewModel.GoToRulesCommand.ExecutionTask!;
+        await viewModel.GoToRulesCommand.ExecuteAsync(null);
 
         metadataMock.Verify(
             m => m.GetEntitiesAsync(
@@ -223,7 +242,8 @@ public sealed class GenerateViewModelStepTests
             Mock.Of<ILogger<GenerateViewModel>>(),
             Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(),
-            Mock.Of<IContentDialogService>());
+            Mock.Of<IContentDialogService>(),
+            new RunViewModel(Mock.Of<IWpfGenerationService>()));
 
         var notified = new List<string>();
         viewModel.PropertyChanged += (_, e) =>
@@ -334,6 +354,7 @@ public sealed class GenerateViewModelStepTests
         Assert.Empty(fieldRules.Rows);
         Assert.Null(viewModel.ReviewedRules);
         Assert.False(viewModel.IsReviewOpen);
+        Assert.Equal(0, viewModel.CurrentStep);
         generationMock.Verify(
             g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -360,7 +381,8 @@ public sealed class GenerateViewModelStepTests
             Mock.Of<ILogger<GenerateViewModel>>(),
             metadataMock.Object,
             Mock.Of<IProfileService>(),
-            Mock.Of<IContentDialogService>());
+            Mock.Of<IContentDialogService>(),
+            new RunViewModel(generationMock.Object));
     }
 
     private static GenerateViewModel CreateViewModel(
@@ -398,7 +420,7 @@ public sealed class GenerateViewModelStepTests
         // async methods can't have out params -- the await moves into this local function instead.
         async Task<GenerateViewModel> AwaitRulesLoaded()
         {
-            await viewModel.GoToRulesCommand.ExecutionTask!;
+            await viewModel.GoNextCommand.ExecuteAsync(null);
             Assert.True(viewModel.IsRulesLoaded);
             return viewModel;
         }
