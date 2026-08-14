@@ -1,40 +1,141 @@
-using System.IO;
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
+using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
+using Seedbomb.Views.Pages;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
+using Wpf.Ui.Extensions;
 
 namespace Seedbomb.ViewModels;
 
-/// <summary>One row in the Profiles manager list (Mock F5 left pane).</summary>
-/// <param name="Name">Profile display name (file stem source).</param>
-public sealed record ProfileListItem(string Name);
+/// <summary>One row in the Profiles list.</summary>
+/// <param name="Name">Profile display name.</param>
+/// <param name="VersionLabel">e.g. v1.</param>
+/// <param name="SummaryLine">e.g. 3 tables · 11 rules · 9,500 rows.</param>
+/// <param name="Description">Optional profile description.</param>
+/// <param name="Seed">Pinned seed, if any.</param>
+/// <param name="RuleCount">Active column rules.</param>
+/// <param name="UnmappedRequiredHint">Footer hint when unmapped required columns exist. Empty until metadata is wired.</param>
+public sealed record ProfileListItem(
+    string Name,
+    string VersionLabel,
+    string SummaryLine,
+    string? Description = null,
+    int? Seed = null,
+    int RuleCount = 0,
+    string UnmappedRequiredHint = "");
+
+/// <summary>One ruled column in the selected profile's detail table.</summary>
+/// <param name="Table">Table logical name.</param>
+/// <param name="Column">Column logical name.</param>
+/// <param name="OperationSummary">Rule op discriminator or type name.</param>
+public sealed record ProfileRuleRow(string Table, string Column, string OperationSummary);
 
 /// <summary>
 /// Profiles manager + visual-only import (Mock F5). Schema stage via
 /// <see cref="IProfileService"/>; metadata stage via <see cref="ProfileImport"/>.
 /// Never renders profile JSON — only list rows and InfoBar summaries.
 /// </summary>
-public sealed partial class ProfilesViewModel : ObservableObject
+public sealed partial class ProfilesViewModel : ViewModelBase
 {
     private readonly IProfileService _profiles;
+    private readonly RulesNavigationRequest? _rulesRequest;
+    private readonly IAppNavigator? _navigator;
+    private readonly IContentDialogService? _dialogs;
+    private readonly Dictionary<string, Profile> _profilesByName = new(StringComparer.OrdinalIgnoreCase);
+
+    private List<ProfileListItem> _allItems = [];
+    private int _sortMode;
+    private CancellationTokenSource? _loadCts;
 
     /// <summary>Initialises the view-model.</summary>
-    public ProfilesViewModel(IProfileService profiles)
+    public ProfilesViewModel(
+        IProfileService profiles,
+        RulesNavigationRequest? rulesRequest = null,
+        IAppNavigator? navigator = null,
+        IContentDialogService? dialogs = null)
     {
         _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
+        _rulesRequest = rulesRequest;
+        _navigator = navigator;
+        _dialogs = dialogs;
+    }
+
+    /// <inheritdoc />
+    public override async Task OnNavigatedToAsync()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        try
+        {
+            await RefreshAsync(_loadCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <inheritdoc />
+    public override Task OnNavigatedFromAsync()
+    {
+        _loadCts?.Cancel();
+        return Task.CompletedTask;
     }
 
     /// <summary>Saved profiles (excludes autosave draft).</summary>
     public ObservableCollection<ProfileListItem> Items { get; } = [];
+
+    /// <summary>In-memory filtered view of <see cref="Items"/>. Does not reload from disk.</summary>
+    public IEnumerable<ProfileListItem> VisibleItems =>
+        string.IsNullOrWhiteSpace(SearchText)
+            ? Items
+            : Items.Where(p => p.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Footer count of the visible set.</summary>
+    public string CountLabel
+    {
+        get
+        {
+            var count = 0;
+            foreach (var _ in VisibleItems)
+                count++;
+            return count == 1 ? "1 profile" : $"{count} profiles";
+        }
+    }
+
+    /// <summary>Alias for <see cref="ImportFromFileCommand"/> (page header binding).</summary>
+    public IRelayCommand ImportCommand => ImportFromFileCommand;
+
+    /// <summary>Flattened rules of the selected profile.</summary>
+    public ObservableCollection<ProfileRuleRow> SelectedProfileRules { get; } = [];
+
+    /// <summary>Footer rule count plus optional unmapped hint.</summary>
+    public string SelectedProfileRuleSummary
+    {
+        get
+        {
+            if (SelectedItem is null) return "";
+            var unmapped = string.IsNullOrEmpty(SelectedItem.UnmappedRequiredHint)
+                ? ""
+                : " · " + SelectedItem.UnmappedRequiredHint;
+            return $"{SelectedItem.RuleCount} rules{unmapped}";
+        }
+    }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
     [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
     [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditRulesCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedProfileRuleSummary))]
     private ProfileListItem? _selectedItem;
 
     [ObservableProperty]
@@ -50,6 +151,27 @@ public sealed partial class ProfilesViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasError;
 
+    [ObservableProperty]
+    private string _searchText = "";
+
+    [ObservableProperty]
+    private int _selectedDetailTab;
+
+    [ObservableProperty]
+    private string _selectedProfileDescription = "";
+
+    [ObservableProperty]
+    private string _selectedProfileSeed = "";
+
+    [ObservableProperty]
+    private string _selectedProfileEditedLabel = "";
+
+    [ObservableProperty]
+    private string _tablesAndVolumeSummary = "";
+
+    [ObservableProperty]
+    private string _profileRunHistory = "";
+
     // ── Import summary pane (Mock F5 right) ───────────────────────────────────
 
     [ObservableProperty]
@@ -60,6 +182,7 @@ public sealed partial class ProfilesViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ExportCommand))]
     [NotifyCanExecuteChangedFor(nameof(DuplicateCommand))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditRulesCommand))]
     private bool _showImportSummary;
 
     /// <summary>Manager list visible when not showing an import summary.</summary>
@@ -141,14 +264,42 @@ public sealed partial class ProfilesViewModel : ObservableObject
     /// </summary>
     public event EventHandler? CloseRequested;
 
+    /// <summary>Raised when the page should open Rules for the named profile.</summary>
+    public event EventHandler<string>? EditRulesRequested;
+
     /// <summary>Reloads the profile list from the store.</summary>
     [RelayCommand]
-    public async Task RefreshAsync()
+    public async Task RefreshAsync(CancellationToken ct = default)
     {
-        var names = await _profiles.ListAsync();
+        var names = await _profiles.ListAsync(ct);
+        var projected = new List<ProfileListItem>();
+        _profilesByName.Clear();
+        foreach (var name in names)
+        {
+            var profile = await _profiles.LoadAsync(name, ct);
+            _profilesByName[profile.Name] = profile;
+            projected.Add(Project(profile));
+        }
+
+        IEnumerable<ProfileListItem> ordered = _sortMode switch
+        {
+            1 => projected.OrderByDescending(p => p.Name, StringComparer.OrdinalIgnoreCase), // placeholder: no mtime
+            2 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
+            _ => projected.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
+        };
+
+        var selectedName = SelectedItem?.Name;
+        _allItems = ordered.ToList();
         Items.Clear();
-        foreach (var name in names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
-            Items.Add(new ProfileListItem(name));
+        foreach (var item in _allItems)
+            Items.Add(item);
+
+        ApplySearchFilter();
+        SelectedItem = null;
+        SelectedItem = Items.FirstOrDefault(i =>
+            string.Equals(i.Name, selectedName, StringComparison.OrdinalIgnoreCase));
+        OnPropertyChanged(nameof(CountLabel));
+        RebuildSelectedDetail();
     }
 
     /// <summary>Loads the selected (or parameter) profile into the pending-import slot (then Open in board).</summary>
@@ -169,6 +320,12 @@ public sealed partial class ProfilesViewModel : ObservableObject
         try
         {
             var profile = await _profiles.LoadAsync(SelectedItem.Name);
+            if (GetMetadata is null)
+            {
+                SetStatus($"Loaded “{SelectedItem.Name}”.");
+                return;
+            }
+
             PresentImport(profile, sourceLabel: SelectedItem.Name);
         }
         catch (Exception ex)
@@ -201,8 +358,19 @@ public sealed partial class ProfilesViewModel : ObservableObject
     private async Task DuplicateAsync()
     {
         if (SelectedItem is null) return;
-        var newName = PromptName?.Invoke($"{SelectedItem.Name} copy")
-            ?? $"{SelectedItem.Name} copy";
+
+        string? newName;
+        var suggested = $"{SelectedItem.Name} copy";
+        if (PromptName is not null)
+            newName = PromptName(suggested) ?? suggested;
+        else if (_dialogs is not null)
+        {
+            newName = await AskNameAsync(suggested);
+            if (string.IsNullOrWhiteSpace(newName)) return;
+        }
+        else
+            newName = suggested;
+
         if (string.IsNullOrWhiteSpace(newName)) return;
 
         try
@@ -224,7 +392,7 @@ public sealed partial class ProfilesViewModel : ObservableObject
     private async Task DeleteAsync()
     {
         if (SelectedItem is null) return;
-        var ok = ConfirmDelete?.Invoke(SelectedItem.Name) ?? false;
+        var ok = await ConfirmDeleteAsync(SelectedItem.Name);
         if (!ok) return;
 
         try
@@ -252,7 +420,7 @@ public sealed partial class ProfilesViewModel : ObservableObject
 
         var name = !string.IsNullOrWhiteSpace(NewProfileName)
             ? NewProfileName.Trim()
-            : PromptName?.Invoke("new-profile");
+            : await AskNameAsync("new-profile");
         if (string.IsNullOrWhiteSpace(name))
         {
             SetError("Enter a name for the new profile.");
@@ -309,8 +477,15 @@ public sealed partial class ProfilesViewModel : ObservableObject
             return;
         }
 
-        await RefreshAsync();
-        PresentImport(profile, sourceLabel: System.IO.Path.GetFileName(sourcePath));
+        await RefreshAsync(ct);
+
+        if (GetMetadata is null)
+        {
+            SetStatus($"Imported “{profile.Name}”.");
+            return;
+        }
+
+        PresentImport(profile, sourceLabel: Path.GetFileName(sourcePath));
     }
 
     /// <summary>
@@ -375,6 +550,129 @@ public sealed partial class ProfilesViewModel : ObservableObject
         SchemaErrorMessage = null;
     }
 
+    [RelayCommand]
+    private async Task CycleSortAsync()
+    {
+        _sortMode = (_sortMode + 1) % 3;
+        await RefreshAsync();
+    }
+
+    [RelayCommand]
+    private async Task NewProfileAsync()
+    {
+        var name = await AskNameAsync("new-profile");
+        if (string.IsNullOrWhiteSpace(name)) return;
+        try
+        {
+            await _profiles.SaveAsync(new Profile(1, name.Trim(), null, null, []));
+            await RefreshAsync();
+            SelectedItem = Items.FirstOrDefault(i =>
+                string.Equals(i.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMutateSelected))]
+    private async Task EditRulesAsync()
+    {
+        if (SelectedItem is null) return;
+        var name = SelectedItem.Name;
+        EditRulesRequested?.Invoke(this, name);
+
+        if (_rulesRequest is null || _navigator is null)
+            return;
+
+        _rulesRequest.Profile = await _profiles.LoadAsync(name);
+        _navigator.Navigate(typeof(RulesPage));
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(CountLabel));
+    }
+
+    partial void OnSelectedItemChanged(ProfileListItem? value) => RebuildSelectedDetail();
+
+    private void ApplySearchFilter()
+    {
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(CountLabel));
+    }
+
+    private void RebuildSelectedDetail()
+    {
+        SelectedProfileRules.Clear();
+        SelectedProfileDescription = "";
+        SelectedProfileSeed = "";
+        SelectedProfileEditedLabel = "";
+        TablesAndVolumeSummary = "";
+        ProfileRunHistory = "";
+        OnPropertyChanged(nameof(SelectedProfileRuleSummary));
+
+        if (SelectedItem is null)
+            return;
+
+        if (!_profilesByName.TryGetValue(SelectedItem.Name, out var profile))
+            return;
+
+        SelectedProfileDescription = profile.Description ?? "";
+        SelectedProfileSeed = profile.Seed?.ToString(CultureInfo.InvariantCulture) ?? "";
+        SelectedProfileEditedLabel = "Local profile";
+        ProfileRunHistory = "No runs recorded for this profile.";
+        TablesAndVolumeSummary = string.Join(
+            "\n",
+            profile.Tables.Select(t =>
+                $"{t.Table} · {t.Count.ToString("N0", CultureInfo.InvariantCulture)} rows"));
+
+        foreach (var table in profile.Tables)
+        {
+            if (table.Columns is null) continue;
+            foreach (var (column, rule) in table.Columns)
+                SelectedProfileRules.Add(new ProfileRuleRow(table.Table, column, OperationSummary(rule)));
+        }
+
+        OnPropertyChanged(nameof(SelectedProfileRuleSummary));
+    }
+
+    private async Task<string?> AskNameAsync(string suggested)
+    {
+        if (PromptName is not null)
+            return PromptName(suggested);
+        if (_dialogs is null)
+            return null;
+
+        var box = new System.Windows.Controls.TextBox { Text = suggested };
+        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+        {
+            Title = "Profile name",
+            Content = box,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+        });
+        return result == ContentDialogResult.Primary ? box.Text : null;
+    }
+
+    private async Task<bool> ConfirmDeleteAsync(string name)
+    {
+        if (ConfirmDelete is not null)
+            return ConfirmDelete(name);
+        if (_dialogs is null)
+            return false;
+
+        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+        {
+            Title = "Delete profile",
+            Content = $"Delete profile '{name}'? This cannot be undone.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+        });
+        return result == ContentDialogResult.Primary;
+    }
+
     private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;
 
     private bool CanOpenInBoard() => ShowImportSummary && PendingImport is not null && SchemaErrorMessage is null;
@@ -392,4 +690,50 @@ public sealed partial class ProfilesViewModel : ObservableObject
         HasError = true;
         StatusMessage = message;
     }
+
+    private static ProfileListItem Project(Profile profile)
+    {
+        var tableCount = profile.Tables.Count;
+        var ruleCount = 0;
+        var rowCount = 0;
+        foreach (var table in profile.Tables)
+        {
+            rowCount += table.Count;
+            ruleCount += table.Columns?.Count ?? 0;
+        }
+
+        var tableWord = tableCount == 1 ? "table" : "tables";
+        var ruleWord = ruleCount == 1 ? "rule" : "rules";
+        var summary =
+            $"{tableCount} {tableWord} · {ruleCount} {ruleWord} · {rowCount.ToString("N0", CultureInfo.InvariantCulture)} rows";
+
+        return new ProfileListItem(
+            profile.Name,
+            $"v{profile.ProfileVersion}",
+            summary,
+            profile.Description,
+            profile.Seed,
+            ruleCount);
+    }
+
+    private static int ParseRowCount(string summary)
+    {
+        var idx = summary.LastIndexOf('·');
+        var tail = idx >= 0 ? summary[(idx + 1)..] : summary;
+        tail = tail.Replace("rows", "", StringComparison.OrdinalIgnoreCase)
+            .Replace(",", "", StringComparison.Ordinal)
+            .Trim();
+        return int.TryParse(tail, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
+    }
+
+    private static string OperationSummary(FieldRule rule) => rule switch
+    {
+        ConstantRule => "constant",
+        OneOfRule => "oneOf",
+        RangeRule => "range",
+        PatternRule => "pattern",
+        SequenceRule => "sequence",
+        NullRule => "null",
+        _ => rule.GetType().Name,
+    };
 }
