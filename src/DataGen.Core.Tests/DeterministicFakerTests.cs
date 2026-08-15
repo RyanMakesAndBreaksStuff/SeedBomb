@@ -58,4 +58,26 @@ public class DeterministicFakerTests
         // Randomizer.Seed must be the exact same object reference — not replaced.
         Assert.Same(sentinel, Randomizer.Seed);
     }
+
+    [Fact]
+    public void Create_DefaultLocale_IsEnglish()
+    {
+        var faker = DeterministicFaker.Create(42, 0);
+        Assert.Equal(DeterministicFaker.DefaultLocale, faker.Locale);
+        Assert.Equal("en", faker.Locale);
+    }
+
+    [Fact]
+    public void Create_BlankLocale_FallsBackToEnglish()
+    {
+        var faker = DeterministicFaker.Create(42, 0, "   ");
+        Assert.Equal("en", faker.Locale);
+    }
+
+    [Fact]
+    public void Create_ExplicitLocale_IsApplied()
+    {
+        var faker = DeterministicFaker.Create(42, 0, "ja");
+        Assert.Equal("ja", faker.Locale);
+    }
 }

@@ -216,7 +216,7 @@ public class BulkCreator : IBulkCreator
         var alternateKeyAttrs = GetAlternateKeyAttributes(meta);
         var specialHandlingAttrs = GetRoutableSpecialHandlingAttributes(meta);
         var hasMoney = specialHandlingAttrs.Any(a => a is MoneyAttributeMetadata);
-        var faker = DeterministicFaker.Create(config.Seed, entityIndex);
+        var faker = DeterministicFaker.Create(config.Seed, entityIndex, config.Locale);
         var entities = new List<Entity>(recordCount);
 
         // Task 6 preflight: resolve + validate every configured field rule for this table once,

@@ -21,6 +21,12 @@ public record GenerationConfig
     public int Seed { get; init; } = 42;
 
     /// <summary>
+    /// Bogus locale for this run. Default is <c>en</c>. Not per-rule.
+    /// The WPF surface is read-only until a locale picker ships.
+    /// </summary>
+    public string Locale { get; init; } = "en";
+
+    /// <summary>
     /// Gets the batch size for bulk creation. Default is 500.
     /// </summary>
     public int BatchSize { get; init; } = 500;

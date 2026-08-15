@@ -5,7 +5,7 @@
     through the footer's Back/Next. Nothing is written to Dataverse until Start on step 4.
     The run sheet overlays the whole page while IsRunning.
 
-    Existing VM members reused: Steps, SelectedEntities, EntitiesSummary, Seed, BatchSize,
+    Existing VM members reused: Steps, SelectedEntities, EntitiesSummary, Seed, Locale, BatchSize,
     MaxParallelism, ReviewedRuleCount, LoadRulesCommand, GoToReviewCommand, StartGenerateCommand,
     ResetCommand, RunId. New: CurrentStep, CanGoNext/CanGoBack, GoNextCommand/GoBackCommand, Run.
 -->
@@ -233,6 +233,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
@@ -241,11 +243,27 @@
                                           Value="{Binding Seed}" Minimum="0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
+                            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Locale"/>
+                            <Border Height="{DynamicResource DG.Size.Control}"
+                                    Background="{DynamicResource DG.CardSunken}"
+                                    BorderBrush="{DynamicResource DG.ControlBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource DG.Radius.Control}"
+                                    Padding="11,0"
+                                    ToolTip="Bogus locale is English for this version. A picker ships later.">
+                                <TextBlock Text="{Binding Locale}"
+                                           VerticalAlignment="Center"
+                                           FontSize="{DynamicResource DG.Type.Caption}"
+                                           Foreground="{DynamicResource DG.Text2}"
+                                           AutomationProperties.Name="Locale"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Batch size"/>
                             <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
                                           Value="{Binding BatchSize}" Minimum="1" Maximum="1000"/>
                         </StackPanel>
-                        <StackPanel Grid.Column="4">
+                        <StackPanel Grid.Column="6">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Parallelism"/>
                             <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
                                           Value="{Binding MaxParallelism}" Minimum="1" Maximum="16"/>

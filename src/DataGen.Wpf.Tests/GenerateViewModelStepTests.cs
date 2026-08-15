@@ -482,6 +482,15 @@ public sealed class GenerateViewModelStepTests
         var viewModel = CreateViewModel(out _, out _, out _);
         viewModel.Seed = 40719;
         Assert.Contains("seed 40719", viewModel.ProfileSummaryLine, StringComparison.Ordinal);
+        Assert.EndsWith("· en", viewModel.ProfileSummaryLine);
+    }
+
+    [Fact]
+    public void Locale_is_english_and_read_only()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        Assert.Equal("en", viewModel.Locale);
+        Assert.Contains(viewModel.RunPlanStats, row => row.Label == "Locale" && row.Value == "en");
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────────

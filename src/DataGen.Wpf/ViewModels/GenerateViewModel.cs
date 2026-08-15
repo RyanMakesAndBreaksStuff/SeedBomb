@@ -4,6 +4,7 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
+using DataGen.Core.Generators;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk;
@@ -221,6 +222,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RunConfirmationLine), nameof(RunPlanStats), nameof(ProfileSummaryLine))]
     private int _seed = 42;
+
+    /// <summary>Run-level Bogus locale. Read-only; always <c>en</c> until a picker ships.</summary>
+    public string Locale => DeterministicFaker.DefaultLocale;
     [ObservableProperty] private int _batchSize = 500;
     [ObservableProperty] private int _maxParallelism;
 
@@ -346,7 +350,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>PROFILE card second line.</summary>
     public string ProfileSummaryLine =>
-        $"{ReviewedRuleCount} rules · seed {Seed}";
+        $"{ReviewedRuleCount} rules · seed {Seed} · {Locale}";
 
     /// <summary>Handoff alias used by the mock Change profile button.</summary>
     public IRelayCommand ChangeProfileCommand => OpenProfilesCommand;
@@ -375,6 +379,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         new("Rows", PlannedTotal.ToString("N0")),
         new("Rules", ReviewedRuleCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         new("Seed", Seed.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        new("Locale", Locale),
     ];
 
     /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
@@ -804,6 +809,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 e => e.LogicalName,
                 e => rawCounts.GetValueOrDefault(e.LogicalName, _defaultRecordCount)),
             Seed = Seed,
+            Locale = Locale,
             BatchSize = BatchSize,
             MaxParallelism = MaxParallelism == 0 ? null : MaxParallelism,
             FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
