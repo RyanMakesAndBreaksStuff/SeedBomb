@@ -52,6 +52,31 @@ public class FieldRulesViewModelTests
     }
 
     [Fact]
+    public void HardReset_then_DiscardDraft_does_not_restore_rules()
+    {
+        var vm = new FieldRulesViewModel();
+        vm.SelectTable("account");
+        vm.SetRule("account", "description", new ConstantRule(J("\"old\"")), "Description", "old");
+        vm.Commit();
+        var events = 0;
+        vm.DraftChanged += (_, _) => events++;
+        var revision = vm.Revision;
+
+        vm.HardReset();
+
+        Assert.Equal(1, events);
+        Assert.True(vm.Revision > revision);
+        Assert.False(vm.IsDirty);
+        Assert.Empty(vm.GetRules());
+        Assert.Empty(vm.Rows);
+
+        vm.DiscardDraft();
+        Assert.Empty(vm.GetRules());
+        Assert.Empty(vm.Rows);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
     public void Every_draft_mutation_changes_revision()
     {
         var vm = new FieldRulesViewModel();

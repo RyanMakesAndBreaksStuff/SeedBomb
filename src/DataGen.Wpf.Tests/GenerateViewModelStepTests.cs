@@ -493,6 +493,56 @@ public sealed class GenerateViewModelStepTests
         Assert.Contains(viewModel.RunPlanStats, row => row.Label == "Locale" && row.Value == "en");
     }
 
+    [Fact]
+    public async Task CommitThenResetThenDiscard_LeavesNoPersistedDraft()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "datagen-t3-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var profiles = new JsonProfileService(root);
+            var generationMock = new Mock<IWpfGenerationService>();
+            var vm = new GenerateViewModel(
+                generationMock.Object,
+                Mock.Of<IRunHistoryService>(),
+                Mock.Of<ISettingsService>(),
+                Mock.Of<ISnackbarService>(),
+                Mock.Of<ILogger<GenerateViewModel>>(),
+                Mock.Of<IMetadataProvider>(),
+                profiles,
+                Mock.Of<IContentDialogService>(),
+                new RunViewModel(generationMock.Object));
+
+            var fieldRules = new FieldRulesViewModel();
+            vm.AttachFieldRules(fieldRules);
+            fieldRules.SelectTable("account");
+            fieldRules.SetRule(
+                "account",
+                "name",
+                new ConstantRule(System.Text.Json.JsonDocument.Parse("\"x\"").RootElement),
+                "Name",
+                "x");
+            fieldRules.Commit();
+
+            await Task.Delay(800, TestContext.Current.CancellationToken);
+            var draftPath = Path.Combine(root, "draft.profile.json");
+            Assert.True(File.Exists(draftPath));
+
+            await vm.ResetWithoutPromptAsync();
+            fieldRules.DiscardDraft();
+            await Task.Delay(800, TestContext.Current.CancellationToken);
+
+            Assert.Empty(fieldRules.GetRules());
+            Assert.False(fieldRules.IsDirty);
+            Assert.Empty(fieldRules.Rows);
+            Assert.False(File.Exists(draftPath));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best-effort temp cleanup */ }
+        }
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────────
 
     private static GenerateViewModel CreateViewModel(

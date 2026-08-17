@@ -81,6 +81,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private readonly HashSet<string> _queueCompletedEntities = new(StringComparer.OrdinalIgnoreCase);
     private string? _queueCurrentEntity;
     private CancellationTokenSource? _draftSaveCts;
+    private Task? _draftSaveTask;
     private Profile? _restoredDraft;
     private FieldOverridesViewModel? _fieldOverrides;
     private FieldRulesViewModel _fieldRules;
@@ -752,6 +753,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     private async Task WipeWizardAsync()
     {
+        await CancelPendingAutosaveAsync();
+
         SelectedEntities = [];
         CurrentProgress = null;
         LastResult = null;
@@ -774,9 +777,11 @@ public sealed partial class GenerateViewModel : ViewModelBase
         Seed = 42;
         ActiveProfileName = "No profile loaded";
         _restoredDraft = null;
-        _fieldRules?.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase));
+        _fieldRules?.HardReset();
 
         _rulesRequest?.Clear();
+
+        await CancelPendingAutosaveAsync();
 
         try
         {
@@ -1078,8 +1083,21 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _draftSaveCts?.Cancel();
         _draftSaveCts?.Dispose();
         _draftSaveCts = new CancellationTokenSource();
-        var ct = _draftSaveCts.Token;
-        _ = DebouncedSaveDraftAsync(ct);
+        _draftSaveTask = DebouncedSaveDraftAsync(_draftSaveCts.Token);
+    }
+
+    private async Task CancelPendingAutosaveAsync()
+    {
+        _draftSaveCts?.Cancel();
+        if (_draftSaveTask is { } pending)
+        {
+            try { await pending; }
+            catch (OperationCanceledException) { }
+        }
+
+        _draftSaveCts?.Dispose();
+        _draftSaveCts = null;
+        _draftSaveTask = null;
     }
 
     private async Task DebouncedSaveDraftAsync(CancellationToken ct)

@@ -86,6 +86,17 @@ public sealed partial class FieldRulesViewModel : ObservableObject
         RebuildRows();
     }
 
+    /// <summary>Clears draft and committed snapshot as one step so <see cref="DiscardDraft"/> cannot resurrect rules.</summary>
+    public void HardReset()
+    {
+        _draft = new(StringComparer.OrdinalIgnoreCase);
+        _committed = new(StringComparer.OrdinalIgnoreCase);
+        IsDirty = false;
+        Revision++;
+        DraftChanged?.Invoke(this, EventArgs.Empty);
+        RebuildRows();
+    }
+
     /// <summary>
     /// Replaces the entire draft with <paramref name="rules"/> (Load / Import → board).
     /// One revision bump; board receives <c>EffectiveRule</c> values only.
