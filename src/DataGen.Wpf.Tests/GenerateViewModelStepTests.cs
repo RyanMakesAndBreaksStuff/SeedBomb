@@ -223,6 +223,21 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GoToReview_BogusRule_UsesContextAndSessionPreview()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.False(viewModel.ReviewHasErrors);
+        var effective = Assert.IsType<BogusRule>(viewModel.ReviewedRules!["account"]["name"]);
+        Assert.Equal("NAME", effective.Api);
+        Assert.Equal(5, viewModel.ReviewPreviewRows.Single().Values.Count);
+        Assert.Equal("Kurtis", viewModel.ReviewPreviewRows.Single().Values[0]);
+    }
+
+    [Fact]
     public async Task OnNavigatedToAppliesSettingsAndNotifiesDefaultRecordCount()
     {
         var settingsMock = new Mock<ISettingsService>();

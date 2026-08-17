@@ -182,6 +182,19 @@ public sealed class RuleEditorViewModelTests
     }
 
     [Fact]
+    public void ApplyExistingBogusRule_PreviewsThroughEvaluatorSession()
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 42, runId: "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.ApplyExistingRule(new BogusRule("NAME", "firstName", 1));
+
+        Assert.Equal("bogus", vm.SelectedOp);
+        Assert.True(vm.CanSave);
+        Assert.Equal("Kurtis", vm.PreviewValues[0]);
+        Assert.DoesNotContain(vm.Messages, m => m.Code == RuleMessageCode.ContextRequired);
+    }
+
+    [Fact]
     public void TemplateExpressionAliasesTemplate()
     {
         var vm = new RuleEditorViewModel(BuildEntity(), 10, 1, "r1");

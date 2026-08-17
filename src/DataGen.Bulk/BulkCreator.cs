@@ -68,94 +68,104 @@ public class BulkCreator : IBulkCreator
         ArgumentNullException.ThrowIfNull(entityMetadata);
         ArgumentNullException.ThrowIfNull(graph);
 
-        var pool = new DataverseRecordPool();
-        await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
-        await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
-
-        var sortedEntities = _topologicalSort.Sort(graph);
-        var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
-        var allErrors = new List<BatchError>();
-        var runStart = DateTimeOffset.UtcNow;
-
-        // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
-        var effectiveDop = config.MaxParallelism ?? 8;
-
-        if (config.RecordCounts.Values.Sum() >= 5000 && config.MaxParallelism is null)
-            await WarmupAndAdoptRecommendedDopAsync(ct).ConfigureAwait(false);
-
-        _logger.LogInformation(
-            "Starting bulk creation for {EntityCount} entities.",
-            sortedEntities.Count);
-
-        for (int entityIndex = 0; entityIndex < sortedEntities.Count; entityIndex++)
+        PreparedBogusRun? preparedRun = null;
+        try
         {
-            var entityName = sortedEntities[entityIndex];
-            ct.ThrowIfCancellationRequested();
+            preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
-            if (!config.RecordCounts.TryGetValue(entityName, out var recordCount) || recordCount <= 0)
-            {
-                _logger.LogDebug("Skipping {Entity}: no record count specified.", entityName);
-                continue;
-            }
+            var pool = new DataverseRecordPool();
+            await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
+            await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
 
-            if (!entityMetadata.TryGetValue(entityName, out var meta))
-            {
-                _logger.LogWarning("Skipping {Entity}: metadata not found.", entityName);
-                continue;
-            }
+            var sortedEntities = _topologicalSort.Sort(graph);
+            var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
+            var allErrors = new List<BatchError>();
+            var runStart = DateTimeOffset.UtcNow;
 
-            _logger.LogInformation(
-                "Generating {RecordCount} records for {Entity}.",
-                recordCount, entityName);
+            // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
+            var effectiveDop = config.MaxParallelism ?? 8;
 
-            var (createdIds, errors) = await CreateEntityRecordsAsync(
-                entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, progress, ct).ConfigureAwait(false);
-
-            pool.Add(entityName, createdIds);
-            allCreatedRecords[entityName] = createdIds.AsReadOnly();
-            allErrors.AddRange(errors);
+            if (config.RecordCounts.Values.Sum() >= 5000 && config.MaxParallelism is null)
+                await WarmupAndAdoptRecommendedDopAsync(ct).ConfigureAwait(false);
 
             _logger.LogInformation(
-                "Completed {Entity}: {Created}/{Requested} records created.",
-                entityName, createdIds.Count, recordCount);
+                "Starting bulk creation for {EntityCount} entities.",
+                sortedEntities.Count);
 
-            // After first entity, re-read server-recommended DOP if no user override
-            if (entityIndex == 0 && config.MaxParallelism is null &&
-                _service is ServiceClient sc)
+            for (int entityIndex = 0; entityIndex < sortedEntities.Count; entityIndex++)
             {
-                var hint = sc.RecommendedDegreesOfParallelism;
-                if (hint > 0)
+                var entityName = sortedEntities[entityIndex];
+                ct.ThrowIfCancellationRequested();
+
+                if (!config.RecordCounts.TryGetValue(entityName, out var recordCount) || recordCount <= 0)
                 {
-                    effectiveDop = hint;
-                    _logger.LogInformation(
-                        "DOP updated to {Dop} from ServiceClient.RecommendedDegreesOfParallelism",
-                        effectiveDop);
+                    _logger.LogDebug("Skipping {Entity}: no record count specified.", entityName);
+                    continue;
+                }
+
+                if (!entityMetadata.TryGetValue(entityName, out var meta))
+                {
+                    _logger.LogWarning("Skipping {Entity}: metadata not found.", entityName);
+                    continue;
+                }
+
+                _logger.LogInformation(
+                    "Generating {RecordCount} records for {Entity}.",
+                    recordCount, entityName);
+
+                var (createdIds, errors) = await CreateEntityRecordsAsync(
+                    entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, progress, ct).ConfigureAwait(false);
+
+                pool.Add(entityName, createdIds);
+                allCreatedRecords[entityName] = createdIds.AsReadOnly();
+                allErrors.AddRange(errors);
+
+                _logger.LogInformation(
+                    "Completed {Entity}: {Created}/{Requested} records created.",
+                    entityName, createdIds.Count, recordCount);
+
+                // After first entity, re-read server-recommended DOP if no user override
+                if (entityIndex == 0 && config.MaxParallelism is null &&
+                    _service is ServiceClient sc)
+                {
+                    var hint = sc.RecommendedDegreesOfParallelism;
+                    if (hint > 0)
+                    {
+                        effectiveDop = hint;
+                        _logger.LogInformation(
+                            "DOP updated to {Dop} from ServiceClient.RecommendedDegreesOfParallelism",
+                            effectiveDop);
+                    }
                 }
             }
+
+            // Phase 2: backfill deferred lookups
+            _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
+            var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
+                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
+            allErrors.AddRange(backfillErrors);
+
+            // Phase 3: N:N associations
+            var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
+                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
+            allErrors.AddRange(associateErrors);
+
+            var elapsed = DateTimeOffset.UtcNow - runStart;
+            _logger.LogInformation(
+                "Bulk creation complete. Total records: {Total}. Errors: {Errors}. Elapsed: {Elapsed}.",
+                allCreatedRecords.Values.Sum(v => v.Count), allErrors.Count, elapsed);
+
+            return new GenerationResult
+            {
+                CreatedRecords = allCreatedRecords,
+                Errors = allErrors.AsReadOnly(),
+                Elapsed = elapsed
+            };
         }
-
-        // Phase 2: backfill deferred lookups
-        _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
-        var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
-            graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
-        allErrors.AddRange(backfillErrors);
-
-        // Phase 3: N:N associations
-        var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
-            graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
-        allErrors.AddRange(associateErrors);
-
-        var elapsed = DateTimeOffset.UtcNow - runStart;
-        _logger.LogInformation(
-            "Bulk creation complete. Total records: {Total}. Errors: {Errors}. Elapsed: {Elapsed}.",
-            allCreatedRecords.Values.Sum(v => v.Count), allErrors.Count, elapsed);
-
-        return new GenerationResult
+        finally
         {
-            CreatedRecords = allCreatedRecords,
-            Errors = allErrors.AsReadOnly(),
-            Elapsed = elapsed
-        };
+            preparedRun?.Dispose();
+        }
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors)> CreateEntityRecordsAsync(
@@ -166,6 +176,7 @@ public class BulkCreator : IBulkCreator
         GenerationConfig config,
         int effectiveDop,
         DataverseRecordPool pool,
+        PreparedBogusRun? preparedRun,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
@@ -217,6 +228,8 @@ public class BulkCreator : IBulkCreator
         var specialHandlingAttrs = GetRoutableSpecialHandlingAttributes(meta);
         var hasMoney = specialHandlingAttrs.Any(a => a is MoneyAttributeMetadata);
         var faker = DeterministicFaker.Create(config.Seed, entityIndex, config.Locale);
+        using var bogusSession = new BogusEvaluatorSession(config.Locale);
+        var evalContext = new RuleEvaluationContext(entityName, config.Seed, config.Locale, config.RunId, recordCount);
         var entities = new List<Entity>(recordCount);
 
         // Task 6 preflight: resolve + validate every configured field rule for this table once,
@@ -238,7 +251,8 @@ public class BulkCreator : IBulkCreator
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
 
-                var validation = RuleValidator.Validate(rule, ruleAttr, recordCount, config.RunId);
+                var validation = RuleValidator.Validate(
+                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId));
                 if (!validation.IsValid)
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule for '{logicalName}' is invalid — " +
@@ -255,7 +269,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = RuleValueGenerator.Evaluate(rule, attr, config.Seed, entityName, i, config.RunId);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
@@ -267,7 +281,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = RuleValueGenerator.Evaluate(rule, attr, config.Seed, entityName, i, config.RunId);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -295,8 +309,7 @@ public class BulkCreator : IBulkCreator
         {
             for (int i = 0; i < entities.Count; i++)
             {
-                var fields = string.Join(", ", entities[i].Attributes
-                    .Select(a => $"{a.Key}={a.Value}"));
+                var fields = string.Join(", ", entities[i].Attributes.Select(DescribeField));
                 _logger.LogDebug("[Pre-create] {Entity}[{Index}]: {Fields}", entityName, i, fields);
             }
         }
@@ -619,5 +632,92 @@ public class BulkCreator : IBulkCreator
         {
             _logger.LogDebug(ex, "Warmup WhoAmI failed; continuing with default DOP.");
         }
+    }
+
+    private static async Task<PreparedBogusRun?> PrepareBogusRunOrThrowAsync(
+        GenerationConfig config,
+        IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
+        CancellationToken ct)
+    {
+        if (config.FieldRules is null)
+            return null;
+
+        var requests = new List<BogusPreparationRequest>();
+        foreach (var (table, columns) in config.FieldRules)
+        {
+            if (!config.RecordCounts.TryGetValue(table, out var recordCount) || recordCount <= 0)
+                continue;
+            if (!entityMetadata.TryGetValue(table, out var meta))
+                continue;
+
+            var attrs = (meta.Attributes ?? [])
+                .Where(a => a.LogicalName is not null)
+                .ToDictionary(a => a.LogicalName!, StringComparer.OrdinalIgnoreCase);
+
+            var context = new RuleEvaluationContext(table, config.Seed, config.Locale, config.RunId, recordCount);
+            foreach (var (column, rule) in columns)
+            {
+                if (rule is not BogusRule bogus)
+                    continue;
+                if (!attrs.TryGetValue(column, out var attr))
+                    continue;
+
+                requests.Add(new BogusPreparationRequest(bogus, attr, table, column, context));
+            }
+        }
+
+        if (requests.Count == 0)
+            return null;
+
+        var preparation = await BogusRulePreparer.PrepareRun(requests, config.AllowRiskyBogusValues, ct)
+            .ConfigureAwait(false);
+        if (!preparation.IsBlocked)
+            return preparation.Run;
+
+        var detail = string.Join(" ", preparation.Messages
+            .Where(m => m.Severity == RuleMessageSeverity.Error)
+            .Select(m => m.Text));
+        throw new DataGenerationException(
+            string.IsNullOrWhiteSpace(detail) ? "Bogus run preparation blocked." : detail);
+    }
+
+    private static object? ResolveRuleValue(
+        FieldRule rule,
+        AttributeMetadata attr,
+        RuleEvaluationContext context,
+        int rowIndex,
+        PreparedBogusRun? preparedRun,
+        BogusEvaluatorSession session)
+    {
+        if (rule is not BogusRule bogus)
+            return RuleValueGenerator.Evaluate(rule, attr, context.Seed, context.Table, rowIndex, context.RunId);
+
+        var column = attr.LogicalName ?? string.Empty;
+        if (preparedRun is not null
+            && preparedRun.TryGetValue(context.Table, column, context, rowIndex, out var cached)
+            && cached is not null)
+        {
+            return cached;
+        }
+
+        PreparedBogusRule compiled;
+        if (preparedRun is not null && preparedRun.TryGetCompiled(context.Table, column, out var prepared) && prepared is not null)
+            compiled = prepared;
+        else
+            compiled = BogusRulePreparer.CompileRule(bogus, attr, context);
+
+        return session.Evaluate(compiled, attr, context, rowIndex);
+    }
+
+    private static string DescribeField(KeyValuePair<string, object> field)
+    {
+        var value = field.Value;
+        var length = value switch
+        {
+            string s => s.Length,
+            byte[] b => b.Length,
+            _ => 0,
+        };
+        return $"{field.Key}:{value?.GetType().Name ?? "null"}/{length}";
     }
 }

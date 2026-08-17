@@ -232,4 +232,30 @@ public sealed class ProfileImportFlowTests : IDisposable
         Assert.Equal("BASE_CURRENCY", ProfileImport.ToReasonCode(EligibilityReason.BaseCurrency));
         Assert.Equal("PLATFORM_KEY", ProfileImport.ToReasonCode(EligibilityReason.PlatformKey));
     }
+
+    [Fact]
+    public void ValidateAgainstMetadata_BogusRule_UsesTableContext()
+    {
+        var meta = BuildAccountMetadata();
+        var profile = new Profile(
+            Profile.CurrentProfileVersion,
+            "bogus-import",
+            null,
+            Seed: null,
+            [
+                new ProfileTable("account", 10, new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["name"] = new BogusRule("NAME", "firstName", 1),
+                }),
+            ]);
+
+        var report = ProfileImport.ValidateAgainstMetadata(
+            profile,
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = meta },
+            runId: "run-test");
+
+        Assert.Equal(1, report.AppliedRuleCount);
+        Assert.IsType<BogusRule>(report.BoardRules["account"]["name"]);
+        Assert.DoesNotContain(report.NotImported, n => n.Contains("validation context", StringComparison.OrdinalIgnoreCase));
+    }
 }

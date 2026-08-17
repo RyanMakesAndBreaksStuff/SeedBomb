@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DataGen.Core.Generators;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.DependencyInjection;
@@ -122,6 +123,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     private IReadOnlyList<RuleMessage> _messages = [];
     private IReadOnlyList<string> _previewValues = [];
     private FieldRule? _effectiveRule;
+    private FieldRule? _restoredBogus;
 
     /// <summary>Initialises the editor from full live entity metadata (Task 9 supplies this via <c>IMetadataProvider</c>).</summary>
     /// <param name="meta">Full entity metadata — editor never derives columns from <c>EntitySummary</c> or creates a provider.</param>
@@ -387,6 +389,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(rule);
 
+        _restoredBogus = null;
         switch (rule)
         {
             case ConstantRule c:
@@ -414,6 +417,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject
                 break;
             case NullRule:
                 SelectedOp = "null";
+                break;
+            case BogusRule b:
+                _restoredBogus = b;
+                SelectedOp = "bogus";
                 break;
         }
     }
@@ -692,16 +699,28 @@ public sealed partial class RuleEditorViewModel : ObservableObject
             }
             else
             {
-                var result = RuleValidator.Validate(draft, attr, _recordCount, _runId);
+                var result = RuleValidator.Validate(
+                    draft, attr, new RuleValidationContext(_table, _recordCount, _runId));
                 messages = result.Messages.ToList();
                 if (result.IsValid && result.EffectiveRule is not null)
                 {
                     _effectiveRule = result.EffectiveRule;
                     var previewSeed = _seed + _previewSalt;
-                    for (var row = 0; row < 3; row++)
+                    var eval = new RuleEvaluationContext(_table, previewSeed, DeterministicFaker.DefaultLocale, _runId, _recordCount);
+                    if (result.EffectiveRule is BogusRule bogus)
                     {
-                        var value = RuleValueGenerator.Evaluate(result.EffectiveRule, attr, previewSeed, _table, row, _runId);
-                        preview.Add(FormatPreview(value));
+                        var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
+                        using var session = new BogusEvaluatorSession(eval.Locale);
+                        for (var row = 0; row < 3; row++)
+                            preview.Add(FormatPreview(session.Evaluate(prepared, attr, eval, row)));
+                    }
+                    else
+                    {
+                        for (var row = 0; row < 3; row++)
+                        {
+                            var value = RuleValueGenerator.Evaluate(result.EffectiveRule, attr, previewSeed, _table, row, _runId);
+                            preview.Add(FormatPreview(value));
+                        }
                     }
                 }
             }
@@ -743,6 +762,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         "pattern" => string.IsNullOrEmpty(Template) ? null : new PatternRule(Template),
         "sequence" => TrySequence(),
         "null" => new NullRule(),
+        "bogus" => _restoredBogus,
         _ => null,
     };
 

@@ -97,7 +97,8 @@ public static class ProfileImport
                     continue;
                 }
 
-                var result = RuleValidator.Validate(rule, attr, table.Count, runId);
+                var result = RuleValidator.Validate(
+                    rule, attr, new RuleValidationContext(table.Table, table.Count, runId));
                 if (!result.IsValid || result.EffectiveRule is null)
                 {
                     var detail = result.Messages.FirstOrDefault(m => m.Severity == RuleMessageSeverity.Error)?.Text

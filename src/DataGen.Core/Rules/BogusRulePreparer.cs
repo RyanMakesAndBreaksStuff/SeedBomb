@@ -430,6 +430,20 @@ public sealed class PreparedBogusRun : IDisposable
         return _caches.ContainsKey(new EntryKey(tableLogicalName, columnLogicalName));
     }
 
+    /// <summary>Returns the compiled rule for a column prepared in this run.</summary>
+    public bool TryGetCompiled(string tableLogicalName, string columnLogicalName, out PreparedBogusRule? rule)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_rules.TryGetValue(new EntryKey(tableLogicalName, columnLogicalName), out var found))
+        {
+            rule = found;
+            return true;
+        }
+
+        rule = null;
+        return false;
+    }
+
     /// <summary>Returns a cached prepared value after validating context, count, and engine version.</summary>
     /// <param name="tableLogicalName">Canonical table key.</param>
     /// <param name="columnLogicalName">Canonical column key.</param>

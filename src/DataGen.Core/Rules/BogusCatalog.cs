@@ -436,6 +436,11 @@ public static class BogusCatalogQuery
 
         return false;
     }
+
+    /// <summary>True when the endpoint is retained and its risk class is not <c>None</c>.</summary>
+    public static bool IsRisky(string api, string endpoint) =>
+        BogusCatalog.TryGet(new BogusEndpointId(api, endpoint), out var descriptor)
+        && descriptor.Risk != BogusRiskClass.None;
 }
 
 /// <summary>UI-facing endpoint choice. Id is the ordinal catalog ID; DisplayName is presentation only.</summary>

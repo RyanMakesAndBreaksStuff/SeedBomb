@@ -6,6 +6,7 @@ using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
+using DataGen.Core.Rules;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
@@ -55,6 +56,9 @@ public sealed partial class RunViewModel : ObservableObject
     private int _seed;
     private string _environmentHost = "";
     private bool _suppressKeepPersist;
+
+    /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
+    internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
 
     /// <summary>Optional services so grouping tests can <c>new RunViewModel()</c> and retry can pass a mock.</summary>
     /// <param name="generation">Pipeline used for first run and retry. Null disables retry.</param>
@@ -161,12 +165,19 @@ public sealed partial class RunViewModel : ObservableObject
         if (_generation is null)
             throw new InvalidOperationException("Generation service is not configured.");
 
-        _lastConfig = config;
+        _lastConfig = config with { AllowRiskyBogusValues = false };
         _environmentHost = environmentHost;
         _plannedTables = tables;
         _plannedTotal = plannedTotal;
         _seed = config.Seed;
         CurrentRunId = Guid.NewGuid();
+
+        if (!config.AllowRiskyBogusValues && ContainsRiskyBogus(config))
+        {
+            if (!await ConfirmRiskyBogusAsync())
+                throw new OperationCanceledException();
+            config = config with { AllowRiskyBogusValues = true };
+        }
 
         await LoadKeepWindowOpenAsync();
         StartRun(environmentHost, config.Seed, plannedTotal, tables);
@@ -261,7 +272,7 @@ public sealed partial class RunViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(result);
 
         if (config is not null)
-            _lastConfig = config;
+            _lastConfig = config with { AllowRiskyBogusValues = false };
         _environmentHost = environmentHost;
         _seed = seed;
         if (CurrentRunId == Guid.Empty)
@@ -356,6 +367,40 @@ public sealed partial class RunViewModel : ObservableObject
         };
 
         await ExecuteAsync(retryConfig, _environmentHost, names, counts.Values.Sum());
+    }
+
+    private async Task<bool> ConfirmRiskyBogusAsync()
+    {
+        if (ConfirmRiskyBogus is not null)
+            return await ConfirmRiskyBogus();
+        if (_dialogs is null)
+            return false;
+
+        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+        {
+            Title = "Allow risky generated values",
+            Content = "This run includes Bogus endpoints that can produce routable, financial, or external values. Continue?",
+            PrimaryButtonText = "Allow",
+            CloseButtonText = "Cancel",
+        });
+        return result == ContentDialogResult.Primary;
+    }
+
+    private static bool ContainsRiskyBogus(GenerationConfig config)
+    {
+        if (config.FieldRules is null)
+            return false;
+
+        foreach (var columns in config.FieldRules.Values)
+        {
+            foreach (var rule in columns.Values)
+            {
+                if (rule is BogusRule bogus && BogusCatalogQuery.IsRisky(bogus.Api, bogus.Endpoint))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     [RelayCommand]

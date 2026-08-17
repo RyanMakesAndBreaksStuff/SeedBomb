@@ -1,4 +1,5 @@
 using System.Reflection;
+using DataGen.Core.Rules;
 
 namespace DataGen.Integration.Tests;
 
@@ -271,5 +272,62 @@ public class BulkCreatorPipelineTests
         Assert.Equal(0, result.TotalRecords);
         serviceMock.Verify(s => s.ExecuteAsync(
             It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task BogusPreviewContext_MatchesWrittenProductionValues()
+    {
+        var captured = new List<Entity>();
+        var serviceMock = MakeServiceMock(supportsCreateMultiple: false);
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.Is<ExecuteMultipleRequest>(_ => true), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
+            {
+                var emr = (ExecuteMultipleRequest)req;
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (var i = 0; i < emr.Requests.Count; i++)
+                {
+                    if (emr.Requests[i] is CreateRequest cr)
+                        captured.Add(cr.Target);
+                    var createResp = new CreateResponse();
+                    createResp.Results["id"] = Guid.NewGuid();
+                    responses.Add(new ExecuteMultipleResponseItem { RequestIndex = i, Response = createResp });
+                }
+                var execMultiResp = new ExecuteMultipleResponse();
+                execMultiResp.Results["Responses"] = responses;
+                execMultiResp.Results["IsFaulted"] = false;
+                return execMultiResp;
+            });
+
+        var creator = MakeBulkCreator(serviceMock);
+        var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 100 };
+        var meta = MakeEntity("account", name);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var ctx = new RuleEvaluationContext("account", Seed: 42, Locale: "en", RunId: "parity", RecordCount: 5);
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 5 },
+            BatchSize = 10,
+            Seed = ctx.Seed,
+            Locale = ctx.Locale,
+            RunId = ctx.RunId,
+            FieldRules = new Dictionary<string, Dictionary<string, FieldRule>>
+            {
+                ["account"] = new() { ["name"] = new BogusRule("NAME", "firstName", 1) },
+            },
+        };
+
+        await creator.CreateAsync(
+            config,
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = meta },
+            graph);
+
+        Assert.Equal(5, captured.Count);
+        var prepared = BogusRulePreparer.CompileRule(new BogusRule("NAME", "firstName", 1), name, ctx);
+        using var session = new BogusEvaluatorSession(ctx.Locale);
+        for (var row = 0; row < 5; row++)
+            Assert.Equal(session.Evaluate(prepared, name, ctx, row), captured[row]["name"]);
     }
 }

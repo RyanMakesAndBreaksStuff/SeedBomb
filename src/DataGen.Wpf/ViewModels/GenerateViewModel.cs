@@ -664,7 +664,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
                     continue;
                 }
 
-                var result = RuleValidator.Validate(rule, attr, recordCount, RunId);
+                var result = RuleValidator.Validate(
+                    rule, attr, new RuleValidationContext(table, recordCount, RunId));
                 messages.AddRange(result.Messages);
                 if (result.Messages.Any(m => m.Severity == RuleMessageSeverity.Error))
                     hasErrors = true;
@@ -673,8 +674,20 @@ public sealed partial class GenerateViewModel : ViewModelBase
                     tableRules[column] = result.EffectiveRule;
 
                     var values = new List<string>(5);
+                    var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
+                    using var session = result.EffectiveRule is BogusRule
+                        ? new BogusEvaluatorSession(Locale)
+                        : null;
+                    PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
+                        ? BogusRulePreparer.CompileRule(bogus, attr, eval)
+                        : null;
                     for (var row = 0; row < 5; row++)
-                        values.Add(FormatPreview(RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId)));
+                    {
+                        var value = prepared is not null && session is not null
+                            ? session.Evaluate(prepared, attr, eval, row)
+                            : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
+                        values.Add(FormatPreview(value));
+                    }
 
                     var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
                     previewRows.Add(new ReviewPreviewRow(table, column, displayName, values));
