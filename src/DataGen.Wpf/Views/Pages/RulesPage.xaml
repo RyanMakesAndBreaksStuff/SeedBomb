@@ -10,6 +10,7 @@
       xmlns:vm="clr-namespace:Seedbomb.ViewModels"
       xmlns:sys="clr-namespace:System;assembly=mscorlib"
       xmlns:rules="clr-namespace:DataGen.Core.Rules;assembly=DataGen.Core"
+      xmlns:behaviors="clr-namespace:Seedbomb.Views.Behaviors"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:RuleEditorViewModel}"
@@ -425,6 +426,128 @@
                                           HorizontalAlignment="Left"
                                           MinWidth="120"
                                           Margin="0,8,0,0"/>
+                            </StackPanel>
+
+                            <!-- bogus -->
+                            <StackPanel Margin="0,0,0,16">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedOp}" Value="bogus">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+
+                                <TextBlock x:Name="BogusApiLabel"
+                                           Style="{DynamicResource DG.GroupLabel}"
+                                           Text="API"/>
+                                <ComboBox x:Name="BogusApiComboBox"
+                                          Style="{DynamicResource DG.ComboBox}"
+                                          ItemsSource="{Binding BogusApis}"
+                                          SelectedItem="{Binding SelectedBogusApi, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=BogusApiLabel}"
+                                          AutomationProperties.Name="API"
+                                          behaviors:ValidationFocusBehavior.InputTarget="Api"
+                                          TabIndex="0"/>
+
+                                <TextBlock x:Name="BogusEndpointLabel"
+                                           Style="{DynamicResource DG.GroupLabel}"
+                                           Text="Endpoint"
+                                           Margin="0,8,0,0"/>
+                                <ComboBox x:Name="BogusEndpointComboBox"
+                                          Style="{DynamicResource DG.ComboBox}"
+                                          ItemsSource="{Binding BogusEndpoints}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Id"
+                                          SelectedValue="{Binding SelectedBogusEndpoint, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=BogusEndpointLabel}"
+                                          AutomationProperties.Name="Endpoint"
+                                          behaviors:ValidationFocusBehavior.InputTarget="Endpoint"
+                                          TabIndex="1"/>
+
+                                <Grid Margin="0,8,0,0"
+                                      Visibility="{Binding BogusHasNumericArgs,
+                                                   Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock x:Name="BogusMinNumberLabel"
+                                                   Style="{DynamicResource DG.GroupLabel}"
+                                                   Text="Minimum"/>
+                                        <TextBox x:Name="BogusMinNumberTextBox"
+                                                 Style="{DynamicResource DG.TextBox}"
+                                                 Text="{Binding BogusMinNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                                 AutomationProperties.LabeledBy="{Binding ElementName=BogusMinNumberLabel}"
+                                                 AutomationProperties.Name="Minimum"
+                                                 behaviors:ValidationFocusBehavior.InputTarget="Minimum"
+                                                 TabIndex="2"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock x:Name="BogusMaxNumberLabel"
+                                                   Style="{DynamicResource DG.GroupLabel}"
+                                                   Text="Maximum"/>
+                                        <TextBox x:Name="BogusMaxNumberTextBox"
+                                                 Style="{DynamicResource DG.TextBox}"
+                                                 Text="{Binding BogusMaxNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                                 AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxNumberLabel}"
+                                                 AutomationProperties.Name="Maximum"
+                                                 behaviors:ValidationFocusBehavior.InputTarget="Maximum"
+                                                 TabIndex="3"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Margin="0,8,0,0"
+                                            Visibility="{Binding BogusHasLengthArg,
+                                                         Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock x:Name="BogusLengthLabel"
+                                               Style="{DynamicResource DG.GroupLabel}"
+                                               Text="Length"/>
+                                    <TextBox x:Name="BogusLengthTextBox"
+                                             Style="{DynamicResource DG.TextBox}"
+                                             Text="{Binding BogusLengthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                                             AutomationProperties.LabeledBy="{Binding ElementName=BogusLengthLabel}"
+                                             AutomationProperties.Name="Length"
+                                             behaviors:ValidationFocusBehavior.InputTarget="Length"
+                                             TabIndex="2"/>
+                                </StackPanel>
+
+                                <Grid Margin="0,8,0,0"
+                                      Visibility="{Binding BogusHasDateArgs,
+                                                   Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock x:Name="BogusMinDateLabel"
+                                                   Style="{DynamicResource DG.GroupLabel}"
+                                                   Text="Minimum date"/>
+                                        <ui:CalendarDatePicker x:Name="BogusMinDatePicker"
+                                                               Date="{Binding BogusMinDate, Mode=TwoWay, ValidatesOnNotifyDataErrors=True}"
+                                                               AutomationProperties.LabeledBy="{Binding ElementName=BogusMinDateLabel}"
+                                                               AutomationProperties.Name="Minimum date"
+                                                               behaviors:ValidationFocusBehavior.InputTarget="MinimumDate"
+                                                               TabIndex="2"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock x:Name="BogusMaxDateLabel"
+                                                   Style="{DynamicResource DG.GroupLabel}"
+                                                   Text="Maximum date"/>
+                                        <ui:CalendarDatePicker x:Name="BogusMaxDatePicker"
+                                                               Date="{Binding BogusMaxDate, Mode=TwoWay, ValidatesOnNotifyDataErrors=True}"
+                                                               AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxDateLabel}"
+                                                               AutomationProperties.Name="Maximum date"
+                                                               behaviors:ValidationFocusBehavior.InputTarget="MaximumDate"
+                                                               TabIndex="3"/>
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
 
                             <ui:InfoBar IsOpen="{Binding HasMessages}"
