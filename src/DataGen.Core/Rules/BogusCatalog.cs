@@ -441,6 +441,37 @@ public static class BogusCatalogQuery
     public static bool IsRisky(string api, string endpoint) =>
         BogusCatalog.TryGet(new BogusEndpointId(api, endpoint), out var descriptor)
         && descriptor.Risk != BogusRiskClass.None;
+
+    /// <summary>UI argument shape for a retained endpoint. Unknown IDs return <see cref="BogusUiArgumentKind.None"/>.</summary>
+    public static BogusUiArgumentKind ArgumentKind(string api, string endpoint)
+    {
+        if (!BogusCatalog.TryGet(new BogusEndpointId(api, endpoint), out var descriptor))
+            return BogusUiArgumentKind.None;
+
+        return descriptor.Arguments switch
+        {
+            NumericRangeContract { AcceptsAuthoredMinMax: true } => BogusUiArgumentKind.NumericRange,
+            LengthContract => BogusUiArgumentKind.Length,
+            DateRangeContract => BogusUiArgumentKind.DateRange,
+            _ => BogusUiArgumentKind.None,
+        };
+    }
+}
+
+/// <summary>Which authored arguments the editor should show for a Bogus endpoint.</summary>
+public enum BogusUiArgumentKind
+{
+    /// <summary>No authored arguments.</summary>
+    None,
+
+    /// <summary>Optional numeric min/max.</summary>
+    NumericRange,
+
+    /// <summary>Length.</summary>
+    Length,
+
+    /// <summary>Date min/max.</summary>
+    DateRange,
 }
 
 /// <summary>UI-facing endpoint choice. Id is the ordinal catalog ID; DisplayName is presentation only.</summary>

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Text.Json;
@@ -90,7 +91,7 @@ public sealed partial class OptionChoice : ObservableObject
 /// <see cref="RuleValidator"/>, and <see cref="RuleValueGenerator"/> (Wave 1, DataGen.Core.Rules);
 /// this class owns no eligibility, validation, or evaluation semantics of its own.
 /// </summary>
-public sealed partial class RuleEditorViewModel : ObservableObject
+public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataErrorInfo
 {
     // ── §3.1 Applies-to catalogs (Docs/field-rules-proto.html, table 3.1) ───────
     private static readonly string[] TextOps = ["constant", "oneOf", "pattern", "null"];
@@ -123,7 +124,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     private IReadOnlyList<RuleMessage> _messages = [];
     private IReadOnlyList<string> _previewValues = [];
     private FieldRule? _effectiveRule;
-    private FieldRule? _restoredBogus;
+    private bool _suppressBogusCascade;
+    private int _previewGeneration;
+    private CancellationTokenSource? _previewCts;
+    private HashSet<string> _errorProperties = [];
 
     /// <summary>Initialises the editor from full live entity metadata (Task 9 supplies this via <c>IMetadataProvider</c>).</summary>
     /// <param name="meta">Full entity metadata — editor never derives columns from <c>EntitySummary</c> or creates a provider.</param>
@@ -320,8 +324,72 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SelectedOperation));
         OnPropertyChanged(nameof(IsTemplateOperation));
+        if (value == "bogus")
+            RefreshBogusCatalogLists();
+        else if (!_suppressBogusCascade)
+            ClearBogusEditor();
         Revalidate();
     }
+
+    [ObservableProperty] private IReadOnlyList<string> _bogusApis = [];
+    [ObservableProperty] private string? _selectedBogusApi;
+    [ObservableProperty] private IReadOnlyList<BogusEndpointOption> _bogusEndpoints = [];
+    [ObservableProperty] private string? _selectedBogusEndpoint;
+    [ObservableProperty] private bool _bogusHasNumericArgs;
+    [ObservableProperty] private bool _bogusHasLengthArg;
+    [ObservableProperty] private bool _bogusHasDateArgs;
+    [ObservableProperty] private string _bogusMinNumber = "";
+    [ObservableProperty] private string _bogusMaxNumber = "";
+    [ObservableProperty] private string _bogusLengthText = "";
+    [ObservableProperty] private DateTime? _bogusMinDate;
+    [ObservableProperty] private DateTime? _bogusMaxDate;
+
+    /// <inheritdoc />
+    public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+
+    bool INotifyDataErrorInfo.HasErrors => _messages.Any(m => m.Severity == RuleMessageSeverity.Error);
+
+    /// <inheritdoc />
+    public IEnumerable GetErrors(string? propertyName)
+    {
+        if (string.IsNullOrEmpty(propertyName))
+            return _messages.Select(m => m.Text).ToList();
+
+        return _messages
+            .Where(m => PropertyNameFor(m.Target) == propertyName)
+            .Select(m => m.Text)
+            .ToList();
+    }
+
+    partial void OnSelectedBogusApiChanged(string? value)
+    {
+        BogusEndpoints = value is null || !TryTargetKind(out var kind)
+            ? []
+            : BogusCatalogQuery.EndpointsFor(value, kind);
+        if (_suppressBogusCascade)
+            return;
+        SelectedBogusEndpoint = null;
+        ClearAllBogusArguments();
+        Revalidate();
+        SaveProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSelectedBogusEndpointChanged(string? value)
+    {
+        if (_suppressBogusCascade)
+            return;
+        ApplyArgumentVisibility(value);
+        if (value is null)
+            ClearAllBogusArguments();
+        Revalidate();
+        SaveProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnBogusMinNumberChanged(string value) => Revalidate();
+    partial void OnBogusMaxNumberChanged(string value) => Revalidate();
+    partial void OnBogusLengthTextChanged(string value) => Revalidate();
+    partial void OnBogusMinDateChanged(DateTime? value) => Revalidate();
+    partial void OnBogusMaxDateChanged(DateTime? value) => Revalidate();
 
     [ObservableProperty]
     private string _constantText = string.Empty;
@@ -389,7 +457,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(rule);
 
-        _restoredBogus = null;
         switch (rule)
         {
             case ConstantRule c:
@@ -419,8 +486,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
                 SelectedOp = "null";
                 break;
             case BogusRule b:
-                _restoredBogus = b;
-                SelectedOp = "bogus";
+                RestoreBogus(b);
                 break;
         }
     }
@@ -679,6 +745,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         "pattern" => new("pattern", "pattern", "text template with tokens"),
         "sequence" => new("sequence", "sequence", "start + step per row"),
         "null" => new("null", "null", "leave unset (platform default)"),
+        "bogus" => new("bogus", "bogus", "generated by Bogus"),
         _ => new(op, op, string.Empty),
     };
 
@@ -692,50 +759,42 @@ public sealed partial class RuleEditorViewModel : ObservableObject
             && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
             && !string.IsNullOrEmpty(SelectedOp))
         {
-            var draft = TryBuildDraft(attr, SelectedOp);
-            if (draft is null)
+            if (SelectedOp == "bogus"
+                && (string.IsNullOrEmpty(SelectedBogusApi) || string.IsNullOrEmpty(SelectedBogusEndpoint)))
             {
-                messages.Add(new RuleMessage(RuleMessageSeverity.Error, "Enter a value for this rule."));
+                messages.Add(new RuleMessage(
+                    RuleMessageSeverity.Error,
+                    "Select a Bogus endpoint.",
+                    RuleMessageCode.UnknownEndpoint,
+                    RuleInputTarget.Endpoint));
             }
             else
             {
-                var result = RuleValidator.Validate(
-                    draft, attr, new RuleValidationContext(_table, _recordCount, _runId));
-                messages = result.Messages.ToList();
-                if (result.IsValid && result.EffectiveRule is not null)
+                var draft = TryBuildDraft(attr, SelectedOp);
+                if (draft is null)
                 {
-                    _effectiveRule = result.EffectiveRule;
-                    var previewSeed = _seed + _previewSalt;
-                    var eval = new RuleEvaluationContext(_table, previewSeed, DeterministicFaker.DefaultLocale, _runId, _recordCount);
-                    if (result.EffectiveRule is BogusRule bogus)
-                    {
-                        var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
-                        using var session = new BogusEvaluatorSession(eval.Locale);
-                        for (var row = 0; row < 3; row++)
-                            preview.Add(FormatPreview(session.Evaluate(prepared, attr, eval, row)));
-                    }
-                    else
-                    {
-                        for (var row = 0; row < 3; row++)
-                        {
-                            var value = RuleValueGenerator.Evaluate(result.EffectiveRule, attr, previewSeed, _table, row, _runId);
-                            preview.Add(FormatPreview(value));
-                        }
-                    }
+                    messages.Add(new RuleMessage(RuleMessageSeverity.Error, "Enter a value for this rule."));
+                }
+                else
+                {
+                    var result = RuleValidator.Validate(
+                        draft, attr, new RuleValidationContext(_table, _recordCount, _runId));
+                    messages = result.Messages.ToList();
+                    if (result.IsValid && result.EffectiveRule is not null)
+                        _effectiveRule = result.EffectiveRule;
                 }
             }
         }
 
-        _messages = messages;
-        _previewValues = preview;
-        RebuildPreviewRows();
+        _messages = messages.OrderBy(m => m.Severity == RuleMessageSeverity.Error ? 0 : 1).ToList();
+        PublishErrors();
         OnPropertyChanged(nameof(Messages));
         OnPropertyChanged(nameof(HasMessages));
         OnPropertyChanged(nameof(InfoBarMessage));
         OnPropertyChanged(nameof(InfoBarIsError));
-        OnPropertyChanged(nameof(PreviewValues));
         OnPropertyChanged(nameof(CanSave));
         SaveProfileCommand.NotifyCanExecuteChanged();
+        SchedulePreview();
     }
 
     private void RebuildPreviewRows()
@@ -762,7 +821,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         "pattern" => string.IsNullOrEmpty(Template) ? null : new PatternRule(Template),
         "sequence" => TrySequence(),
         "null" => new NullRule(),
-        "bogus" => _restoredBogus,
+        "bogus" => TryBuildBogus(),
         _ => null,
     };
 
@@ -982,14 +1041,337 @@ public sealed partial class RuleEditorViewModel : ObservableObject
         _ => "Other",
     };
 
-    private static IReadOnlyList<string> OpsFor(AttributeMetadata attr) => attr switch
+    private static IReadOnlyList<string> OpsFor(AttributeMetadata attr)
     {
-        StringAttributeMetadata or MemoAttributeMetadata => TextOps,
-        IntegerAttributeMetadata or BigIntAttributeMetadata or DecimalAttributeMetadata or MoneyAttributeMetadata => NumericOps,
-        DoubleAttributeMetadata => FloatOps,
-        DateTimeAttributeMetadata => DateOps,
-        EnumAttributeMetadata or BooleanAttributeMetadata => ChoiceOps,
-        _ => NoOps,
+        var ops = attr switch
+        {
+            StringAttributeMetadata or MemoAttributeMetadata => TextOps,
+            IntegerAttributeMetadata or BigIntAttributeMetadata or DecimalAttributeMetadata or MoneyAttributeMetadata => NumericOps,
+            DoubleAttributeMetadata => FloatOps,
+            DateTimeAttributeMetadata => DateOps,
+            BooleanAttributeMetadata => ChoiceOps,
+            EnumAttributeMetadata => ChoiceOps,
+            _ => NoOps,
+        };
+
+        if (attr is EnumAttributeMetadata)
+            return ops;
+        if (TryMapKind(attr, out var kind) && BogusCatalogQuery.HasAny(kind))
+            return [.. ops, "bogus"];
+        return ops;
+    }
+
+    private void RefreshBogusCatalogLists()
+    {
+        if (!TryTargetKind(out var kind))
+        {
+            BogusApis = [];
+            BogusEndpoints = [];
+            return;
+        }
+
+        BogusApis = BogusCatalogQuery.ApisFor(kind);
+        BogusEndpoints = SelectedBogusApi is null
+            ? []
+            : BogusCatalogQuery.EndpointsFor(SelectedBogusApi, kind);
+    }
+
+    private bool TryTargetKind(out DataverseValueKind kind)
+    {
+        kind = default;
+        return SelectedColumn is not null
+            && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
+            && TryMapKind(attr, out kind);
+    }
+
+    private static bool TryMapKind(AttributeMetadata attr, out DataverseValueKind kind)
+    {
+        switch (attr)
+        {
+            case StringAttributeMetadata:
+                kind = DataverseValueKind.String;
+                return true;
+            case MemoAttributeMetadata:
+                kind = DataverseValueKind.Memo;
+                return true;
+            case BooleanAttributeMetadata:
+                kind = DataverseValueKind.Boolean;
+                return true;
+            case IntegerAttributeMetadata:
+                kind = DataverseValueKind.Integer;
+                return true;
+            case BigIntAttributeMetadata:
+                kind = DataverseValueKind.BigInt;
+                return true;
+            case DecimalAttributeMetadata:
+                kind = DataverseValueKind.Decimal;
+                return true;
+            case DoubleAttributeMetadata:
+                kind = DataverseValueKind.Double;
+                return true;
+            case MoneyAttributeMetadata:
+                kind = DataverseValueKind.Money;
+                return true;
+            case DateTimeAttributeMetadata:
+                kind = DataverseValueKind.DateTime;
+                return true;
+            default:
+                kind = default;
+                return false;
+        }
+    }
+
+    private void RestoreBogus(BogusRule rule)
+    {
+        _suppressBogusCascade = true;
+        try
+        {
+            SelectedOp = "bogus";
+            RefreshBogusCatalogLists();
+            SelectedBogusApi = rule.Api;
+            if (TryTargetKind(out var kind))
+                BogusEndpoints = BogusCatalogQuery.EndpointsFor(rule.Api, kind);
+            SelectedBogusEndpoint = $"{rule.Api}.{rule.Endpoint}";
+            ApplyArgumentVisibility(SelectedBogusEndpoint);
+            RestoreBogusArguments(rule);
+        }
+        finally
+        {
+            _suppressBogusCascade = false;
+        }
+
+        Revalidate();
+    }
+
+    private void RestoreBogusArguments(BogusRule rule)
+    {
+        ClearAllBogusArguments();
+        if (rule.Args.TryGetValue("min", out var min))
+        {
+            if (BogusHasDateArgs && DateOnly.TryParse(min.GetString(), out var minDate))
+                BogusMinDate = minDate.ToDateTime(TimeOnly.MinValue);
+            else
+                BogusMinNumber = JsonElementToEditorText(min);
+        }
+
+        if (rule.Args.TryGetValue("max", out var max))
+        {
+            if (BogusHasDateArgs && DateOnly.TryParse(max.GetString(), out var maxDate))
+                BogusMaxDate = maxDate.ToDateTime(TimeOnly.MinValue);
+            else
+                BogusMaxNumber = JsonElementToEditorText(max);
+        }
+
+        if (rule.Args.TryGetValue("length", out var length))
+            BogusLengthText = JsonElementToEditorText(length);
+    }
+
+    private FieldRule? TryBuildBogus()
+    {
+        if (string.IsNullOrEmpty(SelectedBogusApi) || string.IsNullOrEmpty(SelectedBogusEndpoint))
+            return null;
+
+        var dot = SelectedBogusEndpoint.LastIndexOf('.');
+        var endpoint = dot >= 0 ? SelectedBogusEndpoint[(dot + 1)..] : SelectedBogusEndpoint;
+        Dictionary<string, JsonElement>? args = null;
+        if (BogusHasNumericArgs)
+        {
+            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            if (!string.IsNullOrWhiteSpace(BogusMinNumber)
+                && TryParseJsonNumber(BogusMinNumber, out var min))
+                args["min"] = min;
+            if (!string.IsNullOrWhiteSpace(BogusMaxNumber)
+                && TryParseJsonNumber(BogusMaxNumber, out var max))
+                args["max"] = max;
+            if (args.Count == 0)
+                args = null;
+        }
+        else if (BogusHasLengthArg && !string.IsNullOrWhiteSpace(BogusLengthText)
+                 && TryParseJsonNumber(BogusLengthText, out var length))
+        {
+            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal) { ["length"] = length };
+        }
+        else if (BogusHasDateArgs && BogusMinDate is { } minDate && BogusMaxDate is { } maxDate)
+        {
+            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+            {
+                ["min"] = JsonSerializer.SerializeToElement(DateOnly.FromDateTime(minDate).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
+                ["max"] = JsonSerializer.SerializeToElement(DateOnly.FromDateTime(maxDate).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
+            };
+        }
+
+        return new BogusRule(SelectedBogusApi, endpoint, 1, args);
+    }
+
+    private static bool TryParseJsonNumber(string text, out JsonElement element)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.ValueKind == JsonValueKind.Number)
+            {
+                element = doc.RootElement.Clone();
+                return true;
+            }
+        }
+        catch (JsonException)
+        {
+            // Malformed text is handed to the validator via a string element.
+        }
+
+        element = JsonSerializer.SerializeToElement(text);
+        return true;
+    }
+
+    private void ApplyArgumentVisibility(string? endpointId)
+    {
+        var kind = BogusUiArgumentKind.None;
+        if (SelectedBogusApi is not null && endpointId is not null)
+        {
+            var dot = endpointId.LastIndexOf('.');
+            var endpoint = dot >= 0 ? endpointId[(dot + 1)..] : endpointId;
+            kind = BogusCatalogQuery.ArgumentKind(SelectedBogusApi, endpoint);
+        }
+
+        BogusHasNumericArgs = kind == BogusUiArgumentKind.NumericRange;
+        BogusHasLengthArg = kind == BogusUiArgumentKind.Length;
+        BogusHasDateArgs = kind == BogusUiArgumentKind.DateRange;
+    }
+
+    private void ClearBogusEditor()
+    {
+        _suppressBogusCascade = true;
+        try
+        {
+            SelectedBogusApi = null;
+            SelectedBogusEndpoint = null;
+            BogusApis = [];
+            BogusEndpoints = [];
+            ClearAllBogusArguments();
+            ApplyArgumentVisibility(null);
+        }
+        finally
+        {
+            _suppressBogusCascade = false;
+        }
+    }
+
+    private void ClearAllBogusArguments()
+    {
+        BogusMinNumber = "";
+        BogusMaxNumber = "";
+        BogusLengthText = "";
+        BogusMinDate = null;
+        BogusMaxDate = null;
+    }
+
+    private void SchedulePreview()
+    {
+        var generation = Interlocked.Increment(ref _previewGeneration);
+        var effective = _effectiveRule;
+        var column = SelectedColumn;
+        if (effective is null
+            || column is null
+            || !_byName.TryGetValue(column.LogicalName, out var attr))
+        {
+            if (generation == _previewGeneration)
+                PublishPreview([]);
+            return;
+        }
+
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+        _previewCts = new CancellationTokenSource();
+        var ct = _previewCts.Token;
+        var seed = _seed + _previewSalt;
+        var table = _table;
+        var runId = _runId;
+        var count = _recordCount;
+        _ = RunPreviewAsync(generation, effective, attr, seed, table, runId, count, ct);
+    }
+
+    private async Task RunPreviewAsync(
+        int generation,
+        FieldRule effective,
+        AttributeMetadata attr,
+        int seed,
+        string table,
+        string runId,
+        int recordCount,
+        CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(150, ct);
+            if (generation != _previewGeneration)
+                return;
+
+            var preview = new List<string>(3);
+            var eval = new RuleEvaluationContext(table, seed, DeterministicFaker.DefaultLocale, runId, recordCount);
+            if (effective is BogusRule bogus)
+            {
+                var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
+                using var session = new BogusEvaluatorSession(eval.Locale);
+                for (var row = 0; row < 3; row++)
+                    preview.Add(FormatPreview(session.Evaluate(prepared, attr, eval, row)));
+            }
+            else
+            {
+                for (var row = 0; row < 3; row++)
+                    preview.Add(FormatPreview(RuleValueGenerator.Evaluate(effective, attr, seed, table, row, runId)));
+            }
+
+            if (generation != _previewGeneration)
+                return;
+            PublishPreview(preview);
+        }
+        catch (OperationCanceledException)
+        {
+            // superseded edit
+        }
+        catch (InvalidOperationException)
+        {
+            if (generation == _previewGeneration)
+                PublishPreview([]);
+        }
+    }
+
+    private void PublishPreview(IReadOnlyList<string> preview)
+    {
+        _previewValues = preview;
+        RebuildPreviewRows();
+        OnPropertyChanged(nameof(PreviewValues));
+    }
+
+    private void PublishErrors()
+    {
+        var next = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var message in _messages)
+        {
+            var name = PropertyNameFor(message.Target);
+            if (name is not null)
+                next.Add(name);
+        }
+
+        var union = new HashSet<string>(_errorProperties, StringComparer.Ordinal);
+        union.UnionWith(next);
+        _errorProperties = next;
+        ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(null));
+        foreach (var name in union)
+            ErrorsChanged?.Invoke(this, new DataErrorsChangedEventArgs(name));
+    }
+
+    private static string? PropertyNameFor(RuleInputTarget target) => target switch
+    {
+        RuleInputTarget.Rule => nameof(SelectedOp),
+        RuleInputTarget.Api => nameof(SelectedBogusApi),
+        RuleInputTarget.Endpoint => nameof(SelectedBogusEndpoint),
+        RuleInputTarget.Minimum => nameof(BogusMinNumber),
+        RuleInputTarget.Maximum => nameof(BogusMaxNumber),
+        RuleInputTarget.Length => nameof(BogusLengthText),
+        RuleInputTarget.MinimumDate => nameof(BogusMinDate),
+        RuleInputTarget.MaximumDate => nameof(BogusMaxDate),
+        _ => nameof(SelectedOp),
     };
 
     private IReadOnlyList<PickerColumn> Filter(List<PickerColumn> source) =>

@@ -12,6 +12,16 @@ namespace DataGen.Wpf.Tests;
 
 public sealed class RuleEditorViewModelTests
 {
+    private static StringAttributeMetadata StringColumn() =>
+        new() { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
+
+    private static RuleEditorViewModel EditorFor(AttributeMetadata _)
+    {
+        var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 42, runId: "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        return vm;
+    }
+
     // EntityMetadata.Attributes/Keys setters are non-public — same reflection-set pattern
     // already used by DataGen.Bulk.Tests/RuledGenerationTests.cs to build SDK metadata fixtures.
     private static EntityMetadata BuildEntity()
@@ -94,10 +104,10 @@ public sealed class RuleEditorViewModelTests
         var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 1, runId: "r1");
 
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
-        Assert.Equal(["constant", "oneOf", "pattern", "null"], vm.AvailableOps);
+        Assert.Equal(["constant", "oneOf", "pattern", "null", "bogus"], vm.AvailableOps);
 
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "numberofemployees");
-        Assert.Equal(["constant", "oneOf", "range", "sequence", "null"], vm.AvailableOps);
+        Assert.Equal(["constant", "oneOf", "range", "sequence", "null", "bogus"], vm.AvailableOps);
     }
 
     // 3. Routable-domain pattern warns but stays saveable (D3).
@@ -128,7 +138,7 @@ public sealed class RuleEditorViewModelTests
 
     // 5. Preview is engine-true: matches RuleValueGenerator.Evaluate for the same (seed, table, row, runId).
     [Fact]
-    public void PreviewValues_match_RuleValueGenerator_Evaluate_for_rows_0_to_2()
+    public async Task PreviewValues_match_RuleValueGenerator_Evaluate_for_rows_0_to_2()
     {
         var entity = BuildEntity();
         var attr = entity.Attributes.Single(a => a.LogicalName == "numberofemployees");
@@ -147,6 +157,7 @@ public sealed class RuleEditorViewModelTests
             .Select(v => v!.ToString() ?? string.Empty)
             .ToArray();
 
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         Assert.Equal(expected, vm.PreviewValues);
     }
 
@@ -182,7 +193,22 @@ public sealed class RuleEditorViewModelTests
     }
 
     [Fact]
-    public void ApplyExistingBogusRule_PreviewsThroughEvaluatorSession()
+    public void ApiChangeWhileEndpointAlreadyNull_StillRevalidatesAndNotifies()
+    {
+        var vm = EditorFor(StringColumn());
+        vm.SelectedOp = "bogus";
+        var canSaveRaised = 0;
+        vm.SaveProfileCommand.CanExecuteChanged += (_, _) => canSaveRaised++;
+
+        vm.SelectedBogusApi = "NAME";        // endpoint was already null
+
+        Assert.Null(vm.SelectedBogusEndpoint);
+        Assert.True(canSaveRaised > 0);
+        Assert.Contains(vm.GetErrors(nameof(vm.SelectedBogusEndpoint)).Cast<object>(), _ => true);
+    }
+
+    [Fact]
+    public async Task ApplyExistingBogusRule_PreviewsThroughEvaluatorSession()
     {
         var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 42, runId: "r1");
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
@@ -190,6 +216,7 @@ public sealed class RuleEditorViewModelTests
 
         Assert.Equal("bogus", vm.SelectedOp);
         Assert.True(vm.CanSave);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         Assert.Equal("Kurtis", vm.PreviewValues[0]);
         Assert.DoesNotContain(vm.Messages, m => m.Code == RuleMessageCode.ContextRequired);
     }
@@ -257,5 +284,126 @@ public sealed class RuleEditorViewModelTests
 
         vm.NavigateToProfilesCommand.Execute(null);
         navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+    }
+
+    [Fact]
+    public void BooleanColumn_OffersOnlyRandomBool()
+    {
+        var flag = new BooleanAttributeMetadata { LogicalName = "donotemail", IsValidForCreate = true };
+        var vm = EditorForExtra(flag);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "donotemail");
+        vm.SelectedOp = "bogus";
+
+        Assert.Equal(["RANDOM"], vm.BogusApis);
+        vm.SelectedBogusApi = "RANDOM";
+        Assert.Contains(vm.BogusEndpoints, o => o.Id == "RANDOM.bool");
+        Assert.DoesNotContain(vm.BogusEndpoints, o => o.Id != "RANDOM.bool");
+    }
+
+    [Fact]
+    public void ChoiceAndStatus_NeverOfferBogus()
+    {
+        var options = new OptionSetMetadata();
+        options.Options.Add(new OptionMetadata(1));
+        var choice = new PicklistAttributeMetadata
+        {
+            LogicalName = "preferredmethod",
+            IsValidForCreate = true,
+            OptionSet = options,
+        };
+        var vm = EditorForExtra(choice);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "preferredmethod");
+        Assert.DoesNotContain("bogus", vm.AvailableOps);
+
+        var statusVm = new RuleEditorViewModel(BuildEntity(), 10, 1, "r1");
+        statusVm.SelectedColumn = statusVm.ExcludedColumns.Single(c => c.LogicalName == "statecode");
+        Assert.DoesNotContain("bogus", statusVm.AvailableOps);
+    }
+
+    [Fact]
+    public void GetErrors_MapsAllEightTargets()
+    {
+        var vm = EditorFor(StringColumn());
+        vm.SelectedOp = "bogus";
+        vm.SelectedBogusApi = "NAME";
+        Assert.Contains(vm.GetErrors(nameof(vm.SelectedBogusEndpoint)).Cast<object>(), _ => true);
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "numberofemployees");
+        vm.SelectedOp = "bogus";
+        vm.SelectedBogusApi = "RANDOM";
+        vm.SelectedBogusEndpoint = "RANDOM.number";
+        vm.BogusMinNumber = "10";
+        vm.BogusMaxNumber = "1";
+        Assert.Contains(vm.GetErrors(nameof(vm.BogusMaxNumber)).Cast<object>(), _ => true);
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "bogus";
+        vm.SelectedBogusApi = "RANDOM";
+        vm.SelectedBogusEndpoint = "RANDOM.digits";
+        vm.BogusLengthText = "0";
+        Assert.Contains(vm.GetErrors(nameof(vm.BogusLengthText)).Cast<object>(), _ => true);
+    }
+
+    [Fact]
+    public void Restore_NumericLengthDate_KeepsAuthoredArguments()
+    {
+        var scheduled = new DateTimeAttributeMetadata { LogicalName = "scheduledon", IsValidForCreate = true };
+        var vm = EditorForExtra(scheduled);
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "numberofemployees");
+        var numeric = new BogusRule("RANDOM", "number", 1, new Dictionary<string, System.Text.Json.JsonElement>
+        {
+            ["min"] = System.Text.Json.JsonSerializer.SerializeToElement(3),
+            ["max"] = System.Text.Json.JsonSerializer.SerializeToElement(9),
+        });
+        vm.ApplyExistingRule(numeric);
+        Assert.Equal("3", vm.BogusMinNumber);
+        Assert.Equal("9", vm.BogusMaxNumber);
+        Assert.True(vm.BogusHasNumericArgs);
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        var length = new BogusRule("RANDOM", "digits", 1, new Dictionary<string, System.Text.Json.JsonElement>
+        {
+            ["length"] = System.Text.Json.JsonSerializer.SerializeToElement(8),
+        });
+        vm.ApplyExistingRule(length);
+        Assert.Equal("8", vm.BogusLengthText);
+        Assert.True(vm.BogusHasLengthArg);
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "scheduledon");
+        var dates = new BogusRule("DATE", "between", 1, new Dictionary<string, System.Text.Json.JsonElement>
+        {
+            ["min"] = System.Text.Json.JsonSerializer.SerializeToElement("2020-01-01"),
+            ["max"] = System.Text.Json.JsonSerializer.SerializeToElement("2020-12-31"),
+        });
+        vm.ApplyExistingRule(dates);
+        Assert.Equal(new DateTime(2020, 1, 1), vm.BogusMinDate);
+        Assert.Equal(new DateTime(2020, 12, 31), vm.BogusMaxDate);
+        Assert.True(vm.BogusHasDateArgs);
+    }
+
+    [Fact]
+    public async Task StalePreview_DoesNotPublishAfterSupersedingEdit()
+    {
+        var vm = EditorFor(StringColumn());
+        vm.SelectedOp = "pattern";
+        vm.Template = "ACME-{seq:0000}";
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+
+        await Task.Delay(250, TestContext.Current.CancellationToken);
+        Assert.Equal(["fixed", "fixed", "fixed"], vm.PreviewValues);
+        Assert.True(vm.CanSave);
+    }
+
+    private static RuleEditorViewModel EditorForExtra(params AttributeMetadata[] extra)
+    {
+        var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
+        var employees = new IntegerAttributeMetadata { LogicalName = "numberofemployees", IsValidForCreate = true, MinValue = 0, MaxValue = 1_000_000 };
+        var attrs = extra.Concat<AttributeMetadata>([name, employees]).ToArray();
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, attrs);
+        var vm = new RuleEditorViewModel(meta, 10, 42, "r1");
+        return vm;
     }
 }
