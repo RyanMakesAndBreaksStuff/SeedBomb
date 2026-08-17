@@ -100,7 +100,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         Directory.CreateDirectory(_root);
         // The app always writes the current profileVersion regardless of what was passed in
         // (§08 invariant: "load → save is idempotent").
-        var canonical = profile with { ProfileVersion = 1 };
+        var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
         var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
         await File.WriteAllTextAsync(path, json, ct).ConfigureAwait(false);
     }
@@ -198,9 +198,8 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         if (profile is null)
             return (null, error);
 
-        // Copy-in: write the exact validated bytes, never re-serialized (§08 — "Import = copy a
-        // file into the profiles folder"). Same slug-collision guard as Save — two different
-        // display names can kebab to one file; never silently destroy the other.
+        // Canonicalize to current profileVersion on import. Same slug-collision guard as Save —
+        // two different display names can kebab to one file; never silently destroy the other.
         string destPath;
         try
         {
@@ -223,7 +222,9 @@ public sealed class JsonProfileService : IProfileService, IDisposable
                 return (null, $"not a valid profile: {collision}");
 
             Directory.CreateDirectory(_root);
-            await File.WriteAllBytesAsync(destPath, bytes, ct).ConfigureAwait(false);
+            var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
+            var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
+            await File.WriteAllTextAsync(destPath, json, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -240,7 +241,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         try
         {
             Directory.CreateDirectory(_root);
-            var canonical = profile with { ProfileVersion = 1 };
+            var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
             var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
             await File.WriteAllTextAsync(DraftPath, json, ct).ConfigureAwait(false);
         }
@@ -377,7 +378,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     /// 1) Walk the raw JSON once to reject duplicate property names and reserved property names
     ///    (case-insensitive, property names only — <see cref="JsonSerializer"/> alone cannot
     ///    detect duplicate keys). 2) Deserialize with <see cref="FieldRule.JsonOptions"/>
-    ///    (unmapped members disallowed). 3) Validate required fields, profileVersion == 1, and
+    ///    (unmapped members disallowed). 3) Validate required fields, profileVersion 1 or 2, and
     ///    unique table/column names.
     /// </summary>
     private static (Profile? Profile, string? Error) TryParse(byte[] bytes)
@@ -402,10 +403,14 @@ public sealed class JsonProfileService : IProfileService, IDisposable
 
         if (profile is null)
             return (null, "not a valid profile: empty document");
-        if (profile.ProfileVersion > 1)
+        if (profile.ProfileVersion > Profile.CurrentProfileVersion)
             return (null, $"not a valid profile: created by a newer version of the app (profileVersion {profile.ProfileVersion})");
-        if (profile.ProfileVersion != 1)
+        if (profile.ProfileVersion is not (1 or 2))
             return (null, "not a valid profile: unsupported profileVersion");
+        if (profile.ProfileVersion == 1 && ContainsBogusRule(profile))
+            return (null, "not a valid profile: op \"bogus\" requires profileVersion 2");
+        if (profile.ProfileVersion == 1)
+            profile = profile with { ProfileVersion = Profile.CurrentProfileVersion };
         if (string.IsNullOrWhiteSpace(profile.Name))
             return (null, "not a valid profile: name is required");
         if (profile.Tables is null || profile.Tables.Count == 0)
@@ -431,6 +436,22 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         }
 
         return (profile, null);
+    }
+
+    private static bool ContainsBogusRule(Profile profile)
+    {
+        foreach (var table in profile.Tables)
+        {
+            if (table.Columns is null)
+                continue;
+            foreach (var rule in table.Columns.Values)
+            {
+                if (rule is BogusRule)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

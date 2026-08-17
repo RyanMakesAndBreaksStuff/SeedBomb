@@ -21,6 +21,53 @@ public class FieldRuleSerializationTests
     }
 
     [Fact]
+    public void BogusRule_RoundTripsAsV2()
+    {
+        const string json = """
+            {"op":"bogus","api":"RANDOM","endpoint":"number","engineVersion":1,"args":{"min":1,"max":10}}
+            """;
+
+        var rule = JsonSerializer.Deserialize<FieldRule>(json, Options);
+
+        var bogus = Assert.IsType<BogusRule>(rule);
+        Assert.Equal("RANDOM", bogus.Api);
+        Assert.Equal("number", bogus.Endpoint);
+        Assert.Equal(1, bogus.EngineVersion);
+        Assert.Equal(1, bogus.Args["min"].GetInt32());
+        Assert.Equal(10, bogus.Args["max"].GetInt32());
+
+        var again = JsonSerializer.Deserialize<FieldRule>(
+            JsonSerializer.Serialize<FieldRule>(bogus, Options), Options);
+        var roundTripped = Assert.IsType<BogusRule>(again);
+        Assert.Equal(bogus.Api, roundTripped.Api);
+        Assert.Equal(bogus.Endpoint, roundTripped.Endpoint);
+        Assert.Equal(bogus.EngineVersion, roundTripped.EngineVersion);
+    }
+
+    [Fact]
+    public void Missing_engineVersion_is_rejected()
+        => Assert.ThrowsAny<JsonException>(() =>
+            JsonSerializer.Deserialize<FieldRule>(
+                """{"op":"bogus","api":"RANDOM","endpoint":"number"}""", Options));
+
+    [Fact]
+    public void Args_survive_disposed_source_document()
+    {
+        BogusRule rule;
+        using (var doc = JsonDocument.Parse("""{"min":1,"max":10}"""))
+        {
+            rule = new BogusRule("RANDOM", "number", 1, new Dictionary<string, JsonElement>
+            {
+                ["min"] = doc.RootElement.GetProperty("min"),
+                ["max"] = doc.RootElement.GetProperty("max"),
+            });
+        }
+
+        Assert.Equal(1, rule.Args["min"].GetInt32());
+        Assert.Equal(10, rule.Args["max"].GetInt32());
+    }
+
+    [Fact]
     public void Unknown_op_is_hard_error()
         => Assert.ThrowsAny<JsonException>(() =>
             JsonSerializer.Deserialize<FieldRule>("""{"op":"script","body":"x"}""", Options));

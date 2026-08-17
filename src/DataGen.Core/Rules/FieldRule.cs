@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -15,6 +16,7 @@ namespace DataGen.Core.Rules;
 [JsonDerivedType(typeof(PatternRule), "pattern")]
 [JsonDerivedType(typeof(SequenceRule), "sequence")]
 [JsonDerivedType(typeof(NullRule), "null")]
+[JsonDerivedType(typeof(BogusRule), "bogus")]
 public abstract record FieldRule
 {
     /// <summary>Serializer options shared by profiles and config plumbing.</summary>
@@ -43,6 +45,41 @@ public sealed record SequenceRule(decimal Start = 0, decimal Step = 1) : FieldRu
 
 /// <summary>Emit nothing; platform default applies. Invalid on required columns.</summary>
 public sealed record NullRule : FieldRule;
+
+/// <summary>Generates a value from one Bogus catalog endpoint. Arguments are cloned and ordinal-keyed.</summary>
+public sealed record BogusRule : FieldRule
+{
+    private readonly IReadOnlyDictionary<string, JsonElement> _args;
+
+    /// <summary>Creates a Bogus rule with cloned, ordinal-keyed arguments.</summary>
+    /// <param name="Api">All-caps catalog API ID.</param>
+    /// <param name="Endpoint">camelCase catalog endpoint ID.</param>
+    /// <param name="EngineVersion">Evaluator engine version.</param>
+    /// <param name="Args">Optional authored arguments; cloned when present.</param>
+    public BogusRule(string Api, string Endpoint, int EngineVersion,
+                     IReadOnlyDictionary<string, JsonElement>? Args = null)
+    {
+        this.Api = Api;
+        this.Endpoint = Endpoint;
+        this.EngineVersion = EngineVersion;
+        _args = Args is null
+            ? FrozenDictionary<string, JsonElement>.Empty
+            : Args.ToFrozenDictionary(kv => kv.Key, kv => kv.Value.Clone(), StringComparer.Ordinal);
+    }
+
+    /// <summary>All-caps catalog API ID, ordinal and case-sensitive.</summary>
+    public string Api { get; }
+
+    /// <summary>camelCase catalog endpoint ID, ordinal and case-sensitive.</summary>
+    public string Endpoint { get; }
+
+    /// <summary>Evaluator engine version. Unknown versions fail closed.</summary>
+    [JsonRequired]
+    public int EngineVersion { get; init; }
+
+    /// <summary>Cloned, immutable, ordinal-keyed arguments. Never exposes a mutable backing store.</summary>
+    public IReadOnlyDictionary<string, JsonElement> Args => _args;
+}
 
 /// <summary>Pick mode for <see cref="OneOfRule"/>.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter<OneOfPick>))]

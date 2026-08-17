@@ -3,17 +3,22 @@ using DataGen.Core.Rules;
 namespace Seedbomb.Services.Profiles;
 
 /// <summary>
-/// Profile schema v1 (§08): a named, saveable rule configuration — selected tables,
+/// Profile schema: a named, saveable rule configuration — selected tables,
 /// per-table record counts, active field rules, and an optional pinned seed. Plain JSON,
 /// contains no credentials by schema (D2); loaded/saved only through
 /// <see cref="IProfileService"/>. The app never renders this as raw text or a schema editor.
+/// Writers emit <see cref="CurrentProfileVersion"/>.
 /// </summary>
 public sealed record Profile(
     int ProfileVersion,
     string Name,
     string? Description,
     int? Seed,
-    IReadOnlyList<ProfileTable> Tables);
+    IReadOnlyList<ProfileTable> Tables)
+{
+    /// <summary>Version written by every save, export, draft, and import path.</summary>
+    public const int CurrentProfileVersion = 2;
+}
 
 /// <summary>
 /// One table entry inside a <see cref="Profile"/>: target table logical name, row count, and

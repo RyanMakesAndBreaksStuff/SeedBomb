@@ -30,7 +30,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
 
         var row = Assert.Single(vm.Items);
         Assert.Equal("Acme", row.Name);
-        Assert.Equal("v1", row.VersionLabel);
+        Assert.Equal("v2", row.VersionLabel);
         Assert.Contains("2 tables", row.SummaryLine, StringComparison.Ordinal);
         Assert.Equal("1 profile", vm.CountLabel);
     }

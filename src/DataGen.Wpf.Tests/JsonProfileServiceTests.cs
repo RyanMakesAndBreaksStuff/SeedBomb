@@ -73,13 +73,13 @@ public sealed class JsonProfileServiceTests : IDisposable
         Assert.Equal(firstBytes, secondBytes);
     }
 
-    // 2. profileVersion: 2 is rejected with a "created by a newer version" message.
+    // 2. profileVersion greater than current is rejected with a "created by a newer version" message.
     [Fact]
-    public async Task ProfileVersion_2_is_rejected_with_newer_version_message()
+    public async Task ProfileVersion_3_is_rejected_with_newer_version_message()
     {
         var svc = NewService(out _);
         var json = """
-        {"profileVersion":2,"name":"Future Profile","tables":[{"table":"account","count":1}]}
+        {"profileVersion":3,"name":"Future Profile","tables":[{"table":"account","count":1}]}
         """;
 
         var (profile, error) = await ImportRawAsync(svc, json);
@@ -87,6 +87,86 @@ public sealed class JsonProfileServiceTests : IDisposable
         Assert.Null(profile);
         Assert.NotNull(error);
         Assert.Contains("created by a newer version", error);
+        Assert.Contains("profileVersion 3", error);
+    }
+
+    [Theory]
+    [InlineData("""{"name":"x","tables":[{"table":"account","count":1}]}""")]
+    [InlineData("""{"profileVersion":0,"name":"x","tables":[{"table":"account","count":1}]}""")]
+    [InlineData("""{"profileVersion":-1,"name":"x","tables":[{"table":"account","count":1}]}""")]
+    public async Task Missing_zero_and_negative_profileVersion_are_unsupported(string json)
+    {
+        var svc = NewService(out _);
+        var (profile, error) = await ImportRawAsync(svc, json);
+        Assert.Null(profile);
+        Assert.NotNull(error);
+        Assert.Contains("unsupported profileVersion", error);
+    }
+
+    [Fact]
+    public async Task V1ProfileContainingBogus_IsRejectedBeforeMigration()
+    {
+        var svc = NewService(out _);
+        var json = """
+        {"profileVersion":1,"name":"x","tables":[{"table":"account","count":1,"columns":{"name":{"op":"bogus","api":"NAME","endpoint":"firstName","engineVersion":1}}}]}
+        """;
+
+        var (profile, error) = await ImportRawAsync(svc, json);
+
+        Assert.Null(profile);
+        Assert.NotNull(error);
+        Assert.Contains("profileVersion 2", error);
+        Assert.Contains("bogus", error);
+    }
+
+    [Fact]
+    public async Task V1_loads_as_in_memory_v2_clone_and_import_persists_canonical_v2()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = NewService(out var root);
+        var json = """
+        {"profileVersion":1,"name":"Legacy","tables":[{"table":"account","count":1}]}
+        """;
+
+        var (imported, error) = await ImportRawAsync(svc, json);
+        Assert.Null(error);
+        Assert.NotNull(imported);
+        Assert.Equal(Profile.CurrentProfileVersion, imported.ProfileVersion);
+
+        var path = Path.Combine(root, "legacy.profile.json");
+        var written = await File.ReadAllTextAsync(path, ct);
+        Assert.Contains("\"profileVersion\": 2", written, StringComparison.Ordinal);
+
+        var loaded = await svc.LoadAsync("legacy", ct);
+        Assert.Equal(2, loaded.ProfileVersion);
+    }
+
+    [Fact]
+    public async Task Duplicate_bogus_argument_property_is_rejected()
+    {
+        var svc = NewService(out _);
+        var json = """
+        {"profileVersion":2,"name":"x","tables":[{"table":"account","count":1,"columns":{"n":{"op":"bogus","api":"RANDOM","endpoint":"number","engineVersion":1,"args":{"min":1,"min":2}}}}]}
+        """;
+
+        var (profile, error) = await ImportRawAsync(svc, json);
+        Assert.Null(profile);
+        Assert.NotNull(error);
+        Assert.Contains("duplicate property", error);
+    }
+
+    [Fact]
+    public async Task Every_writer_path_emits_current_profile_version()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = NewService(out var root);
+        await svc.SaveAsync(new Profile(1, "Writer", null, null, [new ProfileTable("account", 1, null)]), ct);
+        await svc.SaveDraftAsync(new Profile(1, "draft", null, null, [new ProfileTable("account", 1, null)]), ct);
+
+        var saved = await File.ReadAllTextAsync(Path.Combine(root, "writer.profile.json"), ct);
+        var draft = await File.ReadAllTextAsync(Path.Combine(root, "draft.profile.json"), ct);
+        Assert.Contains("\"profileVersion\": 2", saved, StringComparison.Ordinal);
+        Assert.Contains("\"profileVersion\": 2", draft, StringComparison.Ordinal);
     }
 
     // 3. Malformed JSON -> a single "not a valid profile: ..." line.

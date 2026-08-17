@@ -110,6 +110,10 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Import-summary caption; version comes from <see cref="Profile.CurrentProfileVersion"/>.</summary>
+    public string SchemaValidationCaption =>
+        $"Validated against schema v{Profile.CurrentProfileVersion} and this environment's live metadata. Results are applied visually — nothing here is editable text.";
+
     /// <summary>Alias for <see cref="ImportFromFileCommand"/> (page header binding).</summary>
     public IRelayCommand ImportCommand => ImportFromFileCommand;
 
@@ -520,7 +524,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             : null;
 
         ImportInfoMessage =
-            $"Profile “{sourceLabel}” was validated against schema v1 and this environment's live metadata. "
+            $"Profile “{sourceLabel}” was validated against schema v{Profile.CurrentProfileVersion} and this environment's live metadata. "
             + "The app has no JSON or schema editor — imported content appears as rules, counts, and these messages.";
 
         return report;

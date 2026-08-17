@@ -130,7 +130,7 @@
                            Foreground="{DynamicResource DG.Text3}"
                            FontSize="{DynamicResource DG.Type.Caption}"
                            Margin="0,0,0,10"
-                           Text="Validated against schema v1 and this environment's live metadata. Results are applied visually — nothing here is editable text." />
+                           Text="{Binding SchemaValidationCaption}" />
 
                 <ui:InfoBar IsOpen="{Binding HasSchemaError}"
                             IsClosable="False"
