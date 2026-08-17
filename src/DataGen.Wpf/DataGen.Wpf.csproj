@@ -50,6 +50,7 @@
     <InternalsVisibleTo Include="DataGen.Wpf.Tests" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Bogus" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" />
     <PackageReference Include="WPF-UI" />
     <PackageReference Include="CommunityToolkit.Mvvm" />

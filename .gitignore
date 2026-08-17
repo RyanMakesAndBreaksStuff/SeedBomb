@@ -26,7 +26,7 @@ bld/
 # .NET Core
 project.lock.json
 project.fragment.lock.json
-artifacts/
+
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
@@ -87,3 +87,4 @@ mocks/mock-3-centered-modal.html
 /root_diff.md
 /tasks/lessons.md
 /codereview12Aug.md
+/.grok/skills
