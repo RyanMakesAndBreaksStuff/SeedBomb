@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Xrm.Sdk.Metadata;
 
@@ -13,14 +14,103 @@ public enum RuleMessageSeverity
     Error
 }
 
+/// <summary>Stable reason code. WPF maps this; it never parses <see cref="RuleMessage.Text"/>.</summary>
+public enum RuleMessageCode
+{
+    /// <summary>Unspecified or legacy message.</summary>
+    General,
+
+    /// <summary>API/endpoint pair is not in the catalog.</summary>
+    UnknownEndpoint,
+
+    /// <summary>Argument key is not on the descriptor contract.</summary>
+    UnknownArgument,
+
+    /// <summary>Required argument is absent.</summary>
+    MissingArgument,
+
+    /// <summary>JSON value kind or non-finite number is wrong for the argument.</summary>
+    BadValueKind,
+
+    /// <summary>Number is outside a representable range.</summary>
+    Overflow,
+
+    /// <summary>Normalized domain contains no representable value.</summary>
+    EmptyDomain,
+
+    /// <summary>Known-input length or preparation budget is exceeded.</summary>
+    LengthBudget,
+
+    /// <summary>Date is malformed, reversed, or outside SDK bounds.</summary>
+    DateRange,
+
+    /// <summary>Endpoint cannot produce the column's Dataverse kind or domain.</summary>
+    Incompatible,
+
+    /// <summary>Descriptor is risky; saveable, blocked at run without opt-in.</summary>
+    RiskWarning,
+
+    /// <summary>Engine version is missing or unsupported.</summary>
+    EngineVersion,
+
+    /// <summary>Bogus rule was validated without <see cref="RuleValidationContext"/>.</summary>
+    ContextRequired,
+}
+
+/// <summary>Editor input that produced the message.</summary>
+public enum RuleInputTarget
+{
+    /// <summary>The rule as a whole.</summary>
+    Rule,
+
+    /// <summary>Catalog API picker.</summary>
+    Api,
+
+    /// <summary>Catalog endpoint picker.</summary>
+    Endpoint,
+
+    /// <summary>Numeric minimum.</summary>
+    Minimum,
+
+    /// <summary>Numeric maximum.</summary>
+    Maximum,
+
+    /// <summary>Length argument.</summary>
+    Length,
+
+    /// <summary>Date minimum.</summary>
+    MinimumDate,
+
+    /// <summary>Date maximum.</summary>
+    MaximumDate,
+}
+
 /// <summary>One validation message; <paramref name="Text"/> is user-facing copy, identical in both stages.</summary>
-public sealed record RuleMessage(RuleMessageSeverity Severity, string Text);
+/// <param name="Severity">Blocking vs notice.</param>
+/// <param name="Text">User-facing copy.</param>
+/// <param name="Code">Stable reason code.</param>
+/// <param name="Target">Editor input that produced the message.</param>
+public sealed record RuleMessage(
+    RuleMessageSeverity Severity,
+    string Text,
+    RuleMessageCode Code = RuleMessageCode.General,
+    RuleInputTarget Target = RuleInputTarget.Rule);
 
 /// <summary>
-/// Validation outcome. <see cref="EffectiveRule"/> is the rule after clamping (range only);
-/// all other ops pass through unchanged. Invalid ⇒ EffectiveRule is null.
+/// Validation outcome. <see cref="EffectiveRule"/> is the rule after clamping (range)
+/// or Bogus normalization; all other ops pass through unchanged. Invalid ⇒ EffectiveRule is null.
 /// </summary>
-public sealed record RuleValidationResult(bool IsValid, FieldRule? EffectiveRule, IReadOnlyList<RuleMessage> Messages);
+public sealed record RuleValidationResult(bool IsValid, FieldRule? EffectiveRule, IReadOnlyList<RuleMessage> Messages)
+{
+    /// <summary>Blocking result with one or more messages and no effective rule.</summary>
+    public static RuleValidationResult Error(RuleMessage message) => new(false, null, [message]);
+}
+
+/// <summary>Static validation inputs. Carries no seed — output-dependent checks wait for run preparation.</summary>
+/// <param name="Table">Canonical table logical name, when known.</param>
+/// <param name="RecordCount">Planned row count for this table.</param>
+/// <param name="RunId">Run id used for pattern worst-case width.</param>
+public readonly record struct RuleValidationContext(string Table, int RecordCount, string RunId);
 
 /// <summary>
 /// Single validation code path used by BOTH the rule editor (design-time) and run pre-flight (§3.3).
@@ -31,12 +121,16 @@ public static class RuleValidator
     // D3: reserved TLDs never warn; anything else routable warns.
     private static readonly string[] ReservedTlds = [".test", ".invalid", ".example", ".localhost"];
 
+    private const int CurrentEngineVersion = 1;
+    private const int MaxCellUtf16Units = 65_536;
+    private const long MaxRulePreparationBytes = 64L * 1024 * 1024;
+    private const long MaxTotalPreparationBytes = 256L * 1024 * 1024;
+
     /// <summary>Validates one rule against live attribute metadata.</summary>
     /// <param name="rule">The authored rule.</param>
     /// <param name="attr">Live attribute metadata.</param>
-    /// <param name="recordCount">Planned record count (sequence overflow, pattern worst-case seq width).</param>
-    /// <param name="runId">Run id used only for {runId} worst-case length.</param>
-    public static RuleValidationResult Validate(FieldRule rule, AttributeMetadata attr, int recordCount, string runId)
+    /// <param name="context">Table, planned count, and run id. Required for Bogus rules.</param>
+    public static RuleValidationResult Validate(FieldRule rule, AttributeMetadata attr, RuleValidationContext context)
     {
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(attr);
@@ -47,15 +141,27 @@ public static class RuleValidator
 
         return rule switch
         {
+            BogusRule b => ValidateBogus(b, attr, context),
             ConstantRule c => ValidateConstant(c, attr),
             OneOfRule o => ValidateOneOf(o, attr),
             RangeRule r => ValidateRange(r, attr),
-            PatternRule p => ValidatePattern(p, attr, recordCount, runId),
-            SequenceRule s => ValidateSequence(s, attr, recordCount),
+            PatternRule p => ValidatePattern(p, attr, context.RecordCount, context.RunId),
+            SequenceRule s => ValidateSequence(s, attr, context.RecordCount),
             NullRule n => ValidateNull(n, attr),
             _ => Invalid($"Unknown rule type '{rule.GetType().Name}'."),
         };
     }
+
+    /// <summary>Adapter for existing non-Bogus callers. Migrated away by Task 9.</summary>
+    /// <param name="rule">The authored rule.</param>
+    /// <param name="attr">Live attribute metadata.</param>
+    /// <param name="recordCount">Planned record count (sequence overflow, pattern worst-case seq width).</param>
+    /// <param name="runId">Run id used only for {runId} worst-case length.</param>
+    public static RuleValidationResult Validate(FieldRule rule, AttributeMetadata attr, int recordCount, string runId) =>
+        rule is BogusRule
+            ? RuleValidationResult.Error(new RuleMessage(RuleMessageSeverity.Error,
+                  "Bogus rules require a validation context.", RuleMessageCode.ContextRequired))
+            : Validate(rule, attr, new RuleValidationContext(Table: string.Empty, recordCount, runId));
 
     // ── per-op bodies ─────────────────────────────────────────────────────────
 
@@ -163,6 +269,505 @@ public static class RuleValidator
             ? Invalid($"'{attr.LogicalName}' is business-required — null rule not allowed.")
             : Valid(n);
 
+    // ── Bogus phases 1–3 ──────────────────────────────────────────────────────
+
+    private static RuleValidationResult ValidateBogus(BogusRule rule, AttributeMetadata attr, RuleValidationContext context)
+    {
+        if (rule.EngineVersion != CurrentEngineVersion)
+        {
+            return Fail(RuleMessageCode.EngineVersion, RuleInputTarget.Rule,
+                $"Engine version {rule.EngineVersion} is not supported.");
+        }
+
+        if (!BogusCatalog.TryGet(new BogusEndpointId(rule.Api, rule.Endpoint), out var descriptor))
+        {
+            return Fail(RuleMessageCode.UnknownEndpoint, RuleInputTarget.Endpoint,
+                $"Unknown Bogus endpoint '{rule.Api}.{rule.Endpoint}'.");
+        }
+
+        if (!TryMapValueKind(attr, out var target) || !BogusCatalog.Fits(descriptor, target))
+        {
+            return Fail(RuleMessageCode.Incompatible, RuleInputTarget.Rule,
+                $"'{descriptor.Id}' cannot generate values for '{attr.LogicalName}'.");
+        }
+
+        var keys = new HashSet<string>(rule.Args.Keys, StringComparer.Ordinal);
+        foreach (var key in keys)
+        {
+            if (!IsAllowedKey(descriptor.Arguments, key))
+            {
+                return Fail(RuleMessageCode.UnknownArgument, RuleInputTarget.Rule,
+                    $"Unknown argument '{key}' for '{descriptor.Id}'.");
+            }
+        }
+
+        return descriptor.Arguments switch
+        {
+            NumericRangeContract numeric => NormalizeNumeric(rule, attr, descriptor, numeric, context),
+            LengthContract length => NormalizeLength(rule, attr, descriptor, length, context),
+            DateRangeContract => NormalizeDates(rule, attr, descriptor, context),
+            _ => FinishNone(rule, attr, descriptor, context),
+        };
+    }
+
+    private static bool IsAllowedKey(BogusArgumentContract contract, string key) => contract switch
+    {
+        NumericRangeContract { AcceptsAuthoredMinMax: true } => key is "min" or "max",
+        LengthContract => key is "length",
+        DateRangeContract => key is "min" or "max",
+        _ => false,
+    };
+
+    private static RuleValidationResult NormalizeNumeric(
+        BogusRule rule, AttributeMetadata attr, BogusEndpointDescriptor descriptor,
+        NumericRangeContract contract, RuleValidationContext context)
+    {
+        _ = context;
+        if (!TryReadOptionalNumber(rule.Args, "min", RuleInputTarget.Minimum, out var authoredMin, out var minError))
+            return minError!;
+        if (!TryReadOptionalNumber(rule.Args, "max", RuleInputTarget.Maximum, out var authoredMax, out var maxError))
+            return maxError!;
+
+        if (!contract.AcceptsAuthoredMinMax && (authoredMin is not null || authoredMax is not null))
+        {
+            return Fail(RuleMessageCode.UnknownArgument, RuleInputTarget.Rule,
+                $"'{descriptor.Id}' does not accept authored min/max.");
+        }
+
+        var min = authoredMin ?? contract.DefaultMin;
+        var max = authoredMax ?? contract.DefaultMax;
+        if (min > max)
+        {
+            return Fail(RuleMessageCode.EmptyDomain, RuleInputTarget.Maximum,
+                $"Minimum {min} is greater than maximum {max}.");
+        }
+
+        min = decimal.Max(min, contract.DefaultMin);
+        max = decimal.Min(max, contract.DefaultMax);
+        if (min > max)
+        {
+            return Fail(RuleMessageCode.EmptyDomain, RuleInputTarget.Maximum,
+                $"Authored range is outside the native domain of '{descriptor.Id}'.");
+        }
+
+        if (IsFixedDomain(contract, descriptor) && !MetadataContains(attr, contract.DefaultMin, contract.DefaultMax))
+        {
+            return Fail(RuleMessageCode.Incompatible, RuleInputTarget.Rule,
+                $"'{attr.LogicalName}' cannot hold the full '{descriptor.Id}' domain [{contract.DefaultMin}, {contract.DefaultMax}].");
+        }
+
+        var (metaMin, metaMax) = MetadataBounds(attr);
+        var beforeMeta = (min, max);
+        min = decimal.Max(min, metaMin);
+        max = decimal.Min(max, metaMax);
+        if (min > max)
+        {
+            return Fail(RuleMessageCode.EmptyDomain, RuleInputTarget.Maximum,
+                $"No overlap between '{descriptor.Id}' and '{attr.LogicalName}' bounds.");
+        }
+
+        var messages = new List<RuleMessage>();
+        if (contract.AcceptsAuthoredMinMax && (beforeMeta.min != min || beforeMeta.max != max
+                                              || authoredMin != min || authoredMax != max)
+            && (authoredMin is not null || authoredMax is not null)
+            && (authoredMin != min || authoredMax != max))
+        {
+            messages.Add(new(RuleMessageSeverity.Warning,
+                $"Range for '{descriptor.Id}' on '{attr.LogicalName}' was clamped to [{min}, {max}].",
+                RuleMessageCode.General, RuleInputTarget.Rule));
+        }
+
+        if (IsIntegral(descriptor, contract))
+        {
+            min = decimal.Ceiling(min);
+            max = decimal.Floor(max);
+            if (min > max)
+            {
+                return Fail(RuleMessageCode.EmptyDomain, RuleInputTarget.Maximum,
+                    $"No integral value remains in [{beforeMeta.min}, {beforeMeta.max}] for '{descriptor.Id}'.");
+            }
+
+            if (descriptor.Id.Endpoint == "even")
+            {
+                min = AlignEven(min, up: true);
+                max = AlignEven(max, up: false);
+            }
+            else if (descriptor.Id.Endpoint == "odd")
+            {
+                min = AlignOdd(min, up: true);
+                max = AlignOdd(max, up: false);
+            }
+
+            if (min > max)
+            {
+                return Fail(RuleMessageCode.EmptyDomain, RuleInputTarget.Maximum,
+                    $"No value of the required parity remains for '{descriptor.Id}'.");
+            }
+        }
+
+        if (!FitsNative(min, max, descriptor, contract))
+        {
+            return Fail(RuleMessageCode.Overflow, RuleInputTarget.Rule,
+                $"Normalized bounds [{min}, {max}] are not representable for '{descriptor.Id}'.");
+        }
+
+        if (min < metaMin || max > metaMax)
+        {
+            return Fail(RuleMessageCode.EmptyDomain, RuleInputTarget.Maximum,
+                $"Quantized bounds [{min}, {max}] fall outside '{attr.LogicalName}' metadata.");
+        }
+
+        IReadOnlyDictionary<string, JsonElement>? args = null;
+        if (contract.AcceptsAuthoredMinMax)
+            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+            {
+                ["min"] = JsonNumber(min),
+                ["max"] = JsonNumber(max),
+            };
+
+        return Succeed(new BogusRule(rule.Api, rule.Endpoint, rule.EngineVersion, args), descriptor, messages);
+    }
+
+    private static RuleValidationResult NormalizeLength(
+        BogusRule rule, AttributeMetadata attr, BogusEndpointDescriptor descriptor,
+        LengthContract contract, RuleValidationContext context)
+    {
+        int length;
+        if (rule.Args.TryGetValue("length", out var raw))
+        {
+            if (!TryReadDecimal(raw, RuleInputTarget.Length, out var parsed, out var error))
+                return error!;
+            if (parsed != decimal.Truncate(parsed))
+            {
+                return Fail(RuleMessageCode.BadValueKind, RuleInputTarget.Length,
+                    "length must be an integer greater than zero.");
+            }
+
+            if (parsed <= 0)
+            {
+                return Fail(RuleMessageCode.LengthBudget, RuleInputTarget.Length,
+                    "length must be an integer greater than zero.");
+            }
+
+            if (parsed > int.MaxValue)
+            {
+                return Fail(RuleMessageCode.Overflow, RuleInputTarget.Length,
+                    "length exceeds Int32.");
+            }
+
+            length = (int)parsed;
+        }
+        else
+        {
+            length = contract.DefaultLength;
+        }
+
+        var lengthError = CheckKnownLength(length, descriptor.Output.Multiplier, attr, context, RuleInputTarget.Length);
+        if (lengthError is not null)
+            return lengthError;
+
+        var args = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+        {
+            ["length"] = JsonNumber(length),
+        };
+        return Succeed(new BogusRule(rule.Api, rule.Endpoint, rule.EngineVersion, args), descriptor, []);
+    }
+
+    private static RuleValidationResult NormalizeDates(
+        BogusRule rule, AttributeMetadata attr, BogusEndpointDescriptor descriptor,
+        RuleValidationContext context)
+    {
+        _ = (attr, context);
+        if (!rule.Args.TryGetValue("min", out var minEl))
+        {
+            return Fail(RuleMessageCode.MissingArgument, RuleInputTarget.MinimumDate,
+                "DATE.between requires min.");
+        }
+
+        if (!rule.Args.TryGetValue("max", out var maxEl))
+        {
+            return Fail(RuleMessageCode.MissingArgument, RuleInputTarget.MaximumDate,
+                "DATE.between requires max.");
+        }
+
+        if (!TryReadDate(minEl, RuleInputTarget.MinimumDate, out var min, out var minError))
+            return minError!;
+        if (!TryReadDate(maxEl, RuleInputTarget.MaximumDate, out var max, out var maxError))
+            return maxError!;
+
+        if (min > max)
+        {
+            return Fail(RuleMessageCode.DateRange, RuleInputTarget.MaximumDate,
+                "Minimum date must be ≤ maximum date.");
+        }
+
+        var args = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
+        {
+            ["min"] = JsonSerializer.SerializeToElement(min.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            ["max"] = JsonSerializer.SerializeToElement(max.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+        };
+        return Succeed(new BogusRule(rule.Api, rule.Endpoint, rule.EngineVersion, args), descriptor, []);
+    }
+
+    private static RuleValidationResult FinishNone(
+        BogusRule rule, AttributeMetadata attr, BogusEndpointDescriptor descriptor,
+        RuleValidationContext context)
+    {
+        if (descriptor.Output.Policy == BogusLengthPolicy.Fixed && descriptor.Output.Length is { } fixedLen)
+        {
+            var lengthError = CheckKnownLength(fixedLen, 1, attr, context, RuleInputTarget.Rule);
+            if (lengthError is not null)
+                return lengthError;
+        }
+
+        return Succeed(new BogusRule(rule.Api, rule.Endpoint, rule.EngineVersion), descriptor, []);
+    }
+
+    private static RuleValidationResult? CheckKnownLength(
+        long length, int multiplier, AttributeMetadata attr, RuleValidationContext context, RuleInputTarget target)
+    {
+        long outputChars;
+        try
+        {
+            outputChars = checked(length * multiplier);
+        }
+        catch (OverflowException)
+        {
+            return Fail(RuleMessageCode.LengthBudget, target, "length exceeds the per-cell UTF-16 budget.");
+        }
+
+        if (outputChars > MaxCellUtf16Units)
+        {
+            return Fail(RuleMessageCode.LengthBudget, target,
+                $"Generated text would be {outputChars} UTF-16 units; the per-cell maximum is {MaxCellUtf16Units}.");
+        }
+
+        var columnMax = attr switch
+        {
+            StringAttributeMetadata s => s.MaxLength,
+            MemoAttributeMetadata m => m.MaxLength,
+            _ => null,
+        };
+        if (columnMax is { } maxLen && outputChars > maxLen)
+        {
+            return Fail(RuleMessageCode.LengthBudget, target,
+                $"Generated length {outputChars} exceeds MaxLength {maxLen} for '{attr.LogicalName}'.");
+        }
+
+        if (context.RecordCount < 0)
+        {
+            return Fail(RuleMessageCode.LengthBudget, RuleInputTarget.Rule, "Record count must be nonnegative.");
+        }
+
+        long accounting;
+        try
+        {
+            accounting = checked(context.RecordCount * (long)IntPtr.Size + outputChars * sizeof(char));
+        }
+        catch (OverflowException)
+        {
+            return Fail(RuleMessageCode.LengthBudget, target, "Preparation accounting overflowed.");
+        }
+
+        if (accounting > MaxRulePreparationBytes || accounting > MaxTotalPreparationBytes)
+        {
+            return Fail(RuleMessageCode.LengthBudget, target, "Known-input preparation budget exceeded.");
+        }
+
+        return null;
+    }
+
+    private static bool TryReadOptionalNumber(
+        IReadOnlyDictionary<string, JsonElement> args, string key, RuleInputTarget target,
+        out decimal? value, out RuleValidationResult? error)
+    {
+        value = null;
+        error = null;
+        if (!args.TryGetValue(key, out var raw))
+            return true;
+        if (!TryReadDecimal(raw, target, out var parsed, out error))
+            return false;
+        value = parsed;
+        return true;
+    }
+
+    private static bool TryReadDecimal(
+        JsonElement element, RuleInputTarget target, out decimal value, out RuleValidationResult? error)
+    {
+        value = 0;
+        error = null;
+        if (element.ValueKind != JsonValueKind.Number)
+        {
+            error = Fail(RuleMessageCode.BadValueKind, target, "Expected a finite JSON number.");
+            return false;
+        }
+
+        var raw = element.GetRawText();
+        if (raw.Contains("NaN", StringComparison.OrdinalIgnoreCase)
+            || raw.Contains("Infinity", StringComparison.OrdinalIgnoreCase))
+        {
+            error = Fail(RuleMessageCode.BadValueKind, target, "Number must be finite.");
+            return false;
+        }
+
+        if (!decimal.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+        {
+            error = Fail(RuleMessageCode.Overflow, target, "Number is outside the decimal range.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadDate(
+        JsonElement element, RuleInputTarget target, out DateOnly value, out RuleValidationResult? error)
+    {
+        value = default;
+        error = null;
+        if (element.ValueKind != JsonValueKind.String)
+        {
+            error = Fail(RuleMessageCode.BadValueKind, target, "Date must be a yyyy-MM-dd string.");
+            return false;
+        }
+
+        var text = element.GetString();
+        if (text is null
+            || !DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out value))
+        {
+            error = Fail(RuleMessageCode.DateRange, target, "Date must be exactly yyyy-MM-dd.");
+            return false;
+        }
+
+        var sdkMin = DateOnly.FromDateTime(DateTimeAttributeMetadata.MinSupportedValue);
+        var sdkMax = DateOnly.FromDateTime(DateTimeAttributeMetadata.MaxSupportedValue);
+        if (value < sdkMin || value > sdkMax)
+        {
+            error = Fail(RuleMessageCode.DateRange, target,
+                $"Date must be between {sdkMin:yyyy-MM-dd} and {sdkMax:yyyy-MM-dd}.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryMapValueKind(AttributeMetadata attr, out DataverseValueKind kind)
+    {
+        switch (attr)
+        {
+            case StringAttributeMetadata:
+                kind = DataverseValueKind.String;
+                return true;
+            case MemoAttributeMetadata:
+                kind = DataverseValueKind.Memo;
+                return true;
+            case BooleanAttributeMetadata:
+                kind = DataverseValueKind.Boolean;
+                return true;
+            case IntegerAttributeMetadata:
+                kind = DataverseValueKind.Integer;
+                return true;
+            case BigIntAttributeMetadata:
+                kind = DataverseValueKind.BigInt;
+                return true;
+            case DecimalAttributeMetadata:
+                kind = DataverseValueKind.Decimal;
+                return true;
+            case DoubleAttributeMetadata:
+                kind = DataverseValueKind.Double;
+                return true;
+            case MoneyAttributeMetadata:
+                kind = DataverseValueKind.Money;
+                return true;
+            case DateTimeAttributeMetadata:
+                kind = DataverseValueKind.DateTime;
+                return true;
+            default:
+                kind = default;
+                return false;
+        }
+    }
+
+    private static bool IsIntegral(BogusEndpointDescriptor descriptor, NumericRangeContract contract)
+    {
+        if (descriptor.RawKind == BogusRawKind.Int32)
+            return true;
+        return descriptor.RawKind == BogusRawKind.Decimal
+               && contract.AcceptsAuthoredMinMax
+               && IsWhole(contract.DefaultMin)
+               && IsWhole(contract.DefaultMax)
+               && !(contract.DefaultMin == 0 && contract.DefaultMax == 1);
+    }
+
+    private static bool IsFixedDomain(NumericRangeContract contract, BogusEndpointDescriptor descriptor) =>
+        !contract.AcceptsAuthoredMinMax && descriptor.RawKind == BogusRawKind.Int32
+                                        && contract.DefaultMin == 1 && contract.DefaultMax == 65535;
+
+    private static bool MetadataContains(AttributeMetadata attr, decimal domainMin, decimal domainMax)
+    {
+        var (metaMin, metaMax) = MetadataBounds(attr);
+        return metaMin <= domainMin && metaMax >= domainMax;
+    }
+
+    private static bool FitsNative(
+        decimal min, decimal max, BogusEndpointDescriptor descriptor, NumericRangeContract contract)
+    {
+        if (descriptor.RawKind == BogusRawKind.Int32)
+            return min >= int.MinValue && max <= int.MaxValue;
+        if (descriptor.RawKind == BogusRawKind.Double)
+            return IsFiniteDouble(min) && IsFiniteDouble(max);
+        if (IsIntegral(descriptor, contract))
+        {
+            if (contract.DefaultMin == 0 && contract.DefaultMax == uint.MaxValue)
+                return min >= 0 && max <= uint.MaxValue;
+            if (contract.DefaultMin == 0 && contract.DefaultMax == ulong.MaxValue)
+                return min >= 0 && max <= ulong.MaxValue;
+            return min >= long.MinValue && max <= long.MaxValue;
+        }
+
+        return true;
+    }
+
+    private static bool IsFiniteDouble(decimal value)
+    {
+        var d = (double)value;
+        return !double.IsNaN(d) && !double.IsInfinity(d);
+    }
+
+    private static bool IsWhole(decimal value) => value == decimal.Truncate(value);
+
+    private static decimal AlignEven(decimal value, bool up)
+    {
+        if (decimal.Remainder(value, 2) == 0)
+            return value;
+        return up ? value + 1 : value - 1;
+    }
+
+    private static decimal AlignOdd(decimal value, bool up)
+    {
+        if (decimal.Remainder(value, 2) != 0)
+            return value;
+        return up ? value + 1 : value - 1;
+    }
+
+    private static RuleValidationResult Succeed(
+        BogusRule effective, BogusEndpointDescriptor descriptor, List<RuleMessage> messages)
+    {
+        if (descriptor.Risk != BogusRiskClass.None)
+        {
+            messages.Add(new(RuleMessageSeverity.Warning,
+                $"'{descriptor.Id}' produces {descriptor.Risk} values and requires run-time acknowledgement.",
+                RuleMessageCode.RiskWarning, RuleInputTarget.Rule));
+        }
+
+        return new(true, effective, messages);
+    }
+
+    private static RuleValidationResult Fail(RuleMessageCode code, RuleInputTarget target, string text) =>
+        RuleValidationResult.Error(new RuleMessage(RuleMessageSeverity.Error, text, code, target));
+
+    private static JsonElement JsonNumber(decimal value) =>
+        JsonSerializer.SerializeToElement(value);
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static RuleValidationResult Valid(FieldRule r) => new(true, r, []);
@@ -205,5 +810,5 @@ public static class RuleValidator
         string.Join(", ", e.OptionSet?.Options.Select(o => o.Value) ?? []);
 
     private static JsonElement ToElement(decimal d) =>
-        JsonDocument.Parse(d.ToString(System.Globalization.CultureInfo.InvariantCulture)).RootElement;
+        JsonDocument.Parse(d.ToString(CultureInfo.InvariantCulture)).RootElement;
 }
