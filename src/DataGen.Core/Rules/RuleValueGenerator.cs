@@ -34,6 +34,8 @@ public static class RuleValueGenerator
                 rowIndex,
                 n => RandomChars(seed, table, attr.LogicalName!, rowIndex, n),
                 runId),
+            BogusRule => throw new InvalidOperationException(
+                "Bogus rules evaluate through BogusEvaluatorSession with a prepared rule."),
             _ => throw new InvalidOperationException($"Unhandled rule type {rule.GetType().Name}"),
         };
     }
