@@ -177,10 +177,22 @@ public static class RuleValidator
         IntegerAttributeMetadata i => (i.MinValue ?? int.MinValue, i.MaxValue ?? int.MaxValue),
         BigIntAttributeMetadata b => (b.MinValue ?? long.MinValue, b.MaxValue ?? long.MaxValue),
         DecimalAttributeMetadata d => (d.MinValue ?? decimal.MinValue, d.MaxValue ?? decimal.MaxValue),
-        DoubleAttributeMetadata f => ((decimal)(f.MinValue ?? double.MinValue), (decimal)(f.MaxValue ?? double.MaxValue)),
-        MoneyAttributeMetadata m => ((decimal)(m.MinValue ?? double.MinValue), (decimal)(m.MaxValue ?? double.MaxValue)),
+        DoubleAttributeMetadata f => (ToApplicationBound(f.MinValue, decimal.MinValue),
+                                      ToApplicationBound(f.MaxValue, decimal.MaxValue)),
+        MoneyAttributeMetadata m => (ToApplicationBound(m.MinValue, decimal.MinValue),
+                                     ToApplicationBound(m.MaxValue, decimal.MaxValue)),
         _ => (decimal.MinValue, decimal.MaxValue),
     };
+
+    /// <summary>Converts an optional SDK double bound to a decimal-representable application bound.</summary>
+    private static decimal ToApplicationBound(double? sdkBound, decimal fallback)
+    {
+        if (sdkBound is not { } v || double.IsNaN(v) || double.IsInfinity(v))
+            return fallback;
+        if (v <= (double)decimal.MinValue) return decimal.MinValue;
+        if (v >= (double)decimal.MaxValue) return decimal.MaxValue;
+        return (decimal)v;
+    }
 
     private static bool OutOfBounds(AttributeMetadata a, decimal v)
     { var (min, max) = MetadataBounds(a); return v < min || v > max; }

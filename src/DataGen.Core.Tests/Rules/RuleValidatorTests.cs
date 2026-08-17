@@ -64,6 +64,28 @@ public class RuleValidatorTests
         Assert.False(RuleValidator.Validate(new SequenceRule(Start: 50, Step: 10), attr, recordCount: 10, runId: "r").IsValid);
     }
 
+    [Fact]
+    public void UnboundedDoubleColumn_DoesNotOverflow()
+    {
+        var attr = new DoubleAttributeMetadata { LogicalName = "d" }; // MinValue/MaxValue null
+        var rule = new ConstantRule(JsonSerializer.SerializeToElement(1.5m));
+
+        var result = RuleValidator.Validate(rule, attr, recordCount: 1, runId: "r");
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void UnboundedMoneyColumn_DoesNotOverflow()
+    {
+        var attr = new MoneyAttributeMetadata { LogicalName = "m" };
+        var rule = new ConstantRule(JsonSerializer.SerializeToElement(1.5m));
+
+        var result = RuleValidator.Validate(rule, attr, recordCount: 1, runId: "r");
+
+        Assert.True(result.IsValid);
+    }
+
     private static PicklistAttributeMetadata PicklistWithOptions(string name, params int[] values)
     {
         var os = new OptionSetMetadata();
