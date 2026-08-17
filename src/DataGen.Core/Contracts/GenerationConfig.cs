@@ -26,6 +26,9 @@ public record GenerationConfig
     /// </summary>
     public string Locale { get; init; } = "en";
 
+    /// <summary>Run-scoped opt-in for risky Bogus endpoints. Never persisted to profile or retry state.</summary>
+    public bool AllowRiskyBogusValues { get; init; }
+
     /// <summary>
     /// Gets the batch size for bulk creation. Default is 500.
     /// </summary>

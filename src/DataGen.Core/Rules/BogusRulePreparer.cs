@@ -201,4 +201,306 @@ public static class BogusRulePreparer
         if (v >= (double)decimal.MaxValue) return decimal.MaxValue;
         return (decimal)v;
     }
+
+    private const long MaxRulePreparationBytes = 64L * 1024 * 1024;
+    private const long MaxTotalPreparationBytes = 256L * 1024 * 1024;
+
+    /// <summary>
+    /// Prepares every table in one atomic operation. Pass 1 compiles and validates all requests and
+    /// scans all risk; no dynamic value is generated until it succeeds. Pass 2 fills bounded caches.
+    /// </summary>
+    /// <param name="requests">Every Bogus column in the run, all tables together.</param>
+    /// <param name="allowRiskyValues">Run-scoped opt-in. Never read from profile state.</param>
+    /// <param name="cancellationToken">Observed during row preparation.</param>
+    public static async Task<BogusRunPreparationResult> PrepareRun(
+        IReadOnlyList<BogusPreparationRequest> requests,
+        bool allowRiskyValues,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var messages = new List<RuleMessage>();
+        var compiled = new List<(BogusPreparationRequest Request, PreparedBogusRule Rule, bool Preflight)>();
+        var blocked = false;
+
+        foreach (var request in requests)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArgumentNullException.ThrowIfNull(request.EffectiveRule);
+            ArgumentNullException.ThrowIfNull(request.Attribute);
+
+            var validation = RuleValidator.Validate(
+                request.EffectiveRule,
+                request.Attribute,
+                new RuleValidationContext(request.TableLogicalName, request.Context.RecordCount, request.Context.RunId));
+
+            if (!validation.IsValid)
+            {
+                blocked = true;
+                messages.AddRange(validation.Messages);
+                continue;
+            }
+
+            PreparedBogusRule rule;
+            try
+            {
+                var effective = validation.EffectiveRule as BogusRule ?? request.EffectiveRule;
+                var compileContext = request.Context with { Table = request.TableLogicalName };
+                rule = CompileRule(effective, request.Attribute, compileContext);
+            }
+            catch (InvalidOperationException ex)
+            {
+                blocked = true;
+                messages.Add(new RuleMessage(RuleMessageSeverity.Error, ex.Message, RuleMessageCode.General));
+                continue;
+            }
+
+            if (rule.Descriptor.Risk != BogusRiskClass.None)
+            {
+                messages.Add(new RuleMessage(
+                    allowRiskyValues ? RuleMessageSeverity.Warning : RuleMessageSeverity.Error,
+                    $"'{rule.Descriptor.Id}' produces {rule.Descriptor.Risk} values and requires run-time acknowledgement.",
+                    RuleMessageCode.RiskWarning));
+                if (!allowRiskyValues)
+                    blocked = true;
+            }
+            else
+            {
+                foreach (var message in validation.Messages)
+                {
+                    if (message.Code != RuleMessageCode.RiskWarning)
+                        messages.Add(message);
+                }
+            }
+
+            compiled.Add((request, rule, RequiresPreflight(rule.Descriptor)));
+        }
+
+        if (blocked)
+            return BogusRunPreparationResult.Blocked(messages, generatedValueCount: 0);
+
+        var run = new PreparedBogusRun();
+        var generated = 0;
+        long totalAccounting = 0;
+
+        try
+        {
+            var locale = compiled.Count > 0 ? compiled[0].Request.Context.Locale : DeterministicFaker.DefaultLocale;
+            using var session = new BogusEvaluatorSession(locale);
+
+            foreach (var (request, rule, preflight) in compiled)
+            {
+                run.AddCompiled(request.TableLogicalName, request.ColumnLogicalName, rule);
+                if (!preflight)
+                    continue;
+
+                cancellationToken.ThrowIfCancellationRequested();
+                var count = request.Context.RecordCount;
+                var cache = new object[count];
+                long ruleAccounting = checked((long)count * IntPtr.Size);
+
+                for (var row = 0; row < count; row++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if ((row & 15) == 0)
+                        await Task.Yield();
+
+                    object value;
+                    try
+                    {
+                        value = session.Evaluate(rule, request.Attribute, request.Context, row);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        run.Dispose();
+                        messages.Add(new RuleMessage(
+                            RuleMessageSeverity.Error, ex.Message, RuleMessageCode.LengthBudget, RuleInputTarget.Length));
+                        return BogusRunPreparationResult.Blocked(messages, generated);
+                    }
+
+                    if (value is string text)
+                    {
+                        ruleAccounting = checked(ruleAccounting + (long)text.Length * sizeof(char));
+                        if (ruleAccounting > MaxRulePreparationBytes
+                            || checked(totalAccounting + ruleAccounting) > MaxTotalPreparationBytes)
+                        {
+                            run.Dispose();
+                            messages.Add(new RuleMessage(
+                                RuleMessageSeverity.Error,
+                                "Known-input preparation budget exceeded.",
+                                RuleMessageCode.LengthBudget,
+                                RuleInputTarget.Length));
+                            return BogusRunPreparationResult.Blocked(messages, generated);
+                        }
+                    }
+
+                    cache[row] = value;
+                    generated++;
+                }
+
+                totalAccounting = checked(totalAccounting + ruleAccounting);
+                if (totalAccounting > MaxTotalPreparationBytes)
+                {
+                    run.Dispose();
+                    messages.Add(new RuleMessage(
+                        RuleMessageSeverity.Error,
+                        "Known-input preparation budget exceeded.",
+                        RuleMessageCode.LengthBudget,
+                        RuleInputTarget.Length));
+                    return BogusRunPreparationResult.Blocked(messages, generated);
+                }
+
+                run.AddCache(request.TableLogicalName, request.ColumnLogicalName, cache, request.Context);
+            }
+
+            return BogusRunPreparationResult.Succeeded(run, generated, messages);
+        }
+        catch
+        {
+            run.Dispose();
+            throw;
+        }
+    }
+
+    private static bool RequiresPreflight(BogusEndpointDescriptor descriptor) =>
+        descriptor.RawKind == BogusRawKind.String
+        && (descriptor.Output.Policy == BogusLengthPolicy.Unknown || !descriptor.Output.TransportCertified);
+}
+
+/// <summary>One column submitted to <see cref="BogusRulePreparer.PrepareRun"/>.</summary>
+/// <param name="EffectiveRule">Normalized Bogus rule from validation.</param>
+/// <param name="Attribute">Live attribute metadata.</param>
+/// <param name="TableLogicalName">Canonical table logical name.</param>
+/// <param name="ColumnLogicalName">Canonical column logical name.</param>
+/// <param name="Context">Complete evaluation context for this table.</param>
+public sealed record BogusPreparationRequest(
+    BogusRule EffectiveRule,
+    AttributeMetadata Attribute,
+    string TableLogicalName,
+    string ColumnLogicalName,
+    RuleEvaluationContext Context);
+
+/// <summary>Outcome of atomic whole-run Bogus preparation.</summary>
+public sealed class BogusRunPreparationResult
+{
+    private BogusRunPreparationResult(
+        bool isBlocked, int generatedValueCount, IReadOnlyList<RuleMessage> messages, PreparedBogusRun? run)
+    {
+        IsBlocked = isBlocked;
+        GeneratedValueCount = generatedValueCount;
+        Messages = messages;
+        Run = run;
+    }
+
+    /// <summary>True when the run must not write. <see cref="Run"/> is then null.</summary>
+    public bool IsBlocked { get; }
+
+    /// <summary>Dynamic values generated in pass 2. Zero when pass 1 blocked.</summary>
+    public int GeneratedValueCount { get; }
+
+    /// <summary>Validation, risk, and length messages collected for the run.</summary>
+    public IReadOnlyList<RuleMessage> Messages { get; }
+
+    /// <summary>Prepared caches when not blocked. Null when blocked.</summary>
+    public PreparedBogusRun? Run { get; }
+
+    internal static BogusRunPreparationResult Blocked(IReadOnlyList<RuleMessage> messages, int generatedValueCount) =>
+        new(true, generatedValueCount, messages, run: null);
+
+    internal static BogusRunPreparationResult Succeeded(
+        PreparedBogusRun run, int generatedValueCount, IReadOnlyList<RuleMessage> messages) =>
+        new(false, generatedValueCount, messages, run);
+}
+
+/// <summary>
+/// Context-bound prepared values for one <c>BulkCreator.CreateAsync</c> attempt.
+/// Caches row values only for rules that required exact preflight.
+/// </summary>
+public sealed class PreparedBogusRun : IDisposable
+{
+    private readonly Dictionary<EntryKey, PreparedBogusRule> _rules = [];
+    private readonly Dictionary<EntryKey, CacheEntry> _caches = [];
+    private bool _disposed;
+
+    /// <summary>True when this column has a row-indexed preflight cache.</summary>
+    public bool ContainsCache(string tableLogicalName, string columnLogicalName)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _caches.ContainsKey(new EntryKey(tableLogicalName, columnLogicalName));
+    }
+
+    /// <summary>Returns a cached prepared value after validating context, count, and engine version.</summary>
+    /// <param name="tableLogicalName">Canonical table key.</param>
+    /// <param name="columnLogicalName">Canonical column key.</param>
+    /// <param name="context">Consumption context; table and count must match preparation.</param>
+    /// <param name="rowIndex">Zero-based row.</param>
+    public object GetValue(
+        string tableLogicalName, string columnLogicalName, RuleEvaluationContext context, int rowIndex)
+    {
+        if (!TryGetValue(tableLogicalName, columnLogicalName, context, rowIndex, out var value) || value is null)
+            throw new InvalidOperationException(
+                $"No prepared value for '{tableLogicalName}.{columnLogicalName}' row {rowIndex}.");
+        return value;
+    }
+
+    /// <summary>Tries to read a cached value. Returns false when the column was not preflighted.</summary>
+    public bool TryGetValue(
+        string tableLogicalName,
+        string columnLogicalName,
+        RuleEvaluationContext context,
+        int rowIndex,
+        out object? value)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentOutOfRangeException.ThrowIfNegative(rowIndex);
+        value = null;
+
+        var key = new EntryKey(tableLogicalName, columnLogicalName);
+        if (!_caches.TryGetValue(key, out var entry))
+            return false;
+
+        if (!string.Equals(context.Table, entry.Context.Table, StringComparison.Ordinal)
+            || context.RecordCount != entry.Context.RecordCount)
+        {
+            throw new InvalidOperationException(
+                "Prepared cache context does not match the consumption table or record count.");
+        }
+
+        if (!_rules.TryGetValue(key, out var rule))
+            throw new InvalidOperationException("Prepared cache is missing its compiled rule.");
+
+        rule.EnsureMatches(context);
+        if (rowIndex >= entry.Values.Length)
+            throw new ArgumentOutOfRangeException(nameof(rowIndex));
+
+        value = entry.Values[rowIndex];
+        return true;
+    }
+
+    internal void AddCompiled(string table, string column, PreparedBogusRule rule)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _rules[new EntryKey(table, column)] = rule;
+    }
+
+    internal void AddCache(string table, string column, object[] values, RuleEvaluationContext context)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _caches[new EntryKey(table, column)] = new CacheEntry(values, context);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _caches.Clear();
+        _rules.Clear();
+        _disposed = true;
+    }
+
+    private readonly record struct EntryKey(string Table, string Column);
+
+    private readonly record struct CacheEntry(object[] Values, RuleEvaluationContext Context);
 }
