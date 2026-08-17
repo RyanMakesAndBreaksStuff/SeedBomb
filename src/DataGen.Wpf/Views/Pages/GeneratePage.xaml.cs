@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using DataGen.Core.Contracts;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
@@ -21,9 +23,18 @@ public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
         _vm = viewModel;
         DataContext = _vm;
         InitializeComponent();
+        Loaded += OnPageLoaded;
 
         _vm.AttachFieldOverrides(FieldOverridesCtrl.ViewModel);
         // Do not new FieldRulesViewModel here. GenerateViewModel already owns one.
+    }
+
+    // Page is not a visual descendant of Frame, so FindAncestor Frame never binds.
+    // Logical Parent is NavigationViewContentPresenter; pin Height to its viewport.
+    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    {
+        if (Parent is FrameworkElement host)
+            SetBinding(HeightProperty, new Binding(nameof(ActualHeight)) { Source = host });
     }
 
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>

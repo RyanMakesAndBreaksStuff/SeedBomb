@@ -15,6 +15,8 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:RuleEditorViewModel}"
       mc:Ignorable="d"
+      VerticalAlignment="Stretch"
+      ScrollViewer.CanContentScroll="False"
       Background="{DynamicResource DG.Surface1}">
 
     <Page.Resources>
@@ -56,7 +58,8 @@
                       MinWidth="180"
                       ItemsSource="{Binding Tables}"
                       SelectedItem="{Binding SelectedTable}"
-                      DisplayMemberPath="DisplayName"/>
+                      DisplayMemberPath="DisplayName"
+                      AutomationProperties.Name="Table"/>
 
             <Button Grid.Column="2" Style="{DynamicResource DG.PrimaryButton}"
                     VerticalAlignment="Bottom"
@@ -138,9 +141,15 @@
                     </TextBlock>
                     <ListBox ItemsSource="{Binding ColumnsView}"
                              SelectedItem="{Binding SelectedColumn}"
+                             MinHeight="0"
                              Background="Transparent" BorderThickness="0" Padding="6"
                              HorizontalContentAlignment="Stretch"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling"
+                             VirtualizingPanel.ScrollUnit="Pixel">
                         <ListBox.GroupStyle>
                             <GroupStyle>
                                 <GroupStyle.HeaderTemplate>
@@ -218,9 +227,10 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                     <TextBlock Grid.Column="1" Style="{DynamicResource DG.Cell}"
+                                               FontSize="{DynamicResource DG.Type.Subtitle}"
                                                Text="{Binding LogicalName}" Margin="9,0,0,0"/>
                                     <TextBlock Grid.Column="2" Style="{DynamicResource DG.Tertiary}"
-                                               FontSize="{DynamicResource DG.Type.Label}"
+                                               FontSize="{DynamicResource DG.Type.Small}"
                                                Text="{Binding TypeLabel}" Margin="9,0,0,0"
                                                VerticalAlignment="Center"/>
                                 </Grid>
@@ -261,7 +271,8 @@
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Operation"/>
                                 <ComboBox Style="{DynamicResource DG.ComboBox}"
                                           ItemsSource="{Binding AvailableOperations}"
-                                          SelectedItem="{Binding SelectedOperation}"/>
+                                          SelectedItem="{Binding SelectedOperation}"
+                                          AutomationProperties.Name="Operation"/>
                             </StackPanel>
 
                             <!-- constant -->

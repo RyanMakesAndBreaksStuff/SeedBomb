@@ -1,4 +1,6 @@
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -21,6 +23,14 @@ public partial class RulesPage : Page, INavigableView<RuleEditorViewModel>, INav
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        Loaded += OnPageLoaded;
+    }
+
+    // Same Frame-host trap as GeneratePage: pin Height so the column list can scroll.
+    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    {
+        if (Parent is FrameworkElement host)
+            SetBinding(HeightProperty, new Binding(nameof(ActualHeight)) { Source = host });
     }
 
     /// <inheritdoc />

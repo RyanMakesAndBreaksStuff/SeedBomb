@@ -287,6 +287,45 @@ public sealed class RuleEditorViewModelTests
     }
 
     [Fact]
+    public async Task SelectedTable_change_reloads_columns_and_selects_first()
+    {
+        var account = BuildEntity();
+        var firstname = new StringAttributeMetadata { LogicalName = "firstname", IsValidForCreate = true, MaxLength = 50 };
+        var contact = new EntityMetadata { LogicalName = "contact" };
+        contact.GetType().GetProperty("Attributes")!.SetValue(contact, new AttributeMetadata[] { firstname });
+
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(2, "working-set", null, 42,
+                [new ProfileTable("account", 10, null), new ProfileTable("contact", 10, null)]),
+            TableName = "account",
+        };
+        var metadata = new Mock<IMetadataProvider>();
+        metadata
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([account, contact]);
+
+        var vm = new RuleEditorViewModel(
+            metadata.Object,
+            new Mock<IProfileService>().Object,
+            new Mock<IAppNavigator>().Object,
+            request);
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("account", vm.SelectedTable?.LogicalName);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        Assert.Contains("bogus", vm.AvailableOps);
+
+        vm.SelectedTable = vm.Tables.Single(t => t.LogicalName == "contact");
+
+        Assert.Equal("contact", vm.SelectedTable?.LogicalName);
+        Assert.Contains(vm.SettableColumns, c => c.LogicalName == "firstname");
+        Assert.DoesNotContain(vm.SettableColumns, c => c.LogicalName == "name");
+        Assert.Equal("firstname", vm.SelectedColumn?.LogicalName);
+        Assert.Contains("bogus", vm.AvailableOps);
+    }
+
+    [Fact]
     public void BooleanColumn_OffersOnlyRandomBool()
     {
         var flag = new BooleanAttributeMetadata { LogicalName = "donotemail", IsValidForCreate = true };

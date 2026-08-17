@@ -16,7 +16,8 @@
             <ui:Button Content="Retry" Margin="0,8,0,0" Command="{Binding LoadEntitiesCommand}" />
         </StackPanel>
 
-        <Grid Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisible}}">
+        <Grid MinHeight="0"
+              Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisible}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -35,6 +36,7 @@
                 <Button Grid.Column="1"
                         Command="{Binding ToggleCustomOnlyCommand}"
                         Content="Custom only"
+                        ToolTip="Tables you created (your publisher prefix). Hides standard and first-party tables such as msdyn and mspp."
                         Margin="0,0,8,0">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource DG.Button}">
@@ -55,13 +57,18 @@
             </Grid>
 
             <ListBox Grid.Row="1"
+                     MinHeight="0"
                      ItemsSource="{Binding FilteredEntities}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.CanContentScroll="True"
                      VirtualizingPanel.IsVirtualizing="True"
-                     VirtualizingPanel.VirtualizationMode="Recycling">
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     VirtualizingPanel.ScrollUnit="Pixel">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        <CheckBox Style="{DynamicResource DG.CheckBox}"
+                                  IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                   Padding="0,4">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{Binding DisplayName}" />

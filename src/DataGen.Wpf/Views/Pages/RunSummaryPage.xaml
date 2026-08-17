@@ -118,7 +118,7 @@
                                   ItemsSource="{Binding TableFilters}"
                                   SelectedItem="{Binding SelectedTableFilter}"/>
 
-                        <ToggleButton Grid.Column="4" Style="{DynamicResource DG.Button}"
+                        <ToggleButton Grid.Column="4" Style="{DynamicResource DG.ToggleButton}"
                                       Height="28" Padding="11,0"
                                       IsChecked="{Binding RetryableOnly}"
                                       Content="Retryable only"/>

@@ -513,7 +513,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         var sameSet = incoming.SetEquals(current);
 
         SelectedEntities = entities;
-        _fieldOverrides?.SetEntities(entities, _defaultRecordCount);
+        _fieldOverrides?.SetEntities(entities, DefaultRecordCount);
         OnPropertyChanged(nameof(SelectedTableRows));
 
         QueuedEntities.Clear();
@@ -649,7 +649,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 continue;
             }
 
-            var recordCount = rawCounts.GetValueOrDefault(table, _defaultRecordCount);
+            var recordCount = rawCounts.GetValueOrDefault(table, DefaultRecordCount);
             var tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var (column, rule) in columns)
@@ -825,7 +825,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             EntityLogicalNames = [.. SelectedEntities.Select(e => e.LogicalName)],
             RecordCounts = SelectedEntities.ToDictionary(
                 e => e.LogicalName,
-                e => rawCounts.GetValueOrDefault(e.LogicalName, _defaultRecordCount)),
+                e => rawCounts.GetValueOrDefault(e.LogicalName, DefaultRecordCount)),
             Seed = Seed,
             Locale = Locale,
             BatchSize = BatchSize,
@@ -1019,7 +1019,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 cols = new Dictionary<string, FieldRule>(r, StringComparer.OrdinalIgnoreCase);
             tables.Add(new ProfileTable(
                 entity.LogicalName,
-                counts.GetValueOrDefault(entity.LogicalName, _defaultRecordCount),
+                counts.GetValueOrDefault(entity.LogicalName, DefaultRecordCount),
                 cols));
         }
 
@@ -1028,12 +1028,12 @@ public sealed partial class GenerateViewModel : ViewModelBase
             if (seen.Contains(table) || cols.Count == 0) continue;
             tables.Add(new ProfileTable(
                 table,
-                counts.GetValueOrDefault(table, _defaultRecordCount),
+                counts.GetValueOrDefault(table, DefaultRecordCount),
                 new Dictionary<string, FieldRule>(cols, StringComparer.OrdinalIgnoreCase)));
         }
 
         if (tables.Count == 0)
-            tables.Add(new ProfileTable("account", _defaultRecordCount, null));
+            tables.Add(new ProfileTable("account", DefaultRecordCount, null));
 
         return new Profile(1, name, Description: null, Seed, tables);
     }

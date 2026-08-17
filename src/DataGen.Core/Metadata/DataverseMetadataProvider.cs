@@ -119,7 +119,7 @@ public class DataverseMetadataProvider(
                 .Select(e => new EntitySummary(
                     e.LogicalName,
                     e.DisplayName?.UserLocalizedLabel?.Label ?? e.LogicalName,
-                    e.IsCustomEntity == true))
+                    EntitySummary.IsUserCreated(e.LogicalName, e.IsCustomEntity == true)))
                 .OrderBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList()
                 .AsReadOnly();

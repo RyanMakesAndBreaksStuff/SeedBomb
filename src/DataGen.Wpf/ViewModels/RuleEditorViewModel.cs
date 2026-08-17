@@ -626,9 +626,20 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (!_entities.TryGetValue(value.LogicalName, out var meta))
             return;
 
+        SelectedColumn = null;
         ResetFromMetadata(meta);
+        if (ColumnsView is CollectionView grouped)
+        {
+            using (grouped.DeferRefresh())
+            {
+                grouped.GroupDescriptions.Clear();
+                grouped.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
+            }
+        }
+
         ColumnsView?.Refresh();
         OnPropertyChanged(nameof(PreviewFooterLabel));
+        SelectedColumn = _allSettable.FirstOrDefault();
     }
 
     [RelayCommand]

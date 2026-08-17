@@ -40,7 +40,8 @@ public sealed class ThemePaletteConfigurationTests
     [
         "DG.TitleBar", "DG.OnAccent", "DG.AccentLight", "DG.Info", "DG.InfoSoft",
         "DG.SuccessSoft", "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
-        "DG.Pad.RowTall", "DG.Size.NavPane", "DG.PrimaryButton", "DG.Cell",
+        "DG.Pad.RowTall", "DG.Size.NavPane", "DG.PrimaryButton", "DG.Cell", "DG.CheckBox",
+        "DG.ComboBox", "DG.ComboBoxItem", "DG.ToggleButton",
         "BoolToVisible", "BoolToVisibilityConverter",
     ];
 
@@ -109,6 +110,13 @@ public sealed class ThemePaletteConfigurationTests
         foreach (var key in RequiredSharedKeys)
             Assert.Contains($"x:Key=\"{key}\"", shared, StringComparison.Ordinal);
         Assert.DoesNotContain("#3E6FA8", shared, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<SeekStoryboard", shared, StringComparison.Ordinal);
+        Assert.DoesNotContain("<BeginStoryboard", shared, StringComparison.Ordinal);
+        Assert.Contains("<ControlTemplate TargetType=\"ComboBox\">", shared, StringComparison.Ordinal);
+        Assert.Contains("BasedOn=\"{StaticResource DG.ComboBox}\"", shared, StringComparison.Ordinal);
+        Assert.Contains("OverridesDefaultStyle", shared, StringComparison.Ordinal);
+        Assert.Contains("IsOpen=\"{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}\"", shared, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"DG.ToggleButton\"", shared, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")

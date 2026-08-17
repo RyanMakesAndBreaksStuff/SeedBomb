@@ -219,7 +219,7 @@
     <sys:Double x:Key="DG.Size.ControlSmall">30</sys:Double>
     <sys:Double x:Key="DG.Size.Chip">24</sys:Double>
     <sys:Double x:Key="DG.Size.ListPane">330</sys:Double>   <!-- 3a profile list -->
-    <sys:Double x:Key="DG.Size.ColumnPane">228</sys:Double> <!-- 3b column list -->
+    <sys:Double x:Key="DG.Size.ColumnPane">256</sys:Double> <!-- 3b column list -->
     <sys:Double x:Key="DG.Size.PreviewPane">236</sys:Double><!-- 3b preview -->
     <sys:Double x:Key="DG.Size.AsidePane">320</sys:Double>  <!-- 2a wizard aside -->
     <sys:Double x:Key="DG.Size.SheetWidth">600</sys:Double> <!-- 3c run sheet -->
@@ -378,6 +378,76 @@
         </Setter>
     </Style>
 
+    <!--
+        WPF-UI DefaultCheckBoxStyle SeekStoryboard("SlideIn") on Loaded and
+        Visibility=Visible. SlideIn only begins when IsChecked becomes True, so
+        every unchecked box (the Generate table list) emits Animation Warning 6.
+        Debugger Immediate Window writes hitch the UI. No storyboards here.
+    -->
+    <Style x:Key="DG.CheckBox" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource DefaultControlFocusVisualStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <BulletDecorator Margin="{TemplateBinding Padding}"
+                                     VerticalAlignment="Center"
+                                     Background="Transparent">
+                        <BulletDecorator.Bullet>
+                            <Border x:Name="Box"
+                                    Width="18" Height="18"
+                                    Background="{DynamicResource DG.ControlFill}"
+                                    BorderBrush="{DynamicResource DG.ControlBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource DG.Radius.Control}">
+                                <ui:SymbolIcon x:Name="Glyph"
+                                               Symbol="Checkmark16"
+                                               FontSize="12"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource DG.OnAccent}"
+                                               Visibility="Collapsed"/>
+                            </Border>
+                        </BulletDecorator.Bullet>
+                        <ContentPresenter Margin="8,0,0,0"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          RecognizesAccessKey="True"/>
+                    </BulletDecorator>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.Accent}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                            <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.ControlHover}"/>
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked" Value="True"/>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.AccentHover}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource DG.AccentHover}"/>
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                            <Setter TargetName="Box" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="CheckBox" BasedOn="{StaticResource DG.CheckBox}"/>
+
     <!-- Standard button — everything else, including Back/Next. -->
     <Style x:Key="DG.Button" TargetType="Button">
         <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
@@ -401,6 +471,43 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Pressed-state twin of DG.Button. Do not apply DG.Button to ToggleButton. -->
+    <Style x:Key="DG.ToggleButton" TargetType="ToggleButton">
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
+        <Setter Property="Padding" Value="12,0"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.ControlFill}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{DynamicResource DG.Radius.Control}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
@@ -485,6 +592,44 @@
         <Setter Property="SpinButtonPlacementMode" Value="Compact"/>
     </Style>
 
+    <Style x:Key="DG.ComboBoxItem" TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="11,6"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="Bd"
+                            Background="Transparent"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Dark chrome. WPF-UI's implicit ToggleButton style sizes an empty overlay to 0×0,
+        so the dropdown never opens on mouse click. Style={x:Null} + Stretch restores the hit target.
+        Do not set ScrollViewer.CanContentScroll=False — that blocks item selection.
+    -->
     <Style x:Key="DG.ComboBox" TargetType="ComboBox">
         <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
         <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}"/>
@@ -496,8 +641,106 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource DG.ComboBoxItem}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="28"/>
+                        </Grid.ColumnDefinitions>
+                        <ToggleButton x:Name="ToggleButton"
+                                      Grid.ColumnSpan="2"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      Focusable="False"
+                                      ClickMode="Press"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton">
+                                    <Setter Property="OverridesDefaultStyle" Value="True"/>
+                                    <Setter Property="Focusable" Value="False"/>
+                                    <Setter Property="ClickMode" Value="Press"/>
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                    <Setter Property="VerticalAlignment" Value="Stretch"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ToggleButton.Style>
+                        </ToggleButton>
+                        <Border x:Name="Bd"
+                                Grid.ColumnSpan="2"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource DG.Radius.Control}"
+                                IsHitTestVisible="False"/>
+                        <ContentPresenter x:Name="ContentSite"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                          IsHitTestVisible="False"
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        <Path Grid.Column="1"
+                              Data="M 0,0 L 4,4 L 8,0"
+                              Stroke="{TemplateBinding Foreground}"
+                              StrokeThickness="1.5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              IsHitTestVisible="False"/>
+                        <Popup x:Name="PART_Popup"
+                               Grid.ColumnSpan="2"
+                               Placement="Bottom"
+                               IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               PopupAnimation="None">
+                            <Border Background="{DynamicResource DG.Card}"
+                                    BorderBrush="{DynamicResource DG.ControlBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource DG.Radius.Control}"
+                                    MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <ScrollViewer>
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsDropDownOpen" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource DG.ComboBox}"/>
 
     <!-- Mono editor surface: template box, log block, preview rows. -->
     <Style x:Key="DG.CodeBox" TargetType="Border">

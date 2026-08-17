@@ -308,17 +308,28 @@ internal sealed class StaXunitTestCase : XunitTestCase, ISelfExecutingXunitTestC
         IMessageBus messageBus,
         object?[] constructorArguments,
         ExceptionAggregator aggregator,
-        CancellationTokenSource cancellationTokenSource)
+        CancellationTokenSource cancellationTokenSource,
+        ParallelMode parallelMode,
+        ExecutionScheduler scheduler,
+        FixtureMappingManager methodFixtureMappings)
     {
         if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
-            return RunCore(explicitOption, messageBus, constructorArguments, aggregator, cancellationTokenSource);
+            return RunCore(explicitOption, messageBus, constructorArguments, aggregator, cancellationTokenSource, parallelMode, scheduler, methodFixtureMappings);
 
         var tcs = new TaskCompletionSource<RunSummary>();
         var thread = new Thread(() =>
         {
             try
             {
-                tcs.SetResult(RunCore(explicitOption, messageBus, constructorArguments, aggregator, cancellationTokenSource)
+                tcs.SetResult(RunCore(
+                        explicitOption,
+                        messageBus,
+                        constructorArguments,
+                        aggregator,
+                        cancellationTokenSource,
+                        parallelMode,
+                        scheduler,
+                        methodFixtureMappings)
                     .AsTask()
                     .GetAwaiter()
                     .GetResult());
@@ -339,18 +350,25 @@ internal sealed class StaXunitTestCase : XunitTestCase, ISelfExecutingXunitTestC
         IMessageBus messageBus,
         object?[] constructorArguments,
         ExceptionAggregator aggregator,
-        CancellationTokenSource cancellationTokenSource)
+        CancellationTokenSource cancellationTokenSource,
+        ParallelMode parallelMode,
+        ExecutionScheduler scheduler,
+        FixtureMappingManager methodFixtureMappings)
     {
         var tests = await CreateTests();
+
         return await XunitTestCaseRunner.Instance.Run(
             this,
             tests,
             messageBus,
             aggregator,
             cancellationTokenSource,
+            parallelMode,
+            scheduler,
             TestCaseDisplayName,
             SkipReason,
             explicitOption,
-            constructorArguments);
+            constructorArguments,
+            methodFixtureMappings);
     }
 }
