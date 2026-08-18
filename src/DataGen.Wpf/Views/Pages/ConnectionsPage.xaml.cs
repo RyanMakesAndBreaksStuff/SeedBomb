@@ -65,9 +65,16 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
     {
         if (ViewModel.EditingProfile is { } profile && sender is PasswordBox box)
             profile.ClientSecret = box.Password;
+        ViewModel.SaveProfileCommand.NotifyCanExecuteChanged();
     }
 
     private void OnProfileFieldChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DataContext is ConnectionManagerViewModel vm)
+            vm.SaveProfileCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnAuthTypeChanged(object sender, SelectionChangedEventArgs e)
     {
         if (DataContext is ConnectionManagerViewModel vm)
             vm.SaveProfileCommand.NotifyCanExecuteChanged();
