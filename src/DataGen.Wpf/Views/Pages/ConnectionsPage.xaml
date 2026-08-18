@@ -10,6 +10,7 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:conn="clr-namespace:Seedbomb.Services.Connections"
       xmlns:vm="clr-namespace:Seedbomb.ViewModels"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -220,6 +221,48 @@
                                             PlaceholderText="organizations"
                                             FontFamily="{DynamicResource DG.Font.Mono}"
                                             Height="{DynamicResource DG.Size.Control}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,14">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Auth type"/>
+                                <ComboBox SelectedItem="{Binding EditingProfile.AuthType}"
+                                          ItemsSource="{Binding Source={x:Static conn:AuthTypeValues.All}}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,14"
+                                        Visibility="{Binding EditingProfile.AuthType,
+                                                    Converter={StaticResource AuthTypeToVisibility},
+                                                    ConverterParameter=ClientSecret}">
+                                <TextBlock Text="Client secret" Style="{DynamicResource DG.GroupLabel}"/>
+                                <PasswordBox x:Name="ClientSecretBox"
+                                             PasswordChanged="OnClientSecretChanged"
+                                             Height="{DynamicResource DG.Size.Control}"
+                                             Padding="{DynamicResource DG.Pad.Control}"
+                                             FontSize="{DynamicResource DG.Type.Caption}"
+                                             Foreground="{DynamicResource DG.Text1}"
+                                             CaretBrush="{DynamicResource DG.Text1}"
+                                             Background="{DynamicResource DG.CardSunken}"
+                                             BorderBrush="{DynamicResource DG.ControlBorder}"
+                                             BorderThickness="1"
+                                             VerticalContentAlignment="Center"/>
+                                <TextBlock Style="{DynamicResource DG.Secondary}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,7,0,0"
+                                           Text="Advanced: requires your own Entra app registration. The secret is encrypted at rest with DPAPI but is recoverable by anyone signed in as you — prefer a certificate."/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,16"
+                                        Visibility="{Binding EditingProfile.AuthType,
+                                                    Converter={StaticResource AuthTypeToVisibility},
+                                                    ConverterParameter=Certificate}">
+                                <TextBlock Text="Certificate thumbprint" Style="{DynamicResource DG.GroupLabel}"/>
+                                <ui:TextBox Text="{Binding EditingProfile.CertificateThumbprint, UpdateSourceTrigger=PropertyChanged}"
+                                            FontFamily="{DynamicResource DG.Font.Mono}"
+                                            Height="{DynamicResource DG.Size.Control}"/>
+                                <TextBlock Style="{DynamicResource DG.Secondary}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,7,0,0"
+                                           Text="Certificate must be installed in your personal store (CurrentUser\My). Spacing and case are ignored."/>
                             </StackPanel>
 
                             <!-- Test result. Success and failure share the slot; only the style differs. -->

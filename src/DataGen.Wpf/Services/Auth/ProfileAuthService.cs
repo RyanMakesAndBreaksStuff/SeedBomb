@@ -107,7 +107,6 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             AuthType.OAuth => await SignInOAuthAsync(profile, parentHwnd, commitSession, ct).ConfigureAwait(false),
             AuthType.ClientSecret or AuthType.Certificate => await SignInAppOnlyAsync(profile, commitSession, ct).ConfigureAwait(false),
-            AuthType.UserPassword => await SignInUserPasswordAsync(profile, commitSession, ct).ConfigureAwait(false),
             _ => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"),
         };
 
@@ -236,15 +235,6 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             return new AuthResult(false, null, ex.Message);
         }
-    }
-
-    private Task<AuthResult> SignInUserPasswordAsync(ConnectionProfile profile, bool commitSession, CancellationToken ct)
-    {
-        _ = (profile, commitSession, ct);
-        return Task.FromResult(new AuthResult(
-            false,
-            null,
-            "Username and password sign-in is no longer supported. Switch this profile to OAuth or Client Secret."));
     }
 
     private async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)

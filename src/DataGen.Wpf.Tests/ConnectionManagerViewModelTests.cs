@@ -123,6 +123,31 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
+    public void EditProfile_ClonesCertificateThumbprintAndClientSecret()
+    {
+        var stored = new ConnectionProfile
+        {
+            Name = "cert",
+            EnvironmentUrl = "https://c.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            AuthType = AuthType.Certificate,
+            CertificateThumbprint = "ABC123",
+            ClientSecret = "s3cret",
+        };
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(),
+            Mock.Of<IAuthService>(),
+            Mock.Of<IDataverseConnectionService>());
+
+        vm.EditProfileCommand.Execute(stored);
+
+        Assert.NotSame(stored, vm.EditingProfile);
+        Assert.Equal(AuthType.Certificate, vm.EditingProfile!.AuthType);
+        Assert.Equal("ABC123", vm.EditingProfile.CertificateThumbprint);
+        Assert.Equal("s3cret", vm.EditingProfile.ClientSecret);
+    }
+
+    [Fact]
     public void UseDefaultClientIdWritesWellKnownPublicClient()
     {
         var vm = new ConnectionManagerViewModel(

@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
@@ -18,6 +20,7 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
     /// <inheritdoc />
@@ -34,6 +37,8 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         catch (OperationCanceledException)
         {
         }
+
+        SyncClientSecretBox();
     }
 
     /// <inheritdoc />
@@ -41,6 +46,25 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
     {
         _loadCts?.Cancel();
         return Task.CompletedTask;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ConnectionManagerViewModel.EditingProfile))
+            SyncClientSecretBox();
+    }
+
+    private void SyncClientSecretBox()
+    {
+        var secret = ViewModel.EditingProfile?.ClientSecret ?? string.Empty;
+        if (ClientSecretBox.Password != secret)
+            ClientSecretBox.Password = secret;
+    }
+
+    private void OnClientSecretChanged(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.EditingProfile is { } profile && sender is PasswordBox box)
+            profile.ClientSecret = box.Password;
     }
 
     private void OnProfileFieldChanged(object sender, TextChangedEventArgs e)
