@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using Seedbomb.Services.Settings;
 using Seedbomb.Services.Theme;
 using Seedbomb.ViewModels;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 
 namespace Seedbomb.ViewModels;
 
@@ -11,12 +13,15 @@ namespace Seedbomb.ViewModels;
 /// <remarks>Initialises the view-model.</remarks>
 /// <param name="settingsService">Settings persistence service.</param>
 /// <param name="logger">Logger.</param>
+/// <param name="snackbar">Optional snackbar for I/O failures. Tests keep the 2-arg ctor.</param>
 public sealed partial class SettingsViewModel(
     ISettingsService settingsService,
-    ILogger<SettingsViewModel> logger) : ViewModelBase
+    ILogger<SettingsViewModel> logger,
+    ISnackbarService? snackbar = null) : ViewModelBase
 {
     private readonly ISettingsService _settingsService = settingsService;
     private readonly ILogger<SettingsViewModel> _logger = logger;
+    private readonly ISnackbarService? _snackbar = snackbar;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private CancellationTokenSource? _appearanceSaveCts;
@@ -136,6 +141,8 @@ public sealed partial class SettingsViewModel(
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save settings");
+            _snackbar?.Show("Settings not saved", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
@@ -176,6 +183,8 @@ public sealed partial class SettingsViewModel(
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save appearance settings");
+            _snackbar?.Show("Settings not saved", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 }

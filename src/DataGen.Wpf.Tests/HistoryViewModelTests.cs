@@ -2,6 +2,8 @@ using Seedbomb.Services.History;
 using Seedbomb.ViewModels;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -28,5 +30,74 @@ public sealed class HistoryViewModelTests
         Assert.Equal(2, vm.DayGroups.Count);
         Assert.Equal(2, vm.DayGroups[0].Runs.Count);
         Assert.Single(vm.DayGroups[1].Runs);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ShowsDangerSnackbar_WhenHistoryServiceFails()
+    {
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("history corrupt"));
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new HistoryViewModel(
+            history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        snackbar.Verify(s => s.Show(
+            "Couldn't load run history", "history corrupt",
+            ControlAppearance.Danger, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ClearHistoryAsync_ShowsDangerSnackbar_WhenClearFails()
+    {
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.ClearAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("locked"));
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new HistoryViewModel(
+            history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
+
+        await vm.ClearHistoryCommand.ExecuteAsync(null);
+
+        snackbar.Verify(s => s.Show(
+            "Couldn't clear history", "locked",
+            ControlAppearance.Danger, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ExportCsvAsync_ShowsSuccessSnackbar_WhenWriteSucceeds()
+    {
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new HistoryViewModel(
+            history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        string? exportedPath = null;
+        snackbar
+            .Setup(s => s.Show(
+                "History exported", It.IsAny<string>(),
+                ControlAppearance.Success, null, It.IsAny<TimeSpan>()))
+            .Callback<string, string, ControlAppearance, IconElement?, TimeSpan>(
+                (_, message, _, _, _) => exportedPath = message);
+
+        await vm.ExportCsvCommand.ExecuteAsync(null);
+
+        snackbar.Verify(s => s.Show(
+            "History exported", It.IsAny<string>(),
+            ControlAppearance.Success, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+        Assert.False(string.IsNullOrWhiteSpace(exportedPath));
+        Assert.Contains("Downloads", exportedPath, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(exportedPath));
+        File.Delete(exportedPath);
     }
 }
