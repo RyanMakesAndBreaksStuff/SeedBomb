@@ -107,11 +107,9 @@ public partial class App : Application
         var vm = _host!.Services.GetRequiredService<MainWindowViewModel>();
         vm.UserDisplayName = displayName;
 
-        var settings = _host.Services.GetRequiredService<ISettingsService>();
-        var s = await settings.LoadAsync();
         var profiles = _host.Services.GetRequiredService<IConnectionProfileService>();
         var profile = await profiles.GetLastUsedAsync();
-        vm.OrgUrl = profile?.EnvironmentUrl ?? s.OrgUrl;
+        vm.OrgUrl = profile?.EnvironmentUrl ?? string.Empty;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();

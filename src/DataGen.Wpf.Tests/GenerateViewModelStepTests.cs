@@ -244,9 +244,6 @@ public sealed class GenerateViewModelStepTests
         settingsMock
             .Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AppSettings(
-                OrgUrl: string.Empty,
-                ClientId: string.Empty,
-                TenantId: string.Empty,
                 DefaultRecordCount: 25,
                 DefaultBatchSize: 250,
                 DefaultDop: 4));
@@ -418,7 +415,7 @@ public sealed class GenerateViewModelStepTests
     {
         var settingsMock = new Mock<ISettingsService>();
         settingsMock.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AppSettings("", "", "", 10, 250, 4));
+            .ReturnsAsync(new AppSettings(10, 250, 4));
         var viewModel = new GenerateViewModel(
             Mock.Of<IRunHistoryService>(),
             settingsMock.Object, Mock.Of<ISnackbarService>(),

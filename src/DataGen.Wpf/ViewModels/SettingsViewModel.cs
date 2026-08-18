@@ -136,9 +136,6 @@ public sealed partial class SettingsViewModel(
         try
         {
             var settings = new AppSettings(
-                _loadedSettings.OrgUrl,
-                _loadedSettings.ClientId,
-                _loadedSettings.TenantId,
                 DefaultRecordCount, DefaultBatchSize, DefaultDop,
                 DarkTheme, ReduceMotion, PaletteId, _loadedSettings.KeepRunSheetOpen);
 
