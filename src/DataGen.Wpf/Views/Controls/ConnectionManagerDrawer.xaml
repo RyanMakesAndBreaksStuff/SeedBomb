@@ -197,7 +197,7 @@
 
                         <TextBlock Text="Auth Type" Style="{StaticResource FieldLabel}"/>
                         <ComboBox SelectedItem="{Binding EditingProfile.AuthType}"
-                                  ItemsSource="{Binding Source={x:Static conn:AuthTypeValues.All}}"/>
+                                  ItemsSource="{Binding Source={x:Static conn:AuthTypeValues.OAuthOnly}}"/>
 
                         <!-- Client ID — all auth types -->
                         <TextBlock Text="Client ID (Application ID)" Style="{StaticResource FieldLabel}"/>

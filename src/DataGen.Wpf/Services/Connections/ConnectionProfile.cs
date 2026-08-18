@@ -87,9 +87,12 @@ public sealed class ConnectionProfile : INotifyPropertyChanged
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>
 public static class AuthTypeValues
 {
-    /// <summary>All authentication type options.</summary>
+    /// <summary>All authentication type options (Connections page editor).</summary>
     public static readonly AuthType[] All =
         [AuthType.OAuth, AuthType.ClientSecret, AuthType.Certificate];
+
+    /// <summary>Drawer quick-create is OAuth-only; app-only auth goes through ConnectionsPage.</summary>
+    public static readonly AuthType[] OAuthOnly = [AuthType.OAuth];
 }
 
 /// <summary>Provides all <see cref="EnvironmentType"/> values for binding to ComboBox.</summary>
