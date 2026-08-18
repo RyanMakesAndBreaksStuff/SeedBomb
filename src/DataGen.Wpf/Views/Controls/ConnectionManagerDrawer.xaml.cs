@@ -16,4 +16,10 @@ public partial class ConnectionManagerDrawer : UserControl
                 await vm.LoadAsync();
         };
     }
+
+    private void OnProfileFieldChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DataContext is ConnectionManagerViewModel vm)
+            vm.SaveProfileCommand.NotifyCanExecuteChanged();
+    }
 }

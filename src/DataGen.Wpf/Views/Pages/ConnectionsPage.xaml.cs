@@ -42,4 +42,10 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         _loadCts?.Cancel();
         return Task.CompletedTask;
     }
+
+    private void OnProfileFieldChanged(object sender, TextChangedEventArgs e)
+    {
+        if (DataContext is ConnectionManagerViewModel vm)
+            vm.SaveProfileCommand.NotifyCanExecuteChanged();
+    }
 }

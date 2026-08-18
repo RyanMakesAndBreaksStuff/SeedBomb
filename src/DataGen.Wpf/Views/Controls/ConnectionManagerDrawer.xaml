@@ -183,11 +183,13 @@
 
                         <TextBlock Text="Name" Style="{StaticResource FieldLabel}"/>
                         <ui:TextBox Text="{Binding EditingProfile.Name, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="e.g. Dev, UAT, Prod"/>
+                                    PlaceholderText="e.g. Dev, UAT, Prod"
+                                    TextChanged="OnProfileFieldChanged"/>
 
                         <TextBlock Text="Environment URL" Style="{StaticResource FieldLabel}"/>
                         <ui:TextBox Text="{Binding EditingProfile.EnvironmentUrl, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="https://yourorg.crm.dynamics.com"/>
+                                    PlaceholderText="https://yourorg.crm.dynamics.com"
+                                    TextChanged="OnProfileFieldChanged"/>
 
                         <TextBlock Text="Environment Type" Style="{StaticResource FieldLabel}"/>
                         <ComboBox SelectedItem="{Binding EditingProfile.EnvironmentType}"
@@ -200,7 +202,8 @@
                         <!-- Client ID — all auth types -->
                         <TextBlock Text="Client ID (Application ID)" Style="{StaticResource FieldLabel}"/>
                         <ui:TextBox Text="{Binding EditingProfile.ClientId, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+                                    PlaceholderText="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                    TextChanged="OnProfileFieldChanged"/>
 
                         <!-- Tenant ID — optional for OAuth, required for others -->
                         <TextBlock Text="Tenant ID (Directory ID)" Style="{StaticResource FieldLabel}"/>

@@ -174,4 +174,41 @@ public sealed class ConnectionManagerViewModelTests
 
         Assert.Empty(vm.Profiles);
     }
+
+    [Theory]
+    [InlineData("", "https://c.crm.dynamics.com", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
+    [InlineData("Dev", "", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
+    [InlineData("Dev", "not-a-url", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
+    [InlineData("Dev", "https://c.crm.dynamics.com", "")]
+    public void SaveProfileCommand_CannotExecute_ForIncompleteProfiles(string name, string url, string clientId)
+    {
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object)
+        {
+            EditingProfile = new ConnectionProfile { Name = name, EnvironmentUrl = url, ClientId = clientId },
+        };
+
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SaveProfileCommand_CanExecute_ForACompleteProfile()
+    {
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object)
+        {
+            EditingProfile = new ConnectionProfile
+            {
+                Name = "Dev",
+                EnvironmentUrl = "https://contoso.crm.dynamics.com",
+                ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            },
+        };
+
+        Assert.True(vm.SaveProfileCommand.CanExecute(null));
+    }
 }
