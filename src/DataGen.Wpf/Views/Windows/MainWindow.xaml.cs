@@ -46,20 +46,37 @@ public partial class MainWindow : FluentWindow
         connectionManagerViewModel.ConnectionSwitched += OnConnectionSwitched;
         viewModel.OpenConnectionManagerRequested += (_, _) =>
             _navigator.Navigate(typeof(ConnectionsPage));
+        viewModel.SignInRequested += OnSignInRequested;
 
         RootNavigation.Navigated += (_, e) =>
         {
             _currentPageContent = e.Page;
             SyncFirstRunOverlay();
+            SyncSignInOverlay();
         };
         viewModel.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainWindowViewModel.HasConnection))
+            if (e.PropertyName is nameof(MainWindowViewModel.HasConnection)
+                or nameof(MainWindowViewModel.NeedsSignIn))
+            {
                 SyncFirstRunOverlay();
+                SyncSignInOverlay();
+            }
         };
         _profileService.ProfilesChanged += OnProfilesChanged;
         Loaded += OnWindowLoaded;
         Closed += OnWindowClosed;
+
+        // Same shared ConnectionManagerViewModel instance ConnectionsPage's identical
+        // SwitchError banner reads — a failed retry here is visible there too.
+        SignInErrorBanner.DataContext = connectionManagerViewModel;
+    }
+
+    private async void OnSignInRequested(object? sender, EventArgs e)
+    {
+        var last = await _profileService.GetLastUsedAsync();
+        if (last is not null)
+            await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
     }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
@@ -120,10 +137,12 @@ public partial class MainWindow : FluentWindow
 
         _vm.UserDisplayName = e.Result.DisplayName ?? _vm.UserDisplayName;
         _vm.OrgUrl = e.Profile.EnvironmentUrl;
+        _vm.NeedsSignIn = false;
         SyncHasConnection();
         if (_currentPageContent is GeneratePage page)
             page.ReloadForConnectionSwitch();
         SyncFirstRunOverlay();
+        SyncSignInOverlay();
     }
 
     private void SyncFirstRunOverlay()
@@ -132,6 +151,18 @@ public partial class MainWindow : FluentWindow
             && _currentPageContent is not ConnectionsPage
             && _currentPageContent is not SettingsPage;
         FirstRunOverlay.SetCurrentValue(
+            VisibilityProperty,
+            show ? Visibility.Visible : Visibility.Collapsed);
+    }
+
+    // Same ConnectionsPage/SettingsPage exclusion as SyncFirstRunOverlay: never cover the
+    // page the user needs to interact with to actually sign in.
+    private void SyncSignInOverlay()
+    {
+        var show = _vm.ShowSignInOverlay
+            && _currentPageContent is not ConnectionsPage
+            && _currentPageContent is not SettingsPage;
+        SignInOverlay.SetCurrentValue(
             VisibilityProperty,
             show ? Visibility.Visible : Visibility.Collapsed);
     }

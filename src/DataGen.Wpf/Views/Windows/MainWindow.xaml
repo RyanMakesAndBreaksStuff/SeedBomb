@@ -159,5 +159,43 @@
                 </StackPanel>
             </Border>
         </Border>
+
+        <!-- Shown when a connection profile exists but the startup silent sign-in failed
+             (e.g. an OAuth token needing re-consent). App-only profiles never hit this —
+             their silent sign-in needs no user/window and always succeeds at startup. -->
+        <Border x:Name="SignInOverlay" Grid.Row="1" Style="{DynamicResource DG.Scrim.Style}"
+                Visibility="{Binding ShowSignInOverlay, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Sign in to continue"/>
+                    <TextBlock Style="{DynamicResource DG.PageSubtitle}"
+                               Text="SeedBomb couldn't reconnect automatically."/>
+                    <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
+                            Command="{Binding SignInCommand}" Content="Sign in"/>
+
+                    <!-- DataContext set in code-behind to the same ConnectionManagerViewModel
+                         instance ConnectionsPage's identical banner reads — one shared error. -->
+                    <Border x:Name="SignInErrorBanner" Style="{DynamicResource DG.WarningBanner}"
+                            Margin="0,16,0,0"
+                            Visibility="{Binding HasSwitchError,
+                                         Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Grid.Column="0" Symbol="Warning24"
+                                           FontSize="{DynamicResource DG.Type.IconLg}"
+                                           Foreground="{DynamicResource DG.Warning}"
+                                           VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
+                                       Foreground="{DynamicResource DG.WarningText}"
+                                       Text="{Binding SwitchError}" Margin="14,0,0,0" LineHeight="18"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </ui:FluentWindow>
