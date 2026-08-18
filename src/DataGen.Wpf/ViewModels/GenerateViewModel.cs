@@ -478,7 +478,59 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// read at generation time.
     /// </summary>
     /// <param name="vm">The FieldOverrides view-model.</param>
-    public void AttachFieldOverrides(FieldOverridesViewModel vm) => _fieldOverrides = vm;
+    public void AttachFieldOverrides(FieldOverridesViewModel vm)
+    {
+        ArgumentNullException.ThrowIfNull(vm);
+
+        if (_fieldOverrides is not null)
+        {
+            _fieldOverrides.Entries.CollectionChanged -= OnCountEntriesChanged;
+            foreach (var entry in _fieldOverrides.Entries)
+                entry.PropertyChanged -= OnCountEntryChanged;
+        }
+
+        _fieldOverrides = vm;
+        vm.Entries.CollectionChanged += OnCountEntriesChanged;
+        foreach (var entry in vm.Entries)
+            entry.PropertyChanged += OnCountEntryChanged;
+    }
+
+    // WR-003: SetEntities clears and rebuilds Entries, so per-entry handlers must be
+    // re-attached on every collection change — not once at attach time.
+    private void OnCountEntriesChanged(
+        object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        foreach (var old in e.OldItems?.OfType<EntityCountEntry>() ?? [])
+            old.PropertyChanged -= OnCountEntryChanged;
+        foreach (var added in e.NewItems?.OfType<EntityCountEntry>() ?? [])
+            added.PropertyChanged += OnCountEntryChanged;
+
+        if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset
+            && _fieldOverrides is not null)
+        {
+            foreach (var entry in _fieldOverrides.Entries)
+            {
+                entry.PropertyChanged -= OnCountEntryChanged;
+                entry.PropertyChanged += OnCountEntryChanged;
+            }
+        }
+
+        NotifyVolumeChanged();
+    }
+
+    private void OnCountEntryChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EntityCountEntry.Count))
+            NotifyVolumeChanged();
+    }
+
+    private void NotifyVolumeChanged()
+    {
+        OnPropertyChanged(nameof(PlannedTotal));
+        OnPropertyChanged(nameof(RunConfirmationLine));
+        OnPropertyChanged(nameof(RunPlanStats));
+        OnPropertyChanged(nameof(SelectedTableRows));
+    }
 
     /// <summary>Full entity metadata for the current connection. Empty until tables load.</summary>
     public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadata =>

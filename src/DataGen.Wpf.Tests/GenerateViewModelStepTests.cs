@@ -474,6 +474,53 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public void EditingACount_RaisesPlannedTotalAndRunConfirmationLine()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        var overrides = new FieldOverridesViewModel();
+        viewModel.AttachFieldOverrides(overrides);
+
+        var account = new EntitySummary("account", "Account", false);
+        viewModel.OnEntitiesChanged([account]);
+        overrides.SetEntities([account], defaultCount: 10);
+
+        var raised = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        overrides.Entries.Single().Count = 1000;
+
+        Assert.Contains(nameof(GenerateViewModel.PlannedTotal), raised);
+        Assert.Contains(nameof(GenerateViewModel.RunConfirmationLine), raised);
+        Assert.Equal(1000, viewModel.PlannedTotal);
+        Assert.Contains("1,000", viewModel.RunConfirmationLine);
+    }
+
+    [Fact]
+    public void ChangingTableSelection_KeepsCountEditsObservable()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        var overrides = new FieldOverridesViewModel();
+        viewModel.AttachFieldOverrides(overrides);
+
+        var account = new EntitySummary("account", "Account", false);
+        var contact = new EntitySummary("contact", "Contact", false);
+
+        viewModel.OnEntitiesChanged([account]);
+        overrides.SetEntities([account], defaultCount: 10);
+
+        // SetEntities clears and rebuilds Entries — subscriptions taken at attach time are gone.
+        viewModel.OnEntitiesChanged([account, contact]);
+        overrides.SetEntities([account, contact], defaultCount: 10);
+
+        var raised = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        overrides.Entries.Single(x => x.Entity.LogicalName == "contact").Count = 500;
+
+        Assert.Contains(nameof(GenerateViewModel.PlannedTotal), raised);
+    }
+
+    [Fact]
     public void SelectedTableRows_uses_default_count_per_table()
     {
         var viewModel = CreateViewModel(out _, out _, out _);
