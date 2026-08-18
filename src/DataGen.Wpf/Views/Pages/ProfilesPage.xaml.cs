@@ -1,5 +1,7 @@
+using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using Seedbomb.Services.Navigation;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -8,18 +10,47 @@ namespace Seedbomb.Views.Pages;
 /// <summary>Profiles library — list and detail (1a/3a).</summary>
 public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
 {
+    private readonly GenerateViewModel _generate;
+    private readonly IAppNavigator _navigator;
+
     /// <inheritdoc />
     public ProfilesViewModel ViewModel { get; }
 
-    /// <summary>Initialises the page.</summary>
-    public ProfilesPage(ProfilesViewModel viewModel)
+    /// <summary>Initialises the page and wires the Generate wizard as the profile host.</summary>
+    /// <param name="viewModel">Page view-model.</param>
+    /// <param name="generate">Singleton Generate wizard — receives applied profiles.</param>
+    /// <param name="navigator">Shell navigator.</param>
+    public ProfilesPage(ProfilesViewModel viewModel, GenerateViewModel generate, IAppNavigator navigator)
     {
         ViewModel = viewModel;
+        _generate = generate;
+        _navigator = navigator;
         DataContext = viewModel;
         InitializeComponent();
 
         viewModel.PickImportPath ??= PickImport;
         viewModel.PickExportPath ??= PickExport;
+
+        // CR-001: the page is a first-class profile host, not just a browser. Without these
+        // the primary Generate… button silently no-ops.
+        viewModel.GetMetadata ??= () => generate.EntityMetadata;
+        viewModel.GetRunId ??= () => generate.RunId;
+        viewModel.CaptureCurrent ??= generate.BuildProfileSnapshot;
+        viewModel.IsBoardDirty ??= generate.IsBoardDirty;
+        viewModel.ConfirmOverwrite ??= msg => MessageBox.Show(
+            msg, "Load profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+        viewModel.ConfirmDelete ??= name => MessageBox.Show(
+            $"Delete profile '{name}'? This cannot be undone.",
+            "Delete profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+
+        viewModel.ProfileApplied += OnProfileApplied;
+        Unloaded += (_, _) => viewModel.ProfileApplied -= OnProfileApplied;
+    }
+
+    private void OnProfileApplied(object? sender, Seedbomb.Services.Profiles.ProfileImportReport report)
+    {
+        _generate.ApplyImportReport(report);
+        _navigator.Navigate(typeof(GeneratePage));
     }
 
     private static string? PickImport()

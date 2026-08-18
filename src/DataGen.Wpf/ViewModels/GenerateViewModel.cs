@@ -480,6 +480,13 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="vm">The FieldOverrides view-model.</param>
     public void AttachFieldOverrides(FieldOverridesViewModel vm) => _fieldOverrides = vm;
 
+    /// <summary>Full entity metadata for the current connection. Empty until tables load.</summary>
+    public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadata =>
+        _entityMetadata;
+
+    /// <summary>True when the rules board holds uncommitted edits.</summary>
+    public bool IsBoardDirty() => _fieldRules?.IsDirty == true;
+
     /// <summary>
     /// Replaces the owned <see cref="FieldRulesViewModel"/>. Tests swap a fixture; production
     /// keeps the ctor-owned instance.

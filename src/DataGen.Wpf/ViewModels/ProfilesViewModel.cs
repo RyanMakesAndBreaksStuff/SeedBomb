@@ -271,6 +271,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Raised when the page should open Rules for the named profile.</summary>
     public event EventHandler<string>? EditRulesRequested;
 
+    /// <summary>Raised when the user confirms an import preview. Arg is the validated report.</summary>
+    public event EventHandler<ProfileImportReport>? ProfileApplied;
+
     /// <summary>Reloads the profile list from the store.</summary>
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken ct = default)
@@ -326,7 +329,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             var profile = await _profiles.LoadAsync(SelectedItem.Name);
             if (GetMetadata is null)
             {
-                SetStatus($"Loaded “{SelectedItem.Name}”.");
+                // A host that cannot supply metadata cannot validate the profile against the
+                // org, so there is nothing to apply. Surface it rather than faking success.
+                SetError("Cannot open this profile — no table metadata is available. Connect first.");
                 return;
             }
 
@@ -536,6 +541,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     {
         if (PendingImport is null) return;
         AppliedToBoard = true;
+        ProfileApplied?.Invoke(this, PendingImport);
         ShowImportSummary = false;
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
