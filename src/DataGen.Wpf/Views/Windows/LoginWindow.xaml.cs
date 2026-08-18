@@ -1,9 +1,12 @@
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Seedbomb.Services.Theme;
 using Seedbomb.ViewModels;
+using Wpf.Ui;
 using Wpf.Ui.Controls;
 
 namespace Seedbomb.Views.Windows;
@@ -13,11 +16,15 @@ public partial class LoginWindow : FluentWindow
 {
     private readonly LoginWindowViewModel _vm;
     private readonly ConnectionManagerViewModel _connections;
+    private readonly IContentDialogService _contentDialogService;
     private bool _drawerOpen;
     private TranslateTransform DrawerTranslate => (TranslateTransform)DrawerControl.RenderTransform;
 
     /// <summary>Initialises the window and wires the ViewModel.</summary>
-    public LoginWindow(LoginWindowViewModel viewModel, ConnectionManagerViewModel connectionManagerViewModel)
+    public LoginWindow(
+        LoginWindowViewModel viewModel,
+        ConnectionManagerViewModel connectionManagerViewModel,
+        IContentDialogService contentDialogService)
     {
         _vm = viewModel;
         DataContext = viewModel;
@@ -25,6 +32,7 @@ public partial class LoginWindow : FluentWindow
 
         DrawerControl.DataContext = connectionManagerViewModel;
         _connections = connectionManagerViewModel;
+        _contentDialogService = contentDialogService;
         _connections.DrawerCloseRequested += OnDrawerCloseRequested;
         viewModel.LoginSucceeded += OnLoginSucceeded;
         viewModel.OpenConnectionManagerRequested += (_, _) => OpenDrawer();
@@ -45,6 +53,19 @@ public partial class LoginWindow : FluentWindow
         // The drawer's Test connection / Save paths call SignInAsync(ParentHwnd);
         // without a real HWND MSAL cannot show an interactive prompt (CR-002).
         _connections.ParentHwnd = new WindowInteropHelper(this).Handle;
+
+        // MainWindow re-registers its own host on its own Loaded, which fires after this
+        // window closes (LoginWindow closes before MainWindow.Loaded fires on the
+        // sign-in-succeeded path) — last-writer-wins is correct, no arbitration needed here.
+        if (Content is Grid grid)
+        {
+            foreach (var host in grid.Children.OfType<ContentDialogHost>())
+            {
+                _contentDialogService.SetDialogHost(host);
+                break;
+            }
+        }
+
         await _vm.InitializeAsync();
     }
 
