@@ -35,6 +35,11 @@ public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
     {
         if (Parent is FrameworkElement host)
             SetBinding(HeightProperty, new Binding(nameof(ActualHeight)) { Source = host });
+
+        // EntitySelectorCtrl resolves its ViewModel lazily on its own Loaded, which fires before
+        // this page's Loaded — safe to attach here.
+        if (EntitySelectorCtrl.ViewModel is { } selectorVm)
+            _vm.AttachEntitySelector(selectorVm);
     }
 
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>
