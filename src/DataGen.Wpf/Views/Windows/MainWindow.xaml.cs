@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Navigation;
@@ -15,6 +16,7 @@ public partial class MainWindow : FluentWindow
 {
     private readonly MainWindowViewModel _vm;
     private readonly ConnectionManagerViewModel _connectionManagerViewModel;
+    private readonly IConnectionProfileService _profileService;
     private readonly ISnackbarService _snackbarService;
     private readonly IContentDialogService _contentDialogService;
     private readonly NavigationViewNavigator _navigator;
@@ -24,6 +26,7 @@ public partial class MainWindow : FluentWindow
     public MainWindow(
         MainWindowViewModel viewModel,
         ConnectionManagerViewModel connectionManagerViewModel,
+        IConnectionProfileService profileService,
         IServiceProvider serviceProvider,
         ISnackbarService snackbarService,
         IContentDialogService contentDialogService,
@@ -31,6 +34,7 @@ public partial class MainWindow : FluentWindow
     {
         _vm = viewModel;
         _connectionManagerViewModel = connectionManagerViewModel;
+        _profileService = profileService;
         _snackbarService = snackbarService;
         _contentDialogService = contentDialogService;
         _navigator = (NavigationViewNavigator)navigator;
@@ -53,7 +57,9 @@ public partial class MainWindow : FluentWindow
             if (e.PropertyName == nameof(MainWindowViewModel.HasConnection))
                 SyncFirstRunOverlay();
         };
+        _profileService.ProfilesChanged += OnProfilesChanged;
         Loaded += OnWindowLoaded;
+        Closed += OnWindowClosed;
     }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
@@ -72,14 +78,36 @@ public partial class MainWindow : FluentWindow
 
         _connectionManagerViewModel.ParentHwnd = new WindowInteropHelper(this).Handle;
         await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
-        _connectionManagerViewModel.Profiles.CollectionChanged += OnProfilesCollectionChanged;
         SyncHasConnection();
         RootNavigation.Navigate(typeof(GeneratePage));
     }
 
-    private void OnProfilesCollectionChanged(
-        object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        => SyncHasConnection();
+    private void OnWindowClosed(object? sender, EventArgs e)
+        => _profileService.ProfilesChanged -= OnProfilesChanged;
+
+    // T4: react to saves/deletes (fired by the profile store) instead of ObservableCollection's
+    // CollectionChanged. LoadAsync does Profiles.Clear() then re-adds, so watching the collection
+    // directly drove HasConnection false for an instant on every routine reload (flashing the
+    // first-run overlay). ProfilesChanged can fire on a background thread (the store's disk write
+    // uses ConfigureAwait(false) throughout) — marshal to the UI thread before touching the
+    // ObservableCollection or any DependencyObject.
+    private void OnProfilesChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher.CheckAccess())
+            _ = ReloadAndSyncHasConnectionAsync();
+        else
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(OnProfilesChangedOnUiThread));
+    }
+
+    private void OnProfilesChangedOnUiThread() => _ = ReloadAndSyncHasConnectionAsync();
+
+    // HasConnection must be re-derived only after the reload fully settles, not mid-reload —
+    // that's the fix for the overlay flash.
+    private async Task ReloadAndSyncHasConnectionAsync()
+    {
+        await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
+        SyncHasConnection();
+    }
 
     // WR-001: the profile count is the only source of truth. Deleting the last connection
     // must re-show the first-run overlay and re-disable the nav items.
