@@ -5,8 +5,8 @@
     through the footer's Back/Next. Nothing is written to Dataverse until Start on step 4.
     The run sheet overlays the whole page while IsRunning.
 
-    Existing VM members reused: Steps, SelectedEntities, EntitiesSummary, Seed, Locale, BatchSize,
-    MaxParallelism, ReviewedRuleCount, LoadRulesCommand, GoToReviewCommand, StartGenerateCommand,
+    Existing VM members reused: Steps, SelectedEntities, Seed, Locale, BatchSize,
+    MaxParallelism, ReviewedRuleCount, LoadRulesCommand, GoToReviewCommand,
     ResetCommand, RunId. New: CurrentStep, CanGoNext/CanGoBack, GoNextCommand/GoBackCommand, Run.
 -->
 <Page x:Class="Seedbomb.Views.Pages.GeneratePage"

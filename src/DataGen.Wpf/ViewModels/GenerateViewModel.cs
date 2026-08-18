@@ -65,7 +65,6 @@ public sealed record ReviewPreviewRow(
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase
 {
-    private readonly IWpfGenerationService _generationService;
     private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
@@ -93,7 +92,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
-    /// <param name="generationService">Generation pipeline service.</param>
     /// <param name="historyService">Run history persistence service.</param>
     /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
     /// <param name="snackbar">Snackbar notification service.</param>
@@ -103,7 +101,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="rulesRequest">Optional payload for navigating to <see cref="RulesPage"/>.</param>
     /// <param name="navigator">Optional shell navigator.</param>
     public GenerateViewModel(
-        IWpfGenerationService generationService,
         IRunHistoryService historyService,
         ISettingsService settingsService,
         ISnackbarService snackbar,
@@ -116,7 +113,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IAppNavigator? navigator = null)
     {
         ArgumentNullException.ThrowIfNull(run);
-        _generationService = generationService;
         _historyService = historyService;
         _settingsService = settingsService;
         _snackbar = snackbar;
@@ -194,7 +190,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         nameof(CanExecute),
         nameof(HasEntities),
         nameof(SelectedEntitiesSummary),
-        nameof(EntitiesSummary),
         nameof(Steps),
         nameof(PlannedTotal),
         nameof(SelectedTableRows),
@@ -220,7 +215,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isCancelling;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasProgress))]
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
@@ -293,12 +287,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
             ? "Waiting"
             : string.Join(" · ", SelectedEntities.Take(4).Select(e => e.DisplayName)) +
               (SelectedEntities.Count > 4 ? $" · {SelectedEntities.Count} entities" : string.Empty);
-
-    /// <summary>Handoff alias of <see cref="SelectedEntitiesSummary"/>.</summary>
-    public string EntitiesSummary => SelectedEntitiesSummary;
-
-    /// <summary>Handoff alias of <see cref="GenerateCommand"/>.</summary>
-    public IRelayCommand StartGenerateCommand => GenerateCommand;
 
     /// <summary>Owned field-rules draft. Tests may swap via <see cref="AttachFieldRules"/>.</summary>
     public FieldRulesViewModel FieldRules => _fieldRules;
@@ -394,9 +382,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
     public bool IsGenerating => IsRunning;
-
-    /// <summary>Gets a value indicating whether live progress is available.</summary>
-    public bool HasProgress => CurrentProgress is not null;
 
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
@@ -540,10 +525,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         OnPropertyChanged(nameof(RunPlanStats));
         OnPropertyChanged(nameof(SelectedTableRows));
     }
-
-    /// <summary>Full entity metadata for the current connection. Empty until tables load.</summary>
-    public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadata =>
-        _entityMetadata;
 
     /// <summary>True when the rules board holds uncommitted edits.</summary>
     public bool IsBoardDirty() => _fieldRules?.IsDirty == true;
@@ -788,10 +769,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
             _ => value.ToString() ?? string.Empty,
         };
     }
-
-    /// <summary>Returns to the Rules step without discarding the draft.</summary>
-    [RelayCommand]
-    private void BackToRules() => IsReviewOpen = false;
 
     /// <summary>
     /// Discards the draft and restores the previously committed configuration (S2).
@@ -1215,14 +1192,5 @@ public sealed partial class GenerateViewModel : ViewModelBase
         {
             _logger.LogWarning(ex, "Draft autosave failed");
         }
-    }
-
-
-    /// <summary>Cancels a running generation.</summary>
-    [RelayCommand]
-    private void Abort()
-    {
-        IsCancelling = true;
-        _cts?.Cancel();
     }
 }

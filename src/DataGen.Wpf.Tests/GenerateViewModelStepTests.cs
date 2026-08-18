@@ -252,7 +252,6 @@ public sealed class GenerateViewModelStepTests
                 DefaultDop: 4));
 
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(),
             Mock.Of<IRunHistoryService>(),
             settingsMock.Object,
             Mock.Of<ISnackbarService>(),
@@ -421,7 +420,7 @@ public sealed class GenerateViewModelStepTests
         settingsMock.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AppSettings("", "", "", 10, 250, 4));
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<IRunHistoryService>(),
             settingsMock.Object, Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -459,7 +458,7 @@ public sealed class GenerateViewModelStepTests
     {
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -480,7 +479,7 @@ public sealed class GenerateViewModelStepTests
     {
         var profiles = new Mock<IProfileService>();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             profiles.Object, Mock.Of<IContentDialogService>(),
@@ -602,7 +601,6 @@ public sealed class GenerateViewModelStepTests
             using var profiles = new JsonProfileService(root);
             var generationMock = new Mock<IWpfGenerationService>();
             var vm = new GenerateViewModel(
-                generationMock.Object,
                 Mock.Of<IRunHistoryService>(),
                 Mock.Of<ISettingsService>(),
                 Mock.Of<ISnackbarService>(),
@@ -658,7 +656,6 @@ public sealed class GenerateViewModelStepTests
         snackbarMock = new Mock<ISnackbarService>();
 
         return new GenerateViewModel(
-            generationMock.Object,
             historyMock.Object,
             Mock.Of<ISettingsService>(),
             snackbarMock.Object,

@@ -33,7 +33,7 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
 
         // CR-001: the page is a first-class profile host, not just a browser. Without these
         // the primary Generate… button silently no-ops.
-        viewModel.GetMetadata ??= () => generate.EntityMetadata;
+        viewModel.GetMetadata ??= () => generate.EntityMetadataMap;
         viewModel.GetRunId ??= () => generate.RunId;
         viewModel.CaptureCurrent ??= generate.BuildProfileSnapshot;
         viewModel.IsBoardDirty ??= generate.IsBoardDirty;
