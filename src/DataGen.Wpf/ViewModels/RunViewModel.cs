@@ -101,9 +101,6 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Rows written, host, rules, seed.</summary>
     [ObservableProperty] private string _runDescription = "";
 
-    /// <summary>Pause button caption. Pause is not a pipeline feature.</summary>
-    [ObservableProperty] private string _pauseButtonLabel = "Pause";
-
     /// <summary>Finished timestamp, duration, seed.</summary>
     [ObservableProperty] private string _runMetaLine = "";
 
@@ -223,7 +220,6 @@ public sealed partial class RunViewModel : ObservableObject
         OverallPercentLabel = "0";
         RowsWrittenLabel = 0.ToString("N0");
         RunDescription = BuildRunDescription(0, plannedTotal, environmentHost, seed);
-        PauseButtonLabel = "Pause";
 
         Tables.Clear();
         foreach (var name in tables)
@@ -434,25 +430,6 @@ public sealed partial class RunViewModel : ObservableObject
 
         StatusHeadline = "Cancelling…";
         _runCts?.Cancel();
-    }
-
-    [RelayCommand]
-    private async Task PauseAsync()
-    {
-        if (_dialogs is null)
-            return;
-
-        try
-        {
-            await _dialogs.ShowAlertAsync(
-                "Pause",
-                "Pause is not supported. Cancel to stop further writes. Rows already written stay.",
-                "OK");
-        }
-        catch (Exception)
-        {
-            // Dialog host missing (tests / pre-load).
-        }
     }
 
     [RelayCommand]
