@@ -134,29 +134,38 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <inheritdoc />
     public override async Task OnNavigatedToAsync()
     {
-        var settings = await _settingsService.LoadAsync();
-        DefaultRecordCount = settings.DefaultRecordCount;
-
-        var wizardDirty = SelectedEntities.Count > 0 || CurrentStep > 0;
-        if (!wizardDirty)
-        {
-            BatchSize = settings.DefaultBatchSize;
-            MaxParallelism = settings.DefaultDop;
-        }
-
-        if (wizardDirty)
-            return;
-
         try
         {
-            _restoredDraft = await _profileService.LoadDraftAsync();
-            if (_restoredDraft?.Seed is int seed)
-                Seed = seed;
+            var settings = await _settingsService.LoadAsync();
+            DefaultRecordCount = settings.DefaultRecordCount;
+
+            var wizardDirty = SelectedEntities.Count > 0 || CurrentStep > 0;
+            if (!wizardDirty)
+            {
+                BatchSize = settings.DefaultBatchSize;
+                MaxParallelism = settings.DefaultDop;
+            }
+
+            if (wizardDirty)
+                return;
+
+            try
+            {
+                _restoredDraft = await _profileService.LoadDraftAsync();
+                if (_restoredDraft?.Seed is int seed)
+                    Seed = seed;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Draft profile load skipped");
+                _restoredDraft = null;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft profile load skipped");
-            _restoredDraft = null;
+            _logger.LogError(ex, "Failed to initialise the Generate page");
+            _snackbar.Show("Couldn't load the Generate page", ex.Message,
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 

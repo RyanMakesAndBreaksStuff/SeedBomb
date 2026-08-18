@@ -80,6 +80,12 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         catch (OperationCanceledException)
         {
         }
+        catch (Exception ex)
+        {
+            // WR-005: WPF-UI notifies INavigationAware from `async void PerformNotify`.
+            // An escaping exception here is an unhandled crash, not a failed page load.
+            SetError($"Couldn't load profiles: {ex.Message}");
+        }
     }
 
     /// <inheritdoc />
