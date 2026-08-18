@@ -755,6 +755,34 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IsReviewOpen = true;
     }
 
+    /// <summary>
+    /// Ensures <paramref name="logicalNames"/> are present in <see cref="EntityMetadataMap"/>,
+    /// fetching only the ones not already cached and merging them in — additive, never removes
+    /// or replaces entries <see cref="GoToRulesAsync"/> (or a prior call) already fetched. Lets a
+    /// profiles-first flow (Profiles → Generate…) validate against real metadata without requiring
+    /// a prior visit to the Rules step. Provider failures propagate to the caller rather than
+    /// being swallowed into an empty map.
+    /// </summary>
+    /// <param name="logicalNames">Table logical names to ensure metadata for.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task EnsureMetadataAsync(IEnumerable<string> logicalNames, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(logicalNames);
+
+        var missing = logicalNames
+            .Where(n => !string.IsNullOrWhiteSpace(n) && !_entityMetadata.ContainsKey(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missing.Length == 0)
+            return;
+
+        var list = await _metadataProvider.GetEntitiesAsync(missing, ct);
+        foreach (var m in list.Where(m => m.LogicalName is not null))
+            _entityMetadata[m.LogicalName!] = m;
+
+        OnPropertyChanged(nameof(EntityMetadataMap));
+    }
+
     private bool CanGoToReview() => IsRulesLoaded && !IsRunning;
 
     private static string FormatPreview(object? value)
