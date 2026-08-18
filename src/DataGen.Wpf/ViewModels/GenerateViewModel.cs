@@ -1186,7 +1186,26 @@ public sealed partial class GenerateViewModel : ViewModelBase
         try
         {
             await Task.Delay(400, ct);
-            await PersistDraftAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return; // coalesced by a newer edit
+        }
+
+        await PersistDraftAsync(ct);
+    }
+
+    // WR-006: GenerateAsync calls this as `_ = PersistDraftAsync()`, bypassing the
+    // debounce wrapper. The handler has to live here or that call is unobserved.
+    private async Task PersistDraftAsync(CancellationToken ct = default)
+    {
+        if (SelectedEntities.Count == 0 && (_fieldRules is null || _fieldRules.GetRules().Count == 0))
+            return;
+
+        try
+        {
+            var profile = BuildProfileSnapshot("draft");
+            await _profileService.SaveDraftAsync(profile, ct);
         }
         catch (OperationCanceledException)
         {
@@ -1194,17 +1213,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft autosave failed");
+            _logger.LogWarning(ex, "Draft autosave failed");
         }
-    }
-
-    private async Task PersistDraftAsync(CancellationToken ct = default)
-    {
-        if (SelectedEntities.Count == 0 && (_fieldRules is null || _fieldRules.GetRules().Count == 0))
-            return;
-
-        var profile = BuildProfileSnapshot("draft");
-        await _profileService.SaveDraftAsync(profile, ct);
     }
 
 

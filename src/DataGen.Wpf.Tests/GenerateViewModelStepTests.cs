@@ -357,6 +357,43 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GenerateAsync_DoesNotFault_WhenDraftPersistThrows()
+    {
+        var profileService = new Mock<IProfileService>();
+        profileService.Setup(p => p.SaveDraftAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("draft store unavailable"));
+
+        var logged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var logger = new Mock<ILogger<GenerateViewModel>>();
+        logger
+            .Setup(x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
+            .Callback(() => logged.TrySetResult());
+
+        var viewModel = CreateViewModel(
+            out var generationMock, out _, out _, out _,
+            profileService: profileService.Object,
+            logger: logger.Object);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult());
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        var ex = await Record.ExceptionAsync(() => viewModel.GenerateCommand.ExecuteAsync(null));
+
+        Assert.Null(ex);
+        // F&F PersistDraftAsync must catch + LogWarning; without WR-006 this times out (task faults unobserved).
+        await logged.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        profileService.Verify(
+            p => p.SaveDraftAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CancelDiscardsDraftAndNeverCallsGenerate()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
@@ -611,7 +648,9 @@ public sealed class GenerateViewModelStepTests
         out Mock<IWpfGenerationService> generationMock,
         out Mock<IMetadataProvider> metadataMock,
         out Mock<IRunHistoryService> historyMock,
-        out Mock<ISnackbarService> snackbarMock)
+        out Mock<ISnackbarService> snackbarMock,
+        IProfileService? profileService = null,
+        ILogger<GenerateViewModel>? logger = null)
     {
         generationMock = new Mock<IWpfGenerationService>();
         metadataMock = new Mock<IMetadataProvider>();
@@ -623,12 +662,15 @@ public sealed class GenerateViewModelStepTests
             historyMock.Object,
             Mock.Of<ISettingsService>(),
             snackbarMock.Object,
-            Mock.Of<ILogger<GenerateViewModel>>(),
+            logger ?? Mock.Of<ILogger<GenerateViewModel>>(),
             metadataMock.Object,
-            Mock.Of<IProfileService>(),
+            profileService ?? Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(),
             new RunViewModel(generationMock.Object));
     }
+
+    private static GenerateViewModel CreateViewModel(IProfileService profileService)
+        => CreateViewModel(out _, out _, out _, out _, profileService);
 
     private static GenerateViewModel CreateViewModel(
         out Mock<IWpfGenerationService> generationMock,
