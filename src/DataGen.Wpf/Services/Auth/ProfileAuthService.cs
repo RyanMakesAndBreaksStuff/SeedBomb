@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
 using Seedbomb.Services.Connections;
@@ -17,11 +18,17 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private IAccount? _account;
     private Guid? _activeProfileId;
     private MsalCacheHelper? _cacheHelper;
+    private readonly ILogger<ProfileAuthService>? _logger;
 
     /// <summary>Initialises the service and subscribes to profile changes.</summary>
-    public ProfileAuthService(IConnectionProfileService profiles)
+    /// <param name="profiles">Connection profile store.</param>
+    /// <param name="logger">Optional logger. Tests may omit it.</param>
+    public ProfileAuthService(
+        IConnectionProfileService profiles,
+        ILogger<ProfileAuthService>? logger = null)
     {
         _profiles = profiles;
+        _logger = logger;
         _profiles.ProfilesChanged += OnProfilesChanged;
     }
 
@@ -49,8 +56,12 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             _cacheHelper = await MsalCacheHelper.CreateAsync(CreateCacheProperties()).ConfigureAwait(false);
             return _cacheHelper;
         }
-        catch
+        catch (Exception ex)
         {
+            // WR-011: returning null is correct — auth degrades to interactive-every-launch.
+            // Silently is not: this is the only signal that the token cache is broken.
+            _logger?.LogWarning(ex,
+                "MSAL token cache could not be initialised; sign-in will be interactive every launch");
             return null;
         }
     }
