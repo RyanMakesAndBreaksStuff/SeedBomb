@@ -166,12 +166,9 @@ public partial class App : Application
 
         // Windows — singleton so only one instance exists at a time
         sc.AddSingleton<MainWindow>();
-        sc.AddSingleton<LoginWindow>(sp =>
-        {
-            var loginVm = ActivatorUtilities.CreateInstance<LoginWindowViewModel>(sp);
-            var loginConnections = ActivatorUtilities.CreateInstance<ConnectionManagerViewModel>(sp);
-            return new LoginWindow(loginVm, loginConnections);
-        });
+        sc.AddSingleton<LoginWindow>(sp => new LoginWindow(
+            sp.GetRequiredService<LoginWindowViewModel>(),
+            sp.GetRequiredService<ConnectionManagerViewModel>()));
 
         // Window ViewModels — singleton to match singleton window lifetime
         sc.AddSingleton<MainWindowViewModel>();

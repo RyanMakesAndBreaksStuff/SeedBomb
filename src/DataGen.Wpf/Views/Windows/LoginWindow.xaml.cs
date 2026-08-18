@@ -40,8 +40,13 @@ public partial class LoginWindow : FluentWindow
         Closed -= OnClosed;
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs e) =>
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        // The drawer's Test connection / Save paths call SignInAsync(ParentHwnd);
+        // without a real HWND MSAL cannot show an interactive prompt (CR-002).
+        _connections.ParentHwnd = new WindowInteropHelper(this).Handle;
         await _vm.InitializeAsync();
+    }
 
     private void OnSignInClick(object sender, RoutedEventArgs e)
     {

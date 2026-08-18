@@ -41,6 +41,30 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
+    public async Task TestConnectionAsync_PassesParentHwndToAuthService()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var auth = new Mock<IAuthService>();
+        var connections = new Mock<IDataverseConnectionService>();
+
+        nint captured = -1;
+        auth.Setup(a => a.TryConnectAsync(
+                It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+            .Callback<ConnectionProfile, nint, CancellationToken>((_, hwnd, _) => captured = hwnd)
+            .ReturnsAsync(new AuthResult(true, "user@contoso.com", null));
+
+        var vm = new ConnectionManagerViewModel(profiles.Object, auth.Object, connections.Object)
+        {
+            EditingProfile = new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://c.crm.dynamics.com" },
+            ParentHwnd = (nint)4242,
+        };
+
+        await vm.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal((nint)4242, captured);
+    }
+
+    [Fact]
     public async Task SaveProfileFailureSetsSwitchErrorAndStaysEditing()
     {
         var profiles = new Mock<IConnectionProfileService>();
