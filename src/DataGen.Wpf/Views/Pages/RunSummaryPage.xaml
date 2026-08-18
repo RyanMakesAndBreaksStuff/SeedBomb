@@ -42,7 +42,7 @@
                 </Grid.ColumnDefinitions>
 
                 <ui:SymbolIcon Grid.Column="0" Symbol="{Binding OutcomeGlyph}" FontSize="{DynamicResource DG.Type.IconLg}"
-                               Foreground="{Binding OutcomeBrush}" VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"/>
 
                 <StackPanel Grid.Column="1" Margin="14,0,14,0">
                     <TextBlock Style="{DynamicResource DG.CardTitle}"
@@ -193,10 +193,20 @@
                                                HorizontalAlignment="Right"
                                                VerticalAlignment="Center" Margin="12,0,0,0"/>
 
-                                    <TextBlock Grid.Column="4" Style="{DynamicResource DG.Tertiary}"
-                                               Foreground="{Binding DispositionBrush}"
+                                    <TextBlock Grid.Column="4"
                                                Text="{Binding DispositionLabel}"
-                                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                               VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                <Setter Property="Foreground" Value="{DynamicResource DG.Warning}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DispositionKey}" Value="Retryable">
+                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </Grid>
                             </Border>
                         </DataTemplate>
