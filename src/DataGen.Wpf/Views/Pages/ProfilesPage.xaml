@@ -14,9 +14,12 @@
       Background="{DynamicResource DG.Surface1}">
 
     <Grid Margin="{DynamicResource DG.Pad.Page}">
+        <!-- Manager pane (list + detail). Hidden while the import preview is up. -->
+        <Grid Visibility="{Binding ShowManager, Converter={StaticResource BoolToVisible}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Page header + page-level commands -->
@@ -321,5 +324,81 @@
                 </Grid>
             </Border>
         </Grid>
+
+            <ui:InfoBar Grid.Row="2"
+                        IsOpen="{Binding HasStatusMessage}"
+                        IsClosable="True"
+                        Title=""
+                        Message="{Binding StatusMessage}"
+                        Margin="0,10,0,0">
+                <ui:InfoBar.Style>
+                    <Style TargetType="ui:InfoBar">
+                        <Setter Property="Severity" Value="Informational" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasError}" Value="True">
+                                <Setter Property="Severity" Value="Error" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ui:InfoBar.Style>
+            </ui:InfoBar>
+        </Grid>
+
+        <!-- Import summary pane — same chrome as ProfilesDialog (Mock F5 right). -->
+        <ScrollViewer Visibility="{Binding ShowImportSummary, Converter={StaticResource BoolToVisible}}"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap"
+                           Foreground="{DynamicResource DG.Text3}"
+                           FontSize="{DynamicResource DG.Type.Caption}"
+                           Margin="0,0,0,10"
+                           Text="{Binding SchemaValidationCaption}" />
+
+                <ui:InfoBar IsOpen="{Binding HasSchemaError}"
+                            IsClosable="False"
+                            Severity="Error"
+                            Title="✕"
+                            Message="{Binding SchemaErrorMessage}"
+                            Margin="0,0,0,8" />
+
+                <ui:InfoBar IsOpen="{Binding HasImportApplied}"
+                            IsClosable="False"
+                            Severity="Success"
+                            Title="✓"
+                            Message="{Binding ImportAppliedMessage}"
+                            Margin="0,0,0,8" />
+
+                <ui:InfoBar IsOpen="{Binding HasImportAdjusted}"
+                            IsClosable="False"
+                            Severity="Warning"
+                            Title="⚠"
+                            Message="{Binding ImportAdjustedMessage}"
+                            Margin="0,0,0,8" />
+
+                <ui:InfoBar IsOpen="{Binding HasImportNotImported}"
+                            IsClosable="False"
+                            Severity="Error"
+                            Title="✕"
+                            Message="{Binding ImportNotImportedMessage}"
+                            Margin="0,0,0,8" />
+
+                <ui:InfoBar IsOpen="{Binding HasImportInfo}"
+                            IsClosable="False"
+                            Severity="Informational"
+                            Title="ⓘ"
+                            Message="{Binding ImportInfoMessage}"
+                            Margin="0,0,0,12" />
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button Content="← Back to list"
+                               Appearance="Secondary"
+                               Margin="0,0,8,0"
+                               Command="{Binding DiscardImportCommand}" />
+                    <ui:Button Content="Open in board"
+                               Appearance="Primary"
+                               Command="{Binding OpenInBoardCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Page>
