@@ -132,6 +132,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         EncryptedClientSecret = EncryptString(p.ClientSecret),
         EncryptedPassword = EncryptString(p.Password),
         Username = p.Username,
+        CertificateThumbprint = p.CertificateThumbprint,
     };
 
     private static ConnectionProfile Decrypt(ProfileDto d) => new()
@@ -146,6 +147,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         ClientSecret = DecryptString(d.EncryptedClientSecret),
         Password = DecryptString(d.EncryptedPassword),
         Username = d.Username,
+        CertificateThumbprint = d.CertificateThumbprint,
     };
 
     private static string? EncryptString(string? value)
@@ -185,5 +187,6 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         public string? EncryptedClientSecret { get; set; }
         public string? EncryptedPassword { get; set; }
         public string? Username { get; set; }
+        public string? CertificateThumbprint { get; set; }
     }
 }

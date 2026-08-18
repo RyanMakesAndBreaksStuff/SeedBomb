@@ -145,6 +145,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             ClientId = profile.ClientId,
             TenantId = profile.TenantId,
             ClientSecret = profile.ClientSecret,
+            CertificateThumbprint = profile.CertificateThumbprint,
             Username = profile.Username,
             Password = profile.Password,
         };

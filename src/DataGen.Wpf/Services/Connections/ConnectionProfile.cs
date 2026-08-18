@@ -7,6 +7,8 @@ public enum AuthType
     OAuth,
     /// <summary>Application identity using a client secret.</summary>
     ClientSecret,
+    /// <summary>Application identity using a certificate from the CurrentUser store.</summary>
+    Certificate,
     /// <summary>Resource-owner password credentials (username + password).</summary>
     UserPassword,
 }
@@ -54,6 +56,9 @@ public sealed class ConnectionProfile
     /// <summary>Client secret (plaintext). Used by <see cref="AuthType.ClientSecret"/> only.</summary>
     public string? ClientSecret { get; set; }
 
+    /// <summary>Certificate thumbprint in CurrentUser\My. Used by <see cref="AuthType.Certificate"/> only.</summary>
+    public string? CertificateThumbprint { get; set; }
+
     /// <summary>Username / UPN. Used by <see cref="AuthType.UserPassword"/> only.</summary>
     public string? Username { get; set; }
 
@@ -75,7 +80,8 @@ public sealed class ConnectionProfile
 public static class AuthTypeValues
 {
     /// <summary>All authentication type options.</summary>
-    public static readonly AuthType[] All = [AuthType.OAuth, AuthType.ClientSecret];
+    public static readonly AuthType[] All =
+        [AuthType.OAuth, AuthType.ClientSecret, AuthType.Certificate];
 }
 
 /// <summary>Provides all <see cref="EnvironmentType"/> values for binding to ComboBox.</summary>

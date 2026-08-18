@@ -106,7 +106,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         var result = profile.AuthType switch
         {
             AuthType.OAuth => await SignInOAuthAsync(profile, parentHwnd, commitSession, ct).ConfigureAwait(false),
-            AuthType.ClientSecret => await SignInClientSecretAsync(profile, commitSession, ct).ConfigureAwait(false),
+            AuthType.ClientSecret or AuthType.Certificate => await SignInAppOnlyAsync(profile, commitSession, ct).ConfigureAwait(false),
             AuthType.UserPassword => await SignInUserPasswordAsync(profile, commitSession, ct).ConfigureAwait(false),
             _ => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"),
         };
@@ -207,11 +207,18 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private async Task<AuthResult> SignInClientSecretAsync(
+    private async Task<AuthResult> SignInAppOnlyAsync(
         ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(profile.ClientSecret))
+        if (profile.AuthType == AuthType.Certificate)
+        {
+            if (string.IsNullOrWhiteSpace(profile.CertificateThumbprint))
+                return new AuthResult(false, null, "Certificate thumbprint is not configured for this profile.");
+        }
+        else if (string.IsNullOrWhiteSpace(profile.ClientSecret))
+        {
             return new AuthResult(false, null, "Client Secret is not configured for this profile.");
+        }
 
         var cca = await GetOrCreateCca(profile, commitSession).ConfigureAwait(false);
         var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
@@ -222,6 +229,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             return new AuthResult(true, profile.Name, null);
         }
         catch (MsalException ex)
+        {
+            return new AuthResult(false, null, ex.Message);
+        }
+        catch (InvalidOperationException ex)
         {
             return new AuthResult(false, null, ex.Message);
         }
@@ -277,11 +288,15 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             ? "https://login.microsoftonline.com/common"
             : $"https://login.microsoftonline.com/{profile.TenantId}";
 
-        var newCca = ConfidentialClientApplicationBuilder
+        var ccaBuilder = ConfidentialClientApplicationBuilder
             .Create(profile.ClientId)
-            .WithAuthority(authority)
-            .WithClientSecret(profile.ClientSecret!)
-            .Build();
+            .WithAuthority(authority);
+
+        ccaBuilder = profile.AuthType == AuthType.Certificate
+            ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
+            : ccaBuilder.WithClientSecret(profile.ClientSecret!);
+
+        var newCca = ccaBuilder.Build();
 
         var helper = await GetCacheHelperAsync().ConfigureAwait(false);
         helper?.RegisterCache(newCca.AppTokenCache);
