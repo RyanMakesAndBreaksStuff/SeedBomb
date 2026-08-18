@@ -84,6 +84,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private Profile? _restoredDraft;
     private FieldOverridesViewModel? _fieldOverrides;
     private FieldRulesViewModel _fieldRules;
+    private EntitySelectorViewModel? _entitySelector;
     private Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> _entityMetadata =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -487,6 +488,19 @@ public sealed partial class GenerateViewModel : ViewModelBase
         vm.Entries.CollectionChanged += OnCountEntriesChanged;
         foreach (var entry in vm.Entries)
             entry.PropertyChanged += OnCountEntryChanged;
+    }
+
+    /// <summary>
+    /// Attaches the <see cref="EntitySelectorViewModel"/> instance owned by the page's
+    /// <see cref="Seedbomb.Views.Controls.EntitySelectorControl"/> so a table selection made
+    /// programmatically (e.g. <see cref="ApplyImportReport"/>) is mirrored into the picker's
+    /// checkboxes rather than only updating <see cref="SelectedEntities"/> internally.
+    /// </summary>
+    /// <param name="vm">The entity selector picker's view-model.</param>
+    public void AttachEntitySelector(EntitySelectorViewModel vm)
+    {
+        ArgumentNullException.ThrowIfNull(vm);
+        _entitySelector = vm;
     }
 
     // WR-003: SetEntities clears and rebuilds Entries, so per-entry handlers must be
@@ -1111,6 +1125,41 @@ public sealed partial class GenerateViewModel : ViewModelBase
         return new Profile(1, name, Description: null, Seed, tables);
     }
 
+    /// <summary>
+    /// Ensures every table named by an applied import report is present in
+    /// <see cref="SelectedEntities"/> — a set-union/upsert against the current selection, so
+    /// tables already selected are left exactly where they are (no duplicates, no reordering).
+    /// Tables the report names but this run has no metadata for are skipped: there is no
+    /// <see cref="EntitySummary"/> to build for them and counts/rules for such tables never
+    /// reach the board anyway (see <see cref="Services.Profiles.ProfileImport"/>).
+    /// </summary>
+    /// <param name="tableNames">Logical names of tables named by the report.</param>
+    private void SelectReportTables(IEnumerable<string> tableNames)
+    {
+        var merged = SelectedEntities.ToList();
+        var seen = new HashSet<string>(merged.Select(e => e.LogicalName), StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+
+        foreach (var table in tableNames)
+        {
+            if (seen.Contains(table) || !_entityMetadata.TryGetValue(table, out var meta) || meta.LogicalName is null)
+                continue;
+
+            merged.Add(new EntitySummary(
+                meta.LogicalName,
+                meta.DisplayName?.UserLocalizedLabel?.Label ?? meta.LogicalName,
+                EntitySummary.IsUserCreated(meta.LogicalName, meta.IsCustomEntity == true)));
+            seen.Add(meta.LogicalName);
+            changed = true;
+        }
+
+        if (!changed)
+            return;
+
+        OnEntitiesChanged(merged);
+        _entitySelector?.SetSelection(merged);
+    }
+
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
     public void ApplyImportReport(ProfileImportReport report)
     {
@@ -1118,6 +1167,11 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
         if (report.Seed is int seed)
             Seed = seed;
+
+        // Select the report's tables first: FieldOverridesViewModel.SetCount() is a no-op for a
+        // table that isn't a selected entry yet, so the counts loop below would silently drop
+        // counts for tables the board doesn't already have selected.
+        SelectReportTables(report.TableCounts.Keys);
 
         foreach (var (table, count) in report.TableCounts)
             _fieldOverrides?.SetCount(table, count);

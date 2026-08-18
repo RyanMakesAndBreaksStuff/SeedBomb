@@ -123,6 +123,38 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         ToggleSelectedEntity(entity);
     }
 
+    /// <summary>
+    /// Programmatically sets the selection to exactly <paramref name="entities"/> — e.g. mirroring
+    /// a profile import applied on the owning page's view-model. Checkbox state (<see cref="EntitySelectionItem.IsSelected"/>)
+    /// and <see cref="SelectedEntities"/> are synced without duplicating or reordering rows already
+    /// matching an entry in <paramref name="entities"/>. Does not raise <see cref="SelectedEntitiesChanged"/>:
+    /// the caller already owns the resulting selection and does not need it echoed back.
+    /// </summary>
+    /// <param name="entities">The full desired selection.</param>
+    public void SetSelection(IReadOnlyList<EntitySummary> entities)
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+
+        _suppressSelectionEvents = true;
+        try
+        {
+            var wanted = entities.Select(e => e.LogicalName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in EntityItems)
+                item.IsSelected = wanted.Contains(item.LogicalName);
+
+            SelectedEntities.Clear();
+            foreach (var entity in entities)
+                SelectedEntities.Add(entity);
+        }
+        finally
+        {
+            _suppressSelectionEvents = false;
+        }
+
+        ClearCheckedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(FooterLabel));
+    }
+
     /// <summary>Clears all selected entities.</summary>
     public void ClearSelection()
     {

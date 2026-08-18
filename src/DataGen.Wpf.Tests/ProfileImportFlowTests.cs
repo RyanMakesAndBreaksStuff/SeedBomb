@@ -1,11 +1,19 @@
 using System.IO;
 using System.Text.Json;
+using DataGen.Core.Contracts;
+using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
+using Moq;
+using Seedbomb.Services.Generation;
+using Seedbomb.Services.History;
 using Seedbomb.Services.Profiles;
+using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
+using Wpf.Ui;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -257,5 +265,97 @@ public sealed class ProfileImportFlowTests : IDisposable
         Assert.Equal(1, report.AppliedRuleCount);
         Assert.IsType<BogusRule>(report.BoardRules["account"]["name"]);
         Assert.DoesNotContain(report.NotImported, n => n.Contains("validation context", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ── T8: ApplyImportReport selects the profile's tables ──────────────────────
+
+    /// <summary>Builds a bare-bones view-model wired for T8 checks: no rules/counts needed on the report itself.</summary>
+    private static async Task<(GenerateViewModel ViewModel, FieldOverridesViewModel Overrides)> NewViewModelWithMetadataAsync(
+        IReadOnlyList<EntitySummary> preSelected, IReadOnlyList<EntityMetadata> metadata, CancellationToken ct)
+    {
+        var metadataMock = new Mock<IMetadataProvider>();
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(metadata);
+
+        var vm = new GenerateViewModel(
+            Mock.Of<IRunHistoryService>(),
+            Mock.Of<ISettingsService>(),
+            Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(),
+            metadataMock.Object,
+            Mock.Of<IProfileService>(),
+            Mock.Of<IContentDialogService>(),
+            new RunViewModel(Mock.Of<IWpfGenerationService>()));
+
+        var overrides = new FieldOverridesViewModel();
+        vm.AttachFieldOverrides(overrides);
+
+        // Load metadata for the pre-selected tables (mirrors GoToRulesAsync — T1's fetch path)
+        // so ApplyImportReport's SelectReportTables has EntityMetadata to build EntitySummary from.
+        vm.OnEntitiesChanged(preSelected);
+        await vm.GoToRulesCommand.ExecuteAsync(null);
+        Assert.True(vm.IsRulesLoaded);
+
+        return (vm, overrides);
+    }
+
+    private static ProfileImportReport ReportNaming(params (string Table, int Count)[] tables) =>
+        new(
+            BoardRules: new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase),
+            TableCounts: tables.ToDictionary(t => t.Table, t => t.Count, StringComparer.OrdinalIgnoreCase),
+            Seed: null,
+            AppliedRuleCount: 0,
+            AppliedTableSummaries: [.. tables.Select(t => $"{t.Table} ({t.Count})")],
+            Adjusted: [],
+            NotImported: []);
+
+    [Fact]
+    public async Task ApplyImportReport_selects_reports_tables_from_an_empty_starting_selection()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var accountMeta = new EntityMetadata { LogicalName = "account" };
+        var contactMeta = new EntityMetadata { LogicalName = "contact" };
+
+        // Metadata for account + contact is already loaded (T1 EnsureMetadataAsync), but nothing
+        // is selected on the board yet — the profiles-first scenario T8 exists to fix.
+        var (vm, overrides) = await NewViewModelWithMetadataAsync(
+            [new EntitySummary("account", "Account", false), new EntitySummary("contact", "Contact", false)],
+            [accountMeta, contactMeta],
+            ct);
+        vm.OnEntitiesChanged([]);
+        Assert.Empty(vm.SelectedEntities);
+
+        var report = ReportNaming(("account", 500), ("contact", 300));
+        vm.ApplyImportReport(report);
+
+        Assert.Equal(
+            new[] { "account", "contact" },
+            vm.SelectedEntities.Select(e => e.LogicalName).Order(StringComparer.OrdinalIgnoreCase));
+        var counts = overrides.GetCounts();
+        Assert.Equal(500, counts["account"]);
+        Assert.Equal(300, counts["contact"]);
+    }
+
+    [Fact]
+    public async Task ApplyImportReport_does_not_duplicate_or_reorder_an_already_selected_table()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var accountMeta = new EntityMetadata { LogicalName = "account" };
+        var contactMeta = new EntityMetadata { LogicalName = "contact" };
+
+        // contact then account — a specific, non-alphabetical order to prove it is preserved.
+        var (vm, overrides) = await NewViewModelWithMetadataAsync(
+            [new EntitySummary("contact", "Contact", false), new EntitySummary("account", "Account", false)],
+            [accountMeta, contactMeta],
+            ct);
+
+        var report = ReportNaming(("account", 777));
+        vm.ApplyImportReport(report);
+
+        Assert.Equal(
+            ["contact", "account"],
+            vm.SelectedEntities.Select(e => e.LogicalName).ToArray());
+        Assert.Equal(777, overrides.GetCounts()["account"]);
     }
 }
