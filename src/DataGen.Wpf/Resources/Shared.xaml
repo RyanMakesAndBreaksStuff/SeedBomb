@@ -10,7 +10,6 @@
     <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisible" />
     <converters:NullToVisibilityConverter x:Key="NullToVisible" />
     <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
-    <converters:StringToVisibilityConverter x:Key="StringToVisible" />
     <converters:StepVisibilityConverter x:Key="StepVisibilityConverter" />
     <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
     <converters:EqualityToBoolConverter x:Key="EqualityToBoolConverter" />
