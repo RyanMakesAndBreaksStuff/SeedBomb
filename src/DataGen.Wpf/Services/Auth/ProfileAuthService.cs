@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
@@ -12,13 +14,32 @@ namespace Seedbomb.Services.Auth;
 /// </summary>
 public sealed class ProfileAuthService : IAuthService, IDisposable
 {
+    /// <summary>
+    /// A cached MSAL client (IPublicClientApplication or IConfidentialClientApplication)
+    /// alongside the fingerprint of the credential it was built from, so a stale client
+    /// can be detected and rebuilt when the profile's credential changes.
+    /// </summary>
+    private sealed record CachedClient(object Client, string Fingerprint);
+
     private readonly IConnectionProfileService _profiles;
-    // Values are IPublicClientApplication or IConfidentialClientApplication.
-    private readonly Dictionary<Guid, object> _clients = [];
+    private readonly Dictionary<Guid, CachedClient> _clients = [];
     private IAccount? _account;
     private Guid? _activeProfileId;
     private MsalCacheHelper? _cacheHelper;
     private readonly ILogger<ProfileAuthService>? _logger;
+
+    /// <summary>
+    /// Test seam: when set, replaces real confidential-client construction (which otherwise
+    /// loads a certificate from the CurrentUser store or performs real MSAL builder work).
+    /// Null uses the real MSAL builder.
+    /// </summary>
+    internal Func<ConnectionProfile, IConfidentialClientApplication>? CreateCcaOverride { get; set; }
+
+    /// <summary>
+    /// Test seam: when set, replaces real public-client construction. Null uses the real
+    /// MSAL builder.
+    /// </summary>
+    internal Func<ConnectionProfile, IPublicClientApplication>? CreatePcaOverride { get; set; }
 
     /// <summary>Initialises the service and subscribes to profile changes.</summary>
     /// <param name="profiles">Connection profile store.</param>
@@ -122,13 +143,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public async Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default)
     {
-        if (_activeProfileId is null || !_clients.TryGetValue(_activeProfileId.Value, out var client))
+        if (_activeProfileId is null || !_clients.TryGetValue(_activeProfileId.Value, out var cached))
             throw new InvalidOperationException("Not signed in.");
 
         AuthenticationResult result;
-        if (client is IPublicClientApplication pca)
+        if (cached.Client is IPublicClientApplication pca)
             result = await pca.AcquireTokenSilent(scopes, _account).ExecuteAsync(ct).ConfigureAwait(false);
-        else if (client is IConfidentialClientApplication cca)
+        else if (cached.Client is IConfidentialClientApplication cca)
             result = await cca.AcquireTokenForClient(scopes).ExecuteAsync(ct).ConfigureAwait(false);
         else
             throw new InvalidOperationException("Unknown MSAL client type.");
@@ -141,7 +162,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     {
         // PR-007: clearing _account alone leaves cached confidential clients able to keep
         // minting app-only tokens. Drop every client and the active profile too.
-        foreach (var client in _clients.Values.OfType<IPublicClientApplication>())
+        foreach (var client in _clients.Values.Select(c => c.Client).OfType<IPublicClientApplication>())
         {
             foreach (var account in await client.GetAccountsAsync().ConfigureAwait(false))
             {
@@ -253,62 +274,106 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)
+    /// <summary>
+    /// Fingerprint of the credential a public client is built from: the client ID plus the
+    /// auth type. A cached client whose fingerprint doesn't match the profile's current
+    /// values is stale and must be rebuilt.
+    /// </summary>
+    private static string ComputePcaFingerprint(ConnectionProfile profile) =>
+        $"{profile.AuthType}:{profile.ClientId}";
+
+    /// <summary>
+    /// Fingerprint of the credential a confidential client is built from: the auth type plus
+    /// a SHA-256 hash of the secret or certificate thumbprint currently in use. Hashing keeps
+    /// the raw secret out of the cache key/comparison state.
+    /// </summary>
+    private static string ComputeCcaFingerprint(ConnectionProfile profile)
     {
+        var credential = profile.AuthType == AuthType.Certificate
+            ? profile.CertificateThumbprint
+            : profile.ClientSecret;
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(credential ?? string.Empty));
+        return $"{profile.AuthType}:{Convert.ToHexString(hash)}";
+    }
+
+    internal async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)
+    {
+        var fingerprint = ComputePcaFingerprint(profile);
+
         if (commitSession
             && _clients.TryGetValue(profile.Id, out var existing)
-            && existing is IPublicClientApplication pca)
+            && existing.Client is IPublicClientApplication cachedPca
+            && existing.Fingerprint == fingerprint)
         {
-            return pca;
+            return cachedPca;
         }
 
-        var authority = string.IsNullOrWhiteSpace(profile.TenantId)
-            ? "https://login.microsoftonline.com/common"
-            : $"https://login.microsoftonline.com/{profile.TenantId}";
+        IPublicClientApplication newPca;
+        if (CreatePcaOverride is not null)
+        {
+            newPca = CreatePcaOverride(profile);
+        }
+        else
+        {
+            var authority = string.IsNullOrWhiteSpace(profile.TenantId)
+                ? "https://login.microsoftonline.com/common"
+                : $"https://login.microsoftonline.com/{profile.TenantId}";
 
-        var newPca = PublicClientApplicationBuilder
-            .Create(profile.ClientId)
-            .WithAuthority(authority)
-            .WithDefaultRedirectUri()
-            .Build();
+            newPca = PublicClientApplicationBuilder
+                .Create(profile.ClientId)
+                .WithAuthority(authority)
+                .WithDefaultRedirectUri()
+                .Build();
 
-        var helper = await GetCacheHelperAsync().ConfigureAwait(false);
-        helper?.RegisterCache(newPca.UserTokenCache);
+            var helper = await GetCacheHelperAsync().ConfigureAwait(false);
+            helper?.RegisterCache(newPca.UserTokenCache);
+        }
 
         if (commitSession)
-            _clients[profile.Id] = newPca;
+            _clients[profile.Id] = new CachedClient(newPca, fingerprint);
 
         return newPca;
     }
 
-    private async Task<IConfidentialClientApplication> GetOrCreateCca(ConnectionProfile profile, bool commitSession)
+    internal async Task<IConfidentialClientApplication> GetOrCreateCca(ConnectionProfile profile, bool commitSession)
     {
+        var fingerprint = ComputeCcaFingerprint(profile);
+
         if (commitSession
             && _clients.TryGetValue(profile.Id, out var existing)
-            && existing is IConfidentialClientApplication cca)
+            && existing.Client is IConfidentialClientApplication cachedCca
+            && existing.Fingerprint == fingerprint)
         {
-            return cca;
+            return cachedCca;
         }
 
-        var authority = string.IsNullOrWhiteSpace(profile.TenantId)
-            ? "https://login.microsoftonline.com/common"
-            : $"https://login.microsoftonline.com/{profile.TenantId}";
+        IConfidentialClientApplication newCca;
+        if (CreateCcaOverride is not null)
+        {
+            newCca = CreateCcaOverride(profile);
+        }
+        else
+        {
+            var authority = string.IsNullOrWhiteSpace(profile.TenantId)
+                ? "https://login.microsoftonline.com/common"
+                : $"https://login.microsoftonline.com/{profile.TenantId}";
 
-        var ccaBuilder = ConfidentialClientApplicationBuilder
-            .Create(profile.ClientId)
-            .WithAuthority(authority);
+            var ccaBuilder = ConfidentialClientApplicationBuilder
+                .Create(profile.ClientId)
+                .WithAuthority(authority);
 
-        ccaBuilder = profile.AuthType == AuthType.Certificate
-            ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
-            : ccaBuilder.WithClientSecret(profile.ClientSecret!);
+            ccaBuilder = profile.AuthType == AuthType.Certificate
+                ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
+                : ccaBuilder.WithClientSecret(profile.ClientSecret!);
 
-        var newCca = ccaBuilder.Build();
+            newCca = ccaBuilder.Build();
 
-        var helper = await GetCacheHelperAsync().ConfigureAwait(false);
-        helper?.RegisterCache(newCca.AppTokenCache);
+            var helper = await GetCacheHelperAsync().ConfigureAwait(false);
+            helper?.RegisterCache(newCca.AppTokenCache);
+        }
 
         if (commitSession)
-            _clients[profile.Id] = newCca;
+            _clients[profile.Id] = new CachedClient(newCca, fingerprint);
 
         return newCca;
     }
