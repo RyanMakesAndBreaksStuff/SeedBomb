@@ -43,4 +43,21 @@ public sealed class ProfileAuthServiceTests
         Assert.DoesNotContain(AuthType.ClientSecret, AuthTypeValues.OAuthOnly);
         Assert.DoesNotContain(AuthType.Certificate, AuthTypeValues.OAuthOnly);
     }
+
+    // Vacuous on empty cache: ProfileAuthService has no public seed for _clients.
+    // Asserting HasNoCachedClients after a real sign-in is manual verification only.
+    [Fact]
+    public async Task SignOutAsync_ClearsCachedClientsAndActiveProfile()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ConnectionProfile>());
+
+        var svc = new ProfileAuthService(profiles.Object);
+
+        await svc.SignOutAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(svc.CurrentUserDisplayName);
+        Assert.True(svc.HasNoCachedClients);
+    }
 }

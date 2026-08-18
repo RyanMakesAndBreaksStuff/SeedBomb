@@ -257,9 +257,17 @@
                 <TextBlock Grid.Column="0" Style="{DynamicResource DG.Tertiary}"
                            Text="Appearance changes apply immediately."
                            VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Style="{DynamicResource DG.PrimaryButton}"
-                        Command="{Binding SaveCommand}"
-                        Content="Save settings"/>
+                <StackPanel Grid.Column="1" Orientation="Vertical" HorizontalAlignment="Right">
+                    <Button Style="{DynamicResource DG.PrimaryButton}"
+                            Command="{Binding SaveCommand}"
+                            Content="Save settings"
+                            HorizontalAlignment="Right"/>
+                    <ui:Button Content="Sign out"
+                               Command="{Binding SignOutCommand}"
+                               Appearance="Secondary"
+                               Margin="0,8,0,0"
+                               HorizontalAlignment="Right"/>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

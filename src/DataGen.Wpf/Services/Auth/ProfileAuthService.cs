@@ -35,6 +35,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public string? CurrentUserDisplayName => _account?.Username;
 
+    /// <summary>True when no MSAL client applications are cached. Exposed for tests.</summary>
+    internal bool HasNoCachedClients => _clients.Count == 0;
+
     internal static bool ShouldDropSession(Guid? activeProfileId, IEnumerable<Guid> remainingIds) =>
         activeProfileId is Guid id && remainingIds.All(x => x != id);
 
@@ -136,13 +139,26 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public async Task SignOutAsync(CancellationToken ct = default)
     {
-        if (_account is not null && _activeProfileId is not null
-            && _clients.TryGetValue(_activeProfileId.Value, out var signOutClient)
-            && signOutClient is IPublicClientApplication pca)
+        // PR-007: clearing _account alone leaves cached confidential clients able to keep
+        // minting app-only tokens. Drop every client and the active profile too.
+        foreach (var client in _clients.Values.OfType<IPublicClientApplication>())
         {
-            await pca.RemoveAsync(_account).ConfigureAwait(false);
+            foreach (var account in await client.GetAccountsAsync().ConfigureAwait(false))
+            {
+                try
+                {
+                    await client.RemoveAsync(account).ConfigureAwait(false);
+                }
+                catch (MsalException)
+                {
+                    // Account already gone from the cache; nothing to remove.
+                }
+            }
         }
+
+        _clients.Clear();
         _account = null;
+        _activeProfileId = null;
     }
 
     private async Task<AuthResult> SignInOAuthAsync(

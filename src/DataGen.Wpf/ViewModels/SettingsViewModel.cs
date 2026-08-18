@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Settings;
 using Seedbomb.Services.Theme;
 using Seedbomb.ViewModels;
@@ -14,14 +16,20 @@ namespace Seedbomb.ViewModels;
 /// <param name="settingsService">Settings persistence service.</param>
 /// <param name="logger">Logger.</param>
 /// <param name="snackbar">Optional snackbar for I/O failures. Tests keep the 2-arg ctor.</param>
+/// <param name="auth">Optional auth service for sign-out. Tests may omit it.</param>
+/// <param name="connections">Optional Dataverse connection cache to reset on sign-out.</param>
 public sealed partial class SettingsViewModel(
     ISettingsService settingsService,
     ILogger<SettingsViewModel> logger,
-    ISnackbarService? snackbar = null) : ViewModelBase
+    ISnackbarService? snackbar = null,
+    IAuthService? auth = null,
+    IDataverseConnectionService? connections = null) : ViewModelBase
 {
     private readonly ISettingsService _settingsService = settingsService;
     private readonly ILogger<SettingsViewModel> _logger = logger;
     private readonly ISnackbarService? _snackbar = snackbar;
+    private readonly IAuthService? _auth = auth;
+    private readonly IDataverseConnectionService? _connections = connections;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private CancellationTokenSource? _appearanceSaveCts;
@@ -142,6 +150,26 @@ public sealed partial class SettingsViewModel(
         {
             _logger.LogError(ex, "Failed to save settings");
             _snackbar?.Show("Settings not saved", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
+        }
+    }
+
+    /// <summary>Signs out of the current session and drops the cached Dataverse connection.</summary>
+    [RelayCommand]
+    private async Task SignOutAsync()
+    {
+        if (_auth is null) return;
+        try
+        {
+            await _auth.SignOutAsync();
+            _connections?.Reset();
+            _snackbar?.Show("Signed out", "Sign in again to reconnect.",
+                ControlAppearance.Success, null, TimeSpan.FromSeconds(6));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sign out failed");
+            _snackbar?.Show("Sign out failed", ex.Message,
                 ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
