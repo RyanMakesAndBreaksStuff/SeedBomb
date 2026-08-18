@@ -838,13 +838,6 @@
         <Setter Property="Effect" Value="{StaticResource DG.Shadow.Sheet}"/>
     </Style>
 
-    <Style x:Key="StepHeaderStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Micro}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}" />
-        <Setter Property="Margin" Value="0,0,0,12" />
-    </Style>
-
     <!-- ==================================================================
          8. WPF-UI overrides — keeps library chrome on our palette
          ================================================================== -->
