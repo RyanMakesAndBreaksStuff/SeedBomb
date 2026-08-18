@@ -146,4 +146,32 @@ public sealed class ConnectionManagerViewModelTests
             Mock.Of<IDataverseConnectionService>());
         Assert.Same(vm.CancelCommand, vm.CancelEditCommand);
     }
+
+    [Fact]
+    public async Task DeleteProfileAsync_LeavesProfilesEmpty_WhenLastProfileRemoved()
+    {
+        var stored = new List<ConnectionProfile>
+        {
+            new() { Name = "Only", EnvironmentUrl = "https://c.crm.dynamics.com" },
+        };
+
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => stored.ToList());
+        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => stored.FirstOrDefault());
+        profiles.Setup(p => p.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, CancellationToken>((id, _) => stored.RemoveAll(p => p.Id == id))
+            .Returns(Task.CompletedTask);
+
+        var vm = new ConnectionManagerViewModel(
+            profiles.Object, new Mock<IAuthService>().Object, new Mock<IDataverseConnectionService>().Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+        Assert.Single(vm.Profiles);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(vm.Profiles[0]);
+
+        Assert.Empty(vm.Profiles);
+    }
 }
