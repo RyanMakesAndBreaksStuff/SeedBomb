@@ -129,6 +129,10 @@
             </StackPanel>
         </Border>
 
+        <!-- Content dialog host (ZIndex 11) — above the drawer (10) so dialogs raised from
+             the drawer (e.g. delete-profile confirmation) render on top of it. -->
+        <ui:ContentDialogHost Grid.RowSpan="2" Panel.ZIndex="11" />
+
         <!-- Scrim overlay (ZIndex 9) -->
         <Rectangle x:Name="DrawerScrim"
                    Grid.RowSpan="2"

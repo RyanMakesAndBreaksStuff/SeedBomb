@@ -166,7 +166,8 @@ public partial class App : Application
         sc.AddSingleton<MainWindow>();
         sc.AddSingleton<LoginWindow>(sp => new LoginWindow(
             sp.GetRequiredService<LoginWindowViewModel>(),
-            sp.GetRequiredService<ConnectionManagerViewModel>()));
+            sp.GetRequiredService<ConnectionManagerViewModel>(),
+            sp.GetRequiredService<IContentDialogService>()));
 
         // Window ViewModels — singleton to match singleton window lifetime
         sc.AddSingleton<MainWindowViewModel>();
