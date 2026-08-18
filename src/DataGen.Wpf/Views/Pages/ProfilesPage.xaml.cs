@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using Seedbomb.Services.Navigation;
+using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -12,6 +14,8 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
 {
     private readonly GenerateViewModel _generate;
     private readonly IAppNavigator _navigator;
+    private readonly IProfileService _profiles;
+    private CancellationTokenSource? _metadataPrefetchCts;
 
     /// <inheritdoc />
     public ProfilesViewModel ViewModel { get; }
@@ -20,11 +24,16 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
     /// <param name="viewModel">Page view-model.</param>
     /// <param name="generate">Singleton Generate wizard — receives applied profiles.</param>
     /// <param name="navigator">Shell navigator.</param>
-    public ProfilesPage(ProfilesViewModel viewModel, GenerateViewModel generate, IAppNavigator navigator)
+    /// <param name="profiles">Profile store — used to prefetch live metadata for the selected
+    /// profile's tables (T1: a profiles-first "Generate…" click must not have to wait on a prior
+    /// Rules visit to populate <see cref="GenerateViewModel.EntityMetadataMap"/>).</param>
+    public ProfilesPage(
+        ProfilesViewModel viewModel, GenerateViewModel generate, IAppNavigator navigator, IProfileService profiles)
     {
         ViewModel = viewModel;
         _generate = generate;
         _navigator = navigator;
+        _profiles = profiles;
         DataContext = viewModel;
         InitializeComponent();
 
@@ -44,7 +53,51 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
             "Delete profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
         viewModel.ProfileApplied += OnProfileApplied;
-        Unloaded += (_, _) => viewModel.ProfileApplied -= OnProfileApplied;
+        viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        Unloaded += (_, _) =>
+        {
+            viewModel.ProfileApplied -= OnProfileApplied;
+            viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            _metadataPrefetchCts?.Cancel();
+            _metadataPrefetchCts?.Dispose();
+        };
+    }
+
+    // T1: viewModel.GetMetadata (wired above) reads generate.EntityMetadataMap synchronously —
+    // by the time the user clicks "Generate…" (LoadCommand -> PresentImport) it must already hold
+    // the selected profile's tables, or every table lands in NotImported. GoToRulesAsync only
+    // fills that map when the user visits the Rules step first, which a profiles-first flow may
+    // never do — so fetch it here, as the profile is selected/presented, ahead of that click.
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ProfilesViewModel.SelectedItem) || ViewModel.SelectedItem is null)
+            return;
+
+        _metadataPrefetchCts?.Cancel();
+        _metadataPrefetchCts?.Dispose();
+        _metadataPrefetchCts = new CancellationTokenSource();
+        _ = PrefetchSelectedProfileMetadataAsync(ViewModel.SelectedItem.Name, _metadataPrefetchCts.Token);
+    }
+
+    private async Task PrefetchSelectedProfileMetadataAsync(string profileName, CancellationToken ct)
+    {
+        try
+        {
+            var profile = await _profiles.LoadAsync(profileName, ct);
+            var tables = profile.Tables.Select(t => t.Table).ToArray();
+            if (tables.Length > 0)
+                await _generate.EnsureMetadataAsync(tables, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Selection changed again, or the page navigated away, before the fetch finished.
+        }
+        catch (Exception ex)
+        {
+            // ProfilesViewModel.SetError is private; these are the same two properties it sets.
+            ViewModel.HasError = true;
+            ViewModel.StatusMessage = $"Couldn't load table metadata for “{profileName}”: {ex.Message}";
+        }
     }
 
     private void OnProfileApplied(object? sender, Seedbomb.Services.Profiles.ProfileImportReport report)
