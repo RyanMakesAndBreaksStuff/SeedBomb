@@ -50,8 +50,11 @@ public partial class LoginWindow : FluentWindow
 
     private void OnSignInClick(object sender, RoutedEventArgs e)
     {
+        // WR-002: ICommand.Execute does not consult CanExecute. Without this check a
+        // double-click starts two overlapping SignInAsync calls and two WAM prompts.
         var hwnd = new WindowInteropHelper(this).Handle;
-        _vm.LoginCommand.Execute(hwnd);
+        if (_vm.LoginCommand.CanExecute(hwnd))
+            _vm.LoginCommand.Execute(hwnd);
     }
 
     private async void OnLoginSucceeded(object? sender, string displayName)

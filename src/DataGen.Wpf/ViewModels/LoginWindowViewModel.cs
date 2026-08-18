@@ -31,11 +31,12 @@ public sealed partial class LoginWindowViewModel : ObservableObject
     private string? _errorMessage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSignIn))]
     [NotifyCanExecuteChangedFor(nameof(LoginCommand))]
     private bool _isLoading;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasProfiles), nameof(HasNoProfiles), nameof(SignInButtonText))]
+    [NotifyPropertyChangedFor(nameof(HasProfiles), nameof(HasNoProfiles), nameof(SignInButtonText), nameof(CanSignIn))]
     [NotifyCanExecuteChangedFor(nameof(LoginCommand))]
     private ConnectionProfile? _activeProfile;
 
@@ -84,6 +85,9 @@ public sealed partial class LoginWindowViewModel : ObservableObject
     }
 
     private bool CanLogin() => !IsLoading && HasProfiles;
+
+    /// <summary>Gets whether the Sign In button should be enabled. Mirrors <c>CanLogin</c>.</summary>
+    public bool CanSignIn => !IsLoading && HasProfiles;
 
     /// <summary>Loads the active profile for initial window display.</summary>
     public Task InitializeAsync() => RefreshActiveProfileAsync();
