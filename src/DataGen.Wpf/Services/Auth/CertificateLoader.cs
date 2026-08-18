@@ -19,8 +19,13 @@ public static class CertificateLoader
 
     /// <summary>Loads the certificate with the given thumbprint from CurrentUser\My.</summary>
     /// <param name="thumbprint">Certificate thumbprint; spacing and case are ignored.</param>
-    /// <returns>The matching certificate.</returns>
-    /// <exception cref="InvalidOperationException">No matching certificate is installed.</exception>
+    /// <returns>
+    /// A clone of the matching certificate that stays valid after the underlying store is
+    /// closed.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// No matching certificate is installed, or the match has no usable private key.
+    /// </exception>
     public static X509Certificate2 Load(string thumbprint)
     {
         var normalized = Normalize(thumbprint);
@@ -28,12 +33,38 @@ public static class CertificateLoader
         using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
-        var match = store.Certificates
-            .Cast<X509Certificate2>()
-            .FirstOrDefault(c => string.Equals(
-                Normalize(c.Thumbprint), normalized, StringComparison.Ordinal));
+        X509Certificate2? clone = null;
 
-        return match ?? throw new InvalidOperationException(
+        // store.Certificates materialises every certificate in the store up front, so every
+        // entry - matched or not - owns a native handle that must be disposed here; only the
+        // clone we hand back should outlive this method.
+        foreach (var candidate in store.Certificates.Cast<X509Certificate2>())
+        {
+            using (candidate)
+            {
+                if (clone is not null || !string.Equals(
+                    Normalize(candidate.Thumbprint), normalized, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!candidate.HasPrivateKey)
+                {
+                    throw new InvalidOperationException(
+                        $"Certificate with thumbprint '{normalized}' was found in the current user's " +
+                        "personal store but has no usable private key.");
+                }
+
+                // The copy constructor duplicates the native certificate context (e.g.
+                // CertDuplicateCertificateContext on Windows) instead of exporting and
+                // re-importing key bytes, so it keeps working for non-exportable
+                // (hardware- or TPM-backed) private keys and remains valid once `candidate`
+                // and `store` are disposed.
+                clone = new X509Certificate2(candidate);
+            }
+        }
+
+        return clone ?? throw new InvalidOperationException(
             $"Certificate with thumbprint '{normalized}' was not found in the current user's personal store.");
     }
 }
