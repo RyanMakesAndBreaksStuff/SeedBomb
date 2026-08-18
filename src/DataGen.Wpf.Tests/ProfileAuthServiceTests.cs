@@ -62,6 +62,31 @@ public sealed class ProfileAuthServiceTests
         Assert.True(svc.HasNoCachedClients);
     }
 
+    [Fact]
+    public async Task SignOutAsync_RemovesCachedAccount_ForOAuthProfileWithCachedSession()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ConnectionProfile>());
+
+        var svc = new ProfileAuthService(profiles.Object);
+
+        var account = Mock.Of<IAccount>(a => a.Username == "user@contoso.com");
+        var pca = new Mock<IPublicClientApplication>();
+        pca.Setup(p => p.GetAccountsAsync()).ReturnsAsync([account]);
+        pca.Setup(p => p.RemoveAsync(account)).Returns(Task.CompletedTask);
+        svc.CreatePcaOverride = _ => pca.Object;
+
+        var profile = MakeOAuthProfile();
+        await svc.GetOrCreatePca(profile, commitSession: true);
+
+        await svc.SignOutAsync(TestContext.Current.CancellationToken);
+
+        pca.Verify(p => p.RemoveAsync(account), Times.Once);
+        Assert.True(svc.HasNoCachedClients);
+        Assert.Null(svc.CurrentUserDisplayName);
+    }
+
     private static ConnectionProfile MakeCertificateProfile() => new()
     {
         Name = "Cert Profile",
