@@ -65,7 +65,6 @@ public sealed record ReviewPreviewRow(
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase
 {
-    private readonly IWpfGenerationService _generationService;
     private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
@@ -93,7 +92,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
-    /// <param name="generationService">Generation pipeline service.</param>
     /// <param name="historyService">Run history persistence service.</param>
     /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
     /// <param name="snackbar">Snackbar notification service.</param>
@@ -103,7 +101,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="rulesRequest">Optional payload for navigating to <see cref="RulesPage"/>.</param>
     /// <param name="navigator">Optional shell navigator.</param>
     public GenerateViewModel(
-        IWpfGenerationService generationService,
         IRunHistoryService historyService,
         ISettingsService settingsService,
         ISnackbarService snackbar,
@@ -116,7 +113,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IAppNavigator? navigator = null)
     {
         ArgumentNullException.ThrowIfNull(run);
-        _generationService = generationService;
         _historyService = historyService;
         _settingsService = settingsService;
         _snackbar = snackbar;
@@ -134,29 +130,38 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <inheritdoc />
     public override async Task OnNavigatedToAsync()
     {
-        var settings = await _settingsService.LoadAsync();
-        DefaultRecordCount = settings.DefaultRecordCount;
-
-        var wizardDirty = SelectedEntities.Count > 0 || CurrentStep > 0;
-        if (!wizardDirty)
-        {
-            BatchSize = settings.DefaultBatchSize;
-            MaxParallelism = settings.DefaultDop;
-        }
-
-        if (wizardDirty)
-            return;
-
         try
         {
-            _restoredDraft = await _profileService.LoadDraftAsync();
-            if (_restoredDraft?.Seed is int seed)
-                Seed = seed;
+            var settings = await _settingsService.LoadAsync();
+            DefaultRecordCount = settings.DefaultRecordCount;
+
+            var wizardDirty = SelectedEntities.Count > 0 || CurrentStep > 0;
+            if (!wizardDirty)
+            {
+                BatchSize = settings.DefaultBatchSize;
+                MaxParallelism = settings.DefaultDop;
+            }
+
+            if (wizardDirty)
+                return;
+
+            try
+            {
+                _restoredDraft = await _profileService.LoadDraftAsync();
+                if (_restoredDraft?.Seed is int seed)
+                    Seed = seed;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Draft profile load skipped");
+                _restoredDraft = null;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft profile load skipped");
-            _restoredDraft = null;
+            _logger.LogError(ex, "Failed to initialise the Generate page");
+            _snackbar.Show("Couldn't load the Generate page", ex.Message,
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
@@ -185,7 +190,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         nameof(CanExecute),
         nameof(HasEntities),
         nameof(SelectedEntitiesSummary),
-        nameof(EntitiesSummary),
         nameof(Steps),
         nameof(PlannedTotal),
         nameof(SelectedTableRows),
@@ -211,7 +215,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isCancelling;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasProgress))]
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
@@ -284,12 +287,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
             ? "Waiting"
             : string.Join(" · ", SelectedEntities.Take(4).Select(e => e.DisplayName)) +
               (SelectedEntities.Count > 4 ? $" · {SelectedEntities.Count} entities" : string.Empty);
-
-    /// <summary>Handoff alias of <see cref="SelectedEntitiesSummary"/>.</summary>
-    public string EntitiesSummary => SelectedEntitiesSummary;
-
-    /// <summary>Handoff alias of <see cref="GenerateCommand"/>.</summary>
-    public IRelayCommand StartGenerateCommand => GenerateCommand;
 
     /// <summary>Owned field-rules draft. Tests may swap via <see cref="AttachFieldRules"/>.</summary>
     public FieldRulesViewModel FieldRules => _fieldRules;
@@ -386,9 +383,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
     public bool IsGenerating => IsRunning;
 
-    /// <summary>Gets a value indicating whether live progress is available.</summary>
-    public bool HasProgress => CurrentProgress is not null;
-
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
 
@@ -478,7 +472,62 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// read at generation time.
     /// </summary>
     /// <param name="vm">The FieldOverrides view-model.</param>
-    public void AttachFieldOverrides(FieldOverridesViewModel vm) => _fieldOverrides = vm;
+    public void AttachFieldOverrides(FieldOverridesViewModel vm)
+    {
+        ArgumentNullException.ThrowIfNull(vm);
+
+        if (_fieldOverrides is not null)
+        {
+            _fieldOverrides.Entries.CollectionChanged -= OnCountEntriesChanged;
+            foreach (var entry in _fieldOverrides.Entries)
+                entry.PropertyChanged -= OnCountEntryChanged;
+        }
+
+        _fieldOverrides = vm;
+        vm.Entries.CollectionChanged += OnCountEntriesChanged;
+        foreach (var entry in vm.Entries)
+            entry.PropertyChanged += OnCountEntryChanged;
+    }
+
+    // WR-003: SetEntities clears and rebuilds Entries, so per-entry handlers must be
+    // re-attached on every collection change — not once at attach time.
+    private void OnCountEntriesChanged(
+        object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        foreach (var old in e.OldItems?.OfType<EntityCountEntry>() ?? [])
+            old.PropertyChanged -= OnCountEntryChanged;
+        foreach (var added in e.NewItems?.OfType<EntityCountEntry>() ?? [])
+            added.PropertyChanged += OnCountEntryChanged;
+
+        if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset
+            && _fieldOverrides is not null)
+        {
+            foreach (var entry in _fieldOverrides.Entries)
+            {
+                entry.PropertyChanged -= OnCountEntryChanged;
+                entry.PropertyChanged += OnCountEntryChanged;
+            }
+        }
+
+        NotifyVolumeChanged();
+    }
+
+    private void OnCountEntryChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EntityCountEntry.Count))
+            NotifyVolumeChanged();
+    }
+
+    private void NotifyVolumeChanged()
+    {
+        OnPropertyChanged(nameof(PlannedTotal));
+        OnPropertyChanged(nameof(RunConfirmationLine));
+        OnPropertyChanged(nameof(RunPlanStats));
+        OnPropertyChanged(nameof(SelectedTableRows));
+    }
+
+    /// <summary>True when the rules board holds uncommitted edits.</summary>
+    public bool IsBoardDirty() => _fieldRules?.IsDirty == true;
 
     /// <summary>
     /// Replaces the owned <see cref="FieldRulesViewModel"/>. Tests swap a fixture; production
@@ -720,10 +769,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
             _ => value.ToString() ?? string.Empty,
         };
     }
-
-    /// <summary>Returns to the Rules step without discarding the draft.</summary>
-    [RelayCommand]
-    private void BackToRules() => IsReviewOpen = false;
 
     /// <summary>
     /// Discards the draft and restores the previously committed configuration (S2).
@@ -1118,7 +1163,26 @@ public sealed partial class GenerateViewModel : ViewModelBase
         try
         {
             await Task.Delay(400, ct);
-            await PersistDraftAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return; // coalesced by a newer edit
+        }
+
+        await PersistDraftAsync(ct);
+    }
+
+    // WR-006: GenerateAsync calls this as `_ = PersistDraftAsync()`, bypassing the
+    // debounce wrapper. The handler has to live here or that call is unobserved.
+    private async Task PersistDraftAsync(CancellationToken ct = default)
+    {
+        if (SelectedEntities.Count == 0 && (_fieldRules is null || _fieldRules.GetRules().Count == 0))
+            return;
+
+        try
+        {
+            var profile = BuildProfileSnapshot("draft");
+            await _profileService.SaveDraftAsync(profile, ct);
         }
         catch (OperationCanceledException)
         {
@@ -1126,25 +1190,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft autosave failed");
+            _logger.LogWarning(ex, "Draft autosave failed");
         }
-    }
-
-    private async Task PersistDraftAsync(CancellationToken ct = default)
-    {
-        if (SelectedEntities.Count == 0 && (_fieldRules is null || _fieldRules.GetRules().Count == 0))
-            return;
-
-        var profile = BuildProfileSnapshot("draft");
-        await _profileService.SaveDraftAsync(profile, ct);
-    }
-
-
-    /// <summary>Cancels a running generation.</summary>
-    [RelayCommand]
-    private void Abort()
-    {
-        IsCancelling = true;
-        _cts?.Cancel();
     }
 }

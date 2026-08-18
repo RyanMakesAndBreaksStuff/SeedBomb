@@ -30,32 +30,34 @@ public sealed class ProfileAuthServiceTests
     [Fact]
     public void AuthTypeValuesDoesNotOfferUserPassword()
     {
-        Assert.DoesNotContain(AuthType.UserPassword, AuthTypeValues.All);
-        Assert.Contains(AuthType.OAuth, AuthTypeValues.All);
-        Assert.Contains(AuthType.ClientSecret, AuthTypeValues.All);
+        Assert.DoesNotContain("UserPassword", Enum.GetNames<AuthType>());
+        Assert.Equal(
+            [AuthType.OAuth, AuthType.ClientSecret, AuthType.Certificate],
+            AuthTypeValues.All);
     }
 
     [Fact]
-    public async Task UserPasswordSignInIsRejected()
+    public void AuthTypeValuesOAuthOnlyIsDrawerQuickCreateList()
+    {
+        Assert.Equal([AuthType.OAuth], AuthTypeValues.OAuthOnly);
+        Assert.DoesNotContain(AuthType.ClientSecret, AuthTypeValues.OAuthOnly);
+        Assert.DoesNotContain(AuthType.Certificate, AuthTypeValues.OAuthOnly);
+    }
+
+    // Vacuous on empty cache: ProfileAuthService has no public seed for _clients.
+    // Asserting HasNoCachedClients after a real sign-in is manual verification only.
+    [Fact]
+    public async Task SignOutAsync_ClearsCachedClientsAndActiveProfile()
     {
         var profiles = new Mock<IConnectionProfileService>();
-        var profile = new ConnectionProfile
-        {
-            AuthType = AuthType.UserPassword,
-            EnvironmentUrl = "https://org.crm.dynamics.com",
-            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
-            TenantId = "11111111-1111-1111-1111-111111111111",
-            Username = "user@contoso.com",
-            Password = "secret",
-        };
-        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(profile);
-        profiles.Setup(p => p.SetLastUsedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ConnectionProfile>());
 
-        using var sut = new ProfileAuthService(profiles.Object);
-        var result = await sut.SignInAsync(1, TestContext.Current.CancellationToken);
+        var svc = new ProfileAuthService(profiles.Object);
 
-        Assert.False(result.Succeeded);
-        Assert.Contains("no longer supported", result.Error, StringComparison.OrdinalIgnoreCase);
+        await svc.SignOutAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(svc.CurrentUserDisplayName);
+        Assert.True(svc.HasNoCachedClients);
     }
 }

@@ -106,7 +106,9 @@ public sealed class ThemePaletteConfigurationTests
     {
         var shared = ReadRepoFile("src/DataGen.Wpf/Resources/Shared.xaml");
         Assert.Contains("#A79CF1", shared, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("#7160E8", shared, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#B8AFF5", shared, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("x:Key=\"InverseBoolToVisible\"", shared, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"EqualityToBoolConverter\"", shared, StringComparison.Ordinal);
         foreach (var key in RequiredSharedKeys)
             Assert.Contains($"x:Key=\"{key}\"", shared, StringComparison.Ordinal);
         Assert.DoesNotContain("#3E6FA8", shared, StringComparison.OrdinalIgnoreCase);

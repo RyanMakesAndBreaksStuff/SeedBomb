@@ -191,11 +191,6 @@
                                        Text="Keep window open until finished"/>
                         </CheckBox>
 
-                        <Button Grid.Column="1" Style="{DynamicResource DG.Button}"
-                                Command="{Binding PauseCommand}"
-                                Content="{Binding PauseButtonLabel}"
-                                Margin="0,0,10,0"/>
-
                         <Button Grid.Column="2" Style="{DynamicResource DG.DangerButton}"
                                 Command="{Binding CancelCommand}"
                                 Content="Cancel run"/>

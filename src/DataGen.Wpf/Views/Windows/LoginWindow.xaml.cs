@@ -40,13 +40,21 @@ public partial class LoginWindow : FluentWindow
         Closed -= OnClosed;
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs e) =>
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        // The drawer's Test connection / Save paths call SignInAsync(ParentHwnd);
+        // without a real HWND MSAL cannot show an interactive prompt (CR-002).
+        _connections.ParentHwnd = new WindowInteropHelper(this).Handle;
         await _vm.InitializeAsync();
+    }
 
     private void OnSignInClick(object sender, RoutedEventArgs e)
     {
+        // WR-002: ICommand.Execute does not consult CanExecute. Without this check a
+        // double-click starts two overlapping SignInAsync calls and two WAM prompts.
         var hwnd = new WindowInteropHelper(this).Handle;
-        _vm.LoginCommand.Execute(hwnd);
+        if (_vm.LoginCommand.CanExecute(hwnd))
+            _vm.LoginCommand.Execute(hwnd);
     }
 
     private async void OnLoginSucceeded(object? sender, string displayName)

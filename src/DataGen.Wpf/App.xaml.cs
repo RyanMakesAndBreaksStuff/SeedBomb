@@ -107,11 +107,9 @@ public partial class App : Application
         var vm = _host!.Services.GetRequiredService<MainWindowViewModel>();
         vm.UserDisplayName = displayName;
 
-        var settings = _host.Services.GetRequiredService<ISettingsService>();
-        var s = await settings.LoadAsync();
         var profiles = _host.Services.GetRequiredService<IConnectionProfileService>();
         var profile = await profiles.GetLastUsedAsync();
-        vm.OrgUrl = profile?.EnvironmentUrl ?? s.OrgUrl;
+        vm.OrgUrl = profile?.EnvironmentUrl ?? string.Empty;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -166,12 +164,9 @@ public partial class App : Application
 
         // Windows — singleton so only one instance exists at a time
         sc.AddSingleton<MainWindow>();
-        sc.AddSingleton<LoginWindow>(sp =>
-        {
-            var loginVm = ActivatorUtilities.CreateInstance<LoginWindowViewModel>(sp);
-            var loginConnections = ActivatorUtilities.CreateInstance<ConnectionManagerViewModel>(sp);
-            return new LoginWindow(loginVm, loginConnections);
-        });
+        sc.AddSingleton<LoginWindow>(sp => new LoginWindow(
+            sp.GetRequiredService<LoginWindowViewModel>(),
+            sp.GetRequiredService<ConnectionManagerViewModel>()));
 
         // Window ViewModels — singleton to match singleton window lifetime
         sc.AddSingleton<MainWindowViewModel>();

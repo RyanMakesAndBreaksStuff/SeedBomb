@@ -62,15 +62,6 @@
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
-                <!-- Rules is a first-class destination in 1a, not a dialog off Generate. -->
-                <ui:NavigationViewItem Content="Rules"
-                                       TargetPageType="{x:Type pages:RulesPage}"
-                                       IsEnabled="{Binding HasConnection}">
-                    <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Options24"/>
-                    </ui:NavigationViewItem.Icon>
-                </ui:NavigationViewItem>
-
                 <ui:NavigationViewItem Content="Profiles"
                                        TargetPageType="{x:Type pages:ProfilesPage}"
                                        IsEnabled="{Binding HasConnection}">

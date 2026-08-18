@@ -244,15 +244,11 @@ public sealed class GenerateViewModelStepTests
         settingsMock
             .Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AppSettings(
-                OrgUrl: string.Empty,
-                ClientId: string.Empty,
-                TenantId: string.Empty,
                 DefaultRecordCount: 25,
                 DefaultBatchSize: 250,
                 DefaultDop: 4));
 
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(),
             Mock.Of<IRunHistoryService>(),
             settingsMock.Object,
             Mock.Of<ISnackbarService>(),
@@ -357,6 +353,43 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GenerateAsync_DoesNotFault_WhenDraftPersistThrows()
+    {
+        var profileService = new Mock<IProfileService>();
+        profileService.Setup(p => p.SaveDraftAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("draft store unavailable"));
+
+        var logged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var logger = new Mock<ILogger<GenerateViewModel>>();
+        logger
+            .Setup(x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
+            .Callback(() => logged.TrySetResult());
+
+        var viewModel = CreateViewModel(
+            out var generationMock, out _, out _, out _,
+            profileService: profileService.Object,
+            logger: logger.Object);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult());
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        var ex = await Record.ExceptionAsync(() => viewModel.GenerateCommand.ExecuteAsync(null));
+
+        Assert.Null(ex);
+        // F&F PersistDraftAsync must catch + LogWarning; without WR-006 this times out (task faults unobserved).
+        await logged.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        profileService.Verify(
+            p => p.SaveDraftAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CancelDiscardsDraftAndNeverCallsGenerate()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
@@ -382,9 +415,9 @@ public sealed class GenerateViewModelStepTests
     {
         var settingsMock = new Mock<ISettingsService>();
         settingsMock.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new AppSettings("", "", "", 10, 250, 4));
+            .ReturnsAsync(new AppSettings(10, 250, 4));
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<IRunHistoryService>(),
             settingsMock.Object, Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -422,7 +455,7 @@ public sealed class GenerateViewModelStepTests
     {
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -443,7 +476,7 @@ public sealed class GenerateViewModelStepTests
     {
         var profiles = new Mock<IProfileService>();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IWpfGenerationService>(), Mock.Of<IRunHistoryService>(),
+            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             profiles.Object, Mock.Of<IContentDialogService>(),
@@ -471,6 +504,53 @@ public sealed class GenerateViewModelStepTests
         Assert.Equal(42, viewModel.Seed);
         Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
         profiles.Verify(p => p.ClearDraftAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void EditingACount_RaisesPlannedTotalAndRunConfirmationLine()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        var overrides = new FieldOverridesViewModel();
+        viewModel.AttachFieldOverrides(overrides);
+
+        var account = new EntitySummary("account", "Account", false);
+        viewModel.OnEntitiesChanged([account]);
+        overrides.SetEntities([account], defaultCount: 10);
+
+        var raised = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        overrides.Entries.Single().Count = 1000;
+
+        Assert.Contains(nameof(GenerateViewModel.PlannedTotal), raised);
+        Assert.Contains(nameof(GenerateViewModel.RunConfirmationLine), raised);
+        Assert.Equal(1000, viewModel.PlannedTotal);
+        Assert.Contains("1,000", viewModel.RunConfirmationLine);
+    }
+
+    [Fact]
+    public void ChangingTableSelection_KeepsCountEditsObservable()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        var overrides = new FieldOverridesViewModel();
+        viewModel.AttachFieldOverrides(overrides);
+
+        var account = new EntitySummary("account", "Account", false);
+        var contact = new EntitySummary("contact", "Contact", false);
+
+        viewModel.OnEntitiesChanged([account]);
+        overrides.SetEntities([account], defaultCount: 10);
+
+        // SetEntities clears and rebuilds Entries — subscriptions taken at attach time are gone.
+        viewModel.OnEntitiesChanged([account, contact]);
+        overrides.SetEntities([account, contact], defaultCount: 10);
+
+        var raised = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        overrides.Entries.Single(x => x.Entity.LogicalName == "contact").Count = 500;
+
+        Assert.Contains(nameof(GenerateViewModel.PlannedTotal), raised);
     }
 
     [Fact]
@@ -518,7 +598,6 @@ public sealed class GenerateViewModelStepTests
             using var profiles = new JsonProfileService(root);
             var generationMock = new Mock<IWpfGenerationService>();
             var vm = new GenerateViewModel(
-                generationMock.Object,
                 Mock.Of<IRunHistoryService>(),
                 Mock.Of<ISettingsService>(),
                 Mock.Of<ISnackbarService>(),
@@ -564,7 +643,9 @@ public sealed class GenerateViewModelStepTests
         out Mock<IWpfGenerationService> generationMock,
         out Mock<IMetadataProvider> metadataMock,
         out Mock<IRunHistoryService> historyMock,
-        out Mock<ISnackbarService> snackbarMock)
+        out Mock<ISnackbarService> snackbarMock,
+        IProfileService? profileService = null,
+        ILogger<GenerateViewModel>? logger = null)
     {
         generationMock = new Mock<IWpfGenerationService>();
         metadataMock = new Mock<IMetadataProvider>();
@@ -572,16 +653,18 @@ public sealed class GenerateViewModelStepTests
         snackbarMock = new Mock<ISnackbarService>();
 
         return new GenerateViewModel(
-            generationMock.Object,
             historyMock.Object,
             Mock.Of<ISettingsService>(),
             snackbarMock.Object,
-            Mock.Of<ILogger<GenerateViewModel>>(),
+            logger ?? Mock.Of<ILogger<GenerateViewModel>>(),
             metadataMock.Object,
-            Mock.Of<IProfileService>(),
+            profileService ?? Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(),
             new RunViewModel(generationMock.Object));
     }
+
+    private static GenerateViewModel CreateViewModel(IProfileService profileService)
+        => CreateViewModel(out _, out _, out _, out _, profileService);
 
     private static GenerateViewModel CreateViewModel(
         out Mock<IWpfGenerationService> generationMock,

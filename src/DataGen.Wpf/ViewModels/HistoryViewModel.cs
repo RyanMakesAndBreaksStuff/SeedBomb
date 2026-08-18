@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Views.Pages;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 
 namespace Seedbomb.ViewModels;
 
@@ -24,6 +26,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
     private readonly ILogger<HistoryViewModel> _logger;
     private readonly RunViewModel? _run;
     private readonly IAppNavigator? _navigator;
+    private readonly ISnackbarService? _snackbar;
     private CancellationTokenSource? _navCts;
 
     /// <summary>Initialises the view-model.</summary>
@@ -31,16 +34,19 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <param name="logger">Logger.</param>
     /// <param name="run">Optional live run. Tests keep the 2-arg ctor.</param>
     /// <param name="navigator">Optional navigator to <see cref="RunSummaryPage"/>.</param>
+    /// <param name="snackbar">Optional snackbar for I/O failures. Appended last so existing 2-arg tests compile.</param>
     public HistoryViewModel(
         IRunHistoryService historyService,
         ILogger<HistoryViewModel> logger,
         RunViewModel? run = null,
-        IAppNavigator? navigator = null)
+        IAppNavigator? navigator = null,
+        ISnackbarService? snackbar = null)
     {
         _historyService = historyService;
         _logger = logger;
         _run = run;
         _navigator = navigator;
+        _snackbar = snackbar;
     }
 
     /// <summary>All loaded run records.</summary>
@@ -112,6 +118,8 @@ public sealed partial class HistoryViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load run history");
+            _snackbar?.Show("Couldn't load run history", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
@@ -129,6 +137,8 @@ public sealed partial class HistoryViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to clear history");
+            _snackbar?.Show("Couldn't clear history", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
@@ -163,10 +173,14 @@ public sealed partial class HistoryViewModel : ViewModelBase
 
             await System.IO.File.WriteAllLinesAsync(path, lines);
             _logger.LogInformation("Exported history to {Path}", path);
+            _snackbar?.Show("History exported", path,
+                ControlAppearance.Success, null, TimeSpan.FromSeconds(6));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to export history CSV");
+            _snackbar?.Show("Export failed", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 

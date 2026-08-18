@@ -43,6 +43,9 @@ CodeCoverage/
 /.agents
 /.claude
 
+# Visual Studio markup-compile temp projects
+*_wpftmp.csproj
+
 # MSBuild Binary and Structured Log
 *.binlog
 

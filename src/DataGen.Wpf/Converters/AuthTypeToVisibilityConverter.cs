@@ -5,17 +5,16 @@ using System.Windows.Data;
 namespace Seedbomb.Converters;
 
 /// <summary>
-/// Returns <see cref="Visibility.Visible"/> when value is a non-empty string,
-/// <see cref="Visibility.Collapsed"/> when null or empty.
+/// Visible when the bound value's string form equals <c>ConverterParameter</c>.
+/// Same equality as <see cref="EqualityToBoolConverter"/>; returns <see cref="Visibility"/>.
 /// </summary>
-[ValueConversion(typeof(string), typeof(Visibility))]
-public sealed class StringToVisibilityConverter : IValueConverter
+public sealed class AuthTypeToVisibilityConverter : IValueConverter
 {
     /// <inheritdoc />
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+        Equals(value?.ToString(), parameter?.ToString()) ? Visibility.Visible : Visibility.Collapsed;
 
     /// <inheritdoc />
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Binding.DoNothing;
+        throw new NotSupportedException();
 }

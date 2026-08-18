@@ -1,3 +1,4 @@
+using Moq;
 using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels;
 using Xunit;
@@ -11,6 +12,23 @@ public sealed class ProfilesViewModelPageTests : IDisposable
     public void Dispose()
     {
         try { Directory.Delete(_root, recursive: true); } catch (IOException) { }
+    }
+
+    [Fact]
+    public async Task OnNavigatedToAsync_SetsError_WhenTheProfileStoreThrows()
+    {
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("profile store is corrupt"));
+
+        var vm = new ProfilesViewModel(profiles.Object);
+
+        // Must not throw — WPF-UI notifies INavigationAware from an async void method,
+        // so anything that escapes here crashes the process.
+        var ex = await Record.ExceptionAsync(() => vm.OnNavigatedToAsync());
+
+        Assert.Null(ex);
+        Assert.True(vm.HasError);
     }
 
     [Fact]

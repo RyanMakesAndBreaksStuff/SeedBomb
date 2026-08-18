@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
 using Seedbomb.Services.Connections;
@@ -17,16 +18,25 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private IAccount? _account;
     private Guid? _activeProfileId;
     private MsalCacheHelper? _cacheHelper;
+    private readonly ILogger<ProfileAuthService>? _logger;
 
     /// <summary>Initialises the service and subscribes to profile changes.</summary>
-    public ProfileAuthService(IConnectionProfileService profiles)
+    /// <param name="profiles">Connection profile store.</param>
+    /// <param name="logger">Optional logger. Tests may omit it.</param>
+    public ProfileAuthService(
+        IConnectionProfileService profiles,
+        ILogger<ProfileAuthService>? logger = null)
     {
         _profiles = profiles;
+        _logger = logger;
         _profiles.ProfilesChanged += OnProfilesChanged;
     }
 
     /// <inheritdoc />
     public string? CurrentUserDisplayName => _account?.Username;
+
+    /// <summary>True when no MSAL client applications are cached. Exposed for tests.</summary>
+    internal bool HasNoCachedClients => _clients.Count == 0;
 
     internal static bool ShouldDropSession(Guid? activeProfileId, IEnumerable<Guid> remainingIds) =>
         activeProfileId is Guid id && remainingIds.All(x => x != id);
@@ -49,8 +59,12 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             _cacheHelper = await MsalCacheHelper.CreateAsync(CreateCacheProperties()).ConfigureAwait(false);
             return _cacheHelper;
         }
-        catch
+        catch (Exception ex)
         {
+            // WR-011: returning null is correct — auth degrades to interactive-every-launch.
+            // Silently is not: this is the only signal that the token cache is broken.
+            _logger?.LogWarning(ex,
+                "MSAL token cache could not be initialised; sign-in will be interactive every launch");
             return null;
         }
     }
@@ -95,8 +109,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         var result = profile.AuthType switch
         {
             AuthType.OAuth => await SignInOAuthAsync(profile, parentHwnd, commitSession, ct).ConfigureAwait(false),
-            AuthType.ClientSecret => await SignInClientSecretAsync(profile, commitSession, ct).ConfigureAwait(false),
-            AuthType.UserPassword => await SignInUserPasswordAsync(profile, commitSession, ct).ConfigureAwait(false),
+            AuthType.ClientSecret or AuthType.Certificate => await SignInAppOnlyAsync(profile, commitSession, ct).ConfigureAwait(false),
             _ => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"),
         };
 
@@ -126,13 +139,26 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public async Task SignOutAsync(CancellationToken ct = default)
     {
-        if (_account is not null && _activeProfileId is not null
-            && _clients.TryGetValue(_activeProfileId.Value, out var signOutClient)
-            && signOutClient is IPublicClientApplication pca)
+        // PR-007: clearing _account alone leaves cached confidential clients able to keep
+        // minting app-only tokens. Drop every client and the active profile too.
+        foreach (var client in _clients.Values.OfType<IPublicClientApplication>())
         {
-            await pca.RemoveAsync(_account).ConfigureAwait(false);
+            foreach (var account in await client.GetAccountsAsync().ConfigureAwait(false))
+            {
+                try
+                {
+                    await client.RemoveAsync(account).ConfigureAwait(false);
+                }
+                catch (MsalException)
+                {
+                    // Account already gone from the cache; nothing to remove.
+                }
+            }
         }
+
+        _clients.Clear();
         _account = null;
+        _activeProfileId = null;
     }
 
     private async Task<AuthResult> SignInOAuthAsync(
@@ -196,11 +222,18 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private async Task<AuthResult> SignInClientSecretAsync(
+    private async Task<AuthResult> SignInAppOnlyAsync(
         ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(profile.ClientSecret))
+        if (profile.AuthType == AuthType.Certificate)
+        {
+            if (string.IsNullOrWhiteSpace(profile.CertificateThumbprint))
+                return new AuthResult(false, null, "Certificate thumbprint is not configured for this profile.");
+        }
+        else if (string.IsNullOrWhiteSpace(profile.ClientSecret))
+        {
             return new AuthResult(false, null, "Client Secret is not configured for this profile.");
+        }
 
         var cca = await GetOrCreateCca(profile, commitSession).ConfigureAwait(false);
         var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
@@ -214,15 +247,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             return new AuthResult(false, null, ex.Message);
         }
-    }
-
-    private Task<AuthResult> SignInUserPasswordAsync(ConnectionProfile profile, bool commitSession, CancellationToken ct)
-    {
-        _ = (profile, commitSession, ct);
-        return Task.FromResult(new AuthResult(
-            false,
-            null,
-            "Username and password sign-in is no longer supported. Switch this profile to OAuth or Client Secret."));
+        catch (InvalidOperationException ex)
+        {
+            return new AuthResult(false, null, ex.Message);
+        }
     }
 
     private async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)
@@ -266,11 +294,15 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             ? "https://login.microsoftonline.com/common"
             : $"https://login.microsoftonline.com/{profile.TenantId}";
 
-        var newCca = ConfidentialClientApplicationBuilder
+        var ccaBuilder = ConfidentialClientApplicationBuilder
             .Create(profile.ClientId)
-            .WithAuthority(authority)
-            .WithClientSecret(profile.ClientSecret!)
-            .Build();
+            .WithAuthority(authority);
+
+        ccaBuilder = profile.AuthType == AuthType.Certificate
+            ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
+            : ccaBuilder.WithClientSecret(profile.ClientSecret!);
+
+        var newCca = ccaBuilder.Build();
 
         var helper = await GetCacheHelperAsync().ConfigureAwait(false);
         helper?.RegisterCache(newCca.AppTokenCache);

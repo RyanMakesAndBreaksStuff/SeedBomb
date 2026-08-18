@@ -72,9 +72,19 @@ public partial class MainWindow : FluentWindow
 
         _connectionManagerViewModel.ParentHwnd = new WindowInteropHelper(this).Handle;
         await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
-        _vm.HasConnection = _connectionManagerViewModel.Profiles.Count > 0;
+        _connectionManagerViewModel.Profiles.CollectionChanged += OnProfilesCollectionChanged;
+        SyncHasConnection();
         RootNavigation.Navigate(typeof(GeneratePage));
     }
+
+    private void OnProfilesCollectionChanged(
+        object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => SyncHasConnection();
+
+    // WR-001: the profile count is the only source of truth. Deleting the last connection
+    // must re-show the first-run overlay and re-disable the nav items.
+    private void SyncHasConnection()
+        => _vm.HasConnection = _connectionManagerViewModel.Profiles.Count > 0;
 
     private void OnConnectionSwitched(object? sender, (ConnectionProfile Profile, AuthResult Result) e)
     {
@@ -82,7 +92,7 @@ public partial class MainWindow : FluentWindow
 
         _vm.UserDisplayName = e.Result.DisplayName ?? _vm.UserDisplayName;
         _vm.OrgUrl = e.Profile.EnvironmentUrl;
-        _vm.HasConnection = true;
+        SyncHasConnection();
         if (_currentPageContent is GeneratePage page)
             page.ReloadForConnectionSwitch();
         SyncFirstRunOverlay();

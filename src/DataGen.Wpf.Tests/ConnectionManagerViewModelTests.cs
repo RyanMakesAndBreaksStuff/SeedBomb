@@ -41,6 +41,30 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
+    public async Task TestConnectionAsync_PassesParentHwndToAuthService()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var auth = new Mock<IAuthService>();
+        var connections = new Mock<IDataverseConnectionService>();
+
+        nint captured = -1;
+        auth.Setup(a => a.TryConnectAsync(
+                It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+            .Callback<ConnectionProfile, nint, CancellationToken>((_, hwnd, _) => captured = hwnd)
+            .ReturnsAsync(new AuthResult(true, "user@contoso.com", null));
+
+        var vm = new ConnectionManagerViewModel(profiles.Object, auth.Object, connections.Object)
+        {
+            EditingProfile = new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://c.crm.dynamics.com" },
+            ParentHwnd = (nint)4242,
+        };
+
+        await vm.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal((nint)4242, captured);
+    }
+
+    [Fact]
     public async Task SaveProfileFailureSetsSwitchErrorAndStaysEditing()
     {
         var profiles = new Mock<IConnectionProfileService>();
@@ -99,6 +123,31 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
+    public void EditProfile_ClonesCertificateThumbprintAndClientSecret()
+    {
+        var stored = new ConnectionProfile
+        {
+            Name = "cert",
+            EnvironmentUrl = "https://c.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            AuthType = AuthType.Certificate,
+            CertificateThumbprint = "ABC123",
+            ClientSecret = "s3cret",
+        };
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(),
+            Mock.Of<IAuthService>(),
+            Mock.Of<IDataverseConnectionService>());
+
+        vm.EditProfileCommand.Execute(stored);
+
+        Assert.NotSame(stored, vm.EditingProfile);
+        Assert.Equal(AuthType.Certificate, vm.EditingProfile!.AuthType);
+        Assert.Equal("ABC123", vm.EditingProfile.CertificateThumbprint);
+        Assert.Equal("s3cret", vm.EditingProfile.ClientSecret);
+    }
+
+    [Fact]
     public void UseDefaultClientIdWritesWellKnownPublicClient()
     {
         var vm = new ConnectionManagerViewModel(
@@ -121,5 +170,70 @@ public sealed class ConnectionManagerViewModelTests
             Mock.Of<IAuthService>(),
             Mock.Of<IDataverseConnectionService>());
         Assert.Same(vm.CancelCommand, vm.CancelEditCommand);
+    }
+
+    [Fact]
+    public async Task DeleteProfileAsync_LeavesProfilesEmpty_WhenLastProfileRemoved()
+    {
+        var stored = new List<ConnectionProfile>
+        {
+            new() { Name = "Only", EnvironmentUrl = "https://c.crm.dynamics.com" },
+        };
+
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => stored.ToList());
+        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => stored.FirstOrDefault());
+        profiles.Setup(p => p.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, CancellationToken>((id, _) => stored.RemoveAll(p => p.Id == id))
+            .Returns(Task.CompletedTask);
+
+        var vm = new ConnectionManagerViewModel(
+            profiles.Object, new Mock<IAuthService>().Object, new Mock<IDataverseConnectionService>().Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+        Assert.Single(vm.Profiles);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(vm.Profiles[0]);
+
+        Assert.Empty(vm.Profiles);
+    }
+
+    [Theory]
+    [InlineData("", "https://c.crm.dynamics.com", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
+    [InlineData("Dev", "", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
+    [InlineData("Dev", "not-a-url", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
+    [InlineData("Dev", "https://c.crm.dynamics.com", "")]
+    public void SaveProfileCommand_CannotExecute_ForIncompleteProfiles(string name, string url, string clientId)
+    {
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object)
+        {
+            EditingProfile = new ConnectionProfile { Name = name, EnvironmentUrl = url, ClientId = clientId },
+        };
+
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SaveProfileCommand_CanExecute_ForACompleteProfile()
+    {
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object)
+        {
+            EditingProfile = new ConnectionProfile
+            {
+                Name = "Dev",
+                EnvironmentUrl = "https://contoso.crm.dynamics.com",
+                ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            },
+        };
+
+        Assert.True(vm.SaveProfileCommand.CanExecute(null));
     }
 }

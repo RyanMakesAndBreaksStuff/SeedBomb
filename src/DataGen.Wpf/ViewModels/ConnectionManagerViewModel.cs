@@ -4,6 +4,9 @@ using CommunityToolkit.Mvvm.Input;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
+using Wpf.Ui.Extensions;
 
 namespace Seedbomb.ViewModels;
 
@@ -13,16 +16,23 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private readonly IConnectionProfileService _profileService;
     private readonly IAuthService _authService;
     private readonly IDataverseConnectionService _connectionService;
+    private readonly IContentDialogService? _dialogs;
 
     /// <summary>Initialises the view-model.</summary>
+    /// <param name="profileService">Connection profile store.</param>
+    /// <param name="authService">Auth service.</param>
+    /// <param name="connectionService">Dataverse connection cache.</param>
+    /// <param name="dialogs">Optional dialog host. When null, delete proceeds unconfirmed (tests).</param>
     public ConnectionManagerViewModel(
         IConnectionProfileService profileService,
         IAuthService authService,
-        IDataverseConnectionService connectionService)
+        IDataverseConnectionService connectionService,
+        IContentDialogService? dialogs = null)
     {
         _profileService = profileService;
         _authService = authService;
         _connectionService = connectionService;
+        _dialogs = dialogs;
     }
 
     /// <summary>Raised when the drawer should close.</summary>
@@ -36,7 +46,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<ConnectionProfile> _profiles = [];
     [ObservableProperty] private ConnectionProfile? _selectedProfile;
-    [ObservableProperty] private ConnectionProfile? _editingProfile;
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
+    private ConnectionProfile? _editingProfile;
     [ObservableProperty] private bool _isEditing;
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private string? _testResult;
@@ -133,14 +145,13 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             ClientId = profile.ClientId,
             TenantId = profile.TenantId,
             ClientSecret = profile.ClientSecret,
-            Username = profile.Username,
-            Password = profile.Password,
+            CertificateThumbprint = profile.CertificateThumbprint,
         };
         IsEditing = true;
     }
 
     /// <summary>Persists the editing profile and exits edit mode.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
     private async Task SaveProfileAsync()
     {
         if (EditingProfile is null) return;
@@ -165,12 +176,36 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         }
     }
 
-    /// <summary>Deletes a profile.</summary>
+    // WR-012: without this an empty profile persists AND immediately triggers a doomed
+    // SelectProfileAsync, so the user sees a sign-in failure rather than a validation error.
+    private bool CanSaveProfile() =>
+        EditingProfile is { } p
+        && !string.IsNullOrWhiteSpace(p.Name)
+        && !string.IsNullOrWhiteSpace(p.ClientId)
+        && Uri.TryCreate(p.EnvironmentUrl, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps;
+
+    /// <summary>Deletes a profile after confirmation.</summary>
     [RelayCommand]
     private async Task DeleteProfileAsync(ConnectionProfile? profile)
     {
         if (profile is null) return;
         SwitchError = null;
+
+        if (_dialogs is not null)
+        {
+            var choice = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+            {
+                Title = "Delete connection",
+                Content = $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
+                PrimaryButtonText = "Delete",
+                CloseButtonText = "Cancel",
+            });
+
+            if (choice != ContentDialogResult.Primary)
+                return;
+        }
+
         try
         {
             await _profileService.DeleteAsync(profile.Id);

@@ -10,112 +10,17 @@
     <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisible" />
     <converters:NullToVisibilityConverter x:Key="NullToVisible" />
     <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
-    <converters:StringToVisibilityConverter x:Key="StringToVisible" />
     <converters:StepVisibilityConverter x:Key="StepVisibilityConverter" />
     <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
     <converters:EqualityToBoolConverter x:Key="EqualityToBoolConverter" />
+    <converters:AuthTypeToVisibilityConverter x:Key="AuthTypeToVisibility" />
     <converters:TestResultStyleConverter x:Key="TestResultStyleConverter" />
     <converters:TestResultGlyphConverter x:Key="TestResultGlyphConverter" />
     <converters:TestResultBrushConverter x:Key="TestResultBrushConverter" />
 
     <!-- ==================================================================
-         1. Palette — dark (design of record)
-         ================================================================== -->
-    <Color x:Key="DG.Dark.BgColor">#FF202020</Color>
-    <SolidColorBrush x:Key="DG.Dark.Bg"            Color="#202020"/>  <!-- window + nav pane -->
-    <SolidColorBrush x:Key="DG.Dark.TitleBar"      Color="#1B1B1B"/>
-    <SolidColorBrush x:Key="DG.Dark.Surface1"      Color="#272727"/>  <!-- content region -->
-    <SolidColorBrush x:Key="DG.Dark.Surface2"      Color="#232323"/>  <!-- command bar / footer -->
-    <SolidColorBrush x:Key="DG.Dark.Card"          Color="#2B2B2B"/>
-    <SolidColorBrush x:Key="DG.Dark.CardSunken"    Color="#232323"/>  <!-- inputs inside cards -->
-    <SolidColorBrush x:Key="DG.Dark.CodeSurface"   Color="#1E1E1E"/>  <!-- mono / log blocks -->
-    <SolidColorBrush x:Key="DG.Dark.Border"        Color="#383838"/>
-    <SolidColorBrush x:Key="DG.Dark.BorderStrong"  Color="#454545"/>  <!-- dialogs / sheets -->
-    <SolidColorBrush x:Key="DG.Dark.Divider"       Color="#313131"/>  <!-- inside list/table -->
-    <SolidColorBrush x:Key="DG.Dark.ControlFill"   Color="#323232"/>
-    <SolidColorBrush x:Key="DG.Dark.ControlBorder" Color="#3D3D3D"/>
-    <SolidColorBrush x:Key="DG.Dark.ControlHover"  Color="#3A3A3A"/>
-    <SolidColorBrush x:Key="DG.Dark.ItemSelected"  Color="#2F2F2F"/>  <!-- nav selection -->
-    <SolidColorBrush x:Key="DG.Dark.RowSelected"   Color="#3A3A3A"/>  <!-- list selection -->
-    <SolidColorBrush x:Key="DG.Dark.TrackFill"     Color="#3A3A3A"/>  <!-- progress track -->
-    <SolidColorBrush x:Key="DG.Dark.Scrim"         Color="#9E141414"/><!-- modal overlay, 62% -->
-
-    <SolidColorBrush x:Key="DG.Dark.Text1"     Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="DG.Dark.TextBody"  Color="#EAEAEA"/>
-    <SolidColorBrush x:Key="DG.Dark.TextNav"   Color="#E0E0E0"/>
-    <SolidColorBrush x:Key="DG.Dark.Text2"     Color="#A0A0A0"/>
-    <SolidColorBrush x:Key="DG.Dark.Text3"     Color="#8A8A8A"/>
-    <SolidColorBrush x:Key="DG.Dark.TextDisabled" Color="#6A6A6A"/>
-
-    <SolidColorBrush x:Key="DG.Dark.Accent"       Color="#A79CF1"/>
-    <SolidColorBrush x:Key="DG.Dark.AccentHover"  Color="#B8AFF5"/>
-    <SolidColorBrush x:Key="DG.Dark.AccentPressed" Color="#8F82E4"/>
-    <SolidColorBrush x:Key="DG.Dark.OnAccent"     Color="#1B1338"/>
-    <SolidColorBrush x:Key="DG.Dark.AccentText"   Color="#D9D3FB"/>  <!-- accent on dark bg -->
-    <SolidColorBrush x:Key="DG.Dark.AccentSoft"   Color="#2C2740"/>  <!-- info panel fill -->
-    <SolidColorBrush x:Key="DG.Dark.AccentSoftBorder" Color="#4A4270"/>
-    <SolidColorBrush x:Key="DG.Dark.AccentChip"   Color="#3A3358"/>
-    <SolidColorBrush x:Key="DG.Dark.AccentChipBorder" Color="#544A7D"/>
-
-    <SolidColorBrush x:Key="DG.Dark.Success"       Color="#5BB98B"/>
-    <SolidColorBrush x:Key="DG.Dark.Warning"       Color="#E0A030"/>
-    <SolidColorBrush x:Key="DG.Dark.WarningSoft"   Color="#332A1E"/>
-    <SolidColorBrush x:Key="DG.Dark.WarningBorder" Color="#6A552E"/>
-    <SolidColorBrush x:Key="DG.Dark.WarningText"   Color="#D0C8B8"/>
-    <SolidColorBrush x:Key="DG.Dark.Error"         Color="#FF9C9C"/>
-    <SolidColorBrush x:Key="DG.Dark.ErrorSoft"     Color="#3A2A2A"/>
-    <SolidColorBrush x:Key="DG.Dark.ErrorBorder"   Color="#6A3A3A"/>
-
-    <!-- ==================================================================
-         2. Palette — light (same structure, Win11 light surfaces)
-         ================================================================== -->
-    <SolidColorBrush x:Key="DG.Light.Bg"            Color="#F3F3F3"/>
-    <SolidColorBrush x:Key="DG.Light.TitleBar"      Color="#F9F9F9"/>
-    <SolidColorBrush x:Key="DG.Light.Surface1"      Color="#FAFAFA"/>
-    <SolidColorBrush x:Key="DG.Light.Surface2"      Color="#F2F2F2"/>
-    <SolidColorBrush x:Key="DG.Light.Card"          Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="DG.Light.CardSunken"    Color="#F6F6F6"/>
-    <SolidColorBrush x:Key="DG.Light.CodeSurface"   Color="#F4F4F6"/>
-    <SolidColorBrush x:Key="DG.Light.Border"        Color="#E1E1E1"/>
-    <SolidColorBrush x:Key="DG.Light.BorderStrong"  Color="#CFCFCF"/>
-    <SolidColorBrush x:Key="DG.Light.Divider"       Color="#EBEBEB"/>
-    <SolidColorBrush x:Key="DG.Light.ControlFill"   Color="#FBFBFB"/>
-    <SolidColorBrush x:Key="DG.Light.ControlBorder" Color="#D8D8D8"/>
-    <SolidColorBrush x:Key="DG.Light.ControlHover"  Color="#F0F0F0"/>
-    <SolidColorBrush x:Key="DG.Light.ItemSelected"  Color="#EDEDED"/>
-    <SolidColorBrush x:Key="DG.Light.RowSelected"   Color="#E8E6F6"/>
-    <SolidColorBrush x:Key="DG.Light.TrackFill"     Color="#E0E0E0"/>
-    <SolidColorBrush x:Key="DG.Light.Scrim"         Color="#66000000"/>
-
-    <SolidColorBrush x:Key="DG.Light.Text1"        Color="#151A21"/>
-    <SolidColorBrush x:Key="DG.Light.TextBody"     Color="#26292E"/>
-    <SolidColorBrush x:Key="DG.Light.TextNav"      Color="#2A2D33"/>
-    <SolidColorBrush x:Key="DG.Light.Text2"        Color="#5C6470"/>
-    <SolidColorBrush x:Key="DG.Light.Text3"        Color="#7A828C"/>
-    <SolidColorBrush x:Key="DG.Light.TextDisabled" Color="#A6ADB6"/>
-
-    <SolidColorBrush x:Key="DG.Light.Accent"        Color="#7160E8"/>
-    <SolidColorBrush x:Key="DG.Light.AccentHover"   Color="#8574EE"/>
-    <SolidColorBrush x:Key="DG.Light.AccentPressed" Color="#5B4ACF"/>
-    <SolidColorBrush x:Key="DG.Light.OnAccent"      Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="DG.Light.AccentText"    Color="#5A49C9"/>
-    <SolidColorBrush x:Key="DG.Light.AccentSoft"    Color="#F1EFFD"/>
-    <SolidColorBrush x:Key="DG.Light.AccentSoftBorder" Color="#D6CFFA"/>
-    <SolidColorBrush x:Key="DG.Light.AccentChip"    Color="#EDEAFC"/>
-    <SolidColorBrush x:Key="DG.Light.AccentChipBorder" Color="#CFC6F7"/>
-
-    <SolidColorBrush x:Key="DG.Light.Success"       Color="#1F7A4D"/>
-    <SolidColorBrush x:Key="DG.Light.Warning"       Color="#8A5A00"/>
-    <SolidColorBrush x:Key="DG.Light.WarningSoft"   Color="#FFF6E5"/>
-    <SolidColorBrush x:Key="DG.Light.WarningBorder" Color="#EBD5A8"/>
-    <SolidColorBrush x:Key="DG.Light.WarningText"   Color="#6B5426"/>
-    <SolidColorBrush x:Key="DG.Light.Error"         Color="#B02020"/>
-    <SolidColorBrush x:Key="DG.Light.ErrorSoft"     Color="#FDF1F1"/>
-    <SolidColorBrush x:Key="DG.Light.ErrorBorder"   Color="#EFC4C4"/>
-
-    <!-- ==================================================================
-         3. Current tokens — the ONLY keys views bind to.
-            Seeded dark; DesignThemeManager reassigns from the blocks above.
+         1. Current tokens — the ONLY keys views bind to.
+            Seeded dark; DesignThemeManager.Apply reassigns from C# palettes.
          ================================================================== -->
     <SolidColorBrush x:Key="DG.Bg"            Color="#202020"/>
     <SolidColorBrush x:Key="DG.TitleBar"      Color="#1B1B1B"/>
@@ -172,9 +77,8 @@
     <SolidColorBrush x:Key="AccentBrush" Color="#A79CF1"/>
 
     <!-- ==================================================================
-         4. Geometry — radii, spacing scale, fixed pane widths
+         2. Geometry — radii, spacing scale, fixed pane widths
          ================================================================== -->
-    <CornerRadius x:Key="DG.Radius.Window">8</CornerRadius>
     <CornerRadius x:Key="DG.Radius.Sheet">9</CornerRadius>
     <CornerRadius x:Key="DG.Radius.Card">7</CornerRadius>
     <CornerRadius x:Key="DG.Radius.Panel">6</CornerRadius>
@@ -184,12 +88,7 @@
     <CornerRadius x:Key="DG.Radius.Pill">12</CornerRadius>
 
     <!-- 4pt-based scale. Use these, not literals. -->
-    <sys:Double x:Key="DG.Space.XS">4</sys:Double>
-    <sys:Double x:Key="DG.Space.S">8</sys:Double>
-    <sys:Double x:Key="DG.Space.M">12</sys:Double>
     <sys:Double x:Key="DG.Space.L">16</sys:Double>
-    <sys:Double x:Key="DG.Space.XL">20</sys:Double>
-    <sys:Double x:Key="DG.Space.XXL">32</sys:Double>
 
     <Thickness x:Key="DG.Pad.Card">18,16</Thickness>
     <Thickness x:Key="DG.Pad.CardWide">20,18</Thickness>
@@ -209,12 +108,10 @@
     <Thickness x:Key="DG.Pad.Row">10,6</Thickness>
     <Thickness x:Key="DG.Pad.IndexRow">10,5</Thickness>
     <Thickness x:Key="DG.Pad.RowTall">10,9</Thickness>
-    <Thickness x:Key="DG.Pad.ListItem">11,10</Thickness>
 
     <!-- Structural widths/heights taken from the mocks. -->
     <sys:Double x:Key="DG.Size.NavPane">260</sys:Double>
     <sys:Double x:Key="DG.Size.TitleBar">40</sys:Double>
-    <sys:Double x:Key="DG.Size.CommandBar">60</sys:Double>
     <sys:Double x:Key="DG.Size.Control">32</sys:Double>
     <sys:Double x:Key="DG.Size.ControlSmall">30</sys:Double>
     <sys:Double x:Key="DG.Size.Chip">24</sys:Double>
@@ -227,7 +124,7 @@
     <sys:Double x:Key="DG.Size.SelectionStripe">3</sys:Double>
 
     <!-- ==================================================================
-         5. Type ramp
+         3. Type ramp
          ================================================================== -->
     <FontFamily x:Key="DG.Font">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="DG.Font.Display">Segoe UI Variable Display, Segoe UI</FontFamily>
@@ -311,15 +208,13 @@
     </Style>
 
     <!-- ==================================================================
-         6. Elevation
+         4. Elevation
          ================================================================== -->
     <DropShadowEffect x:Key="DG.Shadow.Sheet" BlurRadius="70" ShadowDepth="24"
                       Direction="270" Opacity="0.7" Color="#000000"/>
-    <DropShadowEffect x:Key="DG.Shadow.Flyout" BlurRadius="28" ShadowDepth="8"
-                      Direction="270" Opacity="0.45" Color="#000000"/>
 
     <!-- ==================================================================
-         7. Control styles — the vocabulary used across all 1a screens
+         5. Control styles — the vocabulary used across all 1a screens
          ================================================================== -->
 
     <!-- Card surface. Every pane in every screen is one of these. -->
@@ -835,13 +730,6 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Sheet}"/>
         <Setter Property="Effect" Value="{StaticResource DG.Shadow.Sheet}"/>
-    </Style>
-
-    <Style x:Key="StepHeaderStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Micro}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}" />
-        <Setter Property="Margin" Value="0,0,0,12" />
     </Style>
 
     <!-- ==================================================================
