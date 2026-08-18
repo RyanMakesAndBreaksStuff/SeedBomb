@@ -3,6 +3,8 @@ using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
 using Seedbomb.ViewModels;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -163,6 +165,33 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
+    public void UseDefaultClientIdCommand_RaisesCanExecuteChangedForSaveProfile()
+    {
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(),
+            Mock.Of<IAuthService>(),
+            Mock.Of<IDataverseConnectionService>())
+        {
+            EditingProfile = new ConnectionProfile
+            {
+                Name = "Dev",
+                EnvironmentUrl = "https://contoso.crm.dynamics.com",
+                ClientId = string.Empty,
+            },
+        };
+
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+
+        var raised = false;
+        vm.SaveProfileCommand.CanExecuteChanged += (_, _) => raised = true;
+
+        vm.UseDefaultClientIdCommand.Execute(null);
+
+        Assert.True(raised);
+        Assert.True(vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void CancelEditCommandIsCancelCommand()
     {
         var vm = new ConnectionManagerViewModel(
@@ -200,6 +229,32 @@ public sealed class ConnectionManagerViewModelTests
         Assert.Empty(vm.Profiles);
     }
 
+    [Fact]
+    public async Task DeleteProfileAsync_DialogHostUnavailable_CancelsDeleteInsteadOfProceeding()
+    {
+        var stored = new ConnectionProfile { Name = "Prod", EnvironmentUrl = "https://c.crm.dynamics.com" };
+
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([stored]);
+        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync((ConnectionProfile?)null);
+
+        // Simulates a dialog host that isn't registered yet (e.g. shown before MainWindow loads).
+        var dialogs = new Mock<IContentDialogService>();
+        dialogs.Setup(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("no dialog host registered"));
+
+        var vm = new ConnectionManagerViewModel(
+            profiles.Object, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>(), dialogs.Object);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(stored);
+
+        // Whichever step fails first (off-STA dialog construction, or the mocked ShowAsync),
+        // the point of the fail-safe is: no dialog shown correctly => no delete.
+        profiles.Verify(p => p.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.True(vm.HasSwitchError);
+        Assert.NotNull(vm.SwitchError);
+    }
+
     [Theory]
     [InlineData("", "https://c.crm.dynamics.com", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
     [InlineData("Dev", "", "51f81489-12ee-4a9e-aaae-a2591f45987d")]
@@ -235,5 +290,38 @@ public sealed class ConnectionManagerViewModelTests
         };
 
         Assert.True(vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    [Theory]
+    [InlineData(AuthType.OAuth, null, null, true)]
+    [InlineData(AuthType.OAuth, "", "", true)]
+    [InlineData(AuthType.ClientSecret, null, null, false)]
+    [InlineData(AuthType.ClientSecret, "", null, false)]
+    [InlineData(AuthType.ClientSecret, "   ", null, false)]
+    [InlineData(AuthType.ClientSecret, "s3cret", null, true)]
+    [InlineData(AuthType.Certificate, null, null, false)]
+    [InlineData(AuthType.Certificate, null, "", false)]
+    [InlineData(AuthType.Certificate, null, "   ", false)]
+    [InlineData(AuthType.Certificate, null, "ABC123", true)]
+    public void SaveProfileCommand_RequiresCredentialMatchingAuthType(
+        AuthType authType, string? clientSecret, string? certificateThumbprint, bool expectedCanSave)
+    {
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object)
+        {
+            EditingProfile = new ConnectionProfile
+            {
+                Name = "Dev",
+                EnvironmentUrl = "https://contoso.crm.dynamics.com",
+                ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+                AuthType = authType,
+                ClientSecret = clientSecret,
+                CertificateThumbprint = certificateThumbprint,
+            },
+        };
+
+        Assert.Equal(expectedCanSave, vm.SaveProfileCommand.CanExecute(null));
     }
 }

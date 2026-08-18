@@ -178,12 +178,21 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     // WR-012: without this an empty profile persists AND immediately triggers a doomed
     // SelectProfileAsync, so the user sees a sign-in failure rather than a validation error.
+    // The AuthType credential check closes the same gap for app-only auth: a blank secret or
+    // thumbprint would otherwise save and then fail sign-in with a confusing error instead of
+    // being blocked at save time.
     private bool CanSaveProfile() =>
         EditingProfile is { } p
         && !string.IsNullOrWhiteSpace(p.Name)
         && !string.IsNullOrWhiteSpace(p.ClientId)
         && Uri.TryCreate(p.EnvironmentUrl, UriKind.Absolute, out var uri)
-        && uri.Scheme == Uri.UriSchemeHttps;
+        && uri.Scheme == Uri.UriSchemeHttps
+        && p.AuthType switch
+        {
+            AuthType.ClientSecret => !string.IsNullOrWhiteSpace(p.ClientSecret),
+            AuthType.Certificate => !string.IsNullOrWhiteSpace(p.CertificateThumbprint),
+            _ => true,
+        };
 
     /// <summary>Deletes a profile after confirmation.</summary>
     [RelayCommand]
@@ -192,27 +201,28 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         if (profile is null) return;
         SwitchError = null;
 
-        if (_dialogs is not null)
-        {
-            var choice = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-            {
-                Title = "Delete connection",
-                Content = $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
-                PrimaryButtonText = "Delete",
-                CloseButtonText = "Cancel",
-            });
-
-            if (choice != ContentDialogResult.Primary)
-                return;
-        }
-
         try
         {
+            if (_dialogs is not null)
+            {
+                var choice = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+                {
+                    Title = "Delete connection",
+                    Content = $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
+                    PrimaryButtonText = "Delete",
+                    CloseButtonText = "Cancel",
+                });
+
+                if (choice != ContentDialogResult.Primary)
+                    return;
+            }
+
             await _profileService.DeleteAsync(profile.Id);
             await LoadAsync();
         }
         catch (Exception ex)
         {
+            // No dialog host (e.g. login window before MainWindow loads) must not delete unconfirmed.
             SwitchError = ex.Message;
         }
     }
@@ -258,6 +268,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         if (EditingProfile is null) return;
         EditingProfile.ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
         OnPropertyChanged(nameof(EditingProfile));
+        SaveProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Requests the drawer to close.</summary>
