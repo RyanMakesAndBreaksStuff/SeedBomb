@@ -854,6 +854,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         await CancelPendingAutosaveAsync();
 
         SelectedEntities = [];
+        _entitySelector?.ClearSelection();
         CurrentProgress = null;
         LastResult = null;
         QueuedEntities.Clear();
@@ -888,6 +889,17 @@ public sealed partial class GenerateViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Draft clear skipped");
+        }
+
+        try
+        {
+            var settings = await _settingsService.LoadAsync();
+            BatchSize = settings.DefaultBatchSize;
+            MaxParallelism = settings.DefaultDop;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Settings reload skipped");
         }
     }
 
