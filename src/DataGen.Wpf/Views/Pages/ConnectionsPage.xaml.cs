@@ -46,6 +46,11 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
     public Task OnNavigatedFromAsync()
     {
         _loadCts?.Cancel();
+
+        // ConnectionsPage is Transient while ConnectionManagerViewModel is Singleton, so a
+        // still-showing toast would otherwise reappear on a fresh page instance if the user
+        // navigates away and back while it's up.
+        ViewModel.ShowConnectedToast = false;
         return Task.CompletedTask;
     }
 
@@ -75,22 +80,24 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         if (ViewModel.EditingProfile is { } profile && sender is PasswordBox box)
             profile.ClientSecret = box.Password;
         if (!_syncingClientSecret)
-            ViewModel.IsDirty = true;
-        ViewModel.SaveProfileCommand.NotifyCanExecuteChanged();
+            MarkDirty();
     }
 
     private void OnProfileFieldChanged(object sender, TextChangedEventArgs e)
     {
-        if (DataContext is not ConnectionManagerViewModel vm) return;
-        vm.IsDirty = true;
-        vm.RefreshEnvironmentUrlValidation();
-        vm.SaveProfileCommand.NotifyCanExecuteChanged();
+        ViewModel.RefreshEnvironmentUrlValidation();
+        MarkDirty();
     }
 
-    private void OnAuthTypeChanged(object sender, SelectionChangedEventArgs e)
+    private void OnAuthTypeChanged(object sender, SelectionChangedEventArgs e) => MarkDirty();
+
+    // NewProfile/EditProfile/Cancel/DeleteProfileAsync synchronously re-push EditingProfile's
+    // field values through these bound controls while IsAssigningEditingProfile is set — skip
+    // marking a freshly-opened, unedited profile dirty from that cascade.
+    private void MarkDirty()
     {
-        if (DataContext is not ConnectionManagerViewModel vm) return;
-        vm.IsDirty = true;
-        vm.SaveProfileCommand.NotifyCanExecuteChanged();
+        if (ViewModel.IsAssigningEditingProfile) return;
+        ViewModel.IsDirty = true;
+        ViewModel.SaveProfileCommand.NotifyCanExecuteChanged();
     }
 }

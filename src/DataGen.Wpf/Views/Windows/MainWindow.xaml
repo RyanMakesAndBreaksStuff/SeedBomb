@@ -168,10 +168,12 @@
             </ui:NavigationView.PaneFooter>
         </ui:NavigationView>
 
-        <!-- Snackbar host sits above the frame so run notifications float over any page. -->
+        <!-- Snackbar host sits above the frame so run notifications float over any page. Centered
+             over the content column via alignment (not a fixed pixel offset) so it stays put
+             when the window is resized. -->
         <ui:SnackbarPresenter Grid.Row="2" x:Name="SnackbarPresenter"
-                              VerticalAlignment="Top" HorizontalAlignment="Left"
-                              Margin="391,529,0,0" Grid.Column="2"/>
+                              VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                              Margin="{DynamicResource DG.Pad.Page}" Grid.Column="2"/>
 
         <ui:ContentDialogHost Grid.RowSpan="3" Grid.ColumnSpan="3" />
 

@@ -487,6 +487,11 @@ public sealed class ConnectionManagerViewModelTests
 
         await vm.ConnectCommand.ExecuteAsync(null);
 
+        // The toast is shown/hidden by a fire-and-forget task (ConnectCommand doesn't wait out
+        // its display time) — await the test seam that tracks it before asserting it hid.
+        Assert.NotNull(vm.ConnectedToastTask);
+        await vm.ConnectedToastTask!;
+
         Assert.True(switched);
         Assert.True(toastShown);
         Assert.False(vm.ShowConnectedToast);

@@ -78,6 +78,17 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Test seam: how long <see cref="ShowConnectedToast"/> stays true.</summary>
     internal TimeSpan ConnectedToastDuration { get; set; } = TimeSpan.FromSeconds(2);
 
+    /// <summary>Test seam: the fire-and-forget toast task started by the last <see cref="ConnectAsync"/>.</summary>
+    internal Task? ConnectedToastTask { get; private set; }
+
+    /// <summary>
+    /// True while <see cref="NewProfile"/>/<see cref="EditProfile"/>/<see cref="Cancel"/>/
+    /// <see cref="DeleteProfileAsync"/> are assigning <see cref="EditingProfile"/>. Assigning it
+    /// synchronously re-pushes its field values through the bound TextBoxes (raising TextChanged),
+    /// so code-behind's field-changed handlers check this and skip dirty-marking while it's set.
+    /// </summary>
+    internal bool IsAssigningEditingProfile { get; private set; }
+
     /// <summary>Gets whether the last connection switch failed.</summary>
     public bool HasSwitchError => SwitchError is not null;
 
@@ -131,17 +142,21 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void NewProfile()
     {
-        EditingProfile = new ConnectionProfile
+        IsAssigningEditingProfile = true;
+        try
         {
-            // Microsoft's well-known public client ID for Dynamics 365 / Power Platform
-            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
-        };
-        IsEditing = true;
-
-        // Must run last: assigning EditingProfile above synchronously re-pushes its (blank)
-        // field values through the bound TextBoxes, which raises TextChanged and marks the
-        // fresh, unedited profile dirty via OnProfileFieldChanged before this line runs.
-        IsDirty = false;
+            EditingProfile = new ConnectionProfile
+            {
+                // Microsoft's well-known public client ID for Dynamics 365 / Power Platform
+                ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            };
+            IsEditing = true;
+            IsDirty = false;
+        }
+        finally
+        {
+            IsAssigningEditingProfile = false;
+        }
     }
 
     /// <summary>Sets a profile as the active connection and re-authenticates against it.</summary>
@@ -183,23 +198,28 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void EditProfile(ConnectionProfile profile)
     {
-        EditingProfile = new ConnectionProfile
+        IsAssigningEditingProfile = true;
+        try
         {
-            Id = profile.Id,
-            Name = profile.Name,
-            EnvironmentUrl = profile.EnvironmentUrl,
-            EnvironmentType = profile.EnvironmentType,
-            AuthType = profile.AuthType,
-            ClientId = profile.ClientId,
-            TenantId = profile.TenantId,
-            ClientSecret = profile.ClientSecret,
-            CertificateThumbprint = profile.CertificateThumbprint,
-        };
-        IsEditing = true;
-
-        // Same ordering reason as NewProfile: must run last, after the bound TextBoxes have
-        // already re-pushed the cloned profile's values and spuriously marked it dirty.
-        IsDirty = false;
+            EditingProfile = new ConnectionProfile
+            {
+                Id = profile.Id,
+                Name = profile.Name,
+                EnvironmentUrl = profile.EnvironmentUrl,
+                EnvironmentType = profile.EnvironmentType,
+                AuthType = profile.AuthType,
+                ClientId = profile.ClientId,
+                TenantId = profile.TenantId,
+                ClientSecret = profile.ClientSecret,
+                CertificateThumbprint = profile.CertificateThumbprint,
+            };
+            IsEditing = true;
+            IsDirty = false;
+        }
+        finally
+        {
+            IsAssigningEditingProfile = false;
+        }
     }
 
     /// <summary>Persists the editing profile. Connecting is a separate, explicit step (<see cref="ConnectAsync"/>).</summary>
@@ -274,8 +294,16 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             // profile stays visible/editable after it no longer exists in the store.
             if (EditingProfile?.Id == profile.Id)
             {
-                EditingProfile = null;
-                IsEditing = false;
+                IsAssigningEditingProfile = true;
+                try
+                {
+                    EditingProfile = null;
+                    IsEditing = false;
+                }
+                finally
+                {
+                    IsAssigningEditingProfile = false;
+                }
             }
 
             if (ConnectedProfileId == profile.Id)
@@ -317,10 +345,18 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
     {
-        IsEditing = false;
-        EditingProfile = null;
-        TestResult = null;
-        IsDirty = false;
+        IsAssigningEditingProfile = true;
+        try
+        {
+            IsEditing = false;
+            EditingProfile = null;
+            TestResult = null;
+            IsDirty = false;
+        }
+        finally
+        {
+            IsAssigningEditingProfile = false;
+        }
     }
 
     /// <summary>Connects to the saved, clean editing profile. Separate from Save — see <see cref="ShowConnectButton"/>.</summary>
@@ -333,12 +369,18 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
         await SelectProfileAsync(saved);
 
+        // Fire-and-forget: the toast's display time shouldn't hold ConnectCommand busy after the
+        // real work above has already finished. Task.Delay can't throw here (no cancellation
+        // token passed), so there's no unobserved-exception risk.
         if (SwitchError is null)
-        {
-            ShowConnectedToast = true;
-            await Task.Delay(ConnectedToastDuration);
-            ShowConnectedToast = false;
-        }
+            ConnectedToastTask = ShowConnectedToastAsync();
+    }
+
+    private async Task ShowConnectedToastAsync()
+    {
+        ShowConnectedToast = true;
+        await Task.Delay(ConnectedToastDuration);
+        ShowConnectedToast = false;
     }
 
     private bool CanConnect() => ShowConnectButton;
