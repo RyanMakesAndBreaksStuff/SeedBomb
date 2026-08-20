@@ -30,6 +30,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
+    [NotifyPropertyChangedFor(nameof(IsConnected))]
     private bool _hasConnection;
 
     /// <summary>
@@ -38,10 +39,14 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
+    [NotifyPropertyChangedFor(nameof(IsConnected))]
     private bool _needsSignIn;
 
     /// <summary>Gets whether the "Sign in to continue" overlay should be shown.</summary>
     public bool ShowSignInOverlay => HasConnection && NeedsSignIn;
+
+    /// <summary>Gets whether the app is actually connected right now (not just "a profile exists").</summary>
+    public bool IsConnected => HasConnection && !NeedsSignIn;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UserInitials))]

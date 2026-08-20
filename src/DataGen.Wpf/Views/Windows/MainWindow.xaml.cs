@@ -17,6 +17,7 @@ public partial class MainWindow : FluentWindow
     private readonly MainWindowViewModel _vm;
     private readonly ConnectionManagerViewModel _connectionManagerViewModel;
     private readonly IConnectionProfileService _profileService;
+    private readonly IAuthService _authService;
     private readonly ISnackbarService _snackbarService;
     private readonly IContentDialogService _contentDialogService;
     private readonly NavigationViewNavigator _navigator;
@@ -27,6 +28,7 @@ public partial class MainWindow : FluentWindow
         MainWindowViewModel viewModel,
         ConnectionManagerViewModel connectionManagerViewModel,
         IConnectionProfileService profileService,
+        IAuthService authService,
         IServiceProvider serviceProvider,
         ISnackbarService snackbarService,
         IContentDialogService contentDialogService,
@@ -35,6 +37,7 @@ public partial class MainWindow : FluentWindow
         _vm = viewModel;
         _connectionManagerViewModel = connectionManagerViewModel;
         _profileService = profileService;
+        _authService = authService;
         _snackbarService = snackbarService;
         _contentDialogService = contentDialogService;
         _navigator = (NavigationViewNavigator)navigator;
@@ -45,7 +48,17 @@ public partial class MainWindow : FluentWindow
 
         connectionManagerViewModel.ConnectionSwitched += OnConnectionSwitched;
         viewModel.OpenConnectionManagerRequested += (_, _) =>
+        {
             _navigator.Navigate(typeof(ConnectionsPage));
+
+            // FirstRunOverlay's "Add connection" button reaches this same handler (the pane
+            // footer's account button is the only other caller, and it's unreachable while the
+            // overlay's scrim covers the nav — HasConnection is false only in the former case).
+            // Without this, ConnectionsPage lands with its editor pane present but disabled,
+            // since only NewProfileCommand sets IsEditing = true.
+            if (!_vm.HasConnection)
+                _connectionManagerViewModel.NewProfileCommand.Execute(null);
+        };
         viewModel.SignInRequested += OnSignInRequested;
 
         RootNavigation.Navigated += (_, e) =>
@@ -56,14 +69,21 @@ public partial class MainWindow : FluentWindow
         };
         viewModel.PropertyChanged += (_, e) =>
         {
+            // ShowSignInOverlay is derived (HasConnection && NeedsSignIn) and raises its own
+            // PropertyChanged via NotifyPropertyChangedFor — a separate, later event than the
+            // HasConnection/NeedsSignIn one. SignInOverlay's Visibility binds directly to it, so
+            // that later event re-pushes Visible from the binding after SyncSignInOverlay already
+            // collapsed it for the current page, unless this also re-syncs on that event.
             if (e.PropertyName is nameof(MainWindowViewModel.HasConnection)
-                or nameof(MainWindowViewModel.NeedsSignIn))
+                or nameof(MainWindowViewModel.NeedsSignIn)
+                or nameof(MainWindowViewModel.ShowSignInOverlay))
             {
                 SyncFirstRunOverlay();
                 SyncSignInOverlay();
             }
         };
         _profileService.ProfilesChanged += OnProfilesChanged;
+        _authService.SignedOut += OnSignedOut;
         Loaded += OnWindowLoaded;
         Closed += OnWindowClosed;
 
@@ -96,11 +116,41 @@ public partial class MainWindow : FluentWindow
         _connectionManagerViewModel.ParentHwnd = new WindowInteropHelper(this).Handle;
         await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
         SyncHasConnection();
+
+        // Startup's silent sign-in (App.xaml.cs) never goes through SelectProfileAsync, so
+        // ConnectedProfileId is only ever set there for later, in-session switches — seed it
+        // here for the common case where the silent reconnect already succeeded.
+        if (_vm.IsConnected)
+        {
+            var lastUsed = _connectionManagerViewModel.Profiles.FirstOrDefault(p => p.IsLastUsed);
+            if (lastUsed is not null)
+                _connectionManagerViewModel.ConnectedProfileId = lastUsed.Id;
+        }
+
         RootNavigation.Navigate(typeof(GeneratePage));
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
-        => _profileService.ProfilesChanged -= OnProfilesChanged;
+    {
+        _profileService.ProfilesChanged -= OnProfilesChanged;
+        _authService.SignedOut -= OnSignedOut;
+    }
+
+    // ProfileAuthService.SignOutAsync uses ConfigureAwait(false) throughout, so SignedOut can
+    // fire on a background thread — marshal before touching the ViewModel, same as OnProfilesChanged.
+    private void OnSignedOut(object? sender, EventArgs e)
+    {
+        if (Dispatcher.CheckAccess())
+            SignOut();
+        else
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(SignOut));
+
+        void SignOut()
+        {
+            _vm.NeedsSignIn = true;
+            _connectionManagerViewModel.ConnectedProfileId = null;
+        }
+    }
 
     // T4: react to saves/deletes (fired by the profile store) instead of ObservableCollection's
     // CollectionChanged. LoadAsync does Profiles.Clear() then re-adds, so watching the collection

@@ -48,19 +48,58 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty] private ConnectionProfile? _selectedProfile;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     private ConnectionProfile? _editingProfile;
-    [ObservableProperty] private bool _isEditing;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
+    private bool _isEditing;
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private string? _testResult;
     [ObservableProperty] private bool _testSucceeded;
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SelectProfileCommand))] private bool _isSwitchingConnection;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSwitchError))] private string? _switchError;
 
+    /// <summary>Not persisted. Id of the profile the app is actually connected to right now, if any.</summary>
+    [ObservableProperty] private Guid? _connectedProfileId;
+
+    /// <summary>Whether the editing profile has unsaved edits since it was opened or last saved.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    private bool _isDirty;
+
+    /// <summary>Shown for ~2s by <see cref="ConnectAsync"/> after a successful connect.</summary>
+    [ObservableProperty] private bool _showConnectedToast;
+
+    /// <summary>Test seam: how long <see cref="ShowConnectedToast"/> stays true.</summary>
+    internal TimeSpan ConnectedToastDuration { get; set; } = TimeSpan.FromSeconds(2);
+
     /// <summary>Gets whether the last connection switch failed.</summary>
     public bool HasSwitchError => SwitchError is not null;
 
     /// <summary>Handoff alias for <see cref="CancelCommand"/>.</summary>
     public IRelayCommand CancelEditCommand => CancelCommand;
+
+    private bool IsNewProfile => EditingProfile is { } p && Profiles.All(x => x.Id != p.Id);
+
+    /// <summary>Gets whether the Save button should show: a never-saved profile, or unsaved edits.</summary>
+    public bool ShowSaveButton => IsEditing && (IsNewProfile || IsDirty);
+
+    /// <summary>Gets whether the Connect button should show: saved, with no pending edits.</summary>
+    public bool ShowConnectButton => IsEditing && !IsNewProfile && !IsDirty;
+
+    /// <summary>Gets an inline validation message for the environment URL, or null when it's valid or blank.</summary>
+    public string? EnvironmentUrlError =>
+        EditingProfile is { } p && !string.IsNullOrWhiteSpace(p.EnvironmentUrl)
+            && !(Uri.TryCreate(p.EnvironmentUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
+            ? "Enter a valid https:// environment URL, e.g. https://contoso.crm.dynamics.com"
+            : null;
+
+    /// <summary>Re-evaluates <see cref="EnvironmentUrlError"/>. EnvironmentUrl's setter doesn't raise PropertyChanged.</summary>
+    internal void RefreshEnvironmentUrlValidation() => OnPropertyChanged(nameof(EnvironmentUrlError));
 
     /// <summary>Loads profiles from storage and marks the active profile.</summary>
     [RelayCommand]
@@ -95,6 +134,11 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
         };
         IsEditing = true;
+
+        // Must run last: assigning EditingProfile above synchronously re-pushes its (blank)
+        // field values through the bound TextBoxes, which raises TextChanged and marks the
+        // fresh, unedited profile dirty via OnProfileFieldChanged before this line runs.
+        IsDirty = false;
     }
 
     /// <summary>Sets a profile as the active connection and re-authenticates against it.</summary>
@@ -112,6 +156,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             if (result.Succeeded)
             {
                 _connectionService.Reset();
+                ConnectedProfileId = profile.Id;
                 ConnectionSwitched?.Invoke(this, (profile, result));
             }
             else
@@ -148,9 +193,13 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             CertificateThumbprint = profile.CertificateThumbprint,
         };
         IsEditing = true;
+
+        // Same ordering reason as NewProfile: must run last, after the bound TextBoxes have
+        // already re-pushed the cloned profile's values and spuriously marked it dirty.
+        IsDirty = false;
     }
 
-    /// <summary>Persists the editing profile and exits edit mode.</summary>
+    /// <summary>Persists the editing profile. Connecting is a separate, explicit step (<see cref="ConnectAsync"/>).</summary>
     [RelayCommand(CanExecute = nameof(CanSaveProfile))]
     private async Task SaveProfileAsync()
     {
@@ -158,17 +207,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         SwitchError = null;
         try
         {
-            var savedInstance = EditingProfile;
-            await _profileService.SaveAsync(savedInstance);
+            await _profileService.SaveAsync(EditingProfile);
             await LoadAsync();
-            if (ReferenceEquals(EditingProfile, savedInstance))
-            {
-                var saved = Profiles.FirstOrDefault(p => p.Id == savedInstance.Id);
-                if (saved is not null)
-                    await SelectProfileAsync(saved);
-            }
-            IsEditing = false;
-            EditingProfile = null;
+            IsDirty = false;
         }
         catch (Exception ex)
         {
@@ -219,6 +260,18 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
             await _profileService.DeleteAsync(profile.Id);
             await LoadAsync();
+
+            // Delete connection's CommandParameter is EditingProfile itself, so a successful
+            // delete always empties the pane it was just deleted from — otherwise the stale
+            // profile stays visible/editable after it no longer exists in the store.
+            if (EditingProfile?.Id == profile.Id)
+            {
+                EditingProfile = null;
+                IsEditing = false;
+            }
+
+            if (ConnectedProfileId == profile.Id)
+                ConnectedProfileId = null;
         }
         catch (Exception ex)
         {
@@ -259,7 +312,28 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         IsEditing = false;
         EditingProfile = null;
         TestResult = null;
+        IsDirty = false;
     }
+
+    /// <summary>Connects to the saved, clean editing profile. Separate from Save — see <see cref="ShowConnectButton"/>.</summary>
+    [RelayCommand(CanExecute = nameof(CanConnect))]
+    private async Task ConnectAsync()
+    {
+        if (EditingProfile is null) return;
+        var saved = Profiles.FirstOrDefault(p => p.Id == EditingProfile.Id);
+        if (saved is null) return;
+
+        await SelectProfileAsync(saved);
+
+        if (SwitchError is null)
+        {
+            ShowConnectedToast = true;
+            await Task.Delay(ConnectedToastDuration);
+            ShowConnectedToast = false;
+        }
+    }
+
+    private bool CanConnect() => ShowConnectButton;
 
     /// <summary>Writes Microsoft's well-known public client ID into the editing profile.</summary>
     [RelayCommand]
@@ -267,6 +341,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     {
         if (EditingProfile is null) return;
         EditingProfile.ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
+        IsDirty = true;
         OnPropertyChanged(nameof(EditingProfile));
         SaveProfileCommand.NotifyCanExecuteChanged();
     }

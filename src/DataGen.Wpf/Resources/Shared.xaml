@@ -17,6 +17,7 @@
     <converters:TestResultStyleConverter x:Key="TestResultStyleConverter" />
     <converters:TestResultGlyphConverter x:Key="TestResultGlyphConverter" />
     <converters:TestResultBrushConverter x:Key="TestResultBrushConverter" />
+    <converters:IdEqualsToVisibilityConverter x:Key="IdEqualsToVisibilityConverter" />
 
     <!-- ==================================================================
          1. Current tokens — the ONLY keys views bind to.
@@ -655,9 +656,11 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Pill}"/>
     </Style>
+    <!-- Solid accent fill, not the soft tint DG.Chip normally carries — this one is a status
+         badge (currently connected), not a filter pill, and needs to read at a glance. -->
     <Style x:Key="DG.ChipSelected" TargetType="Border" BasedOn="{StaticResource DG.Chip}">
-        <Setter Property="Background" Value="{DynamicResource DG.AccentChip}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentChipBorder}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Accent}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
     </Style>
 
     <!-- Info / warning banners. Left edge is the 3px accent stripe. -->
