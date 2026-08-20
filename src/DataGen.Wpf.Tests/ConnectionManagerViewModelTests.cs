@@ -279,6 +279,33 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
+    public async Task DeleteProfileAsync_ClearsEditingProfile_WhenDeletingTheEditedProfile()
+    {
+        var stored = new List<ConnectionProfile>
+        {
+            new() { Name = "Only", EnvironmentUrl = "https://c.crm.dynamics.com" },
+        };
+        var target = stored[0];
+
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => stored.ToList());
+        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => stored.FirstOrDefault());
+        profiles.Setup(p => p.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, CancellationToken>((id, _) => stored.RemoveAll(p => p.Id == id))
+            .Returns(Task.CompletedTask);
+
+        var vm = new ConnectionManagerViewModel(
+            profiles.Object, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
+        vm.EditProfileCommand.Execute(target);
+        Assert.True(vm.IsEditing);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(target);
+
+        Assert.Null(vm.EditingProfile);
+        Assert.False(vm.IsEditing);
+    }
+
+    [Fact]
     public async Task DeleteProfileAsync_DialogHostUnavailable_CancelsDeleteInsteadOfProceeding()
     {
         var stored = new ConnectionProfile { Name = "Prod", EnvironmentUrl = "https://c.crm.dynamics.com" };

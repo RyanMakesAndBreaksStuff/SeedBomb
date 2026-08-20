@@ -51,11 +51,13 @@ public partial class MainWindow : FluentWindow
         {
             _navigator.Navigate(typeof(ConnectionsPage));
 
-            // FirstRunOverlay's "Add connection" button reaches this same handler (the pane
-            // footer's account button is the only other caller, and it's unreachable while the
-            // overlay's scrim covers the nav — HasConnection is false only in the former case).
-            // Without this, ConnectionsPage lands with its editor pane present but disabled,
-            // since only NewProfileCommand sets IsEditing = true.
+            // FirstRunOverlay's "Add connection" button reaches this same handler. The pane
+            // footer's account button and SignInOverlay's "Manage connections" button also call
+            // it, but both are unreachable while HasConnection is false (the overlay's scrim
+            // covers the nav, and SignInOverlay only shows when HasConnection is already true) —
+            // so HasConnection is false only in the FirstRunOverlay case. Without this,
+            // ConnectionsPage lands with its editor pane present but disabled, since only
+            // NewProfileCommand sets IsEditing = true.
             if (!_vm.HasConnection)
                 _connectionManagerViewModel.NewProfileCommand.Execute(null);
         };

@@ -50,6 +50,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
+    [NotifyPropertyChangedFor(nameof(EnvironmentUrlError))]
     private ConnectionProfile? _editingProfile;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
@@ -93,10 +94,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     /// <summary>Gets an inline validation message for the environment URL, or null when it's valid or blank.</summary>
     public string? EnvironmentUrlError =>
-        EditingProfile is { } p && !string.IsNullOrWhiteSpace(p.EnvironmentUrl)
-            && !(Uri.TryCreate(p.EnvironmentUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
+        EditingProfile is { } p && !string.IsNullOrWhiteSpace(p.EnvironmentUrl) && !IsValidHttpsUrl(p.EnvironmentUrl)
             ? "Enter a valid https:// environment URL, e.g. https://contoso.crm.dynamics.com"
             : null;
+
+    private static bool IsValidHttpsUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 
     /// <summary>Re-evaluates <see cref="EnvironmentUrlError"/>. EnvironmentUrl's setter doesn't raise PropertyChanged.</summary>
     internal void RefreshEnvironmentUrlValidation() => OnPropertyChanged(nameof(EnvironmentUrlError));
@@ -204,12 +207,18 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private async Task SaveProfileAsync()
     {
         if (EditingProfile is null) return;
+        var savedInstance = EditingProfile;
         SwitchError = null;
         try
         {
-            await _profileService.SaveAsync(EditingProfile);
+            await _profileService.SaveAsync(savedInstance);
             await LoadAsync();
-            IsDirty = false;
+
+            // Guard against the user switching to a different profile (and possibly starting
+            // real edits on it) while this save was still in flight — that profile's own
+            // dirty state must not be clobbered by this save's completion.
+            if (ReferenceEquals(EditingProfile, savedInstance))
+                IsDirty = false;
         }
         catch (Exception ex)
         {
@@ -226,8 +235,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         EditingProfile is { } p
         && !string.IsNullOrWhiteSpace(p.Name)
         && !string.IsNullOrWhiteSpace(p.ClientId)
-        && Uri.TryCreate(p.EnvironmentUrl, UriKind.Absolute, out var uri)
-        && uri.Scheme == Uri.UriSchemeHttps
+        && IsValidHttpsUrl(p.EnvironmentUrl)
         && p.AuthType switch
         {
             AuthType.ClientSecret => !string.IsNullOrWhiteSpace(p.ClientSecret),
