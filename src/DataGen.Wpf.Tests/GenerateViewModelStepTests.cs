@@ -525,7 +525,7 @@ public sealed class GenerateViewModelStepTests
         Assert.Contains(nameof(GenerateViewModel.PlannedTotal), raised);
         Assert.Contains(nameof(GenerateViewModel.RunConfirmationLine), raised);
         Assert.Equal(1000, viewModel.PlannedTotal);
-        Assert.Contains("1,000", viewModel.RunConfirmationLine);
+        Assert.Contains(1000.ToString("N0"), viewModel.RunConfirmationLine);
     }
 
     [Fact]
@@ -662,9 +662,6 @@ public sealed class GenerateViewModelStepTests
             Mock.Of<IContentDialogService>(),
             new RunViewModel(generationMock.Object));
     }
-
-    private static GenerateViewModel CreateViewModel(IProfileService profileService)
-        => CreateViewModel(out _, out _, out _, out _, profileService);
 
     private static GenerateViewModel CreateViewModel(
         out Mock<IWpfGenerationService> generationMock,

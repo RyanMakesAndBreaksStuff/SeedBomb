@@ -158,6 +158,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 _restoredDraft = null;
             }
         }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialise the Generate page");
@@ -212,7 +215,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isRunning;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CancelLabel))]
     private bool _isCancelling;
 
     [ObservableProperty]
@@ -403,9 +405,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>Gets the label for the Generate button.</summary>
     public string GenerateLabel => IsRunning ? "GENERATING…" : "GENERATE DATA";
-
-    /// <summary>Gets the label for the Abort button.</summary>
-    public string CancelLabel => IsCancelling ? "ABORTING…" : "ABORT";
 
     /// <summary>Gets the status panel label.</summary>
     public string StatusLabel => IsRunning ? "In progress" : (LastResult is null ? "Ready" : "Complete");

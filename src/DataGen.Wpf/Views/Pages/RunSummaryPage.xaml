@@ -197,7 +197,7 @@
                                                Text="{Binding DispositionLabel}"
                                                VerticalAlignment="Center" Margin="12,0,0,0">
                                         <TextBlock.Style>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Tertiary}">
                                                 <Setter Property="Foreground" Value="{DynamicResource DG.Warning}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding DispositionKey}" Value="Retryable">

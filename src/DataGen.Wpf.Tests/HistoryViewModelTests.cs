@@ -81,23 +81,31 @@ public sealed class HistoryViewModelTests
             history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
         await vm.LoadCommand.ExecuteAsync(null);
 
-        string? exportedPath = null;
-        snackbar
-            .Setup(s => s.Show(
+        var exportDir = Directory.CreateTempSubdirectory("datagen-history-export-test-");
+        vm.ExportDirectoryOverride = exportDir.FullName;
+        try
+        {
+            string? exportedPath = null;
+            snackbar
+                .Setup(s => s.Show(
+                    "History exported", It.IsAny<string>(),
+                    ControlAppearance.Success, null, It.IsAny<TimeSpan>()))
+                .Callback<string, string, ControlAppearance, IconElement?, TimeSpan>(
+                    (_, message, _, _, _) => exportedPath = message);
+
+            await vm.ExportCsvCommand.ExecuteAsync(null);
+
+            snackbar.Verify(s => s.Show(
                 "History exported", It.IsAny<string>(),
-                ControlAppearance.Success, null, It.IsAny<TimeSpan>()))
-            .Callback<string, string, ControlAppearance, IconElement?, TimeSpan>(
-                (_, message, _, _, _) => exportedPath = message);
-
-        await vm.ExportCsvCommand.ExecuteAsync(null);
-
-        snackbar.Verify(s => s.Show(
-            "History exported", It.IsAny<string>(),
-            ControlAppearance.Success, null, It.IsAny<TimeSpan>()),
-            Times.Once);
-        Assert.False(string.IsNullOrWhiteSpace(exportedPath));
-        Assert.Contains("Downloads", exportedPath, StringComparison.OrdinalIgnoreCase);
-        Assert.True(File.Exists(exportedPath));
-        File.Delete(exportedPath);
+                ControlAppearance.Success, null, It.IsAny<TimeSpan>()),
+                Times.Once);
+            Assert.False(string.IsNullOrWhiteSpace(exportedPath));
+            Assert.Equal(exportDir.FullName, Path.GetDirectoryName(exportedPath));
+            Assert.True(File.Exists(exportedPath));
+        }
+        finally
+        {
+            exportDir.Delete(recursive: true);
+        }
     }
 }
