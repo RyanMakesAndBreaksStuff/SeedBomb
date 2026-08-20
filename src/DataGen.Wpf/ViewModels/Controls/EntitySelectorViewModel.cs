@@ -60,13 +60,24 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
+    [NotifyPropertyChangedFor(nameof(ShowContent))]
     private string? _errorMessage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowContent))]
     private bool _isLoading;
 
     /// <summary>Gets a value indicating whether an error message is present.</summary>
     public bool HasError => ErrorMessage is not null;
+
+    /// <summary>
+    /// Gets whether the search bar and entity list should render. Sharing this Grid cell with
+    /// the loading spinner and error banner without it lets the search row and error banner
+    /// render stacked on top of each other whenever a load fails (IsLoading alone doesn't cover
+    /// the errored-and-not-loading state) — and since this content is later in the XAML, it also
+    /// sits above the error banner in z-order and swallows clicks meant for its Retry button.
+    /// </summary>
+    public bool ShowContent => !IsLoading && !HasError;
 
     /// <summary>Loads the entity list from Dataverse. Called once on control load.</summary>
     [RelayCommand]

@@ -180,7 +180,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         _clients.Clear();
         _account = null;
         _activeProfileId = null;
+        SignedOut?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <inheritdoc />
+    public event EventHandler? SignedOut;
 
     private async Task<AuthResult> SignInOAuthAsync(
         ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)

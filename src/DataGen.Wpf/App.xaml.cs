@@ -103,11 +103,17 @@ public partial class App : Application
     {
         var vm = _host!.Services.GetRequiredService<MainWindowViewModel>();
         vm.UserDisplayName = displayName;
-        vm.NeedsSignIn = !signedIn;
 
         var profiles = _host.Services.GetRequiredService<IConnectionProfileService>();
         var profile = await profiles.GetLastUsedAsync();
         vm.OrgUrl = profile?.EnvironmentUrl ?? string.Empty;
+
+        // A failed silent attempt only means "needs sign-in" when there was a profile to
+        // reconnect to. With zero profiles, SignInAsync fails with "no profile configured" —
+        // that's FirstRunOverlay's case, not a stale-session one, and NeedsSignIn must not
+        // latch true here or it reappears the moment the first profile is saved (before its
+        // own connect attempt has even run).
+        vm.NeedsSignIn = profile is not null && !signedIn;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();

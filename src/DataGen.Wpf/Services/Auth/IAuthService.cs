@@ -22,6 +22,9 @@ public interface IAuthService
     /// <summary>Removes the cached account token.</summary>
     Task SignOutAsync(CancellationToken ct = default);
 
+    /// <summary>Raised after <see cref="SignOutAsync"/> completes.</summary>
+    event EventHandler? SignedOut;
+
     /// <summary>Acquires a token silently for the given scopes.</summary>
     Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default);
 
