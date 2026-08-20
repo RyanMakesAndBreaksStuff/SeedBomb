@@ -76,7 +76,7 @@ nunit-*.xml
 /.codex
 /.superpowers/brainstorm
 /.cursorrules
-/AGENTS.md
+AGENTS.md
 /AGENTS.md.lean-ctx.bak
 /displayissue.png
 /src/DataGen.Web/wwwroot/appsettings.json
@@ -85,13 +85,14 @@ mocks/mock-2-dark-slate.html
 mocks/mock-3-centered-modal.html
 /Assets/updated__dark_mode_palette_collection.html
 /Assets/updated__light_mode_palette_collection_vol1.html
-/Assets/logos
+Assets/logos
 /screenshots/bindingissues.png
 /root_diff.md
-/tasks/lessons.md
+tasks/lessons.md
 /codereview12Aug.md
 /.grok/skills
 /artifacts/verify-build
 /artifacts/verify-obj
 /handoff
 /src/DataGen.Wpf/DataGen.Wpf_yru5cmu4_wpftmp.csproj
+/.kiro/steering
