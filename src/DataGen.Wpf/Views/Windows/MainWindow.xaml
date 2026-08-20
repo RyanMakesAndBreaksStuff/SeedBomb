@@ -211,12 +211,16 @@
                             HorizontalAlignment="Center"
                             Command="{Binding OpenConnectionsCommand}" Content="Manage connections"/>
 
-                    <!-- DataContext set in code-behind to the same ConnectionManagerViewModel
-                         instance ConnectionsPage's identical banner reads — one shared error. -->
+                    <!-- Bindings for both properties below are wired up in code-behind, with an
+                         explicit Source, against the same ConnectionManagerViewModel instance
+                         ConnectionsPage's identical banner reads — one shared error. Not declared
+                         here as {Binding ...}: that would resolve against the inherited
+                         MainWindowViewModel DataContext at parse time (before code-behind can
+                         retarget it), logging spurious "property not found" trace errors on every
+                         launch even though it's harmless (this banner only ever becomes visible
+                         after the retarget has already happened). -->
                     <Border x:Name="SignInErrorBanner" Style="{DynamicResource DG.WarningBanner}"
-                            Margin="0,16,0,0"
-                            Visibility="{Binding HasSwitchError,
-                                         Converter={StaticResource BoolToVisibilityConverter}}">
+                            Margin="0,16,0,0" Visibility="Collapsed">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -226,9 +230,9 @@
                                            FontSize="{DynamicResource DG.Type.IconLg}"
                                            Foreground="{DynamicResource DG.Warning}"
                                            VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
+                            <TextBlock x:Name="SignInErrorText" Grid.Column="1" Style="{DynamicResource DG.Secondary}"
                                        Foreground="{DynamicResource DG.WarningText}"
-                                       Text="{Binding SwitchError}" Margin="14,0,0,0" LineHeight="18"/>
+                                       Margin="14,0,0,0" LineHeight="18"/>
                         </Grid>
                     </Border>
                 </StackPanel>

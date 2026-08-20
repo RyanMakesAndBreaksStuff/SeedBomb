@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Seedbomb.Services.Auth;
@@ -90,8 +91,17 @@ public partial class MainWindow : FluentWindow
         Closed += OnWindowClosed;
 
         // Same shared ConnectionManagerViewModel instance ConnectionsPage's identical
-        // SwitchError banner reads — a failed retry here is visible there too.
-        SignInErrorBanner.DataContext = connectionManagerViewModel;
+        // SwitchError banner reads — a failed retry here is visible there too. Bound with an
+        // explicit Source (not via DataContext) so the binding's source is correct from the
+        // first evaluation — see the comment on SignInErrorBanner in the XAML.
+        BindingOperations.SetBinding(SignInErrorBanner, VisibilityProperty, new Binding(
+            nameof(ConnectionManagerViewModel.HasSwitchError))
+        {
+            Source = connectionManagerViewModel,
+            Converter = (IValueConverter)FindResource("BoolToVisibilityConverter"),
+        });
+        BindingOperations.SetBinding(SignInErrorText, System.Windows.Controls.TextBlock.TextProperty, new Binding(
+            nameof(ConnectionManagerViewModel.SwitchError)) { Source = connectionManagerViewModel });
     }
 
     private async void OnSignInRequested(object? sender, EventArgs e)
