@@ -268,12 +268,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
 
-    /// <summary>
-    /// Raised when the host dialog should close and return to the Field Rules board
-    /// (Open in board applied a pending import).
-    /// </summary>
-    public event EventHandler? CloseRequested;
-
     /// <summary>Raised when the page should open Rules for the named profile.</summary>
     public event EventHandler<string>? EditRulesRequested;
 
@@ -557,7 +551,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         return report;
     }
 
-    /// <summary>Commits the pending import for the host to push onto the board, then closes back to rules.</summary>
+    /// <summary>Commits the pending import for the host to apply via <see cref="ProfileApplied"/>.</summary>
     [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
     private void OpenInBoard()
     {
@@ -565,7 +559,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         AppliedToBoard = true;
         ProfileApplied?.Invoke(this, PendingImport);
         ShowImportSummary = false;
-        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Drops the pending import / schema-error pane and returns to the profile list.</summary>

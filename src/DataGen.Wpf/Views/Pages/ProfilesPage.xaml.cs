@@ -25,8 +25,8 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
     /// <param name="generate">Singleton Generate wizard — receives applied profiles.</param>
     /// <param name="navigator">Shell navigator.</param>
     /// <param name="profiles">Profile store — used to prefetch live metadata for the selected
-    /// profile's tables (T1: a profiles-first "Generate…" click must not have to wait on a prior
-    /// Rules visit to populate <see cref="GenerateViewModel.EntityMetadataMap"/>).</param>
+    /// profile's tables (T1: a profiles-first "Load Profile" click must not have to wait on a
+    /// prior Rules visit to populate <see cref="GenerateViewModel.EntityMetadataMap"/>).</param>
     public ProfilesPage(
         ProfilesViewModel viewModel, GenerateViewModel generate, IAppNavigator navigator, IProfileService profiles)
     {
@@ -41,7 +41,7 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
         viewModel.PickExportPath ??= PickExport;
 
         // CR-001: the page is a first-class profile host, not just a browser. Without these
-        // the primary Generate… button silently no-ops.
+        // the primary Load Profile button silently no-ops.
         viewModel.GetMetadata ??= () => generate.EntityMetadataMap;
         viewModel.GetRunId ??= () => generate.RunId;
         viewModel.CaptureCurrent ??= generate.BuildProfileSnapshot;
@@ -64,7 +64,7 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
     }
 
     // T1: viewModel.GetMetadata (wired above) reads generate.EntityMetadataMap synchronously —
-    // by the time the user clicks "Generate…" (LoadCommand -> PresentImport) it must already hold
+    // by the time the user clicks "Load Profile" (LoadCommand -> PresentImport) it must already hold
     // the selected profile's tables, or every table lands in NotImported. GoToRulesAsync only
     // fills that map when the user visits the Rules step first, which a profiles-first flow may
     // never do — so fetch it here, as the profile is selected/presented, ahead of that click.
@@ -104,6 +104,16 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
     {
         _generate.ApplyImportReport(report);
         _navigator.Navigate(typeof(GeneratePage));
+    }
+
+    // ContextMenu only opens on right-click by default — open it on left-click instead.
+    private void OnMoreButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            menu.IsOpen = true;
+        }
     }
 
     private static string? PickImport()

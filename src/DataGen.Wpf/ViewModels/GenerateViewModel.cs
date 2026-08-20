@@ -19,7 +19,6 @@ using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
-using Seedbomb.Views.Dialogs;
 using Seedbomb.Views.Pages;
 
 namespace Seedbomb.ViewModels;
@@ -1040,52 +1039,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
             _fieldRules.SelectTable(SelectedEntities[0].LogicalName);
     }
 
-    /// <summary>Opens the Profiles manager dialog (Mock F5) and applies Open-in-board results.</summary>
+    /// <summary>Navigates to <see cref="ProfilesPage"/> to browse/load/manage profiles.</summary>
     [RelayCommand]
-    private async Task OpenProfilesAsync()
-    {
-        var vm = new ProfilesViewModel(_profileService)
-        {
-            CaptureCurrent = name => BuildProfileSnapshot(name),
-            IsBoardDirty = () => _fieldRules?.IsDirty == true,
-            GetMetadata = () => _entityMetadata,
-            GetRunId = () => RunId,
-            ConfirmOverwrite = msg =>
-                System.Windows.MessageBox.Show(msg, "Load profile",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
-            ConfirmDelete = name =>
-                System.Windows.MessageBox.Show(
-                    $"Delete profile '{name}'? This cannot be undone.",
-                    "Delete profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
-            PickImportPath = () =>
-            {
-                var dlg = new Microsoft.Win32.OpenFileDialog
-                {
-                    Filter = "Profile (*.profile.json)|*.profile.json|JSON (*.json)|*.json|All files|*.*",
-                    Title = "Import profile",
-                };
-                return dlg.ShowDialog() == true ? dlg.FileName : null;
-            },
-            PickExportPath = name =>
-            {
-                var dlg = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "Profile (*.profile.json)|*.profile.json",
-                    FileName = $"{name}.profile.json",
-                    Title = "Export profile",
-                };
-                return dlg.ShowDialog() == true ? dlg.FileName : null;
-            },
-        };
-
-        await vm.RefreshCommand.ExecuteAsync(null);
-
-        var dialog = new ProfilesDialog(vm);
-        await _contentDialogService.ShowAsync(dialog, CancellationToken.None);
-
-        if (vm.AppliedToBoard && vm.PendingImport is { } report)
-            ApplyImportReport(report);
-    }
+    private void OpenProfiles() => _navigator?.Navigate(typeof(ProfilesPage));
 
     /// <summary>Builds a profile snapshot of the current wizard selection, counts, rules, and seed.</summary>
     public Profile BuildProfileSnapshot(string name)

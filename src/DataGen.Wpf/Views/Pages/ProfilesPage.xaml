@@ -206,7 +206,7 @@
                                 <Button Style="{DynamicResource DG.PrimaryButton}"
                                         Height="{DynamicResource DG.Size.ControlSmall}"
                                         Command="{Binding LoadCommand}"
-                                        Content="Generate…" Margin="0,0,8,0"/>
+                                        Content="Load Profile" Margin="0,0,8,0"/>
                                 <Button Style="{DynamicResource DG.Button}"
                                         Height="{DynamicResource DG.Size.ControlSmall}"
                                         Command="{Binding EditRulesCommand}"
@@ -214,10 +214,13 @@
                                 <ui:Button Style="{DynamicResource DG.Button}"
                                            Height="{DynamicResource DG.Size.ControlSmall}"
                                            Width="{DynamicResource DG.Size.ControlSmall}"
-                                           Padding="0" ToolTip="More">
+                                           Padding="0" ToolTip="More"
+                                           Click="OnMoreButtonClick">
                                     <ui:SymbolIcon Symbol="MoreHorizontal24" FontSize="{DynamicResource DG.Type.Icon}"/>
+                                    <!-- A ContextMenu only opens on right-click by default; OnMoreButtonClick
+                                         opens it on left-click instead, matching every other button here. -->
                                     <ui:Button.ContextMenu>
-                                        <ContextMenu>
+                                        <ContextMenu Placement="Bottom">
                                             <MenuItem Header="Duplicate" Command="{Binding DuplicateCommand}"/>
                                             <MenuItem Header="Export…" Command="{Binding ExportCommand}"/>
                                             <Separator/>
