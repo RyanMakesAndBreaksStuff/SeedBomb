@@ -33,6 +33,10 @@ public enum EligibilityReason
     /// <summary>Lookup — out of scope in v1.</summary>
     Lookup,
 
+    /// <summary>Type discriminator of a polymorphic lookup (Owner/Customer) — Dataverse never
+    /// populates a real OptionSet for it, so a oneOf rule can never be completed.</summary>
+    PolymorphicType,
+
     /// <summary>Not valid for create.</summary>
     NotCreatable,
 
@@ -73,6 +77,8 @@ public static class RuleEligibility
             return new(false, EligibilityReason.BinaryUpload);
         if (attr is LookupAttributeMetadata)
             return new(false, EligibilityReason.Lookup);
+        if (attr is EntityNameAttributeMetadata)
+            return new(false, EligibilityReason.PolymorphicType);
         if (attr is MultiSelectPicklistAttributeMetadata)
             return new(false, EligibilityReason.MultiSelectV2);
         if (attr.IsValidForCreate == false)

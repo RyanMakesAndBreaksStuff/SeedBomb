@@ -166,6 +166,11 @@
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="Background" Value="Transparent"/>
+                                <!-- Disabled (platform-owned) rows stay visible but unselectable;
+                                     the tooltip is the only place DisabledReason surfaces (S3). -->
+                                <Setter Property="IsEnabled" Value="{Binding IsSelectable}"/>
+                                <Setter Property="ToolTip" Value="{Binding DisabledReason}"/>
+                                <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
@@ -198,6 +203,15 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid>
+                                    <Grid.Style>
+                                        <Style TargetType="Grid">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StateKey}" Value="Disabled">
+                                                    <Setter Property="Opacity" Value="0.5"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Grid.Style>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="14"/>
                                         <ColumnDefinition Width="*"/>

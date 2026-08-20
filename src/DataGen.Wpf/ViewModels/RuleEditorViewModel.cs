@@ -104,6 +104,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private readonly Dictionary<string, AttributeMetadata> _byName;
     private readonly List<PickerColumn> _allSettable;
     private readonly List<PickerColumn> _allExcluded;
+    // Settable + excluded, in metadata order — the one list ColumnsView wraps, so excluded
+    // (platform-owned) columns stay visible-but-disabled instead of silently disappearing (S3).
+    private readonly List<PickerColumn> _allColumns = [];
     private readonly Dictionary<string, EntityMetadata> _entities = new(StringComparer.OrdinalIgnoreCase);
     private readonly IMetadataProvider? _metadata;
     private readonly IProfileService? _profiles;
@@ -505,10 +508,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         return _filterKey switch
         {
-            "Required" => IsRequired(column),
+            // Disabled (platform-owned) columns never belong to Required/Mapped — they're
+            // never actionable, so they'd only mislead the checklist those chips exist for.
+            "Required" => column.IsSelectable && IsRequired(column),
             // Metadata ctor has no profile: keep settable columns visible so required-unmapped
             // (and the rest of the picker) stay testable without a ColumnsView.
-            "Mapped" => IsMapped(column) || IsRequired(column) || _profile is null,
+            "Mapped" => column.IsSelectable && (IsMapped(column) || IsRequired(column) || _profile is null),
+            "Disabled" => !column.IsSelectable,
             _ => true,
         };
     }
@@ -545,6 +551,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             SelectedColumn = null;
             _allSettable.Clear();
             _allExcluded.Clear();
+            _allColumns.Clear();
             OnPropertyChanged(nameof(SettableColumns));
             OnPropertyChanged(nameof(ExcludedColumns));
             ColumnFilterModes.Clear();
@@ -602,7 +609,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         ResetFromMetadata(meta);
 
-        ColumnsView = CollectionViewSource.GetDefaultView(_allSettable);
+        ColumnsView = CollectionViewSource.GetDefaultView(_allColumns);
         ColumnsView.Filter = o => o is PickerColumn c && MatchesColumnFilter(c);
         if (ColumnsView is CollectionView view)
         {
@@ -925,10 +932,12 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         _allSettable.Clear();
         _allExcluded.Clear();
+        _allColumns.Clear();
         foreach (var attr in attrs)
         {
             var column = BuildPickerColumn(attr, altKeyAttrs);
             (column.IsSelectable ? _allSettable : _allExcluded).Add(column);
+            _allColumns.Add(column);
         }
 
         RebuildFilterChips();
@@ -974,10 +983,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         var mapped = _allSettable.Count(c => c.GroupName == "Mapped");
         var required = _allSettable.Count(IsRequired);
-        var all = _allSettable.Count;
+        var disabled = _allExcluded.Count;
+        // "All" now includes the Disabled group shown alongside them in ColumnsView (S3).
+        var all = _allColumns.Count;
         ColumnFilterModes.Clear();
         ColumnFilterModes.Add(new ColumnFilterMode("Mapped", $"Mapped ({mapped})", mapped));
         ColumnFilterModes.Add(new ColumnFilterMode("Required", $"Required ({required})", required));
+        ColumnFilterModes.Add(new ColumnFilterMode("Disabled", $"Disabled ({disabled})", disabled));
         ColumnFilterModes.Add(new ColumnFilterMode("All", $"All ({all})", all));
     }
 
@@ -1026,6 +1038,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         EligibilityReason.BpfBookkeeping => "Platform-owned state — set Status (reason) instead.",
         EligibilityReason.BinaryUpload => "File/image — needs the upload API.",
         EligibilityReason.Lookup => "Lookup — out of scope in v1.",
+        EligibilityReason.PolymorphicType => "Owner/Customer type — determined by its paired lookup value.",
         EligibilityReason.NotCreatable => "Not valid for create.",
         EligibilityReason.MultiSelectV2 => "MultiSelect — rule editing planned for v2.",
         _ => reason.ToString(),
