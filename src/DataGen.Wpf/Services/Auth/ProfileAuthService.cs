@@ -25,7 +25,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private readonly Dictionary<Guid, CachedClient> _clients = [];
     private IAccount? _account;
     private Guid? _activeProfileId;
-    private MsalCacheHelper? _cacheHelper;
+    private MsalCacheHelper? _userCacheHelper;
+    private MsalCacheHelper? _appCacheHelper;
     private readonly ILogger<ProfileAuthService>? _logger;
 
     /// <summary>
@@ -62,30 +63,59 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     internal static bool ShouldDropSession(Guid? activeProfileId, IEnumerable<Guid> remainingIds) =>
         activeProfileId is Guid id && remainingIds.All(x => x != id);
 
-    internal static StorageCreationProperties CreateCacheProperties()
+    internal static StorageCreationProperties CreateUserCacheProperties()
     {
         var dir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DataGen");
-        return new StorageCreationPropertiesBuilder("msal_cache.bin", dir).Build();
+        return new StorageCreationPropertiesBuilder("msal_user_cache.bin", dir).Build();
     }
 
-    private async Task<MsalCacheHelper?> GetCacheHelperAsync()
+    // MSAL rejects a single flat file backing both a public-client (user) and confidential-client
+    // (app-only) token cache: MsalClientException "combined_user_app_cache_not_supported". Each
+    // client type needs its own cache file.
+    internal static StorageCreationProperties CreateAppCacheProperties()
     {
-        if (_cacheHelper is not null)
-            return _cacheHelper;
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DataGen");
+        return new StorageCreationPropertiesBuilder("msal_app_cache.bin", dir).Build();
+    }
+
+    private async Task<MsalCacheHelper?> GetUserCacheHelperAsync()
+    {
+        if (_userCacheHelper is not null)
+            return _userCacheHelper;
 
         try
         {
-            _cacheHelper = await MsalCacheHelper.CreateAsync(CreateCacheProperties()).ConfigureAwait(false);
-            return _cacheHelper;
+            _userCacheHelper = await MsalCacheHelper.CreateAsync(CreateUserCacheProperties()).ConfigureAwait(false);
+            return _userCacheHelper;
         }
         catch (Exception ex)
         {
             // WR-011: returning null is correct — auth degrades to interactive-every-launch.
             // Silently is not: this is the only signal that the token cache is broken.
             _logger?.LogWarning(ex,
-                "MSAL token cache could not be initialised; sign-in will be interactive every launch");
+                "MSAL user token cache could not be initialised; sign-in will be interactive every launch");
+            return null;
+        }
+    }
+
+    private async Task<MsalCacheHelper?> GetAppCacheHelperAsync()
+    {
+        if (_appCacheHelper is not null)
+            return _appCacheHelper;
+
+        try
+        {
+            _appCacheHelper = await MsalCacheHelper.CreateAsync(CreateAppCacheProperties()).ConfigureAwait(false);
+            return _appCacheHelper;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex,
+                "MSAL app token cache could not be initialised; app-only auth will re-acquire tokens every launch");
             return null;
         }
     }
@@ -329,7 +359,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
                 .WithDefaultRedirectUri()
                 .Build();
 
-            var helper = await GetCacheHelperAsync().ConfigureAwait(false);
+            var helper = await GetUserCacheHelperAsync().ConfigureAwait(false);
             helper?.RegisterCache(newPca.UserTokenCache);
         }
 
@@ -372,7 +402,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
             newCca = ccaBuilder.Build();
 
-            var helper = await GetCacheHelperAsync().ConfigureAwait(false);
+            var helper = await GetAppCacheHelperAsync().ConfigureAwait(false);
             helper?.RegisterCache(newCca.AppTokenCache);
         }
 

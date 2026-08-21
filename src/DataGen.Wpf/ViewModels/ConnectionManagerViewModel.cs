@@ -48,11 +48,13 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty] private ConnectionProfile? _selectedProfile;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     [NotifyPropertyChangedFor(nameof(EnvironmentUrlError))]
     private ConnectionProfile? _editingProfile;
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     private bool _isEditing;

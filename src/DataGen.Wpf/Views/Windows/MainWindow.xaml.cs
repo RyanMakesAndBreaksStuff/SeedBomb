@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Navigation;
@@ -22,6 +23,7 @@ public partial class MainWindow : FluentWindow
     private readonly ISnackbarService _snackbarService;
     private readonly IContentDialogService _contentDialogService;
     private readonly NavigationViewNavigator _navigator;
+    private readonly IServiceProvider _serviceProvider;
     private object? _currentPageContent;
 
     /// <summary>Initialises the window, sets DataContext, and wires NavigationView to DI.</summary>
@@ -42,6 +44,7 @@ public partial class MainWindow : FluentWindow
         _snackbarService = snackbarService;
         _contentDialogService = contentDialogService;
         _navigator = (NavigationViewNavigator)navigator;
+        _serviceProvider = serviceProvider;
 
         DataContext = viewModel;
         InitializeComponent();
@@ -201,8 +204,13 @@ public partial class MainWindow : FluentWindow
         _vm.OrgUrl = e.Profile.EnvironmentUrl;
         _vm.NeedsSignIn = false;
         SyncHasConnection();
-        if (_currentPageContent is GeneratePage page)
-            page.ReloadForConnectionSwitch();
+
+        // GeneratePage and its ViewModel are DI singletons, so the entity picker's "load once on
+        // control load" cache otherwise survives a connection switch untouched whenever the switch
+        // happens from a different page (the normal case — switching lives on ConnectionsPage).
+        // Resolve the singleton directly instead of gating on _currentPageContent so a switch made
+        // from elsewhere still clears stale entities before the user next lands on Generate.
+        _serviceProvider.GetRequiredService<GeneratePage>().ReloadForConnectionSwitch();
         SyncFirstRunOverlay();
         SyncSignInOverlay();
     }
