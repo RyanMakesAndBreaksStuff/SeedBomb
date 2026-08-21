@@ -1,11 +1,15 @@
+using DataGen.Core.Exceptions;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels;
 using Seedbomb.Views.Pages;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -323,6 +327,246 @@ public sealed class RuleEditorViewModelTests
         Assert.DoesNotContain(vm.SettableColumns, c => c.LogicalName == "name");
         Assert.Equal("firstname", vm.SelectedColumn?.LogicalName);
         Assert.Contains("bogus", vm.AvailableOps);
+    }
+
+    // Repro for the crash-on-expired-connection bug: DataverseMetadataProvider wraps every
+    // live-fetch failure (expired token included) as SchemaException. Today LoadForProfileAsync
+    // has no try/catch around the fetch, so this exception escapes uncaught — RulesPage.xaml.cs's
+    // OnNavigatedToAsync only catches OperationCanceledException, so it propagates all the way to
+    // the WPF-UI navigation framework's async void dispatch and crashes the whole process.
+    [Fact]
+    public async Task LoadForProfileAsync_metadata_fetch_failure_does_not_throw()
+    {
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(1, "working-set", null, 42,
+                [new ProfileTable("account", 10, null)]),
+            TableName = "account",
+        };
+        var metadata = new Mock<IMetadataProvider>();
+        metadata
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new SchemaException("Failed to retrieve metadata for entity 'account'.",
+                new InvalidOperationException("expired token")));
+        var snackbar = new Mock<ISnackbarService>();
+
+        var vm = new RuleEditorViewModel(
+            metadata.Object,
+            new Mock<IProfileService>().Object,
+            new Mock<IAppNavigator>().Object,
+            request,
+            snackbar: snackbar.Object,
+            logger: Mock.Of<ILogger<RuleEditorViewModel>>());
+
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+
+        snackbar.Verify(
+            s => s.Show(
+                "Couldn't load table metadata",
+                "Failed to retrieve metadata for entity 'account'.",
+                ControlAppearance.Danger,
+                null,
+                It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    // Per-rule Save/Cancel/Delete (RulesPage Preview pane + config-panel "More" menu).
+    private static async Task<(RuleEditorViewModel Vm, Mock<IAppNavigator> Navigator, Mock<IProfileService> Profiles, List<Profile> Saved)>
+        LoadedEditorAsync(IReadOnlyList<string>? existingProfileNames = null, Type? returnPage = null,
+            Dictionary<string, FieldRule>? nameColumnRule = null)
+    {
+        var navigator = new Mock<IAppNavigator>();
+        var saved = new List<Profile>();
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(1, "working-set", null, 42,
+                [new ProfileTable("account", 10, nameColumnRule)]),
+            TableName = "account",
+            ReturnPage = returnPage,
+            OnSaved = p => saved.Add(p),
+        };
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([BuildEntity()]);
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingProfileNames ?? Array.Empty<string>());
+        profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var vm = new RuleEditorViewModel(metadata.Object, profiles.Object, navigator.Object, request);
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+        return (vm, navigator, profiles, saved);
+    }
+
+    [Fact]
+    public async Task SaveRuleCommand_commits_without_navigating()
+    {
+        var (vm, navigator, _, saved) = await LoadedEditorAsync(returnPage: typeof(GeneratePage));
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.Single(saved);
+        Assert.True(saved[0].Tables.Single(t => t.Table == "account").Columns!.ContainsKey("name"));
+        navigator.Verify(n => n.Navigate(It.IsAny<Type>()), Times.Never);
+        Assert.Equal("name", vm.SelectedColumn?.LogicalName); // staleness-fix regression
+    }
+
+    [Fact]
+    public async Task SaveProfileCommand_still_navigates_after_commit()
+    {
+        var (vm, navigator, _, saved) = await LoadedEditorAsync(returnPage: typeof(GeneratePage));
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+
+        await vm.SaveProfileCommand.ExecuteAsync(null);
+
+        Assert.Single(saved);
+        Assert.True(saved[0].Tables.Single(t => t.Table == "account").Columns!.ContainsKey("name"));
+        navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+    }
+
+    [Fact]
+    public async Task CancelRuleCommand_discards_unsaved_edit_on_mapped_column()
+    {
+        var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm, _, _, _) = await LoadedEditorAsync(
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        Assert.Equal("original", vm.ConstantText);
+
+        vm.ConstantText = "dirty";
+
+        Assert.True(vm.CancelRuleCommand.CanExecute(null));
+        vm.CancelRuleCommand.Execute(null);
+
+        Assert.Equal("original", vm.ConstantText);
+    }
+
+    [Fact]
+    public async Task CancelRuleCommand_resets_op_to_default_on_never_mapped_column()
+    {
+        var (vm, _, _, _) = await LoadedEditorAsync();
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        Assert.Equal("constant", vm.SelectedOp);
+
+        vm.SelectedOp = "pattern";
+        vm.Template = "dirty-{seq}";
+
+        Assert.True(vm.CancelRuleCommand.CanExecute(null));
+        vm.CancelRuleCommand.Execute(null);
+
+        Assert.Equal("constant", vm.SelectedOp);
+    }
+
+    [Fact]
+    public async Task DeleteRuleCommand_CanExecute_toggles_with_mapped_state()
+    {
+        var (vm, _, _, _) = await LoadedEditorAsync();
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        Assert.False(vm.DeleteRuleCommand.CanExecute(null));
+
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.True(vm.DeleteRuleCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DeleteRuleCommand_removes_mapping_after_confirmation()
+    {
+        var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm, _, _, saved) = await LoadedEditorAsync(
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.ConfirmDeleteRule = _ => Task.FromResult(true);
+
+        await vm.DeleteRuleCommand.ExecuteAsync(null);
+
+        Assert.Single(saved);
+        Assert.False(saved[0].Tables.Single(t => t.Table == "account").Columns!.ContainsKey("name"));
+        Assert.Equal(0, vm.ColumnFilterModes.Single(m => m.Key == "Mapped").Count);
+        Assert.Equal("name", vm.SelectedColumn?.LogicalName);
+    }
+
+    [Fact]
+    public async Task DeleteRuleCommand_noop_when_confirmation_declined()
+    {
+        var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm, _, _, saved) = await LoadedEditorAsync(
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.ConfirmDeleteRule = _ => Task.FromResult(false);
+
+        await vm.DeleteRuleCommand.ExecuteAsync(null);
+
+        Assert.Empty(saved);
+        Assert.True(vm.DeleteRuleCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task DeleteRuleCommand_persists_only_when_profile_already_in_store()
+    {
+        var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm, _, profiles, _) = await LoadedEditorAsync(
+            existingProfileNames: Array.Empty<string>(),
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.ConfirmDeleteRule = _ => Task.FromResult(true);
+
+        await vm.DeleteRuleCommand.ExecuteAsync(null);
+        profiles.Verify(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var existing2 = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm2, _, profiles2, _) = await LoadedEditorAsync(
+            existingProfileNames: ["working-set"],
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing2 });
+        vm2.SelectedColumn = vm2.SettableColumns.Single(c => c.LogicalName == "name");
+        vm2.ConfirmDeleteRule = _ => Task.FromResult(true);
+
+        await vm2.DeleteRuleCommand.ExecuteAsync(null);
+        profiles2.Verify(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveRuleCommand_and_SaveProfileCommand_CanExecute_stay_in_sync()
+    {
+        var (vm, _, _, _) = await LoadedEditorAsync();
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name"); // MaxLength 20
+        vm.SelectedOp = "constant";
+        vm.ConstantText = new string('x', 30);
+
+        Assert.False(vm.SaveRuleCommand.CanExecute(null));
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+
+        vm.ConstantText = "fixed";
+
+        Assert.True(vm.SaveRuleCommand.CanExecute(null));
+        Assert.True(vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    // RelayCommand doesn't auto-hook CommandManager.RequerySuggested, so a bound Button/MenuItem
+    // only re-queries CanExecute when CanExecuteChanged actually fires — calling CanExecute(null)
+    // directly (as the other tests above do) can't catch a missing notify call, since it always
+    // re-evaluates the predicate fresh regardless of whether anything was ever raised.
+    [Fact]
+    public async Task SelectedColumnChange_notifies_CancelAndDeleteRuleCommands()
+    {
+        var (vm, _, _, _) = await LoadedEditorAsync();
+        var cancelRaised = 0;
+        var deleteRaised = 0;
+        vm.CancelRuleCommand.CanExecuteChanged += (_, _) => cancelRaised++;
+        vm.DeleteRuleCommand.CanExecuteChanged += (_, _) => deleteRaised++;
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+
+        Assert.True(cancelRaised > 0);
+        Assert.True(deleteRaised > 0);
     }
 
     [Fact]

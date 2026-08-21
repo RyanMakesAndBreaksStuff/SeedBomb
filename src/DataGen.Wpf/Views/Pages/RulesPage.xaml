@@ -266,17 +266,40 @@
                     <!-- Stacked, not inline: the type line wrapped into the title at narrow widths. -->
                     <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
                             BorderThickness="0,0,0,1" Padding="20,16">
-                        <StackPanel>
-                            <TextBlock Style="{DynamicResource DG.CardTitle}"
-                                       Text="{Binding SelectedColumn.LogicalName}"
-                                       TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Style="{DynamicResource DG.Mono}"
-                                       Text="{Binding SelectedColumn.TypeDetail}"
-                                       Margin="0,3,0,0"/>
-                            <TextBlock Style="{DynamicResource DG.Secondary}"
-                                       Text="Choose how SeedBomb fills this column for every generated row."
-                                       Margin="0,4,0,0"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Style="{DynamicResource DG.CardTitle}"
+                                           Text="{Binding SelectedColumn.LogicalName}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Style="{DynamicResource DG.Mono}"
+                                           Text="{Binding SelectedColumn.TypeDetail}"
+                                           Margin="0,3,0,0"/>
+                                <TextBlock Style="{DynamicResource DG.Secondary}"
+                                           Text="Choose how SeedBomb fills this column for every generated row."
+                                           Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <ui:Button Grid.Column="1" Style="{DynamicResource DG.Button}"
+                                       Height="{DynamicResource DG.Size.ControlSmall}"
+                                       Width="{DynamicResource DG.Size.ControlSmall}"
+                                       Padding="0" ToolTip="More"
+                                       VerticalAlignment="Top"
+                                       Click="OnMoreButtonClick">
+                                <ui:SymbolIcon Symbol="MoreHorizontal24" FontSize="{DynamicResource DG.Type.Icon}"/>
+                                <!-- A ContextMenu only opens on right-click by default; OnMoreButtonClick
+                                     opens it on left-click instead, matching ProfilesPage. -->
+                                <ui:Button.ContextMenu>
+                                    <ContextMenu Placement="Bottom">
+                                        <MenuItem Header="Delete rule" Command="{Binding DeleteRuleCommand}"/>
+                                    </ContextMenu>
+                                </ui:Button.ContextMenu>
+                            </ui:Button>
+                        </Grid>
                     </Border>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16">
@@ -659,6 +682,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
@@ -719,6 +743,19 @@
                         <TextBlock Style="{DynamicResource DG.Tertiary}"
                                    Text="{Binding PreviewFooterLabel}"
                                    TextWrapping="Wrap" LineHeight="17"/>
+                    </Border>
+
+                    <!-- Per-rule commit, decoupled from "Save profile" (header) which also
+                         navigates away — this is the "true rule cancel/save" the mock called for. -->
+                    <Border Grid.Row="3" Style="{DynamicResource DG.CardFooter}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{DynamicResource DG.Button}"
+                                    Command="{Binding SaveRuleCommand}"
+                                    Content="Save" Margin="0,0,8,0"/>
+                            <Button Style="{DynamicResource DG.Button}"
+                                    Command="{Binding CancelRuleCommand}"
+                                    Content="Cancel"/>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>
