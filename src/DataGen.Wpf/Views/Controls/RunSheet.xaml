@@ -88,11 +88,22 @@
                                         <TextBlock Style="{DynamicResource DG.GroupLabel}"
                                                    Margin="0"
                                                    Text="{Binding Label}"/>
-                                        <TextBlock Style="{DynamicResource DG.Mono}"
-                                                   FontSize="{DynamicResource DG.Type.Subtitle}"
-                                                   Foreground="{Binding ValueBrush}"
+                                        <TextBlock FontSize="{DynamicResource DG.Type.Subtitle}"
                                                    Text="{Binding Value}"
-                                                   Margin="0,3,0,0"/>
+                                                   Margin="0,3,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Mono}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ValueKind}" Value="Muted">
+                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Text3}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ValueKind}" Value="Warning">
+                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Warning}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -113,19 +124,48 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Style="{DynamicResource DG.Cell}"
                                                Text="{Binding TableName}"
-                                               FontWeight="{Binding NameWeight}"
-                                               Foreground="{Binding NameBrush}"/>
-                                    <TextBlock Grid.Column="1" Style="{DynamicResource DG.Mono}"
-                                               Text="{Binding ProgressLabel}"
-                                               Foreground="{Binding StateBrush}"
-                                               Margin="8,0,8,0"/>
-                                    <TextBlock Grid.Column="2" Style="{DynamicResource DG.Tertiary}"
-                                               Text="{Binding StateLabel}"
-                                               Foreground="{Binding StateBrush}"/>
+                                               FontWeight="{Binding NameWeight}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding ProgressLabel}"
+                                               Margin="8,0,8,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Mono}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding StateKey}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StateKey}" Value="Done">
+                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Grid.Column="2" Text="{Binding StateLabel}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Tertiary}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding StateKey}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StateKey}" Value="Done">
+                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </Grid>
-                                <ProgressBar Style="{DynamicResource DG.ProgressBar}"
-                                             Value="{Binding Percent}" Maximum="100"
-                                             Foreground="{Binding StateBrush}"/>
+                                <ProgressBar Value="{Binding Percent}" Maximum="100">
+                                    <ProgressBar.Style>
+                                        <Style TargetType="ProgressBar" BasedOn="{StaticResource DG.ProgressBar}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StateKey}" Value="Done">
+                                                    <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ProgressBar.Style>
+                                </ProgressBar>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -160,7 +200,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Style="{DynamicResource DG.Mono}"
-                                               Foreground="{Binding SeverityBrush}"
+                                               Foreground="{DynamicResource DG.TextBody}"
                                                Text="{Binding Line}"
                                                LineHeight="17"
                                                TextTrimming="CharacterEllipsis"/>

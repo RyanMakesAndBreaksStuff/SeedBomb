@@ -78,9 +78,20 @@
                         <StackPanel>
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Margin="0"
                                        Text="{Binding Label}"/>
-                            <TextBlock Style="{DynamicResource DG.Stat}"
-                                       Foreground="{Binding ValueBrush}"
-                                       Text="{Binding Value}"/>
+                            <TextBlock Text="{Binding Value}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Stat}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ValueKind}" Value="Muted">
+                                                <Setter Property="Foreground" Value="{DynamicResource DG.Text3}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ValueKind}" Value="Warning">
+                                                <Setter Property="Foreground" Value="{DynamicResource DG.Warning}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </Border>
                 </DataTemplate>
