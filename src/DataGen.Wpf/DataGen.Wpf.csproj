@@ -59,7 +59,7 @@
          before OnStartup runs and auto-closed on first window render. No custom code needed. -->
     <SplashScreen Include="..\..\Assets\logos\seedbomb_splash.png" />
 
-    <!-- Embedded as pack://application:,,,/<filename> (Link flattens path). Matches MainWindow/LoginWindow/TrayIconService. -->
+    <!-- Embedded as pack://application:,,,/<filename> (Link flattens path). Matches MainWindow/TrayIconService. -->
     <Resource Include="..\..\Assets\logos\seedbomb.ico" Link="seedbomb.ico" />
     <Resource Include="..\..\Assets\logos\seedbomb_32x32.png" Link="seedbomb_32x32.png" />
     <Resource Include="..\..\Assets\logos\seedbomb_tray_colored.ico" Link="seedbomb_tray_colored.ico" />

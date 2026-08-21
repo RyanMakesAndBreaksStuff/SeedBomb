@@ -9,10 +9,18 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>Raised when the header's connection display is clicked.</summary>
     public event EventHandler? OpenConnectionManagerRequested;
 
+    /// <summary>Raised when the sign-in overlay's button is clicked.</summary>
+    public event EventHandler? SignInRequested;
+
     /// <summary>Opens the Connection Manager drawer.</summary>
     [RelayCommand]
     private void OpenConnectionManager() =>
         OpenConnectionManagerRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Retries sign-in for the last-used profile.</summary>
+    [RelayCommand]
+    private void SignIn() =>
+        SignInRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Handoff alias for <see cref="OrgHost"/>.</summary>
     public string EnvironmentHost => OrgHost;
@@ -21,7 +29,24 @@ public partial class MainWindowViewModel : ObservableObject
     public IRelayCommand OpenConnectionsCommand => OpenConnectionManagerCommand;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
+    [NotifyPropertyChangedFor(nameof(IsConnected))]
     private bool _hasConnection;
+
+    /// <summary>
+    /// Set at startup when the silent sign-in attempt failed. Cleared once
+    /// <see cref="Seedbomb.Views.Windows.MainWindow"/> observes a successful connection switch.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
+    [NotifyPropertyChangedFor(nameof(IsConnected))]
+    private bool _needsSignIn;
+
+    /// <summary>Gets whether the "Sign in to continue" overlay should be shown.</summary>
+    public bool ShowSignInOverlay => HasConnection && NeedsSignIn;
+
+    /// <summary>Gets whether the app is actually connected right now (not just "a profile exists").</summary>
+    public bool IsConnected => HasConnection && !NeedsSignIn;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UserInitials))]

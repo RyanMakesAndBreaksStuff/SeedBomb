@@ -5,15 +5,20 @@ using System.Text.Json;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DataGen.Core.Exceptions;
 using DataGen.Core.Generators;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Views.Pages;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
+using Wpf.Ui.Extensions;
 
 namespace Seedbomb.ViewModels;
 
@@ -104,11 +109,17 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private readonly Dictionary<string, AttributeMetadata> _byName;
     private readonly List<PickerColumn> _allSettable;
     private readonly List<PickerColumn> _allExcluded;
+    // Settable + excluded, in metadata order — the one list ColumnsView wraps, so excluded
+    // (platform-owned) columns stay visible-but-disabled instead of silently disappearing (S3).
+    private readonly List<PickerColumn> _allColumns = [];
     private readonly Dictionary<string, EntityMetadata> _entities = new(StringComparer.OrdinalIgnoreCase);
     private readonly IMetadataProvider? _metadata;
     private readonly IProfileService? _profiles;
     private readonly IAppNavigator? _navigator;
     private readonly RulesNavigationRequest? _request;
+    private readonly IContentDialogService? _dialogs;
+    private readonly ISnackbarService? _snackbar;
+    private readonly ILogger<RuleEditorViewModel>? _logger;
 
     private string _table;
     private int _recordCount;
@@ -155,12 +166,18 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         IMetadataProvider metadata,
         IProfileService profiles,
         IAppNavigator navigator,
-        RulesNavigationRequest request)
+        RulesNavigationRequest request,
+        IContentDialogService? dialogs = null,
+        ISnackbarService? snackbar = null,
+        ILogger<RuleEditorViewModel>? logger = null)
     {
         _metadata = metadata;
         _profiles = profiles;
         _navigator = navigator;
         _request = request;
+        _dialogs = dialogs;
+        _snackbar = snackbar;
+        _logger = logger;
         _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
         _allSettable = [];
         _allExcluded = [];
@@ -278,8 +295,23 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     partial void OnSelectedColumnChanged(PickerColumn? value)
     {
+        LoadDraftForColumn(value);
+        // RelayCommand doesn't auto-hook CommandManager.RequerySuggested — without this, a button
+        // bound to one of these commands (Cancel; Delete rule's mapped-state check) can bind while
+        // SelectedColumn is still null/unmapped and never re-query CanExecute again.
+        CancelRuleCommand.NotifyCanExecuteChanged();
+        DeleteRuleCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Loads <paramref name="column"/>'s committed rule (or a blank default, if it has none) into
+    /// the editor fields. Used both when the picker selection changes and by
+    /// <see cref="CancelRule"/> to discard an in-progress edit back to last-committed state.
+    /// </summary>
+    private void LoadDraftForColumn(PickerColumn? column)
+    {
         Options.Clear();
-        if (value is not null && _byName.TryGetValue(value.LogicalName, out var attr) && attr is EnumAttributeMetadata em)
+        if (column is not null && _byName.TryGetValue(column.LogicalName, out var attr) && attr is EnumAttributeMetadata em)
         {
             foreach (var opt in em.OptionSet?.Options ?? [])
             {
@@ -296,15 +328,21 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         OnPropertyChanged(nameof(AvailableOpOptions));
         OnPropertyChanged(nameof(AvailableOperations));
         SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
-        if (value is not null
+        if (column is not null
             && TryGetProfileColumns(out var cols)
-            && cols.TryGetValue(value.LogicalName, out var existing))
+            && cols.TryGetValue(column.LogicalName, out var existing))
         {
             ApplyExistingRule(existing);
         }
 
         Revalidate();
     }
+
+    private bool CanCancelRule() => SelectedColumn is not null;
+
+    /// <summary>Discards any unsaved edit to the current rule, reverting to last-committed state.</summary>
+    [RelayCommand(CanExecute = nameof(CanCancelRule))]
+    private void CancelRule() => LoadDraftForColumn(SelectedColumn);
 
     /// <summary>Ops valid for <see cref="SelectedColumn"/>'s type, per §3.1 Applies-to.</summary>
     public IReadOnlyList<string> AvailableOps =>
@@ -371,7 +409,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         SelectedBogusEndpoint = null;
         ClearAllBogusArguments();
         Revalidate();
-        SaveProfileCommand.NotifyCanExecuteChanged();
+        NotifyCanSaveChanged();
     }
 
     partial void OnSelectedBogusEndpointChanged(string? value)
@@ -382,7 +420,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (value is null)
             ClearAllBogusArguments();
         Revalidate();
-        SaveProfileCommand.NotifyCanExecuteChanged();
+        NotifyCanSaveChanged();
     }
 
     partial void OnBogusMinNumberChanged(string value) => Revalidate();
@@ -505,10 +543,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         return _filterKey switch
         {
-            "Required" => IsRequired(column),
+            // Disabled (platform-owned) columns never belong to Required/Mapped — they're
+            // never actionable, so they'd only mislead the checklist those chips exist for.
+            "Required" => column.IsSelectable && IsRequired(column),
             // Metadata ctor has no profile: keep settable columns visible so required-unmapped
             // (and the rest of the picker) stay testable without a ColumnsView.
-            "Mapped" => IsMapped(column) || IsRequired(column) || _profile is null,
+            "Mapped" => column.IsSelectable && (IsMapped(column) || IsRequired(column) || _profile is null),
+            "Disabled" => !column.IsSelectable,
             _ => true,
         };
     }
@@ -545,12 +586,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             SelectedColumn = null;
             _allSettable.Clear();
             _allExcluded.Clear();
+            _allColumns.Clear();
             OnPropertyChanged(nameof(SettableColumns));
             OnPropertyChanged(nameof(ExcludedColumns));
             ColumnFilterModes.Clear();
             ColumnsView = null;
             OnPropertyChanged(nameof(ColumnsView));
-            SaveProfileCommand.NotifyCanExecuteChanged();
+            NotifyCanSaveChanged();
             return;
         }
 
@@ -579,14 +621,27 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         if (SelectedTable is null || _metadata is null)
         {
-            SaveProfileCommand.NotifyCanExecuteChanged();
+            NotifyCanSaveChanged();
             return;
         }
 
         ApplyTableCounts(SelectedTable.LogicalName);
 
         var names = Tables.Select(t => t.LogicalName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var list = await _metadata.GetEntitiesAsync(names, ct);
+        IReadOnlyList<EntityMetadata> list;
+        try
+        {
+            list = await _metadata.GetEntitiesAsync(names, ct);
+        }
+        catch (SchemaException ex)
+        {
+            _logger?.LogError(ex, "Failed to load table metadata for the Rules page");
+            _snackbar?.Show("Couldn't load table metadata", ex.Message,
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(5));
+            NotifyCanSaveChanged();
+            return;
+        }
+
         _entities.Clear();
         foreach (var entity in list)
         {
@@ -596,13 +651,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         if (!_entities.TryGetValue(SelectedTable.LogicalName, out var meta))
         {
-            SaveProfileCommand.NotifyCanExecuteChanged();
+            NotifyCanSaveChanged();
             return;
         }
 
         ResetFromMetadata(meta);
 
-        ColumnsView = CollectionViewSource.GetDefaultView(_allSettable);
+        ColumnsView = CollectionViewSource.GetDefaultView(_allColumns);
         ColumnsView.Filter = o => o is PickerColumn c && MatchesColumnFilter(c);
         if (ColumnsView is CollectionView view)
         {
@@ -614,7 +669,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         }
 
         OnPropertyChanged(nameof(ColumnsView));
-        SaveProfileCommand.NotifyCanExecuteChanged();
+        NotifyCanSaveChanged();
     }
 
     partial void OnSelectedTableChanged(RuleTableOption? value)
@@ -681,20 +736,31 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     private bool CanSaveProfile() => _profiles is not null && _profile is not null && CanSave;
 
-    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
-    private async Task SaveProfileAsync(CancellationToken ct)
+    /// <summary>SaveRuleCommand shares CanSaveProfile's predicate, so it must be invalidated
+    /// everywhere SaveProfileCommand is, or the Preview pane's Save button desyncs from the
+    /// header's.</summary>
+    private void NotifyCanSaveChanged()
+    {
+        SaveProfileCommand.NotifyCanExecuteChanged();
+        SaveRuleCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Builds and commits the current draft rule for <see cref="SelectedColumn"/> into the
+    /// profile (and disk, if it's already a saved profile), without leaving the page.</summary>
+    /// <returns>False if there was no valid draft to commit.</returns>
+    private async Task<bool> CommitSelectedColumnRuleAsync(CancellationToken ct)
     {
         if (_profiles is null || _profile is null || SelectedColumn is null)
-            return;
+            return false;
 
         var rule = BuildRule();
         if (rule is null)
-            return;
+            return false;
 
         var tables = _profile.Tables.ToList();
         var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
         if (idx < 0)
-            return;
+            return false;
 
         var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
         cols[SelectedColumn.LogicalName] = rule;
@@ -708,13 +774,89 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         _onSaved?.Invoke(_profile);
 
+        if (_entities.TryGetValue(_table, out var meta))
+        {
+            // ResetFromMetadata rebuilds every PickerColumn record; re-point SelectedColumn at its
+            // fresh instance by name or the ListBox loses its highlight when the mapped state flips.
+            var name = SelectedColumn.LogicalName;
+            ResetFromMetadata(meta);
+            ColumnsView?.Refresh();
+            SelectedColumn = _allColumns.FirstOrDefault(c =>
+                string.Equals(c.LogicalName, name, StringComparison.OrdinalIgnoreCase)) ?? SelectedColumn;
+        }
+
+        return true;
+    }
+
+    /// <summary>Commits the current rule without leaving the page (Preview pane's Save button).</summary>
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
+    private async Task SaveRuleAsync(CancellationToken ct) => await CommitSelectedColumnRuleAsync(ct);
+
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
+    private async Task SaveProfileAsync(CancellationToken ct)
+    {
+        if (!await CommitSelectedColumnRuleAsync(ct))
+            return;
+
         if (_returnPage is not null)
             _navigator?.Navigate(_returnPage);
+    }
+
+    private bool CanDeleteRule() =>
+        _profiles is not null && _profile is not null && SelectedColumn is not null && IsMapped(SelectedColumn);
+
+    /// <summary>Test seam for <see cref="ConfirmDeleteRuleAsync"/> — bypasses the real dialog.</summary>
+    internal Func<string, Task<bool>>? ConfirmDeleteRule { get; set; }
+
+    private async Task<bool> ConfirmDeleteRuleAsync(string columnDisplayName)
+    {
+        if (ConfirmDeleteRule is not null)
+            return await ConfirmDeleteRule(columnDisplayName);
+        if (_dialogs is null)
+            return false;
+
+        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+        {
+            Title = "Delete rule",
+            Content = $"Delete the rule for '{columnDisplayName}'? This cannot be undone.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+        });
+        return result == ContentDialogResult.Primary;
+    }
+
+    /// <summary>Removes the current column's rule entirely (reverts it to Unmapped), after confirm.</summary>
+    [RelayCommand(CanExecute = nameof(CanDeleteRule))]
+    private async Task DeleteRuleAsync(CancellationToken ct)
+    {
+        if (_profiles is null || _profile is null || SelectedColumn is null)
+            return;
+        if (!await ConfirmDeleteRuleAsync(SelectedColumn.DisplayName))
+            return;
+
+        var tables = _profile.Tables.ToList();
+        var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
+        if (idx < 0)
+            return;
+
+        var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+        cols.Remove(SelectedColumn.LogicalName);
+        tables[idx] = tables[idx] with { Columns = cols };
+        _profile = _profile with { Tables = tables };
+
+        var names = await _profiles.ListAsync(ct);
+        if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+            await _profiles.SaveAsync(_profile, ct);
+
+        _onSaved?.Invoke(_profile);
 
         if (_entities.TryGetValue(_table, out var meta))
         {
+            var name = SelectedColumn.LogicalName;
             ResetFromMetadata(meta);
             ColumnsView?.Refresh();
+            SelectedColumn = _allColumns.FirstOrDefault(c =>
+                string.Equals(c.LogicalName, name, StringComparison.OrdinalIgnoreCase)) ?? SelectedColumn;
         }
     }
 
@@ -804,7 +946,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         OnPropertyChanged(nameof(InfoBarMessage));
         OnPropertyChanged(nameof(InfoBarIsError));
         OnPropertyChanged(nameof(CanSave));
-        SaveProfileCommand.NotifyCanExecuteChanged();
+        NotifyCanSaveChanged();
         SchedulePreview();
     }
 
@@ -925,10 +1067,12 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         _allSettable.Clear();
         _allExcluded.Clear();
+        _allColumns.Clear();
         foreach (var attr in attrs)
         {
             var column = BuildPickerColumn(attr, altKeyAttrs);
             (column.IsSelectable ? _allSettable : _allExcluded).Add(column);
+            _allColumns.Add(column);
         }
 
         RebuildFilterChips();
@@ -974,10 +1118,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         var mapped = _allSettable.Count(c => c.GroupName == "Mapped");
         var required = _allSettable.Count(IsRequired);
-        var all = _allSettable.Count;
+        var disabled = _allExcluded.Count;
+        // "All" now includes the Disabled group shown alongside them in ColumnsView (S3).
+        var all = _allColumns.Count;
         ColumnFilterModes.Clear();
         ColumnFilterModes.Add(new ColumnFilterMode("Mapped", $"Mapped ({mapped})", mapped));
         ColumnFilterModes.Add(new ColumnFilterMode("Required", $"Required ({required})", required));
+        ColumnFilterModes.Add(new ColumnFilterMode("Disabled", $"Disabled ({disabled})", disabled));
         ColumnFilterModes.Add(new ColumnFilterMode("All", $"All ({all})", all));
     }
 
@@ -1026,6 +1173,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         EligibilityReason.BpfBookkeeping => "Platform-owned state — set Status (reason) instead.",
         EligibilityReason.BinaryUpload => "File/image — needs the upload API.",
         EligibilityReason.Lookup => "Lookup — out of scope in v1.",
+        EligibilityReason.PolymorphicType => "Owner/Customer type — determined by its paired lookup value.",
         EligibilityReason.NotCreatable => "Not valid for create.",
         EligibilityReason.MultiSelectV2 => "MultiSelect — rule editing planned for v2.",
         _ => reason.ToString(),

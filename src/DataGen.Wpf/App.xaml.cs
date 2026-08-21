@@ -49,8 +49,8 @@ public partial class App : Application
             // automatically when the host's ServiceProvider is disposed in OnExit.
             _host.Services.GetRequiredService<TrayIconService>();
 
-            // Apply saved theme before showing any window so both LoginWindow
-            // and MainWindow render correctly from the first frame.
+            // Apply saved theme before showing MainWindow so it renders correctly
+            // from the first frame.
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             var savedSettings = await settings.LoadAsync();
             DesignThemeManager.ReduceMotion = savedSettings.ReduceMotion;
@@ -73,14 +73,9 @@ public partial class App : Application
                 result = new AuthResult(false, null, ex.Message);
             }
 
-            if (result.Succeeded)
-                await ShowMainWindow(result.DisplayName ?? string.Empty);
-            else
-            {
-                // W1-A will wire LoginWindow.LoginSucceeded → ShowMainWindow.
-                var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
-                loginWindow.Show();
-            }
+            // Always show MainWindow — its "Sign in to continue" overlay covers a failed
+            // silent attempt, and the first-run overlay already covers zero profiles.
+            await ShowMainWindow(result.DisplayName ?? string.Empty, result.Succeeded);
         }
         catch (Exception ex)
         {
@@ -102,7 +97,9 @@ public partial class App : Application
 
     /// <summary>Shows the main window and populates header user info.</summary>
     /// <param name="displayName">The signed-in user's display name.</param>
-    internal async Task ShowMainWindow(string displayName)
+    /// <param name="signedIn">Whether sign-in already succeeded (false shows the "Sign in to
+    /// continue" overlay once a connection profile exists).</param>
+    internal async Task ShowMainWindow(string displayName, bool signedIn = true)
     {
         var vm = _host!.Services.GetRequiredService<MainWindowViewModel>();
         vm.UserDisplayName = displayName;
@@ -110,6 +107,13 @@ public partial class App : Application
         var profiles = _host.Services.GetRequiredService<IConnectionProfileService>();
         var profile = await profiles.GetLastUsedAsync();
         vm.OrgUrl = profile?.EnvironmentUrl ?? string.Empty;
+
+        // A failed silent attempt only means "needs sign-in" when there was a profile to
+        // reconnect to. With zero profiles, SignInAsync fails with "no profile configured" —
+        // that's FirstRunOverlay's case, not a stale-session one, and NeedsSignIn must not
+        // latch true here or it reappears the moment the first profile is saved (before its
+        // own connect attempt has even run).
+        vm.NeedsSignIn = profile is not null && !signedIn;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         mainWindow.Show();
@@ -164,15 +168,11 @@ public partial class App : Application
 
         // Windows — singleton so only one instance exists at a time
         sc.AddSingleton<MainWindow>();
-        sc.AddSingleton<LoginWindow>(sp => new LoginWindow(
-            sp.GetRequiredService<LoginWindowViewModel>(),
-            sp.GetRequiredService<ConnectionManagerViewModel>()));
 
         // Window ViewModels — singleton to match singleton window lifetime
         sc.AddSingleton<MainWindowViewModel>();
 
         // Page/control ViewModels — transient so each page/control gets a fresh instance
-        sc.AddTransient<LoginWindowViewModel>();
         sc.AddSingleton<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
         sc.AddSingleton<GenerateViewModel>();

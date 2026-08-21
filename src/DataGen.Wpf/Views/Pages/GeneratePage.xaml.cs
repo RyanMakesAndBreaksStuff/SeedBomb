@@ -35,6 +35,23 @@ public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
     {
         if (Parent is FrameworkElement host)
             SetBinding(HeightProperty, new Binding(nameof(ActualHeight)) { Source = host });
+
+        // EntitySelectorCtrl usually resolves its ViewModel on its own Loaded before this page's
+        // Loaded fires, but that ordering isn't guaranteed (and both this page and the VM are
+        // DI singletons, so a missed attach on the first navigation never gets retried on later
+        // ones — Loaded/Unloaded do refire per navigation, but EntitySelectorControl.OnLoaded only
+        // resolves its ViewModel once). Fall back to attaching once the control's own Loaded fires.
+        if (EntitySelectorCtrl.ViewModel is { } selectorVm)
+            _vm.AttachEntitySelector(selectorVm);
+        else
+            EntitySelectorCtrl.Loaded += OnEntitySelectorCtrlLoaded;
+    }
+
+    private void OnEntitySelectorCtrlLoaded(object sender, RoutedEventArgs e)
+    {
+        EntitySelectorCtrl.Loaded -= OnEntitySelectorCtrlLoaded;
+        if (EntitySelectorCtrl.ViewModel is { } selectorVm)
+            _vm.AttachEntitySelector(selectorVm);
     }
 
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>

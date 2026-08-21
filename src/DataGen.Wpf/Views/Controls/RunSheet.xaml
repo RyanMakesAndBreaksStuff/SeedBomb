@@ -181,7 +181,6 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
                         <CheckBox Grid.Column="0"
@@ -191,7 +190,7 @@
                                        Text="Keep window open until finished"/>
                         </CheckBox>
 
-                        <Button Grid.Column="2" Style="{DynamicResource DG.DangerButton}"
+                        <Button Grid.Column="1" Style="{DynamicResource DG.DangerButton}"
                                 Command="{Binding CancelCommand}"
                                 Content="Cancel run"/>
                     </Grid>

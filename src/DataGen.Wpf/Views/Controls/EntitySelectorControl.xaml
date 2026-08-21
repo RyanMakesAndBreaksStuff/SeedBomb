@@ -17,7 +17,7 @@
         </StackPanel>
 
         <Grid MinHeight="0"
-              Visibility="{Binding IsLoading, Converter={StaticResource InverseBoolToVisible}}">
+              Visibility="{Binding ShowContent, Converter={StaticResource BoolToVisible}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />

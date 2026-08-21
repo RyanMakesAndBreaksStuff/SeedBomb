@@ -14,7 +14,7 @@ The same core generation engine is exposed through two front ends:
 - **Fake data**: `Bogus` with deterministic seeds.
 - **Authentication**:
   - Web: `Microsoft.Identity.Web` (Azure AD OIDC).
-  - Desktop: `Microsoft.Identity.Client` / MSAL supporting OAuth, client secret, and username/password flows.
+  - Desktop: `Microsoft.Identity.Client` / MSAL supporting interactive OAuth, client secret (app-only), and certificate (app-only) flows.
 - **UI**:
   - Web: `MudBlazor` on Blazor Server.
   - Desktop: `WPF-UI` + `CommunityToolkit.Mvvm`.
@@ -33,7 +33,7 @@ The same core generation engine is exposed through two front ends:
 | `DataGen.Core` | Class library | Dataverse metadata provider, dependency graph (`GraphBuilder`, `CycleDetector`, `TopologicalSort`), field generators, edge-case validation, contracts, exceptions. |
 | `DataGen.Bulk` | Class library | `BulkCreator`, `GenerationPipeline`, throttle/retry policy, deferred lookup backfill, N:N association handling. References Core. |
 | `DataGen.Web` | ASP.NET Core Blazor Server app | DI wiring, scoped Dataverse client factory, lazy metadata/bulk-creator adapters, MudBlazor UI. References Core and Bulk. |
-| `DataGen.Wpf` | WPF executable (`net10.0-windows10.0.19041.0`) | MVVM view models, connection manager, MSAL auth service, DPAPI profile storage, desktop generation service. Root namespace `DataGen.Desktop`. References Core and Bulk. |
+| `DataGen.Wpf` | WPF executable (`net10.0-windows10.0.17763.0`) | MVVM view models, connection manager, MSAL auth service, DPAPI profile storage, desktop generation service. Root namespace `Seedbomb`. References Core and Bulk. |
 
 ### Test projects
 
@@ -88,6 +88,8 @@ dotnet run --project tests/DataGen.Integration.Tests/DataGen.Integration.Tests.c
 > `DataGen.Wpf.Tests` requires the .NET **Windows Desktop** runtime and must be run on Windows.
 
 `dotnet test DataGen.sln` may fail in some environments because the VSTest host cannot discover the xunit.v3 runner. Use `dotnet run --project <test.csproj>` as the fallback.
+
+> The repo's `global.json` pins the Microsoft.Testing.Platform (MTP) test runner for .NET 10. Without it, `dotnet test` can silently report 0 tests discovered as a "pass" — always confirm the reported test count against the verified counts below.
 
 Verified test counts:
 

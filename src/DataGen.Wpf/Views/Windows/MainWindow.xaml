@@ -15,17 +15,43 @@
                  WindowCornerPreference="Round"
                  WindowStartupLocation="CenterScreen">
 
+    <ui:FluentWindow.Resources>
+        <!-- Dimmed, not disabled: IsEnabled still gates on HasConnection alone (zero profiles).
+             This is a purely visual cue that a profile exists but nothing is actually connected. -->
+        <Style x:Key="DG.NavItemConnected" TargetType="ui:NavigationViewItem"
+               BasedOn="{StaticResource {x:Type ui:NavigationViewItem}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                    <Setter Property="Opacity" Value="0.55"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="DG.PaneFooterConnected" TargetType="Button" BasedOn="{StaticResource DG.LinkButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                    <Setter Property="Opacity" Value="0.55"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </ui:FluentWindow.Resources>
+
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="105*"/>
+            <ColumnDefinition Width="94*"/>
+            <ColumnDefinition Width="981*"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="171*"/>
+            <RowDefinition Height="553*"/>
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0"
+        <ui:TitleBar
                      Height="{DynamicResource DG.Size.TitleBar}"
                      Background="{DynamicResource DG.TitleBar}"
                      Title="SeedBomb — Mock data explosion"
-                     ShowMaximize="True" ShowMinimize="True">
+                     ShowMaximize="True" ShowMinimize="True" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <ui:TitleBar.Icon>
                 <ui:ImageIcon Source="pack://application:,,,/seedbomb.ico" Width="16" Height="16"/>
             </ui:TitleBar.Icon>
@@ -42,7 +68,7 @@
                            IsBackButtonVisible="Collapsed"
                            PaneDisplayMode="Left"
                            FrameMargin="0"
-                           Background="{DynamicResource DG.Surface1}">
+                           Background="{DynamicResource DG.Surface1}" Grid.RowSpan="2" Grid.ColumnSpan="3">
 
             <ui:NavigationView.AutoSuggestBox>
                 <ui:AutoSuggestBox PlaceholderText="Find a setting or table"
@@ -56,7 +82,8 @@
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Generate"
                                        TargetPageType="{x:Type pages:GeneratePage}"
-                                       IsEnabled="{Binding HasConnection}">
+                                       IsEnabled="{Binding HasConnection}"
+                                       Style="{StaticResource DG.NavItemConnected}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Flash24"/>
                     </ui:NavigationViewItem.Icon>
@@ -64,7 +91,8 @@
 
                 <ui:NavigationViewItem Content="Profiles"
                                        TargetPageType="{x:Type pages:ProfilesPage}"
-                                       IsEnabled="{Binding HasConnection}">
+                                       IsEnabled="{Binding HasConnection}"
+                                       Style="{StaticResource DG.NavItemConnected}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Layer24"/>
                     </ui:NavigationViewItem.Icon>
@@ -72,7 +100,8 @@
 
                 <ui:NavigationViewItem Content="History"
                                        TargetPageType="{x:Type pages:HistoryPage}"
-                                       IsEnabled="{Binding HasConnection}">
+                                       IsEnabled="{Binding HasConnection}"
+                                       Style="{StaticResource DG.NavItemConnected}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="History24"/>
                     </ui:NavigationViewItem.Icon>
@@ -101,7 +130,7 @@
 
             <!-- Account + environment. Click opens the connection manager. -->
             <ui:NavigationView.PaneFooter>
-                <Button Style="{DynamicResource DG.LinkButton}"
+                <Button Style="{StaticResource DG.PaneFooterConnected}"
                         Command="{Binding OpenConnectionsCommand}"
                         HorizontalContentAlignment="Stretch"
                         Margin="8,8,8,4">
@@ -139,15 +168,17 @@
             </ui:NavigationView.PaneFooter>
         </ui:NavigationView>
 
-        <!-- Snackbar host sits above the frame so run notifications float over any page. -->
-        <ui:SnackbarPresenter Grid.Row="1" x:Name="SnackbarPresenter"
+        <!-- Snackbar host sits above the frame so run notifications float over any page. Centered
+             over the content column via alignment (not a fixed pixel offset) so it stays put
+             when the window is resized. -->
+        <ui:SnackbarPresenter Grid.Row="2" x:Name="SnackbarPresenter"
                               VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                              Margin="0,0,0,24"/>
+                              Margin="{DynamicResource DG.Pad.Page}" Grid.Column="2"/>
 
-        <ui:ContentDialogHost Grid.RowSpan="2" />
+        <ui:ContentDialogHost Grid.RowSpan="3" Grid.ColumnSpan="3" />
 
         <Border x:Name="FirstRunOverlay" Grid.Row="1" Style="{DynamicResource DG.Scrim.Style}"
-                Visibility="{Binding HasConnection, Converter={StaticResource InverseBoolToVisible}}">
+                Visibility="{Binding HasConnection, Converter={StaticResource InverseBoolToVisible}}" Grid.RowSpan="2" Grid.ColumnSpan="3">
             <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
                 <StackPanel>
@@ -156,6 +187,56 @@
                                Text="SeedBomb needs a Dataverse connection before it can generate data."/>
                     <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
                             Command="{Binding OpenConnectionsCommand}" Content="Add connection"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Shown when a connection profile exists but the startup silent sign-in failed
+             (e.g. an OAuth token needing re-consent). App-only profiles never hit this —
+             their silent sign-in needs no user/window and always succeeds at startup. -->
+        <Border x:Name="SignInOverlay" Grid.Row="1" Style="{DynamicResource DG.Scrim.Style}"
+                Visibility="{Binding ShowSignInOverlay, Converter={StaticResource BoolToVisibilityConverter}}" Grid.RowSpan="2" Grid.ColumnSpan="3">
+            <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Sign in to continue"/>
+                    <TextBlock Style="{DynamicResource DG.PageSubtitle}"
+                               Text="SeedBomb couldn't reconnect automatically."/>
+                    <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
+                            Command="{Binding SignInCommand}" Content="Sign in"/>
+
+                    <!-- Escape hatch: the scrim blocks hit-testing on the nav pane underneath
+                         (Background is set, so opacity alone doesn't let clicks through), so
+                         without this a profile with a bad URL/credential retries "Sign in"
+                         forever with no way to reach Connections and fix or delete it. -->
+                    <Button Style="{DynamicResource DG.LinkButton}" Margin="0,8,0,0"
+                            HorizontalAlignment="Center"
+                            Command="{Binding OpenConnectionsCommand}" Content="Manage connections"/>
+
+                    <!-- Bindings for both properties below are wired up in code-behind, with an
+                         explicit Source, against the same ConnectionManagerViewModel instance
+                         ConnectionsPage's identical banner reads — one shared error. Not declared
+                         here as {Binding ...}: that would resolve against the inherited
+                         MainWindowViewModel DataContext at parse time (before code-behind can
+                         retarget it), logging spurious "property not found" trace errors on every
+                         launch even though it's harmless (this banner only ever becomes visible
+                         after the retarget has already happened). -->
+                    <Border x:Name="SignInErrorBanner" Style="{DynamicResource DG.WarningBanner}"
+                            Margin="0,16,0,0" Visibility="Collapsed">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Grid.Column="0" Symbol="Warning24"
+                                           FontSize="{DynamicResource DG.Type.IconLg}"
+                                           Foreground="{DynamicResource DG.Warning}"
+                                           VerticalAlignment="Center"/>
+                            <TextBlock x:Name="SignInErrorText" Grid.Column="1" Style="{DynamicResource DG.Secondary}"
+                                       Foreground="{DynamicResource DG.WarningText}"
+                                       Margin="14,0,0,0" LineHeight="18"/>
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </Border>
         </Border>

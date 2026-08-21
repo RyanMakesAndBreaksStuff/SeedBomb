@@ -19,7 +19,6 @@ using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
-using Seedbomb.Views.Dialogs;
 using Seedbomb.Views.Pages;
 
 namespace Seedbomb.ViewModels;
@@ -84,6 +83,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private Profile? _restoredDraft;
     private FieldOverridesViewModel? _fieldOverrides;
     private FieldRulesViewModel _fieldRules;
+    private EntitySelectorViewModel? _entitySelector;
     private Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> _entityMetadata =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -157,6 +157,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 _restoredDraft = null;
             }
         }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialise the Generate page");
@@ -211,7 +214,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isRunning;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CancelLabel))]
     private bool _isCancelling;
 
     [ObservableProperty]
@@ -403,9 +405,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Gets the label for the Generate button.</summary>
     public string GenerateLabel => IsRunning ? "GENERATING…" : "GENERATE DATA";
 
-    /// <summary>Gets the label for the Abort button.</summary>
-    public string CancelLabel => IsCancelling ? "ABORTING…" : "ABORT";
-
     /// <summary>Gets the status panel label.</summary>
     public string StatusLabel => IsRunning ? "In progress" : (LastResult is null ? "Ready" : "Complete");
 
@@ -487,6 +486,19 @@ public sealed partial class GenerateViewModel : ViewModelBase
         vm.Entries.CollectionChanged += OnCountEntriesChanged;
         foreach (var entry in vm.Entries)
             entry.PropertyChanged += OnCountEntryChanged;
+    }
+
+    /// <summary>
+    /// Attaches the <see cref="EntitySelectorViewModel"/> instance owned by the page's
+    /// <see cref="Seedbomb.Views.Controls.EntitySelectorControl"/> so a table selection made
+    /// programmatically (e.g. <see cref="ApplyImportReport"/>) is mirrored into the picker's
+    /// checkboxes rather than only updating <see cref="SelectedEntities"/> internally.
+    /// </summary>
+    /// <param name="vm">The entity selector picker's view-model.</param>
+    public void AttachEntitySelector(EntitySelectorViewModel vm)
+    {
+        ArgumentNullException.ThrowIfNull(vm);
+        _entitySelector = vm;
     }
 
     // WR-003: SetEntities clears and rebuilds Entries, so per-entry handlers must be
@@ -755,6 +767,34 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IsReviewOpen = true;
     }
 
+    /// <summary>
+    /// Ensures <paramref name="logicalNames"/> are present in <see cref="EntityMetadataMap"/>,
+    /// fetching only the ones not already cached and merging them in — additive, never removes
+    /// or replaces entries <see cref="GoToRulesAsync"/> (or a prior call) already fetched. Lets a
+    /// profiles-first flow (Profiles → Generate…) validate against real metadata without requiring
+    /// a prior visit to the Rules step. Provider failures propagate to the caller rather than
+    /// being swallowed into an empty map.
+    /// </summary>
+    /// <param name="logicalNames">Table logical names to ensure metadata for.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task EnsureMetadataAsync(IEnumerable<string> logicalNames, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(logicalNames);
+
+        var missing = logicalNames
+            .Where(n => !string.IsNullOrWhiteSpace(n) && !_entityMetadata.ContainsKey(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (missing.Length == 0)
+            return;
+
+        var list = await _metadataProvider.GetEntitiesAsync(missing, ct);
+        foreach (var m in list.Where(m => m.LogicalName is not null))
+            _entityMetadata[m.LogicalName!] = m;
+
+        OnPropertyChanged(nameof(EntityMetadataMap));
+    }
+
     private bool CanGoToReview() => IsRulesLoaded && !IsRunning;
 
     private static string FormatPreview(object? value)
@@ -814,6 +854,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         await CancelPendingAutosaveAsync();
 
         SelectedEntities = [];
+        _entitySelector?.ClearSelection();
         CurrentProgress = null;
         LastResult = null;
         QueuedEntities.Clear();
@@ -848,6 +889,17 @@ public sealed partial class GenerateViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Draft clear skipped");
+        }
+
+        try
+        {
+            var settings = await _settingsService.LoadAsync();
+            BatchSize = settings.DefaultBatchSize;
+            MaxParallelism = settings.DefaultDop;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Settings reload skipped");
         }
     }
 
@@ -999,52 +1051,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
             _fieldRules.SelectTable(SelectedEntities[0].LogicalName);
     }
 
-    /// <summary>Opens the Profiles manager dialog (Mock F5) and applies Open-in-board results.</summary>
+    /// <summary>Navigates to <see cref="ProfilesPage"/> to browse/load/manage profiles.</summary>
     [RelayCommand]
-    private async Task OpenProfilesAsync()
-    {
-        var vm = new ProfilesViewModel(_profileService)
-        {
-            CaptureCurrent = name => BuildProfileSnapshot(name),
-            IsBoardDirty = () => _fieldRules?.IsDirty == true,
-            GetMetadata = () => _entityMetadata,
-            GetRunId = () => RunId,
-            ConfirmOverwrite = msg =>
-                System.Windows.MessageBox.Show(msg, "Load profile",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
-            ConfirmDelete = name =>
-                System.Windows.MessageBox.Show(
-                    $"Delete profile '{name}'? This cannot be undone.",
-                    "Delete profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes,
-            PickImportPath = () =>
-            {
-                var dlg = new Microsoft.Win32.OpenFileDialog
-                {
-                    Filter = "Profile (*.profile.json)|*.profile.json|JSON (*.json)|*.json|All files|*.*",
-                    Title = "Import profile",
-                };
-                return dlg.ShowDialog() == true ? dlg.FileName : null;
-            },
-            PickExportPath = name =>
-            {
-                var dlg = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "Profile (*.profile.json)|*.profile.json",
-                    FileName = $"{name}.profile.json",
-                    Title = "Export profile",
-                };
-                return dlg.ShowDialog() == true ? dlg.FileName : null;
-            },
-        };
-
-        await vm.RefreshCommand.ExecuteAsync(null);
-
-        var dialog = new ProfilesDialog(vm);
-        await _contentDialogService.ShowAsync(dialog, CancellationToken.None);
-
-        if (vm.AppliedToBoard && vm.PendingImport is { } report)
-            ApplyImportReport(report);
-    }
+    private void OpenProfiles() => _navigator?.Navigate(typeof(ProfilesPage));
 
     /// <summary>Builds a profile snapshot of the current wizard selection, counts, rules, and seed.</summary>
     public Profile BuildProfileSnapshot(string name)
@@ -1083,6 +1092,41 @@ public sealed partial class GenerateViewModel : ViewModelBase
         return new Profile(1, name, Description: null, Seed, tables);
     }
 
+    /// <summary>
+    /// Ensures every table named by an applied import report is present in
+    /// <see cref="SelectedEntities"/> — a set-union/upsert against the current selection, so
+    /// tables already selected are left exactly where they are (no duplicates, no reordering).
+    /// Tables the report names but this run has no metadata for are skipped: there is no
+    /// <see cref="EntitySummary"/> to build for them and counts/rules for such tables never
+    /// reach the board anyway (see <see cref="Services.Profiles.ProfileImport"/>).
+    /// </summary>
+    /// <param name="tableNames">Logical names of tables named by the report.</param>
+    private void SelectReportTables(IEnumerable<string> tableNames)
+    {
+        var merged = SelectedEntities.ToList();
+        var seen = new HashSet<string>(merged.Select(e => e.LogicalName), StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+
+        foreach (var table in tableNames)
+        {
+            if (seen.Contains(table) || !_entityMetadata.TryGetValue(table, out var meta) || meta.LogicalName is null)
+                continue;
+
+            merged.Add(new EntitySummary(
+                meta.LogicalName,
+                meta.DisplayName?.UserLocalizedLabel?.Label ?? meta.LogicalName,
+                EntitySummary.IsUserCreated(meta.LogicalName, meta.IsCustomEntity == true)));
+            seen.Add(meta.LogicalName);
+            changed = true;
+        }
+
+        if (!changed)
+            return;
+
+        OnEntitiesChanged(merged);
+        _entitySelector?.SetSelection(merged);
+    }
+
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
     public void ApplyImportReport(ProfileImportReport report)
     {
@@ -1090,6 +1134,11 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
         if (report.Seed is int seed)
             Seed = seed;
+
+        // Select the report's tables first: FieldOverridesViewModel.SetCount() is a no-op for a
+        // table that isn't a selected entry yet, so the counts loop below would silently drop
+        // counts for tables the board doesn't already have selected.
+        SelectReportTables(report.TableCounts.Keys);
 
         foreach (var (table, count) in report.TableCounts)
             _fieldOverrides?.SetCount(table, count);

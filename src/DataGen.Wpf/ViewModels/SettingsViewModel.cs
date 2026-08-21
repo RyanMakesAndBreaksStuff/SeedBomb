@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Settings;
 using Seedbomb.Services.Theme;
@@ -18,18 +19,21 @@ namespace Seedbomb.ViewModels;
 /// <param name="snackbar">Optional snackbar for I/O failures. Tests keep the 2-arg ctor.</param>
 /// <param name="auth">Optional auth service for sign-out. Tests may omit it.</param>
 /// <param name="connections">Optional Dataverse connection cache to reset on sign-out.</param>
+/// <param name="profiles">Optional connection profile store, used to tailor the sign-out message to the active profile's auth type.</param>
 public sealed partial class SettingsViewModel(
     ISettingsService settingsService,
     ILogger<SettingsViewModel> logger,
     ISnackbarService? snackbar = null,
     IAuthService? auth = null,
-    IDataverseConnectionService? connections = null) : ViewModelBase
+    IDataverseConnectionService? connections = null,
+    IConnectionProfileService? profiles = null) : ViewModelBase
 {
     private readonly ISettingsService _settingsService = settingsService;
     private readonly ILogger<SettingsViewModel> _logger = logger;
     private readonly ISnackbarService? _snackbar = snackbar;
     private readonly IAuthService? _auth = auth;
     private readonly IDataverseConnectionService? _connections = connections;
+    private readonly IConnectionProfileService? _profiles = profiles;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private CancellationTokenSource? _appearanceSaveCts;
@@ -160,8 +164,20 @@ public sealed partial class SettingsViewModel(
         {
             await _auth.SignOutAsync();
             _connections?.Reset();
-            _snackbar?.Show("Signed out", "Sign in again to reconnect.",
-                ControlAppearance.Success, null, TimeSpan.FromSeconds(6));
+
+            // WR-T7: app-only profiles (client secret / certificate) have no user account to sign
+            // out of - the credential stays on disk and the profile stays last-used, so the next
+            // Dataverse call reconnects automatically. Reflect that in the message instead of
+            // implying a fresh sign-in is required.
+            var profile = _profiles is null ? null : await _profiles.GetLastUsedAsync();
+            var appOnly = profile?.AuthType is AuthType.ClientSecret or AuthType.Certificate;
+
+            _snackbar?.Show(
+                appOnly ? "Session cleared" : "Signed out",
+                appOnly
+                    ? "This connection signs in with an application credential, so it reconnects automatically on next launch. Remove the credential on the Connections page to stop that."
+                    : "Sign in again to reconnect.",
+                ControlAppearance.Success, null, TimeSpan.FromSeconds(appOnly ? 10 : 6));
         }
         catch (Exception ex)
         {

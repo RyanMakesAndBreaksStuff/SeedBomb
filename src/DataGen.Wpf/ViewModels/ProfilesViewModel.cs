@@ -268,12 +268,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
 
-    /// <summary>
-    /// Raised when the host dialog should close and return to the Field Rules board
-    /// (Open in board applied a pending import).
-    /// </summary>
-    public event EventHandler? CloseRequested;
-
     /// <summary>Raised when the page should open Rules for the named profile.</summary>
     public event EventHandler<string>? EditRulesRequested;
 
@@ -286,10 +280,23 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     {
         var names = await _profiles.ListAsync(ct);
         var projected = new List<ProfileListItem>();
+        var unreadable = new List<string>();
         _profilesByName.Clear();
         foreach (var name in names)
         {
-            var profile = await _profiles.LoadAsync(name, ct);
+            Profile profile;
+            try
+            {
+                profile = await _profiles.LoadAsync(name, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // One corrupt/invalid file (e.g. hand-edited, or from an old bug) must not take
+                // the whole list down with it — every other profile is still perfectly loadable.
+                unreadable.Add($"{name} ({ex.Message})");
+                continue;
+            }
+
             _profilesByName[profile.Name] = profile;
             projected.Add(Project(profile));
         }
@@ -313,6 +320,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             string.Equals(i.Name, selectedName, StringComparison.OrdinalIgnoreCase));
         OnPropertyChanged(nameof(CountLabel));
         RebuildSelectedDetail();
+
+        if (unreadable.Count > 0)
+            SetError($"Couldn't load {unreadable.Count} profile(s): {string.Join(", ", unreadable)}");
     }
 
     /// <summary>Loads the selected (or parameter) profile into the pending-import slot (then Open in board).</summary>
@@ -541,7 +551,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         return report;
     }
 
-    /// <summary>Commits the pending import for the host to push onto the board, then closes back to rules.</summary>
+    /// <summary>Commits the pending import for the host to apply via <see cref="ProfileApplied"/>.</summary>
     [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
     private void OpenInBoard()
     {
@@ -549,7 +559,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         AppliedToBoard = true;
         ProfileApplied?.Invoke(this, PendingImport);
         ShowImportSummary = false;
-        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Drops the pending import / schema-error pane and returns to the profile list.</summary>
@@ -573,17 +582,33 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         await RefreshAsync();
     }
 
+    // A profile with zero tables fails the exact same schema check LoadAsync enforces (see
+    // JsonProfileService.TryParse), so saving one blind — as this used to do — wrote a file
+    // that then threw the moment RefreshAsync tried to reload it, silently discarding the new
+    // entry and leaving no error visible on this command's own failure path. Reusing
+    // CaptureCurrent (the same snapshot SaveCurrentAsNewAsync already uses) guarantees a
+    // schema-valid profile: BuildProfileSnapshot falls back to a placeholder "account" table
+    // when nothing is selected, so this never produces an empty table list.
     [RelayCommand]
     private async Task NewProfileAsync()
     {
+        if (CaptureCurrent is null)
+        {
+            SetError("No current board is available to save.");
+            return;
+        }
+
         var name = await AskNameAsync("new-profile");
         if (string.IsNullOrWhiteSpace(name)) return;
+
         try
         {
-            await _profiles.SaveAsync(new Profile(1, name.Trim(), null, null, []));
+            var profile = CaptureCurrent(name.Trim());
+            await _profiles.SaveAsync(profile);
             await RefreshAsync();
             SelectedItem = Items.FirstOrDefault(i =>
-                string.Equals(i.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+                string.Equals(i.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
+            SetStatus($"Saved “{profile.Name}”.");
         }
         catch (Exception ex)
         {

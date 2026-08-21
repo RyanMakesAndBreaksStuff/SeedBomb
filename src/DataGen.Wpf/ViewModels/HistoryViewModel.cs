@@ -29,6 +29,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
     private readonly ISnackbarService? _snackbar;
     private CancellationTokenSource? _navCts;
 
+    /// <summary>Test seam: overrides the export destination folder. Null uses the real Downloads folder.</summary>
+    internal string? ExportDirectoryOverride { get; set; }
+
     /// <summary>Initialises the view-model.</summary>
     /// <param name="historyService">Run history service.</param>
     /// <param name="logger">Logger.</param>
@@ -147,9 +150,11 @@ public sealed partial class HistoryViewModel : ViewModelBase
     {
         try
         {
-            var path = System.IO.Path.Combine(
+            var directory = ExportDirectoryOverride ?? System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads",
+                "Downloads");
+            var path = System.IO.Path.Combine(
+                directory,
                 $"datagen-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
 
             var lines = new List<string>

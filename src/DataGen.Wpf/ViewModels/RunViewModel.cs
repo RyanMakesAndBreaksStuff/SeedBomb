@@ -62,7 +62,7 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>Optional services so grouping tests can <c>new RunViewModel()</c> and retry can pass a mock.</summary>
     /// <param name="generation">Pipeline used for first run and retry. Null disables retry.</param>
-    /// <param name="contentDialogService">Cancel, pause, and log dialogs. Null skips them.</param>
+    /// <param name="contentDialogService">Cancel and log dialogs. Null skips them.</param>
     /// <param name="settings">Persists <see cref="KeepWindowOpen"/>.</param>
     /// <param name="navigator">Used by <see cref="OpenInHistory"/>.</param>
     public RunViewModel(

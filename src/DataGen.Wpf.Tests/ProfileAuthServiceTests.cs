@@ -1,3 +1,4 @@
+using Microsoft.Identity.Client;
 using Moq;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
@@ -59,5 +60,186 @@ public sealed class ProfileAuthServiceTests
 
         Assert.Null(svc.CurrentUserDisplayName);
         Assert.True(svc.HasNoCachedClients);
+    }
+
+    [Fact]
+    public async Task SignOutAsync_RemovesCachedAccount_ForOAuthProfileWithCachedSession()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ConnectionProfile>());
+
+        var svc = new ProfileAuthService(profiles.Object);
+
+        var account = Mock.Of<IAccount>(a => a.Username == "user@contoso.com");
+        var pca = new Mock<IPublicClientApplication>();
+        pca.Setup(p => p.GetAccountsAsync()).ReturnsAsync([account]);
+        pca.Setup(p => p.RemoveAsync(account)).Returns(Task.CompletedTask);
+        svc.CreatePcaOverride = _ => pca.Object;
+
+        var profile = MakeOAuthProfile();
+        await svc.GetOrCreatePca(profile, commitSession: true);
+
+        await svc.SignOutAsync(TestContext.Current.CancellationToken);
+
+        pca.Verify(p => p.RemoveAsync(account), Times.Once);
+        Assert.True(svc.HasNoCachedClients);
+        Assert.Null(svc.CurrentUserDisplayName);
+    }
+
+    private static ConnectionProfile MakeCertificateProfile() => new()
+    {
+        Name = "Cert Profile",
+        EnvironmentUrl = "https://org.crm.dynamics.com",
+        ClientId = Guid.NewGuid().ToString(),
+        TenantId = Guid.NewGuid().ToString(),
+        AuthType = AuthType.Certificate,
+        CertificateThumbprint = "AAAA1111BBBB2222",
+    };
+
+    private static ConnectionProfile MakeOAuthProfile() => new()
+    {
+        Name = "OAuth Profile",
+        EnvironmentUrl = "https://org.crm.dynamics.com",
+        ClientId = Guid.NewGuid().ToString(),
+        TenantId = Guid.NewGuid().ToString(),
+        AuthType = AuthType.OAuth,
+    };
+
+    [Fact]
+    public async Task GetOrCreateCca_RebuildsClient_WhenCertificateThumbprintChanges()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var buildCount = 0;
+        svc.CreateCcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IConfidentialClientApplication>();
+        };
+
+        var profile = MakeCertificateProfile();
+
+        var first = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        profile.CertificateThumbprint = "CCCC3333DDDD4444";
+        var second = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, buildCount);
+    }
+
+    [Fact]
+    public async Task GetOrCreateCca_ReusesClient_WhenCredentialUnchanged()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var buildCount = 0;
+        svc.CreateCcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IConfidentialClientApplication>();
+        };
+
+        var profile = MakeCertificateProfile();
+
+        var first = await svc.GetOrCreateCca(profile, commitSession: true);
+        var second = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, buildCount);
+    }
+
+    [Fact]
+    public async Task GetOrCreateCca_RebuildsClient_WhenClientSecretChanges()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var buildCount = 0;
+        svc.CreateCcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IConfidentialClientApplication>();
+        };
+
+        var profile = MakeCertificateProfile();
+        profile.AuthType = AuthType.ClientSecret;
+        profile.ClientSecret = "secret-1";
+
+        var first = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        profile.ClientSecret = "secret-2";
+        var second = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, buildCount);
+    }
+
+    [Fact]
+    public async Task GetOrCreateCca_RebuildsClient_WhenAuthTypeChanges()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var buildCount = 0;
+        svc.CreateCcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IConfidentialClientApplication>();
+        };
+
+        var profile = MakeCertificateProfile();
+        profile.ClientSecret = "secret-1";
+
+        var first = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        profile.AuthType = AuthType.ClientSecret;
+        var second = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, buildCount);
+    }
+
+    [Fact]
+    public async Task GetOrCreatePca_RebuildsClient_WhenClientIdChanges()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var buildCount = 0;
+        svc.CreatePcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IPublicClientApplication>();
+        };
+
+        var profile = MakeOAuthProfile();
+
+        var first = await svc.GetOrCreatePca(profile, commitSession: true);
+
+        profile.ClientId = Guid.NewGuid().ToString();
+        var second = await svc.GetOrCreatePca(profile, commitSession: true);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, buildCount);
+    }
+
+    [Fact]
+    public async Task GetOrCreatePca_ReusesClient_WhenCredentialUnchanged()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var buildCount = 0;
+        svc.CreatePcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IPublicClientApplication>();
+        };
+
+        var profile = MakeOAuthProfile();
+
+        var first = await svc.GetOrCreatePca(profile, commitSession: true);
+        var second = await svc.GetOrCreatePca(profile, commitSession: true);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, buildCount);
     }
 }
