@@ -15,6 +15,7 @@ namespace Seedbomb.Services.Profiles;
 /// <param name="AppliedTableSummaries">e.g. <c>account (500)</c> for the success InfoBar.</param>
 /// <param name="Adjusted">Clamp / warning lines (warning InfoBar).</param>
 /// <param name="NotImported">Rejected rules with reasons (error InfoBar).</param>
+/// <param name="ProfileName">Name of the imported profile, for the board's Profile card.</param>
 public sealed record ProfileImportReport(
     IReadOnlyDictionary<string, Dictionary<string, FieldRule>> BoardRules,
     IReadOnlyDictionary<string, int> TableCounts,
@@ -22,7 +23,8 @@ public sealed record ProfileImportReport(
     int AppliedRuleCount,
     IReadOnlyList<string> AppliedTableSummaries,
     IReadOnlyList<string> Adjusted,
-    IReadOnlyList<string> NotImported);
+    IReadOnlyList<string> NotImported,
+    string ProfileName = "");
 
 /// <summary>
 /// Layer-2 import: runs <see cref="RuleValidator"/> against live metadata and partitions
@@ -125,7 +127,8 @@ public static class ProfileImport
             appliedRules,
             appliedTables,
             adjusted,
-            notImported);
+            notImported,
+            profile.Name);
     }
 
     /// <summary>Spec §3.2 reason codes as SCREAMING_SNAKE for import reports (Mock F5).</summary>

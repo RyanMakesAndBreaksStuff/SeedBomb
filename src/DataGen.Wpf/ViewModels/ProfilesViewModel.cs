@@ -535,7 +535,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             : null;
 
         ImportAdjustedMessage = report.Adjusted.Count > 0
-            ? "Adjusted — " + report.Adjusted.Count + " rule(s) clamped.\n"
+            // Not all of these are clamps — the bucket carries every validator warning, including
+            // risky-value rules that are applied as authored and re-confirmed when the run starts.
+            ? "Warnings — " + report.Adjusted.Count + " rule(s). All were applied; see below.\n"
               + string.Join("\n", report.Adjusted.Select(a => "· " + a))
             : null;
 

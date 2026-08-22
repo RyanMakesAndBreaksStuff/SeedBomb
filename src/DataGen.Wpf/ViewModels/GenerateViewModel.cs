@@ -320,7 +320,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     };
 
     /// <summary>Volume-step link out to the Rules page.</summary>
-    public string RulesLinkLabel => $"{ReviewedRuleCount} rules · edit";
+    public string RulesLinkLabel => $"{DraftRuleCount} rules · edit";
 
     /// <summary>Handoff alias of <see cref="ReviewPreviewRows"/>.</summary>
     public IReadOnlyList<ReviewPreviewRow> ReviewedPreviewRows => ReviewPreviewRows;
@@ -350,7 +350,13 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     /// <summary>PROFILE card second line.</summary>
     public string ProfileSummaryLine =>
-        $"{ReviewedRuleCount} rules · seed {Seed} · {Locale}";
+        $"{DraftRuleCount} rules · seed {Seed} · {Locale}";
+
+    /// <summary>
+    /// Rules currently on the board. <see cref="ReviewedRuleCount"/> only becomes non-zero after
+    /// preflight (step 3), so it reads "0 rules" for a profile just loaded onto step 1.
+    /// </summary>
+    public int DraftRuleCount => _fieldRules?.GetRules().Sum(t => t.Value.Count) ?? 0;
 
     /// <summary>Handoff alias used by the mock Change profile button.</summary>
     public IRelayCommand ChangeProfileCommand => OpenProfilesCommand;
@@ -562,6 +568,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
         ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
+        OnPropertyChanged(nameof(DraftRuleCount));
+        OnPropertyChanged(nameof(RulesLinkLabel));
+        OnPropertyChanged(nameof(ProfileSummaryLine));
         ScheduleDraftAutosave();
     }
 
@@ -1131,6 +1140,11 @@ public sealed partial class GenerateViewModel : ViewModelBase
     public void ApplyImportReport(ProfileImportReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
+
+        // The Profiles page applies a report directly (no ApplySavedRulesProfile hop), so the
+        // Profile card's name has to come off the report or it stays "No profile loaded".
+        if (!string.IsNullOrEmpty(report.ProfileName))
+            ActiveProfileName = report.ProfileName;
 
         if (report.Seed is int seed)
             Seed = seed;

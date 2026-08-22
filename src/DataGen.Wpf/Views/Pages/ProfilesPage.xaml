@@ -393,11 +393,11 @@
                             Margin="0,0,0,12" />
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <ui:Button Content="← Back to list"
+                    <ui:Button Content="Cancel"
                                Appearance="Secondary"
                                Margin="0,0,8,0"
                                Command="{Binding DiscardImportCommand}" />
-                    <ui:Button Content="Open in board"
+                    <ui:Button Content="Use in Generate"
                                Appearance="Primary"
                                Command="{Binding OpenInBoardCommand}" />
                 </StackPanel>
