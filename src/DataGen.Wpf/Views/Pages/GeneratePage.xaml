@@ -334,7 +334,7 @@
                         </Grid>
                     </Border>
 
-                    <ItemsControl Grid.Row="2" ItemsSource="{Binding ReviewedPreviewRows}"
+                    <ItemsControl Grid.Row="2" ItemsSource="{Binding ReviewPreviewRows}"
                                   Margin="20,16,20,0">
                         <ItemsControl.Template>
                             <ControlTemplate TargetType="ItemsControl">

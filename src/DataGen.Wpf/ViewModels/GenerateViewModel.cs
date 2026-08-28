@@ -322,9 +322,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <summary>Volume-step link out to the Rules page.</summary>
     public string RulesLinkLabel => $"{DraftRuleCount} rules · edit";
 
-    /// <summary>Handoff alias of <see cref="ReviewPreviewRows"/>.</summary>
-    public IReadOnlyList<ReviewPreviewRow> ReviewedPreviewRows => ReviewPreviewRows;
-
     /// <summary>Joined preflight errors for the review banner.</summary>
     public string ReviewErrorSummary =>
         string.Join(
