@@ -227,12 +227,21 @@
                                   IsChecked="{Binding KeepWindowOpen}"
                                   VerticalAlignment="Center">
                             <TextBlock Style="{DynamicResource DG.Cell}"
-                                       Text="Keep window open until finished"/>
+                                       Text="Keep window open after finish"/>
                         </CheckBox>
 
+                        <!-- Cancel while generating; once finished the sheet holds open and this becomes Close. -->
                         <Button Grid.Column="1" Style="{DynamicResource DG.DangerButton}"
                                 Command="{Binding CancelCommand}"
-                                Content="Cancel run"/>
+                                Content="Cancel run"
+                                Visibility="{Binding IsRunning,
+                                             Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <Button Grid.Column="1" Style="{DynamicResource DG.PrimaryButton}"
+                                Command="{Binding CloseSheetCommand}"
+                                Content="Close"
+                                Visibility="{Binding IsRunning,
+                                             Converter={StaticResource InverseBoolToVisible}}"/>
                     </Grid>
                 </Border>
             </Grid>

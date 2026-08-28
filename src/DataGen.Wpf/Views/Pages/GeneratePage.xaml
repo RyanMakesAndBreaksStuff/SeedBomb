@@ -465,7 +465,7 @@
         <!-- ── Run sheet overlay ─────────────────────────────────────── -->
         <controls:RunSheet Grid.Row="0" Grid.RowSpan="4"
                            DataContext="{Binding Run}"
-                           Visibility="{Binding IsRunning,
+                           Visibility="{Binding IsSheetVisible,
                                         Converter={StaticResource BoolToVisibilityConverter}}"/>
     </Grid>
 </Page>

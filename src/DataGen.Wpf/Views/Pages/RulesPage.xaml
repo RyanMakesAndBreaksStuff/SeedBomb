@@ -577,23 +577,43 @@
                                         <TextBlock x:Name="BogusMinDateLabel"
                                                    Style="{DynamicResource DG.GroupLabel}"
                                                    Text="Minimum date"/>
-                                        <ui:CalendarDatePicker x:Name="BogusMinDatePicker"
-                                                               Date="{Binding BogusMinDate, Mode=TwoWay, ValidatesOnNotifyDataErrors=True}"
-                                                               AutomationProperties.LabeledBy="{Binding ElementName=BogusMinDateLabel}"
-                                                               AutomationProperties.Name="Minimum date"
-                                                               behaviors:ValidationFocusBehavior.InputTarget="MinimumDate"
-                                                               TabIndex="2"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="BogusMinDateTextBox" Grid.Column="0"
+                                                     Style="{DynamicResource DG.TextBox}"
+                                                     Text="{Binding BogusMinDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
+                                                     AutomationProperties.LabeledBy="{Binding ElementName=BogusMinDateLabel}"
+                                                     AutomationProperties.Name="Minimum date"
+                                                     behaviors:ValidationFocusBehavior.InputTarget="MinimumDate"
+                                                     TabIndex="2"/>
+                                            <ui:CalendarDatePicker x:Name="BogusMinDatePicker" Grid.Column="1"
+                                                                   Date="{Binding BogusMinDate, Mode=TwoWay}"
+                                                                   Margin="6,0,0,0"/>
+                                        </Grid>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock x:Name="BogusMaxDateLabel"
                                                    Style="{DynamicResource DG.GroupLabel}"
                                                    Text="Maximum date"/>
-                                        <ui:CalendarDatePicker x:Name="BogusMaxDatePicker"
-                                                               Date="{Binding BogusMaxDate, Mode=TwoWay, ValidatesOnNotifyDataErrors=True}"
-                                                               AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxDateLabel}"
-                                                               AutomationProperties.Name="Maximum date"
-                                                               behaviors:ValidationFocusBehavior.InputTarget="MaximumDate"
-                                                               TabIndex="3"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="BogusMaxDateTextBox" Grid.Column="0"
+                                                     Style="{DynamicResource DG.TextBox}"
+                                                     Text="{Binding BogusMaxDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
+                                                     AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxDateLabel}"
+                                                     AutomationProperties.Name="Maximum date"
+                                                     behaviors:ValidationFocusBehavior.InputTarget="MaximumDate"
+                                                     TabIndex="3"/>
+                                            <ui:CalendarDatePicker x:Name="BogusMaxDatePicker" Grid.Column="1"
+                                                                   Date="{Binding BogusMaxDate, Mode=TwoWay}"
+                                                                   Margin="6,0,0,0"/>
+                                        </Grid>
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>

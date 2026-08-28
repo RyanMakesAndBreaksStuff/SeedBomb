@@ -42,6 +42,9 @@ public sealed record PickerColumn(string LogicalName, string DisplayName, string
 
     /// <summary>CollectionView group: Mapped, Unmapped · required, or Unmapped.</summary>
     public string GroupName { get; init; } = "Unmapped";
+
+    /// <summary>Group display rank — Mapped, Required, Unmapped, Disabled, in that order regardless of metadata order.</summary>
+    public int GroupOrder { get; init; }
 }
 
 /// <summary>One selectable operation chip in the rule editor (Mock F2 op cards).</summary>
@@ -102,7 +105,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private static readonly string[] TextOps = ["constant", "oneOf", "pattern", "null"];
     private static readonly string[] NumericOps = ["constant", "oneOf", "range", "sequence", "null"]; // Whole#/BigInt/Decimal/Money
     private static readonly string[] FloatOps = ["constant", "oneOf", "range", "null"]; // Float has no sequence row
-    private static readonly string[] DateOps = ["constant", "oneOf", "range", "null"];
+    private static readonly string[] DateOps = ["constant", "oneOf", "null"];
     private static readonly string[] ChoiceOps = ["constant", "oneOf", "null"]; // Choice/Status(reason)/Two-Options
     private static readonly string[] NoOps = [];
 
@@ -663,6 +666,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         {
             using (view.DeferRefresh())
             {
+                view.SortDescriptions.Clear();
+                view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
                 view.GroupDescriptions.Clear();
                 view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
             }
@@ -687,6 +692,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         {
             using (grouped.DeferRefresh())
             {
+                grouped.SortDescriptions.Clear();
+                grouped.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
                 grouped.GroupDescriptions.Clear();
                 grouped.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
             }
@@ -708,6 +715,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         {
             using (view.DeferRefresh())
             {
+                view.SortDescriptions.Clear();
+                view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
                 view.GroupDescriptions.Clear();
                 view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
             }
@@ -1094,24 +1103,25 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         var required = IsRequiredLevel(attr);
         var mapped = selectable && IsMappedName(name);
-        var (stateKey, groupName) = ResolveState(selectable, mapped, required);
+        var (stateKey, groupName, groupOrder) = ResolveState(selectable, mapped, required);
 
         return new PickerColumn(name, display, TypeLabelFor(attr), selectable, disabledReason)
         {
             StateKey = stateKey,
             GroupName = groupName,
+            GroupOrder = groupOrder,
         };
     }
 
-    private static (string StateKey, string GroupName) ResolveState(bool selectable, bool mapped, bool required)
+    private static (string StateKey, string GroupName, int GroupOrder) ResolveState(bool selectable, bool mapped, bool required)
     {
         if (!selectable)
-            return ("Disabled", "Disabled");
+            return ("Disabled", "Disabled", 3);
         if (mapped)
-            return ("Mapped", "Mapped");
+            return ("Mapped", "Mapped", 0);
         if (required)
-            return ("Required", "Unmapped · required");
-        return ("Unmapped", "Unmapped");
+            return ("Required", "Unmapped · required", 1);
+        return ("Unmapped", "Unmapped", 2);
     }
 
     private void RebuildFilterChips()

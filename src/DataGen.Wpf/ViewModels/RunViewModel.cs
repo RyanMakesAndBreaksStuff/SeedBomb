@@ -80,8 +80,12 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
 
-    /// <summary>When true the generate overlay sheet is visible.</summary>
+    /// <summary>True while generation is in flight. Drives the ring, headline, and Cancel/Close swap.</summary>
     [ObservableProperty] private bool _isRunning;
+
+    /// <summary>Drives the overlay's visibility. Stays true after finish when <see cref="KeepWindowOpen"/> is set,
+    /// so the completed sheet holds until the user clicks Close.</summary>
+    [ObservableProperty] private bool _isSheetVisible;
 
     /// <summary>True before the first batch completes.</summary>
     [ObservableProperty] private bool _isIndeterminate;
@@ -197,6 +201,8 @@ public sealed partial class RunViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+            // Hold the completed sheet up until manual Close when the user asked to keep it open.
+            IsSheetVisible = KeepWindowOpen;
             _runCts?.Dispose();
             _runCts = null;
         }
@@ -214,6 +220,7 @@ public sealed partial class RunViewModel : ObservableObject
         _tableWritten.Clear();
 
         IsRunning = true;
+        IsSheetVisible = true;
         IsIndeterminate = true;
         StatusHeadline = "Generating…";
         OverallPercent = 0;
@@ -288,6 +295,7 @@ public sealed partial class RunViewModel : ObservableObject
 
         RunMetaLine = $"Finished {DateTime.Now:d MMM yyyy, HH:mm} · {FormatDuration(result.Elapsed)} · seed {seed}";
         ApplyOutcome(written, rejected, result.Elapsed, tableCount: CountTables(result, _plannedTables));
+        StatusHeadline = OutcomeHeadline;
 
         ReplaceGroups(result.Errors
             .GroupBy(e => (e.EntityLogicalName, e.ErrorMessage))
@@ -457,6 +465,10 @@ public sealed partial class RunViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenInHistory() => _navigator?.Navigate(typeof(HistoryPage));
+
+    /// <summary>Manually dismisses the completed overlay (shown once the run finishes).</summary>
+    [RelayCommand]
+    private void CloseSheet() => IsSheetVisible = false;
 
     [RelayCommand]
     private async Task ShowFullLogAsync()
