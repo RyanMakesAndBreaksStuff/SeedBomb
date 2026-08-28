@@ -250,6 +250,13 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Live entity metadata for import/load validation (same path as Task 9).</summary>
     public Func<IReadOnlyDictionary<string, EntityMetadata>>? GetMetadata { get; set; }
 
+    /// <summary>
+    /// Fetches live metadata for the profile's tables. Invoked only when the user clicks Load —
+    /// never on selection — so browsing a profile whose tables are absent from the connected org
+    /// no longer throws. Provider failures surface through <see cref="LoadAsync"/>'s error handler.
+    /// </summary>
+    public Func<IReadOnlyList<string>, CancellationToken, Task>? EnsureMetadata { get; set; }
+
     /// <summary>Current run id for pattern worst-case length during import validation.</summary>
     public Func<string>? GetRunId { get; set; }
 
@@ -343,6 +350,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         try
         {
             var profile = await _profiles.LoadAsync(SelectedItem.Name);
+            if (EnsureMetadata is not null)
+                await EnsureMetadata([.. profile.Tables.Select(t => t.Table)], CancellationToken.None);
             if (GetMetadata is null)
             {
                 // A host that cannot supply metadata cannot validate the profile against the
