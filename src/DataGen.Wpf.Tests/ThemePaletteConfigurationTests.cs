@@ -134,6 +134,16 @@ public sealed class ThemePaletteConfigurationTests
         Assert.Contains("OverridesDefaultStyle", shared, StringComparison.Ordinal);
         Assert.Contains("IsOpen=\"{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}\"", shared, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"DG.ToggleButton\"", shared, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{DynamicResource DG.RunSweep}\"", shared, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{DynamicResource DG.SelectionIndicator}\"", shared, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunSheetRingUsesTheAccentToEnergySweep()
+    {
+        var sheet = ReadRepoFile("src/DataGen.Wpf/Views/Controls/RunSheet.xaml");
+        Assert.Contains("Foreground=\"{DynamicResource DG.RunSweep}\"", sheet, StringComparison.Ordinal);
+        Assert.DoesNotContain("Foreground=\"{DynamicResource DG.Accent}\"", sheet, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")

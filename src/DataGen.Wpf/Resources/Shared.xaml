@@ -725,7 +725,7 @@
     <Style x:Key="DG.ProgressBar" TargetType="ProgressBar">
         <Setter Property="Height" Value="4"/>
         <Setter Property="Background" Value="{DynamicResource DG.TrackFill}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.RunSweep}"/>
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
@@ -733,7 +733,7 @@
     <Style x:Key="DG.SelectionStripe" TargetType="Border">
         <Setter Property="Width" Value="{DynamicResource DG.Size.SelectionStripe}"/>
         <Setter Property="CornerRadius" Value="2"/>
-        <Setter Property="Background" Value="{DynamicResource DG.Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.SelectionIndicator}"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
         <Setter Property="Margin" Value="0,9"/>
     </Style>
