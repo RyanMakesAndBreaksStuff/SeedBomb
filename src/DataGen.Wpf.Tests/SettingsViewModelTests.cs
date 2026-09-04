@@ -18,9 +18,9 @@ public sealed class SettingsViewModelTests
             Mock.Of<ISettingsService>(),
             Mock.Of<ILogger<SettingsViewModel>>());
 
-        Assert.True(vm.SelectPaletteCommand.CanExecute("graphite"));
-        vm.SelectPaletteCommand.Execute("graphite");
-        Assert.Equal("graphite", vm.PaletteId);
+        Assert.True(vm.SelectPaletteCommand.CanExecute("notes"));
+        vm.SelectPaletteCommand.Execute("notes");
+        Assert.Equal("notes", vm.PaletteId);
     }
 
     [Fact]
@@ -28,12 +28,12 @@ public sealed class SettingsViewModelTests
     {
         var settings = new Mock<ISettingsService>();
         settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(AppSettings.Default with { PaletteId = "slate-steel" });
+            .ReturnsAsync(AppSettings.Default with { PaletteId = "violet-ink" });
 
         var vm = new SettingsViewModel(settings.Object, Mock.Of<ILogger<SettingsViewModel>>());
         await vm.LoadCommand.ExecuteAsync(null);
 
-        Assert.Equal("graphite", vm.PaletteId);
+        Assert.Equal("kiln", vm.PaletteId);
     }
 
     [Fact]
