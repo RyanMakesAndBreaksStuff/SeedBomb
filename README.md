@@ -5,7 +5,7 @@ DataGen is a Microsoft Dataverse synthetic-data generator. It reads entity metad
 The same core generation engine is exposed through two front ends:
 
 - **DataGen.Web** — Blazor Server web app with MudBlazor UI and Azure AD / Microsoft.Identity.Web authentication.
-- **DataGen.Wpf** — Windows WPF desktop app with MSAL multi-profile authentication and DPAPI-encrypted connection profiles.
+- **SeedBomb.Wpf** — Windows WPF desktop app with MSAL multi-profile authentication and DPAPI-encrypted connection profiles.
 
 ## Technology stack
 
@@ -33,7 +33,7 @@ The same core generation engine is exposed through two front ends:
 | `DataGen.Core` | Class library | Dataverse metadata provider, dependency graph (`GraphBuilder`, `CycleDetector`, `TopologicalSort`), field generators, edge-case validation, contracts, exceptions. |
 | `DataGen.Bulk` | Class library | `BulkCreator`, `GenerationPipeline`, throttle/retry policy, deferred lookup backfill, N:N association handling. References Core. |
 | `DataGen.Web` | ASP.NET Core Blazor Server app | DI wiring, scoped Dataverse client factory, lazy metadata/bulk-creator adapters, MudBlazor UI. References Core and Bulk. |
-| `DataGen.Wpf` | WPF executable (`net10.0-windows10.0.17763.0`) | MVVM view models, connection manager, MSAL auth service, DPAPI profile storage, desktop generation service. Root namespace `Seedbomb`. References Core and Bulk. |
+| `SeedBomb.Wpf` | WPF executable (`net10.0-windows10.0.17763.0`) | MVVM view models, connection manager, MSAL auth service, DPAPI profile storage, desktop generation service. Root namespace `Seedbomb`. References Core and Bulk. |
 
 ### Test projects
 
@@ -56,7 +56,7 @@ dotnet build DataGen.sln -p:EnableWindowsTargeting=true
 
 # Individual projects
 dotnet build src/DataGen.Web/DataGen.Web.csproj
-dotnet build src/DataGen.Wpf/DataGen.Wpf.csproj -p:EnableWindowsTargeting=true
+dotnet build src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -p:EnableWindowsTargeting=true
 ```
 
 ## Run
@@ -71,7 +71,7 @@ dotnet run --project src/DataGen.Web/DataGen.Web.csproj --launch-profile https
 WPF app (Windows only):
 
 ```bash
-dotnet run --project src/DataGen.Wpf/DataGen.Wpf.csproj
+dotnet run --project src/SeedBomb.Wpf/SeedBomb.Wpf.csproj
 ```
 
 ## Test
@@ -108,7 +108,7 @@ Verified test counts:
 ## Deploy
 
 - **Web**: publish with `dotnet publish src/DataGen.Web/DataGen.Web.csproj -c Release`. A container launch profile exists in `Properties/launchSettings.json`.
-- **WPF**: publish with `dotnet publish src/DataGen.Wpf/DataGen.Wpf.csproj -c Release -p:EnableWindowsTargeting=true -r win-x64 --self-contained false`.
+- **WPF**: publish a self-contained single-file exe with `dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -c Release -p:PublishProfile=GitHubRelease -o ./publish`. GitHub Actions workflow **SeedBomb Publish** uploads `SeedBomb.exe` to GitHub Releases (push a `v*.*.*` tag, or run the workflow manually).
 - **Secrets** must always be supplied through secure configuration providers; never commit credentials to the repo.
 
 ## Project conventions

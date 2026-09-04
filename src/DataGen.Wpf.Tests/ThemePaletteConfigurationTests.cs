@@ -81,7 +81,7 @@ public sealed class ThemePaletteConfigurationTests
     [Fact]
     public void RuntimeThemeManagerDeclaresNewPalettesAndDropsRetiredIds()
     {
-        var manager = ReadRepoFile("src/DataGen.Wpf/Services/Theme/DesignThemeManager.cs");
+        var manager = ReadRepoFile("src/SeedBomb.Wpf/Services/Theme/DesignThemeManager.cs");
 
         Assert.Contains("kiln", manager, StringComparison.Ordinal);
         Assert.Contains("0xBADD52", manager, StringComparison.OrdinalIgnoreCase);   // Kiln dark accent
@@ -102,7 +102,7 @@ public sealed class ThemePaletteConfigurationTests
     [Fact]
     public void ApplyPublishesRequiredKeys()
     {
-        var manager = ReadRepoFile("src/DataGen.Wpf/Services/Theme/DesignThemeManager.cs");
+        var manager = ReadRepoFile("src/SeedBomb.Wpf/Services/Theme/DesignThemeManager.cs");
         foreach (var key in RequiredApplyKeys)
             Assert.Contains($"\"{key}\"", manager, StringComparison.Ordinal);
         Assert.Contains("!app.Dispatcher.CheckAccess()", manager, StringComparison.Ordinal);
@@ -118,7 +118,7 @@ public sealed class ThemePaletteConfigurationTests
     [Fact]
     public void SharedResourcesDefineKilnKeysAndConverterAliases()
     {
-        var shared = ReadRepoFile("src/DataGen.Wpf/Resources/Shared.xaml");
+        var shared = ReadRepoFile("src/SeedBomb.Wpf/Resources/Shared.xaml");
         Assert.Contains("#BADD52", shared, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("#C9E76F", shared, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("#A79CF1", shared, StringComparison.OrdinalIgnoreCase);
@@ -141,7 +141,7 @@ public sealed class ThemePaletteConfigurationTests
     [Fact]
     public void RunSheetRingUsesTheAccentToEnergySweep()
     {
-        var sheet = ReadRepoFile("src/DataGen.Wpf/Views/Controls/RunSheet.xaml");
+        var sheet = ReadRepoFile("src/SeedBomb.Wpf/Views/Controls/RunSheet.xaml");
         Assert.Contains("Foreground=\"{DynamicResource DG.RunSweep}\"", sheet, StringComparison.Ordinal);
         Assert.DoesNotContain("Foreground=\"{DynamicResource DG.Accent}\"", sheet, StringComparison.Ordinal);
     }
