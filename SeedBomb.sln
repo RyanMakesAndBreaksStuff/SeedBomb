@@ -21,7 +21,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Core", "src\DataGen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Integration.Tests", "tests\DataGen.Integration.Tests\DataGen.Integration.Tests.csproj", "{1A4CD2DA-1F44-F663-A0D4-829AE2D14C06}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Wpf", "src\DataGen.Wpf\DataGen.Wpf.csproj", "{FBF86FAE-C1EA-4F28-A793-5237927917F8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Wpf", "src\SeedBomb.Wpf\SeedBomb.Wpf.csproj", "{FBF86FAE-C1EA-4F28-A793-5237927917F8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Wpf.Tests", "src\DataGen.Wpf.Tests\DataGen.Wpf.Tests.csproj", "{33B437FC-27CD-439B-87E2-6D9126218140}"
 EndProject

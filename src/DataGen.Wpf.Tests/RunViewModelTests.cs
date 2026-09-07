@@ -149,4 +149,26 @@ public sealed class RunViewModelTests
             It.IsAny<IProgress<ProgressUpdate>>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public void StartRun_ClearsActivityFromThePreviousRun()
+    {
+        var vm = new RunViewModel();
+
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 10, tables: ["account"]);
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [Guid.NewGuid()],
+            },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [],
+        }, seed: 1, environmentHost: "contoso-dev");
+        Assert.NotEmpty(vm.RecentActivity);
+
+        vm.StartRun("contoso-dev", seed: 2, plannedTotal: 10, tables: ["account"]);
+
+        Assert.Empty(vm.RecentActivity);
+    }
 }

@@ -51,7 +51,7 @@
                                          IsIndeterminate="{Binding IsIndeterminate}"
                                          Width="{DynamicResource DG.Size.ProgressRing}"
                                          Height="{DynamicResource DG.Size.ProgressRing}"
-                                         Foreground="{DynamicResource DG.Accent}"/>
+                                         Foreground="{DynamicResource DG.RunSweep}"/>
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="{Binding OverallPercentLabel}"

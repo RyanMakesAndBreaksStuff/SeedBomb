@@ -94,5 +94,9 @@ tasks/lessons.md
 /artifacts/verify-build
 /artifacts/verify-obj
 /handoff
-/src/DataGen.Wpf/DataGen.Wpf_yru5cmu4_wpftmp.csproj
+/src/SeedBomb.Wpf/*_wpftmp.csproj
 /.kiro/steering
+/coverage/src
+/artifacts
+/.gitignore
+/artifacts/performance/bogus-rules.json

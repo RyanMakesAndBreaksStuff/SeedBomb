@@ -1,0 +1,114 @@
+name: SeedBomb Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.0.0 or v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: seedbomb-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  PROJECT: src/SeedBomb.Wpf/SeedBomb.Wpf.csproj
+  TEST_PROJECT: src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj
+  PUBLISH_DIR: ${{ github.workspace }}/publish
+
+jobs:
+  publish:
+    name: Publish self-contained exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $raw = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { $env:INPUT_VERSION }
+          $raw = "$raw".Trim()
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            throw "Version is required."
+          }
+          $version = $raw
+          if ($version.StartsWith("v") -or $version.StartsWith("V")) {
+            $version = $version.Substring(1)
+          }
+          if ($version -notmatch "^\d+\.\d+\.\d+") {
+            throw "Version must look like 1.2.3 (got '$raw')."
+          }
+          $assemblyVersion = ($version -split "-", 2)[0]
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "ASSEMBLY_VERSION=$assemblyVersion" >> $env:GITHUB_ENV
+          "RELEASE_TAG=v$version" >> $env:GITHUB_ENV
+          "PRERELEASE=$($version.Contains('-'))" >> $env:GITHUB_ENV
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore ${{ env.TEST_PROJECT }}
+
+      - name: Test
+        run: dotnet run --project ${{ env.TEST_PROJECT }} -c Release --no-restore
+
+      - name: Publish self-contained single-file exe
+        run: |
+          dotnet publish ${{ env.PROJECT }} `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishProfile=GitHubRelease `
+            -p:Version=$env:VERSION `
+            -p:AssemblyVersion=$env:ASSEMBLY_VERSION `
+            -p:FileVersion=$env:ASSEMBLY_VERSION `
+            -p:InformationalVersion=$env:VERSION `
+            -o $env:PUBLISH_DIR
+
+      - name: Verify exe
+        run: |
+          $exe = Join-Path $env:PUBLISH_DIR "SeedBomb.exe"
+          if (-not (Test-Path $exe)) {
+            Get-ChildItem $env:PUBLISH_DIR | Format-Table Name, Length
+            throw "SeedBomb.exe was not produced."
+          }
+          $file = Get-Item $exe
+          if ($file.Length -lt 1MB) {
+            throw "SeedBomb.exe is unexpectedly small ($($file.Length) bytes); self-contained publish likely failed."
+          }
+          Write-Host "Published $($file.Name) ($([math]::Round($file.Length / 1MB, 1)) MB)"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = Join-Path $env:PUBLISH_DIR "SeedBomb.exe"
+          $ghArgs = @(
+            "release", "create", $env:RELEASE_TAG, $exe,
+            "--title", "SeedBomb $($env:VERSION)",
+            "--generate-notes",
+            "--target", $env:GITHUB_SHA
+          )
+          if ($env:PRERELEASE -eq "true") {
+            $ghArgs += "--prerelease"
+          }
+          & gh @ghArgs

@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Seedbomb</RootNamespace>
+    <AssemblyName>SeedBomb</AssemblyName>
+    <Product>SeedBomb</Product>
     <!-- Embeds seedbomb.ico as the Win32 EXE resource: taskbar, Alt+Tab, and Explorer all read this. -->
     <ApplicationIcon>seedbomb.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -13,7 +15,7 @@
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
     <Platforms>AnyCPU;x64</Platforms>
     <StartupObject>Seedbomb.App</StartupObject>
-    <AssemblyTitle>Seedbomb</AssemblyTitle>
+    <AssemblyTitle>SeedBomb</AssemblyTitle>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

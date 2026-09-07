@@ -23,59 +23,74 @@
          1. Current tokens — the ONLY keys views bind to.
             Seeded dark; DesignThemeManager.Apply reassigns from C# palettes.
          ================================================================== -->
-    <SolidColorBrush x:Key="DG.Bg"            Color="#202020"/>
-    <SolidColorBrush x:Key="DG.TitleBar"      Color="#1B1B1B"/>
-    <SolidColorBrush x:Key="DG.Surface1"      Color="#272727"/>
-    <SolidColorBrush x:Key="DG.Surface2"      Color="#232323"/>
-    <SolidColorBrush x:Key="DG.Card"          Color="#2B2B2B"/>
-    <SolidColorBrush x:Key="DG.CardSunken"    Color="#232323"/>
-    <SolidColorBrush x:Key="DG.CodeSurface"   Color="#1E1E1E"/>
-    <SolidColorBrush x:Key="DG.Border"        Color="#383838"/>
-    <SolidColorBrush x:Key="DG.BorderStrong"  Color="#454545"/>
-    <SolidColorBrush x:Key="DG.Divider"       Color="#313131"/>
-    <SolidColorBrush x:Key="DG.ControlFill"   Color="#323232"/>
-    <SolidColorBrush x:Key="DG.ControlBorder" Color="#3D3D3D"/>
-    <SolidColorBrush x:Key="DG.ControlHover"  Color="#3A3A3A"/>
-    <SolidColorBrush x:Key="DG.ItemSelected"  Color="#2F2F2F"/>
-    <SolidColorBrush x:Key="DG.RowSelected"   Color="#3A3A3A"/>
-    <SolidColorBrush x:Key="DG.TrackFill"     Color="#3A3A3A"/>
-    <SolidColorBrush x:Key="DG.Scrim"         Color="#9E141414"/>
+    <SolidColorBrush x:Key="DG.Bg"            Color="#121110"/>
+    <SolidColorBrush x:Key="DG.TitleBar"      Color="#121110"/>
+    <SolidColorBrush x:Key="DG.Surface1"      Color="#191816"/>
+    <SolidColorBrush x:Key="DG.Surface2"      Color="#2A2825"/>
+    <SolidColorBrush x:Key="DG.Card"          Color="#201F1C"/>
+    <SolidColorBrush x:Key="DG.CardSunken"    Color="#0E0D0C"/>
+    <SolidColorBrush x:Key="DG.CodeSurface"   Color="#0E0D0C"/>
+    <SolidColorBrush x:Key="DG.Border"        Color="#2E2C28"/>
+    <SolidColorBrush x:Key="DG.BorderStrong"  Color="#57534A"/>
+    <SolidColorBrush x:Key="DG.Divider"       Color="#262421"/>
+    <SolidColorBrush x:Key="DG.Focus"         Color="#BADD52"/>
+    <SolidColorBrush x:Key="DG.ControlFill"   Color="#2A2825"/>
+    <SolidColorBrush x:Key="DG.ControlBorder" Color="#3D3A34"/>
+    <SolidColorBrush x:Key="DG.ControlHover"  Color="#35322D"/>
+    <SolidColorBrush x:Key="DG.ItemSelected"  Color="#2A2825"/>
+    <SolidColorBrush x:Key="DG.RowSelected"   Color="#31302D"/>
+    <SolidColorBrush x:Key="DG.TrackFill"     Color="#33302B"/>
+    <SolidColorBrush x:Key="DG.Scrim"         Color="#99000000"/>
 
-    <SolidColorBrush x:Key="DG.Text1"         Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="DG.TextBody"      Color="#EAEAEA"/>
-    <SolidColorBrush x:Key="DG.TextNav"       Color="#E0E0E0"/>
-    <SolidColorBrush x:Key="DG.Text2"         Color="#A0A0A0"/>
-    <SolidColorBrush x:Key="DG.Text3"         Color="#8A8A8A"/>
-    <SolidColorBrush x:Key="DG.TextDisabled"  Color="#6A6A6A"/>
+    <SolidColorBrush x:Key="DG.Text1"         Color="#F2F0EA"/>
+    <SolidColorBrush x:Key="DG.TextBody"      Color="#E4E1DA"/>
+    <SolidColorBrush x:Key="DG.TextNav"       Color="#DFDCD4"/>
+    <SolidColorBrush x:Key="DG.Text2"         Color="#B4AFA3"/>
+    <SolidColorBrush x:Key="DG.Text3"         Color="#8B857A"/>
+    <SolidColorBrush x:Key="DG.TextDisabled"  Color="#625D54"/>
 
-    <SolidColorBrush x:Key="DG.Accent"            Color="#A79CF1"/>
-    <SolidColorBrush x:Key="DG.AccentHover"       Color="#B8AFF5"/>
-    <SolidColorBrush x:Key="DG.AccentPressed"     Color="#8F82E4"/>
-    <SolidColorBrush x:Key="DG.OnAccent"          Color="#1B1338"/>
-    <SolidColorBrush x:Key="DG.AccentText"        Color="#D9D3FB"/>
-    <SolidColorBrush x:Key="DG.AccentSoft"        Color="#2C2740"/>
-    <SolidColorBrush x:Key="DG.AccentSoftBorder"  Color="#4A4270"/>
-    <SolidColorBrush x:Key="DG.AccentChip"        Color="#3A3358"/>
-    <SolidColorBrush x:Key="DG.AccentChipBorder"  Color="#544A7D"/>
+    <SolidColorBrush x:Key="DG.Accent"              Color="#BADD52"/>
+    <SolidColorBrush x:Key="DG.AccentHover"         Color="#C9E76F"/>
+    <SolidColorBrush x:Key="DG.AccentPressed"       Color="#A6C93F"/>
+    <SolidColorBrush x:Key="DG.OnAccent"            Color="#14130F"/>
+    <SolidColorBrush x:Key="DG.AccentText"          Color="#C2E060"/>
+    <SolidColorBrush x:Key="DG.AccentSoft"          Color="#24290F"/>
+    <SolidColorBrush x:Key="DG.AccentSoftBorder"    Color="#3E4A18"/>
+    <SolidColorBrush x:Key="DG.AccentChip"          Color="#48541F"/>
+    <SolidColorBrush x:Key="DG.AccentChipBorder"    Color="#637629"/>
+    <SolidColorBrush x:Key="DG.AccentLight"         Color="#C9E76F"/>
+    <SolidColorBrush x:Key="DG.SelectionIndicator"  Color="#BADD52"/>
 
-    <SolidColorBrush x:Key="DG.Success"       Color="#5BB98B"/>
-    <SolidColorBrush x:Key="DG.Warning"       Color="#E0A030"/>
-    <SolidColorBrush x:Key="DG.WarningSoft"   Color="#332A1E"/>
-    <SolidColorBrush x:Key="DG.WarningBorder" Color="#6A552E"/>
-    <SolidColorBrush x:Key="DG.WarningText"   Color="#D0C8B8"/>
-    <SolidColorBrush x:Key="DG.Error"         Color="#FF9C9C"/>
-    <SolidColorBrush x:Key="DG.ErrorSoft"     Color="#3A2A2A"/>
-    <SolidColorBrush x:Key="DG.ErrorBorder"   Color="#6A3A3A"/>
+    <SolidColorBrush x:Key="DG.Success"       Color="#5BD08D"/>
+    <SolidColorBrush x:Key="DG.SuccessSoft"   Color="#14251C"/>
+    <SolidColorBrush x:Key="DG.SuccessBorder" Color="#595BD08D"/>
+    <SolidColorBrush x:Key="DG.Warning"       Color="#E8B04B"/>
+    <SolidColorBrush x:Key="DG.WarningSoft"   Color="#2C2313"/>
+    <SolidColorBrush x:Key="DG.WarningBorder" Color="#59E8B04B"/>
+    <SolidColorBrush x:Key="DG.WarningText"   Color="#F4DBAE"/>
+    <SolidColorBrush x:Key="DG.Error"         Color="#FF8E80"/>
+    <SolidColorBrush x:Key="DG.ErrorSoft"     Color="#2E1815"/>
+    <SolidColorBrush x:Key="DG.ErrorBorder"   Color="#63302A"/>
+    <SolidColorBrush x:Key="DG.Info"          Color="#BADD52"/>
+    <SolidColorBrush x:Key="DG.InfoSoft"      Color="#24290F"/>
+    <SolidColorBrush x:Key="DG.InfoBorder"    Color="#3E4A18"/>
 
-    <SolidColorBrush x:Key="DG.SuccessSoft"   Color="#1F2A24"/>
-    <SolidColorBrush x:Key="DG.SuccessBorder" Color="#335BB98B"/>
-    <SolidColorBrush x:Key="DG.Info"          Color="#8FB6E2"/>
-    <SolidColorBrush x:Key="DG.InfoSoft"      Color="#268FB6E2"/>
-    <SolidColorBrush x:Key="DG.InfoBorder"    Color="#598FB6E2"/>
-    <SolidColorBrush x:Key="DG.AccentLight"   Color="#B8AFF5"/>
+    <!-- Energy & series. Series brushes are published for future per-table charts. -->
+    <SolidColorBrush x:Key="DG.Energy"        Color="#9DCB1F"/>
+    <SolidColorBrush x:Key="DG.Series1"       Color="#D8D3C8"/>
+    <SolidColorBrush x:Key="DG.Series2"       Color="#BADD52"/>
+    <SolidColorBrush x:Key="DG.Series3"       Color="#E0965A"/>
+    <SolidColorBrush x:Key="DG.Series4"       Color="#6FB4D6"/>
+    <SolidColorBrush x:Key="DG.Series5"       Color="#D291C4"/>
+
+    <!-- Signature run sweep: Accent → Energy. Rebuilt per palette in DesignThemeManager.Apply. -->
+    <LinearGradientBrush x:Key="DG.RunSweep" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#BADD52" Offset="0"/>
+        <GradientStop Color="#9DCB1F" Offset="1"/>
+    </LinearGradientBrush>
 
     <!-- Legacy key kept for existing references. -->
-    <SolidColorBrush x:Key="AccentBrush" Color="#A79CF1"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#BADD52"/>
 
     <!-- ==================================================================
          2. Geometry — radii, spacing scale, fixed pane widths
@@ -710,7 +725,7 @@
     <Style x:Key="DG.ProgressBar" TargetType="ProgressBar">
         <Setter Property="Height" Value="4"/>
         <Setter Property="Background" Value="{DynamicResource DG.TrackFill}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.RunSweep}"/>
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
@@ -718,7 +733,7 @@
     <Style x:Key="DG.SelectionStripe" TargetType="Border">
         <Setter Property="Width" Value="{DynamicResource DG.Size.SelectionStripe}"/>
         <Setter Property="CornerRadius" Value="2"/>
-        <Setter Property="Background" Value="{DynamicResource DG.Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.SelectionIndicator}"/>
         <Setter Property="HorizontalAlignment" Value="Left"/>
         <Setter Property="Margin" Value="0,9"/>
     </Style>
@@ -738,32 +753,33 @@
     <!-- ==================================================================
          8. WPF-UI overrides — keeps library chrome on our palette
          ================================================================== -->
-    <SolidColorBrush x:Key="ApplicationBackgroundBrush"              Color="#202020"/>
-    <SolidColorBrush x:Key="LayerFillColorDefaultBrush"              Color="#272727"/>
-    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush"     Color="#2B2B2B"/>
-    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush"   Color="#232323"/>
-    <SolidColorBrush x:Key="ControlFillColorDefaultBrush"            Color="#323232"/>
-    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush"          Color="#3D3D3D"/>
-    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush"          Color="#383838"/>
-    <SolidColorBrush x:Key="NavigationViewContentBackground"         Color="#272727"/>
-    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush"    Color="#2D2D2D"/>
-    <SolidColorBrush x:Key="TextFillColorPrimaryBrush"               Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="TextFillColorSecondaryBrush"             Color="#A0A0A0"/>
-    <SolidColorBrush x:Key="TextFillColorTertiaryBrush"              Color="#8A8A8A"/>
-    <SolidColorBrush x:Key="TextFillColorDisabledBrush"              Color="#6A6A6A"/>
-    <SolidColorBrush x:Key="AccentFillColorDefaultBrush"             Color="#A79CF1"/>
-    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush"           Color="#B8AFF5"/>
-    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush"            Color="#8F82E4"/>
-    <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush"         Color="#D9D3FB"/>
-    <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush"       Color="#1B1338"/>
-    <SolidColorBrush x:Key="SystemAccentColorBrush"                  Color="#A79CF1"/>
-    <SolidColorBrush x:Key="SystemAccentColorPrimaryBrush"           Color="#A79CF1"/>
-    <SolidColorBrush x:Key="SystemAccentColor3Brush"                 Color="#3A3358"/>
-    <SolidColorBrush x:Key="SystemFillColorSuccessBrush"             Color="#5BB98B"/>
-    <SolidColorBrush x:Key="SystemFillColorCautionBrush"             Color="#E0A030"/>
-    <SolidColorBrush x:Key="SystemFillColorCriticalBrush"            Color="#FF9C9C"/>
-    <SolidColorBrush x:Key="SystemFillColorSuccessBackgroundBrush"   Color="#1F2A24"/>
-    <SolidColorBrush x:Key="SystemFillColorCautionBackgroundBrush"   Color="#332A1E"/>
-    <SolidColorBrush x:Key="SystemFillColorCriticalBackgroundBrush"  Color="#3A2A2A"/>
+    <SolidColorBrush x:Key="ApplicationBackgroundBrush"              Color="#121110"/>
+    <SolidColorBrush x:Key="LayerFillColorDefaultBrush"              Color="#191816"/>
+    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush"     Color="#201F1C"/>
+    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush"   Color="#0E0D0C"/>
+    <SolidColorBrush x:Key="ControlFillColorDefaultBrush"            Color="#2A2825"/>
+    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush"          Color="#3D3A34"/>
+    <SolidColorBrush x:Key="KeyboardFocusBorderColorBrush"           Color="#BADD52"/>
+    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush"          Color="#2E2C28"/>
+    <SolidColorBrush x:Key="NavigationViewContentBackground"         Color="#191816"/>
+    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush"    Color="#2E2C28"/>
+    <SolidColorBrush x:Key="TextFillColorPrimaryBrush"               Color="#F2F0EA"/>
+    <SolidColorBrush x:Key="TextFillColorSecondaryBrush"             Color="#B4AFA3"/>
+    <SolidColorBrush x:Key="TextFillColorTertiaryBrush"              Color="#8B857A"/>
+    <SolidColorBrush x:Key="TextFillColorDisabledBrush"              Color="#625D54"/>
+    <SolidColorBrush x:Key="AccentFillColorDefaultBrush"             Color="#BADD52"/>
+    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush"           Color="#C9E76F"/>
+    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush"            Color="#A6C93F"/>
+    <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush"         Color="#C2E060"/>
+    <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush"       Color="#14130F"/>
+    <SolidColorBrush x:Key="SystemAccentColorBrush"                  Color="#BADD52"/>
+    <SolidColorBrush x:Key="SystemAccentColorPrimaryBrush"           Color="#BADD52"/>
+    <SolidColorBrush x:Key="SystemAccentColor3Brush"                 Color="#48541F"/>
+    <SolidColorBrush x:Key="SystemFillColorSuccessBrush"             Color="#5BD08D"/>
+    <SolidColorBrush x:Key="SystemFillColorCautionBrush"             Color="#E8B04B"/>
+    <SolidColorBrush x:Key="SystemFillColorCriticalBrush"            Color="#FF8E80"/>
+    <SolidColorBrush x:Key="SystemFillColorSuccessBackgroundBrush"   Color="#14251C"/>
+    <SolidColorBrush x:Key="SystemFillColorCautionBackgroundBrush"   Color="#2C2313"/>
+    <SolidColorBrush x:Key="SystemFillColorCriticalBackgroundBrush"  Color="#2E1815"/>
 
 </ResourceDictionary>

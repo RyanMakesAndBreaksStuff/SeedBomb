@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "DataGen.Wpf": {
+    "SeedBomb.Wpf": {
       "commandName": "Project",
       "debugEngines": "managed,native"
     }

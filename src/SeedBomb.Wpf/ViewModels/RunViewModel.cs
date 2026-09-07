@@ -218,6 +218,10 @@ public sealed partial class RunViewModel : ObservableObject
         _plannedTotal = plannedTotal;
         _plannedTables = tables;
         _tableWritten.Clear();
+        // A new run must not inherit the previous run's lines — this is the only reset point,
+        // and ShowFullLogAsync reads the same backing list as the RecentActivity tail.
+        _activityLog.Clear();
+        RecentActivity.Clear();
 
         IsRunning = true;
         IsSheetVisible = true;

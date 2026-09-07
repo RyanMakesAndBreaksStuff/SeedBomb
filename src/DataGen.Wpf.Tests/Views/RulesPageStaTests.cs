@@ -227,7 +227,7 @@ public sealed class RulesPageStaTests : IDisposable
         app.Resources.MergedDictionaries.Add(new ControlsDictionary());
         app.Resources.MergedDictionaries.Add(new ResourceDictionary
         {
-            Source = new Uri("pack://application:,,,/DataGen.Wpf;component/Resources/Shared.xaml", UriKind.Absolute),
+            Source = new Uri("pack://application:,,,/SeedBomb;component/Resources/Shared.xaml", UriKind.Absolute),
         });
     }
 
