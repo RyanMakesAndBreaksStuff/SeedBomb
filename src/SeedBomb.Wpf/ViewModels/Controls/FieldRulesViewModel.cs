@@ -1,5 +1,7 @@
 // src/DataGen.Wpf/ViewModels/Controls/FieldRulesViewModel.cs
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DataGen.Core.Rules;
 
@@ -138,18 +140,53 @@ public sealed partial class FieldRulesViewModel : ObservableObject
 
     private static string OpBadge(FieldRule r) => r switch
     {
-        ConstantRule => "constant", OneOfRule => "one-of", RangeRule => "range",
-        PatternRule => "pattern", SequenceRule => "sequence", NullRule => "null", _ => "?",
+        ConstantRule => "constant",
+        OneOfRule => "one-of",
+        RangeRule => "range",
+        PatternRule => "pattern",
+        SequenceRule => "sequence",
+        NullRule => "null",
+        LookupRandomRule => "random lookup",
+        BogusRule => "bogus",
+        _ => "?",
     };
 
     private static string Summary(FieldRule r) => r switch
     {
-        ConstantRule c => c.Value.ToString(),
-        OneOfRule o => $"{{ {string.Join(", ", o.Values)} }} · pick: {o.Pick.ToString().ToLowerInvariant()}",
+        ConstantRule c => FormatValue(c.Value),
+        OneOfRule o => $"{{ {string.Join(", ", o.Values.Select(FormatValue))} }} · pick: {o.Pick.ToString().ToLowerInvariant()}",
         RangeRule g => $"{g.Min} – {g.Max}",
         PatternRule p => p.Template,
         SequenceRule s => $"start {s.Start} · step {s.Step}",
         NullRule => "leave unset",
+        BogusRule b => $"{b.Api}.{b.Endpoint}",
+        LookupRandomRule =>
+            $"up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target",
         _ => "",
     };
+
+    private static string FormatValue(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+            return value.ToString();
+
+        string? name = null;
+        string? entity = null;
+        string? id = null;
+        foreach (var property in value.EnumerateObject())
+        {
+            if (property.Value.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+                continue;
+            if (property.NameEquals("name") && property.Value.ValueKind == JsonValueKind.String)
+                name = property.Value.GetString();
+            else if (property.NameEquals("entity") && property.Value.ValueKind == JsonValueKind.String)
+                entity = property.Value.GetString();
+            else if (property.NameEquals("id") && property.Value.ValueKind == JsonValueKind.String)
+                id = property.Value.GetString();
+        }
+
+        if (entity is null || id is null)
+            return value.ToString();
+        return string.IsNullOrWhiteSpace(name) ? $"{entity} · {id}" : $"{name} · {entity} · {id}";
+    }
 }

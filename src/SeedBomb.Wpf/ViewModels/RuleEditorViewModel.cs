@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
+using System.ServiceModel;
 using System.Text.Json;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -13,8 +15,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
+using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
+using Seedbomb.ViewModels.Controls;
 using Seedbomb.Views.Pages;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
@@ -123,6 +127,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private readonly IContentDialogService? _dialogs;
     private readonly ISnackbarService? _snackbar;
     private readonly ILogger<RuleEditorViewModel>? _logger;
+    private readonly ILookupRecordPicker? _picker;
+    private readonly IDataverseConnectionService? _connection;
 
     private string _table;
     private int _recordCount;
@@ -139,9 +145,20 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private IReadOnlyList<string> _previewValues = [];
     private FieldRule? _effectiveRule;
     private bool _suppressBogusCascade;
+    private bool _suppressDraftLoad;
+    private string? _lookupDraftError;
     private int _previewGeneration;
+    private int _editorGeneration;
+    private int _metadataGeneration;
     private CancellationTokenSource? _previewCts;
+    private CancellationTokenSource? _pageCts;
+    private CancellationTokenSource? _pickerCts;
+    private CancellationTokenSource? _metadataCts;
+    private SynchronizationContext? _uiContext;
     private HashSet<string> _errorProperties = [];
+
+    /// <summary>Lookup identity editor state for the selected column.</summary>
+    public LookupRuleInputViewModel LookupInput { get; }
 
     /// <summary>Initialises the editor from full live entity metadata (Task 9 supplies this via <c>IMetadataProvider</c>).</summary>
     /// <param name="meta">Full entity metadata — editor never derives columns from <c>EntitySummary</c> or creates a provider.</param>
@@ -160,7 +177,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _recordCount = recordCount;
         _seed = seed;
         _runId = runId;
+        LookupInput = new LookupRuleInputViewModel();
+        LookupInput.Changed += OnLookupInputChanged;
         ResetFromMetadata(meta);
+        IsMetadataAvailable = true;
     }
 
     /// <summary>DI constructor for the Rules page. Call <see cref="LoadForProfileAsync"/> on navigate.</summary>
@@ -172,7 +192,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         RulesNavigationRequest request,
         IContentDialogService? dialogs = null,
         ISnackbarService? snackbar = null,
-        ILogger<RuleEditorViewModel>? logger = null)
+        ILogger<RuleEditorViewModel>? logger = null,
+        ILookupRecordPicker? picker = null,
+        IDataverseConnectionService? connection = null)
     {
         _metadata = metadata;
         _profiles = profiles;
@@ -181,6 +203,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _dialogs = dialogs;
         _snackbar = snackbar;
         _logger = logger;
+        _picker = picker;
+        _connection = connection;
         _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
         _allSettable = [];
         _allExcluded = [];
@@ -188,6 +212,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _recordCount = 10;
         _seed = 42;
         _runId = "rules-preview";
+        LookupInput = new LookupRuleInputViewModel();
+        LookupInput.Changed += OnLookupInputChanged;
     }
 
     // ── Handoff aliases (lock 22) ────────────────────────────────────────────
@@ -218,6 +244,42 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     /// <summary>True when the selected op is <c>pattern</c> — shows the template block.</summary>
     public bool IsTemplateOperation => SelectedOp == "pattern";
+
+    /// <summary>True when the selected column is a lookup or customer attribute.</summary>
+    public bool IsLookupColumn =>
+        SelectedColumn is not null
+        && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
+        && attr is LookupAttributeMetadata;
+
+    /// <summary>True when constant/one-of identity editing is shown for a lookup column.</summary>
+    public bool IsLookupValueOperation =>
+        IsLookupColumn && SelectedOp is "constant" or "oneOf";
+
+    /// <summary>True when the lookup-random explanation is shown.</summary>
+    public bool IsLookupRandomOperation =>
+        IsLookupColumn && SelectedOp == "lookupRandom";
+
+    /// <summary>Run-time-only copy for lookupRandom preview. Interpolates the shared candidate bound.</summary>
+    public string LookupRandomExplanation =>
+        $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts.";
+
+    /// <summary>True when a metadata load failed and the page should show reconnect/retry guidance.</summary>
+    public bool HasMetadataError => !string.IsNullOrWhiteSpace(MetadataError);
+
+    /// <summary>True when live table metadata is loaded and save/picker may run.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _isMetadataAvailable;
+
+    /// <summary>True while table metadata is being fetched.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _isMetadataLoading;
+
+    /// <summary>Persistent reconnect/retry copy after a metadata or connection failure.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMetadataError))]
+    private string? _metadataError;
 
     // ── Page-scoped surface ──────────────────────────────────────────────────
 
@@ -313,29 +375,46 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// </summary>
     private void LoadDraftForColumn(PickerColumn? column)
     {
-        Options.Clear();
-        if (column is not null && _byName.TryGetValue(column.LogicalName, out var attr) && attr is EnumAttributeMetadata em)
+        CancelPicker();
+        _suppressDraftLoad = true;
+        try
         {
-            foreach (var opt in em.OptionSet?.Options ?? [])
+            Options.Clear();
+            AttributeMetadata? attr = null;
+            if (column is not null)
+                _byName.TryGetValue(column.LogicalName, out attr);
+
+            LookupInput.Configure(attr as LookupAttributeMetadata);
+            Pick = OneOfPick.Random;
+
+            if (attr is EnumAttributeMetadata em)
             {
-                if (opt.Value is int v)
+                foreach (var opt in em.OptionSet?.Options ?? [])
                 {
-                    var choice = new OptionChoice(v, opt.Label?.UserLocalizedLabel?.Label ?? v.ToString());
-                    choice.PropertyChanged += (_, _) => Revalidate();
-                    Options.Add(choice);
+                    if (opt.Value is int v)
+                    {
+                        var choice = new OptionChoice(v, opt.Label?.UserLocalizedLabel?.Label ?? v.ToString());
+                        choice.PropertyChanged += (_, _) => Revalidate();
+                        Options.Add(choice);
+                    }
                 }
             }
-        }
 
-        OnPropertyChanged(nameof(AvailableOps));
-        OnPropertyChanged(nameof(AvailableOpOptions));
-        OnPropertyChanged(nameof(AvailableOperations));
-        SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
-        if (column is not null
-            && TryGetProfileColumns(out var cols)
-            && cols.TryGetValue(column.LogicalName, out var existing))
+            OnPropertyChanged(nameof(AvailableOps));
+            OnPropertyChanged(nameof(AvailableOpOptions));
+            OnPropertyChanged(nameof(AvailableOperations));
+            NotifyLookupPresentation();
+            SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
+            if (column is not null
+                && TryGetProfileColumns(out var cols)
+                && cols.TryGetValue(column.LogicalName, out var existing))
+            {
+                ApplyExistingRule(existing);
+            }
+        }
+        finally
         {
-            ApplyExistingRule(existing);
+            _suppressDraftLoad = false;
         }
 
         Revalidate();
@@ -363,8 +442,12 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     partial void OnSelectedOpChanged(string value)
     {
+        CancelPicker();
         OnPropertyChanged(nameof(SelectedOperation));
         OnPropertyChanged(nameof(IsTemplateOperation));
+        NotifyLookupPresentation();
+        if (_suppressDraftLoad)
+            return;
         if (value == "bogus")
             RefreshBogusCatalogLists();
         else if (!_suppressBogusCascade)
@@ -485,7 +568,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public IReadOnlyList<string> PreviewValues => _previewValues;
 
     /// <summary>True when a draft rule built and validated with no Error-severity message.</summary>
-    public bool CanSave => _effectiveRule is not null && !_messages.Any(m => m.Severity == RuleMessageSeverity.Error);
+    public bool CanSave =>
+        IsMetadataAvailable
+        && !IsMetadataLoading
+        && _effectiveRule is not null
+        && !_messages.Any(m => m.Severity == RuleMessageSeverity.Error);
 
     /// <summary>Returns the last-validated effective rule (clamped range, etc.), or null if nothing valid is drafted.</summary>
     public FieldRule? BuildRule() => _effectiveRule;
@@ -497,6 +584,42 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public void ApplyExistingRule(FieldRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
+
+        if (SelectedColumn is not null
+            && _byName.TryGetValue(SelectedColumn.LogicalName, out var lookupAttr)
+            && lookupAttr is LookupAttributeMetadata)
+        {
+            var previousSuppress = _suppressDraftLoad;
+            _suppressDraftLoad = true;
+            try
+            {
+                LookupInput.Restore(rule);
+                switch (rule)
+                {
+                    case ConstantRule:
+                        SelectedOp = "constant";
+                        break;
+                    case OneOfRule o:
+                        SelectedOp = "oneOf";
+                        Pick = o.Pick;
+                        break;
+                    case NullRule:
+                        SelectedOp = "null";
+                        break;
+                    case LookupRandomRule:
+                        SelectedOp = "lookupRandom";
+                        break;
+                }
+            }
+            finally
+            {
+                _suppressDraftLoad = previousSuppress;
+            }
+
+            if (!previousSuppress)
+                Revalidate();
+            return;
+        }
 
         switch (rule)
         {
@@ -595,7 +718,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             ColumnFilterModes.Clear();
             ColumnsView = null;
             OnPropertyChanged(nameof(ColumnsView));
+            IsMetadataAvailable = false;
+            MetadataError = "No profile is loaded. Open a profile, then retry.";
             NotifyCanSaveChanged();
+            RetryMetadataCommand.NotifyCanExecuteChanged();
             return;
         }
 
@@ -622,63 +748,143 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             _suppressTableChange = false;
         }
 
-        if (SelectedTable is null || _metadata is null)
+        if (SelectedTable is not null)
+            ApplyTableCounts(SelectedTable.LogicalName);
+
+        await ReloadMetadataAsync(ct);
+    }
+
+    private bool CanRetryMetadata() =>
+        _profile is not null && _metadata is not null && !IsMetadataLoading;
+
+    /// <summary>Retries metadata load using the retained profile, save callback, and selected table.</summary>
+    [RelayCommand(CanExecute = nameof(CanRetryMetadata))]
+    private Task RetryMetadataAsync(CancellationToken ct) => ReloadMetadataAsync(ct);
+
+    private async Task ReloadMetadataAsync(CancellationToken ct)
+    {
+        if (_profile is null || _metadata is null)
         {
+            IsMetadataAvailable = false;
+            IsMetadataLoading = false;
+            MetadataError = "No profile is loaded. Open a profile, then retry.";
             NotifyCanSaveChanged();
+            RetryMetadataCommand.NotifyCanExecuteChanged();
+            PickLookupRecordsCommand.NotifyCanExecuteChanged();
             return;
         }
 
-        ApplyTableCounts(SelectedTable.LogicalName);
+        if (SelectedTable is null)
+        {
+            IsMetadataAvailable = false;
+            IsMetadataLoading = false;
+            MetadataError = "No table is selected. Choose a table, then retry.";
+            NotifyCanSaveChanged();
+            RetryMetadataCommand.NotifyCanExecuteChanged();
+            return;
+        }
 
-        var names = Tables.Select(t => t.LogicalName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        IReadOnlyList<EntityMetadata> list;
+        var generation = Interlocked.Increment(ref _metadataGeneration);
+        _metadataCts?.Cancel();
+        _metadataCts?.Dispose();
+        _metadataCts = CancellationTokenSource.CreateLinkedTokenSource(_pageCts?.Token ?? CancellationToken.None, ct);
+        var token = _metadataCts.Token;
+
+        IsMetadataLoading = true;
+        MetadataError = null;
+        NotifyCanSaveChanged();
+        RetryMetadataCommand.NotifyCanExecuteChanged();
+        PickLookupRecordsCommand.NotifyCanExecuteChanged();
+
         try
         {
-            list = await _metadata.GetEntitiesAsync(names, ct);
-        }
-        catch (SchemaException ex)
-        {
-            _logger?.LogError(ex, "Failed to load table metadata for the Rules page");
-            _snackbar?.Show("Couldn't load table metadata", ex.Message,
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(5));
-            NotifyCanSaveChanged();
-            return;
-        }
-
-        _entities.Clear();
-        foreach (var entity in list)
-        {
-            if (entity.LogicalName is not null)
-                _entities[entity.LogicalName] = entity;
-        }
-
-        if (!_entities.TryGetValue(SelectedTable.LogicalName, out var meta))
-        {
-            NotifyCanSaveChanged();
-            return;
-        }
-
-        ResetFromMetadata(meta);
-
-        ColumnsView = CollectionViewSource.GetDefaultView(_allColumns);
-        ColumnsView.Filter = o => o is PickerColumn c && MatchesColumnFilter(c);
-        if (ColumnsView is CollectionView view)
-        {
-            using (view.DeferRefresh())
+            token.ThrowIfCancellationRequested();
+            var names = Tables.Select(t => t.LogicalName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            IReadOnlyList<EntityMetadata> list;
+            try
             {
-                view.SortDescriptions.Clear();
-                view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
-                view.GroupDescriptions.Clear();
-                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
+                list = await _metadata.GetEntitiesAsync(names, token);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (generation != _metadataGeneration)
+                    return;
+                FailMetadata(DescribeMetadataFailure(ex), ex);
+                return;
+            }
+
+            if (generation != _metadataGeneration || token.IsCancellationRequested)
+                return;
+
+            _entities.Clear();
+            foreach (var entity in list)
+            {
+                if (entity.LogicalName is not null)
+                    _entities[entity.LogicalName] = entity;
+            }
+
+            if (!_entities.TryGetValue(SelectedTable.LogicalName, out var meta))
+            {
+                if (generation != _metadataGeneration)
+                    return;
+                IsMetadataAvailable = false;
+                MetadataError = "Table metadata was not returned. Reconnect and retry.";
+                NotifyCanSaveChanged();
+                return;
+            }
+
+            var selectedName = SelectedColumn?.LogicalName;
+            ResetFromMetadata(meta);
+
+            ColumnsView = CollectionViewSource.GetDefaultView(_allColumns);
+            ColumnsView.Filter = o => o is PickerColumn c && MatchesColumnFilter(c);
+            if (ColumnsView is CollectionView view)
+            {
+                using (view.DeferRefresh())
+                {
+                    view.SortDescriptions.Clear();
+                    view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
+                    view.GroupDescriptions.Clear();
+                    view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
+                }
+            }
+
+            OnPropertyChanged(nameof(ColumnsView));
+            IsMetadataAvailable = true;
+            MetadataError = null;
+            if (selectedName is not null)
+            {
+                SelectedColumn = _allColumns.FirstOrDefault(c =>
+                    string.Equals(c.LogicalName, selectedName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            NotifyCanSaveChanged();
+            RetryMetadataCommand.NotifyCanExecuteChanged();
+            PickLookupRecordsCommand.NotifyCanExecuteChanged();
+        }
+        catch (OperationCanceledException)
+        {
+            // superseded or page closed — a newer generation owns UI state
+        }
+        finally
+        {
+            if (generation == _metadataGeneration)
+            {
+                IsMetadataLoading = false;
+                NotifyCanSaveChanged();
+                RetryMetadataCommand.NotifyCanExecuteChanged();
+                PickLookupRecordsCommand.NotifyCanExecuteChanged();
             }
         }
-
-        OnPropertyChanged(nameof(ColumnsView));
-        NotifyCanSaveChanged();
     }
 
     partial void OnSelectedTableChanged(RuleTableOption? value)
     {
+        CancelPicker();
         if (_suppressTableChange || value is null)
             return;
 
@@ -908,6 +1114,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         "sequence" => new("sequence", "sequence", "start + step per row"),
         "null" => new("null", "null", "leave unset (platform default)"),
         "bogus" => new("bogus", "bogus", "generated by Bogus"),
+        "lookupRandom" => new(
+            "lookupRandom",
+            "random (existing records)",
+            $"up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target"),
         _ => new(op, op, string.Empty),
     };
 
@@ -935,7 +1145,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
                 var draft = TryBuildDraft(attr, SelectedOp);
                 if (draft is null)
                 {
-                    messages.Add(new RuleMessage(RuleMessageSeverity.Error, "Enter a value for this rule."));
+                    messages.Add(new RuleMessage(
+                        RuleMessageSeverity.Error,
+                        _lookupDraftError ?? "Enter a value for this rule."));
                 }
                 else
                 {
@@ -975,17 +1187,24 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         string.IsNullOrWhiteSpace(value)
         || value is "(null)" or "(omitted)";
 
-    private FieldRule? TryBuildDraft(AttributeMetadata attr, string op) => op switch
+    private FieldRule? TryBuildDraft(AttributeMetadata attr, string op)
     {
-        "constant" => TryConstantValue(attr, ConstantText, out var v) ? new ConstantRule(v) : null,
-        "oneOf" => TryOneOf(attr),
-        "range" => TryRange(attr),
-        "pattern" => string.IsNullOrEmpty(Template) ? null : new PatternRule(Template),
-        "sequence" => TrySequence(),
-        "null" => new NullRule(),
-        "bogus" => TryBuildBogus(),
-        _ => null,
-    };
+        if (attr is LookupAttributeMetadata)
+            return LookupInput.Build(op, Pick, out _lookupDraftError);
+
+        _lookupDraftError = null;
+        return op switch
+        {
+            "constant" => TryConstantValue(attr, ConstantText, out var v) ? new ConstantRule(v) : null,
+            "oneOf" => TryOneOf(attr),
+            "range" => TryRange(attr),
+            "pattern" => string.IsNullOrEmpty(Template) ? null : new PatternRule(Template),
+            "sequence" => TrySequence(),
+            "null" => new NullRule(),
+            "bogus" => TryBuildBogus(),
+            _ => null,
+        };
+    }
 
     private FieldRule? TryOneOf(AttributeMetadata attr)
     {
@@ -1056,6 +1275,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             OptionSetValue osv => osv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             Money m => m.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            EntityReference r => $"{r.LogicalName} · {r.Id:D}",
             _ => value.ToString() ?? string.Empty,
         };
     }
@@ -1182,7 +1402,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         EligibilityReason.StateCode => "Platform-owned state — set Status (reason) instead.",
         EligibilityReason.BpfBookkeeping => "Platform-owned state — set Status (reason) instead.",
         EligibilityReason.BinaryUpload => "File/image — needs the upload API.",
-        EligibilityReason.Lookup => "Lookup — out of scope in v1.",
+        EligibilityReason.Lookup => "Unsupported lookup type or target metadata.",
+        EligibilityReason.OwnerAssigned => "Owner is assigned by Dataverse; owner rules are not supported.",
         EligibilityReason.PolymorphicType => "Owner/Customer type — determined by its paired lookup value.",
         EligibilityReason.NotCreatable => "Not valid for create.",
         EligibilityReason.MultiSelectV2 => "MultiSelect — rule editing planned for v2.",
@@ -1204,7 +1425,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         StatusAttributeMetadata => "Status (reason)",
         StateAttributeMetadata => "Status",
         EnumAttributeMetadata => "Choice",
-        LookupAttributeMetadata => "Lookup",
+        LookupAttributeMetadata lookup =>
+            lookup.AttributeType == AttributeTypeCode.Customer ? "customer" : "lookup",
         UniqueIdentifierAttributeMetadata => "Unique Identifier",
         ImageAttributeMetadata or FileAttributeMetadata => "File/Image",
         _ => "Other",
@@ -1212,6 +1434,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     private static IReadOnlyList<string> OpsFor(AttributeMetadata attr)
     {
+        if (attr is LookupAttributeMetadata)
+            return RuleEligibility.Classify(attr).IsSettable
+                ? ["constant", "oneOf", "lookupRandom", "null"]
+                : NoOps;
+
         var ops = attr switch
         {
             StringAttributeMetadata or MemoAttributeMetadata => TextOps,
@@ -1477,7 +1704,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
             var preview = new List<string>(3);
             var eval = new RuleEvaluationContext(table, seed, DeterministicFaker.DefaultLocale, runId, recordCount);
-            if (effective is BogusRule bogus)
+            if (effective is LookupRandomRule)
+            {
+                preview.Add(LookupRandomExplanation);
+            }
+            else if (effective is BogusRule bogus)
             {
                 var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
                 using var session = new BogusEvaluatorSession(eval.Locale);
@@ -1549,4 +1780,169 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             : source.Where(c => c.LogicalName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
                               || c.DisplayName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                     .ToList();
+
+    /// <summary>Starts page lifetime: captures the UI context and listens for connection resets.</summary>
+    public void Activate()
+    {
+        _uiContext = SynchronizationContext.Current;
+        _pageCts?.Cancel();
+        _pageCts?.Dispose();
+        _pageCts = new CancellationTokenSource();
+        if (_connection is not null)
+        {
+            _connection.ConnectionReset -= OnConnectionReset;
+            _connection.ConnectionReset += OnConnectionReset;
+        }
+    }
+
+    /// <summary>Ends page lifetime and cancels picker, preview, and metadata work.</summary>
+    public void Deactivate()
+    {
+        if (_connection is not null)
+            _connection.ConnectionReset -= OnConnectionReset;
+        Interlocked.Increment(ref _editorGeneration);
+        Interlocked.Increment(ref _previewGeneration);
+        Interlocked.Increment(ref _metadataGeneration);
+        _pageCts?.Cancel();
+        _pickerCts?.Cancel();
+        _previewCts?.Cancel();
+        _metadataCts?.Cancel();
+    }
+
+    private bool CanPickLookupRecords() =>
+        _picker is not null
+        && IsMetadataAvailable
+        && !IsMetadataLoading
+        && IsLookupValueOperation
+        && SelectedColumn is not null;
+
+    /// <summary>Opens the lookup record picker and replaces selection only after Add on the current column.</summary>
+    [RelayCommand(CanExecute = nameof(CanPickLookupRecords))]
+    private async Task PickLookupRecordsAsync(CancellationToken ct)
+    {
+        if (_picker is null
+            || SelectedColumn is null
+            || !_byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
+            || attr is not LookupAttributeMetadata lookup)
+            return;
+
+        var table = _table;
+        var column = SelectedColumn.LogicalName;
+        var op = SelectedOp;
+        var single = SelectedOp == "constant";
+
+        CancelPicker();
+        var generation = _editorGeneration;
+        _pickerCts = CancellationTokenSource.CreateLinkedTokenSource(_pageCts?.Token ?? CancellationToken.None, ct);
+        var token = _pickerCts.Token;
+
+        IReadOnlyList<LookupRuleValue>? result;
+        try
+        {
+            result = await _picker.PickAsync(lookup, LookupInput.Records.ToArray(), single, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (result is null
+            || token.IsCancellationRequested
+            || generation != _editorGeneration
+            || !string.Equals(table, _table, StringComparison.OrdinalIgnoreCase)
+            || SelectedColumn is null
+            || !string.Equals(column, SelectedColumn.LogicalName, StringComparison.OrdinalIgnoreCase)
+            || SelectedOp != op)
+            return;
+
+        if (!_byName.TryGetValue(column, out var currentAttr) || currentAttr is not LookupAttributeMetadata currentLookup)
+            return;
+
+        var accepted = new List<LookupRuleValue>(result.Count);
+        foreach (var value in result)
+        {
+            if (!LookupRuleValue.TryParse(value.ToJson(), currentLookup, out var parsed, out _) || parsed is null)
+                return;
+            accepted.Add(parsed);
+        }
+
+        LookupInput.ReplaceSelection(accepted);
+    }
+
+    private void OnLookupInputChanged(object? sender, EventArgs e)
+    {
+        if (!_suppressDraftLoad)
+            Revalidate();
+    }
+
+    private void NotifyLookupPresentation()
+    {
+        OnPropertyChanged(nameof(IsLookupColumn));
+        OnPropertyChanged(nameof(IsLookupValueOperation));
+        OnPropertyChanged(nameof(IsLookupRandomOperation));
+        PickLookupRecordsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void CancelPicker()
+    {
+        Interlocked.Increment(ref _editorGeneration);
+        _pickerCts?.Cancel();
+        _pickerCts?.Dispose();
+        _pickerCts = null;
+    }
+
+    private void OnConnectionReset(object? sender, EventArgs e)
+    {
+        InvalidateInFlightWork();
+        if (_uiContext is not null)
+            _uiContext.Post(_ => ApplyConnectionResetUi(), null);
+        else
+            ApplyConnectionResetUi();
+    }
+
+    private void InvalidateInFlightWork()
+    {
+        Interlocked.Increment(ref _editorGeneration);
+        Interlocked.Increment(ref _previewGeneration);
+        Interlocked.Increment(ref _metadataGeneration);
+        _pickerCts?.Cancel();
+        _previewCts?.Cancel();
+        _metadataCts?.Cancel();
+    }
+
+    private void ApplyConnectionResetUi()
+    {
+        _entities.Clear();
+        IsMetadataAvailable = false;
+        IsMetadataLoading = false;
+        MetadataError = "Connection changed. Reconnect and retry to reload table metadata.";
+        PublishPreview([]);
+        NotifyCanSaveChanged();
+        RetryMetadataCommand.NotifyCanExecuteChanged();
+        PickLookupRecordsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void FailMetadata(string message, Exception ex)
+    {
+        _logger?.LogError(ex, "Failed to load table metadata for the Rules page");
+        _snackbar?.Show("Couldn't load table metadata", message,
+            ControlAppearance.Danger, null, TimeSpan.FromSeconds(5));
+        IsMetadataAvailable = false;
+        MetadataError = string.IsNullOrWhiteSpace(message)
+            ? "Couldn't load table metadata. Reconnect and retry."
+            : $"{message} Reconnect and retry.";
+        NotifyCanSaveChanged();
+        RetryMetadataCommand.NotifyCanExecuteChanged();
+        PickLookupRecordsCommand.NotifyCanExecuteChanged();
+    }
+
+    private static string DescribeMetadataFailure(Exception ex) => ex switch
+    {
+        SchemaException schema => schema.Message,
+        InvalidOperationException invalid => invalid.Message,
+        FaultException<OrganizationServiceFault> fault =>
+            $"Dataverse error {fault.Detail.ErrorCode}: {fault.Detail.Message}",
+        FaultException fault => fault.Message,
+        _ => ex.Message,
+    };
 }

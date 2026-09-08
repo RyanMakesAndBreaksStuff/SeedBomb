@@ -87,4 +87,36 @@ public class FieldRulesViewModelTests
         vm.RemoveRule("account", "description");
         Assert.True(vm.Revision > afterSet);
     }
+
+    [Fact]
+    public void OpBadge_and_Summary_display_bogus_and_lookup_identities()
+    {
+        var vm = new FieldRulesViewModel();
+        vm.SelectTable("account");
+        vm.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "preview");
+        var bogus = Assert.Single(vm.Rows);
+        Assert.Equal("bogus", bogus.OpBadge);
+        Assert.Equal("NAME.firstName", bogus.ParameterSummary);
+
+        vm.RemoveRule("account", "name");
+        var named = new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Acme");
+        var unnamed = new LookupRuleValue("contact", Guid.Parse("22222222-2222-2222-2222-222222222222"));
+        vm.SetRule("account", "parentcustomerid",
+            new OneOfRule([named.ToJson(), unnamed.ToJson()], OneOfPick.Cycle),
+            "Customer", "preview");
+        var identities = Assert.Single(vm.Rows);
+        Assert.Equal("one-of", identities.OpBadge);
+        Assert.DoesNotContain("\"entity\"", identities.ParameterSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"id\"", identities.ParameterSummary, StringComparison.Ordinal);
+        Assert.Contains("Acme · account · 11111111-1111-1111-1111-111111111111", identities.ParameterSummary);
+        Assert.Contains("contact · 22222222-2222-2222-2222-222222222222", identities.ParameterSummary);
+        Assert.Contains("pick: cycle", identities.ParameterSummary);
+
+        vm.RemoveRule("account", "parentcustomerid");
+        vm.SetRule("account", "parentaccountid", new LookupRandomRule(), "Parent", "preview");
+        var random = Assert.Single(vm.Rows);
+        Assert.Equal("random lookup", random.OpBadge);
+        Assert.Contains("1,000", random.ParameterSummary);
+        Assert.DoesNotContain("?", random.OpBadge);
+    }
 }

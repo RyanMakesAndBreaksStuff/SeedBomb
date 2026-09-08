@@ -30,6 +30,7 @@
     <Grid Margin="{DynamicResource DG.Pad.Page}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -67,7 +68,30 @@
                     Content="Save profile"/>
         </Grid>
 
-        <Grid Grid.Row="1">
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasMetadataError}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+            <ui:InfoBar IsOpen="True"
+                        Severity="Error"
+                        IsClosable="False"
+                        Title="Metadata unavailable"
+                        Message="{Binding MetadataError}"/>
+            <Button Style="{DynamicResource DG.Button}"
+                    Content="Retry"
+                    Command="{Binding RetryMetadataCommand}"
+                    HorizontalAlignment="Left"
+                    Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="14"/>
@@ -307,9 +331,61 @@
                             <StackPanel Margin="0,0,0,16">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Operation"/>
                                 <ComboBox Style="{DynamicResource DG.ComboBox}"
-                                          ItemsSource="{Binding AvailableOperations}"
-                                          SelectedItem="{Binding SelectedOperation}"
+                                          ItemsSource="{Binding AvailableOpOptions}"
+                                          DisplayMemberPath="Title" SelectedValuePath="Op"
+                                          SelectedValue="{Binding SelectedOp, Mode=TwoWay}"
                                           AutomationProperties.Name="Operation"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,16">
+                                <StackPanel.Style><Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers><DataTrigger Binding="{Binding IsLookupValueOperation}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger></Style.Triggers>
+                                </Style></StackPanel.Style>
+                                <TextBlock Text="Add record GUIDs or choose existing records" TextWrapping="Wrap"/>
+                                <ComboBox ItemsSource="{Binding LookupInput.Targets}"
+                                          SelectedItem="{Binding LookupInput.SelectedTarget, Mode=TwoWay}">
+                                    <ComboBox.Style><Style TargetType="ComboBox"><Style.Triggers>
+                                        <DataTrigger Binding="{Binding LookupInput.Targets.Count}" Value="1">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers></Style></ComboBox.Style>
+                                </ComboBox>
+                                <TextBox Text="{Binding LookupInput.GuidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Comma-separated record GUIDs"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}"/>
+                                    <Button Content="Choose records…" Command="{Binding PickLookupRecordsCommand}" Margin="8,0,0,0"/>
+                                    <Button Content="Clear selected" Command="{Binding LookupInput.ClearCommand}" Margin="8,0,0,0"/>
+                                </StackPanel>
+                                <ListBox ItemsSource="{Binding LookupInput.Records}" Height="120"
+                                         ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
+                                         VirtualizingPanel.VirtualizationMode="Recycling">
+                                    <ListBox.ItemTemplate><DataTemplate><DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="Remove" CommandParameter="{Binding}"
+                                                Command="{Binding DataContext.LookupInput.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
+                                        <TextBlock><Run Text="{Binding Name, Mode=OneWay}"/><Run Text=" · "/>
+                                            <Run Text="{Binding Entity, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Id, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </DockPanel></DataTemplate></ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Text="Manual GUIDs are checked for format and target type, not existence." TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,16">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsLookupRandomOperation}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding LookupRandomExplanation}" TextWrapping="Wrap"/>
                             </StackPanel>
 
                             <!-- constant -->
@@ -318,9 +394,13 @@
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedOp}" Value="constant">
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding SelectedOp}" Value="constant"/>
+                                                    <Condition Binding="{Binding IsLookupColumn}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
+                                            </MultiDataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
@@ -446,9 +526,13 @@
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedOp}" Value="oneOf">
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding SelectedOp}" Value="oneOf"/>
+                                                    <Condition Binding="{Binding IsLookupColumn}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
+                                            </MultiDataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
@@ -468,6 +552,19 @@
                                 <TextBlock Style="{DynamicResource DG.Tertiary}"
                                            Text="Or comma-separated values for non-choice columns"
                                            Margin="0,4,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,0,16">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedOp}" Value="oneOf">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
                                 <ComboBox Style="{DynamicResource DG.ComboBox}"
                                           ItemsSource="{Binding Source={StaticResource OneOfPickValues}}"
                                           SelectedItem="{Binding Pick}"

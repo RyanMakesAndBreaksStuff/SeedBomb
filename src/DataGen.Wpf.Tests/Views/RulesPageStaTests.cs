@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -153,6 +154,36 @@ public sealed class RulesPageStaTests : IDisposable
 
         Assert.True(ValidationFocusBehavior.FocusFirstError(page, vm.Messages));
         Assert.True(endpoint.IsKeyboardFocused || endpoint.IsFocused || endpoint.IsKeyboardFocusWithin);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void OperationComboBox_BindsAvailableOpOptions_WithoutSplitOneOfIds()
+    {
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(lookup, AttributeTypeCode.Lookup);
+        var (page, vm) = LoadRulesPageOnSta(lookup);
+        Flush();
+
+        var combo = FindVisualChildren<ComboBox>(page)
+            .Single(c => AutomationProperties.GetName(c) == "Operation");
+        Assert.Equal(vm.AvailableOpOptions, combo.ItemsSource);
+        Assert.Equal(["constant", "oneOf", "lookupRandom", "null"], vm.AvailableOps);
+        Assert.DoesNotContain(vm.AvailableOpOptions, o => o.Op is "oneOfManual" or "oneOfPicker");
+        Assert.Contains(vm.AvailableOpOptions, o => o.Op == "oneOf" && o.Title == "one-of");
+        Assert.Contains(vm.AvailableOpOptions, o => o.Op == "lookupRandom" && o.Title == "random (existing records)");
+        Assert.Equal("constant", combo.SelectedValue);
+
+        vm.SelectedOp = "lookupRandom";
+        Flush();
+        Assert.Equal("lookupRandom", combo.SelectedValue);
+        Assert.Equal("lookupRandom", vm.SelectedOp);
         Assert.Empty(CapturedBindingErrors);
     }
 

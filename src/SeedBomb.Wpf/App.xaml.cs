@@ -161,6 +161,12 @@ public partial class App : Application
         sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
+        sc.AddSingleton<DataGen.Bulk.ThrottlePolicy>();
+        sc.AddTransient<ILookupRecordSource, LookupRecordSource>();
+        sc.AddTransient<LookupRecordPickerViewModel>();
+        sc.AddTransient<Func<LookupRecordPickerViewModel>>(sp =>
+            () => sp.GetRequiredService<LookupRecordPickerViewModel>());
+        sc.AddTransient<ILookupRecordPicker, LookupRecordPickerService>();
         sc.AddSingleton<IGenerationPipeline, GenerationPipeline>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
         sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();

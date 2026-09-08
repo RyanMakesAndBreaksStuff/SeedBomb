@@ -704,15 +704,80 @@ public sealed class GenerateViewModelStepTests
         }
     }
 
+    [Fact]
+    public async Task GoToReview_LookupRandomRule_KeepsRuleAndExplanatoryPreview()
+    {
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(lookup, AttributeTypeCode.Lookup);
+        var meta = BuildAccountMetadata(lookup);
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        fieldRules.SetRule("account", "parentaccountid", new LookupRandomRule(), "Parent Account", "preview");
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.False(viewModel.ReviewHasErrors);
+        Assert.IsType<LookupRandomRule>(viewModel.ReviewedRules!["account"]["parentaccountid"]);
+        var preview = Assert.Single(viewModel.ReviewPreviewRows.Single().Values);
+        Assert.Contains("1,000", preview);
+        Assert.Contains("Candidate validation happens at Start", preview);
+        Assert.DoesNotContain("11111111", preview);
+    }
+
+    [Fact]
+    public async Task GoToReview_LookupConstant_FormatsEntityReference()
+    {
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(lookup, AttributeTypeCode.Lookup);
+        var meta = BuildAccountMetadata(lookup);
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        var id = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        fieldRules.SetRule("account", "parentaccountid",
+            new ConstantRule(new LookupRuleValue("account", id, "Acme").ToJson()),
+            "Parent Account", "preview");
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.False(viewModel.ReviewHasErrors);
+        Assert.Equal($"account · {id:D}", viewModel.ReviewPreviewRows.Single().Values[0]);
+    }
+
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
     // RuleEditorViewModelTests / DataGen.Bulk.Tests/RuledGenerationTests.
-    private static EntityMetadata BuildAccountMetadata()
+    private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)
     {
         var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 100 };
         var employees = new IntegerAttributeMetadata { LogicalName = "numberofemployees", IsValidForCreate = true, MinValue = 0, MaxValue = 1000 };
 
         var meta = new EntityMetadata { LogicalName = "account" };
-        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { name, employees });
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, extra.Length == 0
+            ? [name, employees]
+            : extra.Concat<AttributeMetadata>([name, employees]).ToArray());
         return meta;
     }
 }

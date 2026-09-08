@@ -741,19 +741,27 @@ public sealed partial class GenerateViewModel : ViewModelBase
                     tableRules[column] = result.EffectiveRule;
 
                     var values = new List<string>(5);
-                    var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
-                    using var session = result.EffectiveRule is BogusRule
-                        ? new BogusEvaluatorSession(Locale)
-                        : null;
-                    PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
-                        ? BogusRulePreparer.CompileRule(bogus, attr, eval)
-                        : null;
-                    for (var row = 0; row < 5; row++)
+                    if (result.EffectiveRule is LookupRandomRule)
                     {
-                        var value = prepared is not null && session is not null
-                            ? session.Evaluate(prepared, attr, eval, row)
-                            : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
-                        values.Add(FormatPreview(value));
+                        values.Add(
+                            $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
+                    }
+                    else
+                    {
+                        var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
+                        using var session = result.EffectiveRule is BogusRule
+                            ? new BogusEvaluatorSession(Locale)
+                            : null;
+                        PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
+                            ? BogusRulePreparer.CompileRule(bogus, attr, eval)
+                            : null;
+                        for (var row = 0; row < 5; row++)
+                        {
+                            var value = prepared is not null && session is not null
+                                ? session.Evaluate(prepared, attr, eval, row)
+                                : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
+                            values.Add(FormatPreview(value));
+                        }
                     }
 
                     var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
@@ -812,6 +820,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             OptionSetValue osv => osv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             Money m => m.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            EntityReference r => $"{r.LogicalName} · {r.Id:D}",
             _ => value.ToString() ?? string.Empty,
         };
     }

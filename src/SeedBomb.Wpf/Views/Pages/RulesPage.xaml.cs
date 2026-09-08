@@ -46,6 +46,7 @@ public partial class RulesPage : Page, INavigableView<RuleEditorViewModel>, INav
     /// <inheritdoc />
     public async Task OnNavigatedToAsync()
     {
+        ViewModel.Activate();
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
@@ -62,6 +63,7 @@ public partial class RulesPage : Page, INavigableView<RuleEditorViewModel>, INav
     public Task OnNavigatedFromAsync()
     {
         _loadCts?.Cancel();
+        ViewModel.Deactivate();
         return Task.CompletedTask;
     }
 }
