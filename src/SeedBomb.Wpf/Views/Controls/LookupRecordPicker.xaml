@@ -1,0 +1,60 @@
+<UserControl x:Class="Seedbomb.Views.Controls.LookupRecordPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             MinWidth="420" MaxWidth="680" Height="480">
+    <UserControl.InputBindings>
+        <KeyBinding Key="Enter" Command="{Binding SearchCommand}"/>
+    </UserControl.InputBindings>
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="84"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Target table"/>
+            <ComboBox ItemsSource="{Binding Targets}" SelectedItem="{Binding SelectedTarget, Mode=TwoWay}">
+                <ComboBox.Style><Style TargetType="ComboBox">
+                    <Style.Triggers><DataTrigger Binding="{Binding Targets.Count}" Value="1">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                    </DataTrigger></Style.Triggers>
+                </Style></ComboBox.Style>
+            </ComboBox>
+            <TextBlock Text="Search by name prefix or full GUID"/>
+            <DockPanel Margin="0,4,0,8">
+                <Button DockPanel.Dock="Right" Content="Search / Retry" Command="{Binding SearchCommand}" Margin="8,0,0,0"/>
+                <TextBox Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="200"/>
+            </DockPanel>
+        </StackPanel>
+        <TextBlock Grid.Row="1" Text="Selected records"/>
+        <ListBox Grid.Row="2" ItemsSource="{Binding Selected}" ScrollViewer.CanContentScroll="True"
+                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+            <ListBox.ItemTemplate><DataTemplate><DockPanel>
+                <Button DockPanel.Dock="Right" Content="Remove" CommandParameter="{Binding}"
+                        Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
+                <TextBlock><Run Text="{Binding Name, Mode=OneWay}"/><Run Text=" · "/>
+                    <Run Text="{Binding Entity, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Id, Mode=OneWay}"/>
+                </TextBlock>
+            </DockPanel></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+        <ui:InfoBar Grid.Row="3" IsOpen="{Binding HasError}" Title="Lookup search failed"
+                    Message="{Binding ErrorMessage}" Severity="Error"/>
+        <ListView Grid.Row="4" ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
+                  ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling">
+            <ListView.View><GridView>
+                <GridViewColumn Header="Record" DisplayMemberBinding="{Binding Label}" Width="340"/>
+                <GridViewColumn Header="Created (UTC)" DisplayMemberBinding="{Binding CreatedOn}" Width="155"/>
+                <GridViewColumn Header="Created by" DisplayMemberBinding="{Binding CreatedBy}" Width="120"/>
+            </GridView></ListView.View>
+        </ListView>
+        <StackPanel Grid.Row="5" Margin="0,8,0,0">
+            <TextBlock Text="{Binding Status}" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Select highlighted record" Command="{Binding AddHighlightedCommand}"/>
+                <Button Content="Next page" Command="{Binding NextPageCommand}" Margin="8,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</UserControl>
