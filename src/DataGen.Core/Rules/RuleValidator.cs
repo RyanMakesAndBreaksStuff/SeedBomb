@@ -139,6 +139,10 @@ public static class RuleValidator
         if (!eligibility.IsSettable)
             return Invalid($"Column '{attr.LogicalName}' is not a rule target: {eligibility.Reason}.");
 
+        if (attr is LookupAttributeMetadata
+            && rule is not (ConstantRule or OneOfRule or NullRule or LookupRandomRule))
+            return Invalid($"'{attr.LogicalName}' lookup rules must be constant, one-of, null, or lookupRandom.");
+
         return rule switch
         {
             BogusRule b => ValidateBogus(b, attr, context),
@@ -148,6 +152,9 @@ public static class RuleValidator
             PatternRule p => ValidatePattern(p, attr, context.RecordCount, context.RunId),
             SequenceRule s => ValidateSequence(s, attr, context.RecordCount),
             NullRule n => ValidateNull(n, attr),
+            LookupRandomRule => attr is LookupAttributeMetadata
+                ? Valid(rule)
+                : Invalid($"lookupRandom applies to lookup columns only ('{attr.LogicalName}')."),
             _ => Invalid($"Unknown rule type '{rule.GetType().Name}'."),
         };
     }
@@ -183,12 +190,34 @@ public static class RuleValidator
             => Invalid($"'{attr.LogicalName}' expects a number."),
         _ when IsNumeric(attr) && OutOfBounds(attr, c.Value.GetDecimal())
             => Invalid($"Value {c.Value} is outside metadata bounds for '{attr.LogicalName}'."),
+        LookupAttributeMetadata lookup => ValidateLookupConstant(c, lookup),
         _ => Valid(c),
     };
 
+    private static RuleValidationResult ValidateLookupConstant(
+        ConstantRule rule, LookupAttributeMetadata attr)
+        => LookupRuleValue.TryParse(rule.Value, attr, out var value, out var error)
+            ? Valid(new ConstantRule(value!.ToJson()))
+            : Invalid($"'{attr.LogicalName}': {error}");
+
     private static RuleValidationResult ValidateOneOf(OneOfRule o, AttributeMetadata attr)
     {
-        if (o.Values.Count < 2) return Invalid("one-of needs at least 2 values.");
+        if (o.Values is null || o.Values.Count < 2)
+            return Invalid(attr is LookupAttributeMetadata
+                ? "Choose at least two records for one-of, or use constant for one record."
+                : "one-of needs at least 2 values.");
+        if (!Enum.IsDefined(o.Pick)) return Invalid("Unknown one-of pick mode.");
+        if (attr is LookupAttributeMetadata lookup)
+        {
+            var normalized = new List<JsonElement>(o.Values.Count);
+            for (var index = 0; index < o.Values.Count; index++)
+            {
+                if (!LookupRuleValue.TryParse(o.Values[index], lookup, out var value, out var error))
+                    return Invalid($"'{attr.LogicalName}', value {index + 1}: {error}");
+                normalized.Add(value!.ToJson());
+            }
+            return Valid(o with { Values = normalized.AsReadOnly() });
+        }
         if (attr is EnumAttributeMetadata e)
         {
             var bad = o.Values.Where(v => !OptionExists(e, v)).ToList();

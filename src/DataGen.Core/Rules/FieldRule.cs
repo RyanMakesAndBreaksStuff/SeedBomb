@@ -17,6 +17,7 @@ namespace DataGen.Core.Rules;
 [JsonDerivedType(typeof(SequenceRule), "sequence")]
 [JsonDerivedType(typeof(NullRule), "null")]
 [JsonDerivedType(typeof(BogusRule), "bogus")]
+[JsonDerivedType(typeof(LookupRandomRule), "lookupRandom")]
 public abstract record FieldRule
 {
     /// <summary>Serializer options shared by profiles and config plumbing.</summary>
@@ -79,6 +80,13 @@ public sealed record BogusRule : FieldRule
 
     /// <summary>Cloned, immutable, ordinal-keyed arguments. Never exposes a mutable backing store.</summary>
     public IReadOnlyDictionary<string, JsonElement> Args => _args;
+}
+
+/// <summary>Draws from the immutable external candidate set prepared for this run.</summary>
+public sealed record LookupRandomRule : FieldRule
+{
+    /// <summary>Maximum existing candidates captured from each target table.</summary>
+    public const int MaximumCandidatesPerTarget = 1000;
 }
 
 /// <summary>Pick mode for <see cref="OneOfRule"/>.</summary>

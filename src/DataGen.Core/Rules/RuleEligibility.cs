@@ -30,7 +30,7 @@ public enum EligibilityReason
     /// <summary>File/image — needs the upload API.</summary>
     BinaryUpload,
 
-    /// <summary>Lookup — out of scope in v1.</summary>
+    /// <summary>Unsupported lookup shape — party list, empty or invalid targets, or a non-customer multi-target lookup.</summary>
     Lookup,
 
     /// <summary>Type discriminator of a polymorphic lookup (Owner/Customer) — Dataverse never
@@ -42,6 +42,9 @@ public enum EligibilityReason
 
     /// <summary>MultiSelect — rule editing planned for v2 (D5; listed disabled, not excluded).</summary>
     MultiSelectV2,
+
+    /// <summary>Owner is assigned by the platform, not by a field rule.</summary>
+    OwnerAssigned,
 }
 
 /// <summary>Classification result for one attribute.</summary>
@@ -75,8 +78,24 @@ public static class RuleEligibility
             return new(false, EligibilityReason.BaseCurrency);
         if (FieldFilter.IsFileOrImageColumn(attr))
             return new(false, EligibilityReason.BinaryUpload);
-        if (attr is LookupAttributeMetadata)
+        if (attr.AttributeType == AttributeTypeCode.Owner
+            || string.Equals(attr.LogicalName, "ownerid", StringComparison.OrdinalIgnoreCase))
+            return new(false, EligibilityReason.OwnerAssigned);
+        if (attr.AttributeType == AttributeTypeCode.PartyList)
             return new(false, EligibilityReason.Lookup);
+        if (attr is LookupAttributeMetadata lookup)
+        {
+            if (lookup.Targets is null || lookup.Targets.Length == 0
+                || lookup.Targets.Any(string.IsNullOrWhiteSpace))
+                return new(false, EligibilityReason.Lookup);
+            var targets = (lookup.Targets ?? [])
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (targets.Length == 0
+                || (lookup.AttributeType != AttributeTypeCode.Customer
+                    && (lookup.AttributeType != AttributeTypeCode.Lookup || targets.Length != 1)))
+                return new(false, EligibilityReason.Lookup);
+        }
         if (attr is EntityNameAttributeMetadata)
             return new(false, EligibilityReason.PolymorphicType);
         if (attr is MultiSelectPicklistAttributeMetadata)

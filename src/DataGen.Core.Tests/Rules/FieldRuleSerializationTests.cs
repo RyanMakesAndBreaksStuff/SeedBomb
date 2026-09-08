@@ -14,6 +14,7 @@ public class FieldRuleSerializationTests
     [InlineData("""{"op":"pattern","template":"dg+{seq:0000}@test.invalid"}""", typeof(PatternRule))]
     [InlineData("""{"op":"sequence","start":0,"step":1}""", typeof(SequenceRule))]
     [InlineData("""{"op":"null"}""", typeof(NullRule))]
+    [InlineData("""{"op":"lookupRandom"}""", typeof(LookupRandomRule))]
     public void Deserializes_each_op(string json, Type expected)
     {
         var rule = JsonSerializer.Deserialize<FieldRule>(json, Options);
@@ -84,5 +85,45 @@ public class FieldRuleSerializationTests
         var json = JsonSerializer.Serialize<FieldRule>(rule, Options);
         var back = JsonSerializer.Deserialize<FieldRule>(json, Options);
         Assert.Equal(json, JsonSerializer.Serialize(back, Options));
+    }
+
+    [Fact]
+    public void LookupRandom_deserializes_as_marker()
+    {
+        var rule = JsonSerializer.Deserialize<FieldRule>("""{"op":"lookupRandom"}""", Options);
+        Assert.IsType<LookupRandomRule>(rule);
+        var json = JsonSerializer.Serialize<FieldRule>(new LookupRandomRule(), Options);
+        Assert.IsType<LookupRandomRule>(JsonSerializer.Deserialize<FieldRule>(json, Options));
+    }
+
+    [Fact]
+    public void Lookup_identity_without_name_round_trips()
+    {
+        const string json = """
+            {"op":"constant","value":{"entity":"account","id":"11111111-1111-1111-1111-111111111111"}}
+            """;
+
+        var rule = Assert.IsType<ConstantRule>(JsonSerializer.Deserialize<FieldRule>(json, Options));
+        Assert.Equal("account", rule.Value.GetProperty("entity").GetString());
+        Assert.Equal("11111111-1111-1111-1111-111111111111", rule.Value.GetProperty("id").GetString());
+        Assert.False(rule.Value.TryGetProperty("name", out _));
+
+        var again = Assert.IsType<ConstantRule>(
+            JsonSerializer.Deserialize<FieldRule>(JsonSerializer.Serialize<FieldRule>(rule, Options), Options));
+        Assert.Equal("account", again.Value.GetProperty("entity").GetString());
+        Assert.Equal("11111111-1111-1111-1111-111111111111", again.Value.GetProperty("id").GetString());
+        Assert.False(again.Value.TryGetProperty("name", out _));
+    }
+
+    [Fact]
+    public void Lookup_identity_with_name_round_trips()
+    {
+        var value = new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Contoso").ToJson();
+        var rule = new ConstantRule(value);
+        var json = JsonSerializer.Serialize<FieldRule>(rule, Options);
+        var back = Assert.IsType<ConstantRule>(JsonSerializer.Deserialize<FieldRule>(json, Options));
+        Assert.Equal("account", back.Value.GetProperty("entity").GetString());
+        Assert.Equal("11111111-1111-1111-1111-111111111111", back.Value.GetProperty("id").GetString());
+        Assert.Equal("Contoso", back.Value.GetProperty("name").GetString());
     }
 }
