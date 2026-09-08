@@ -14,18 +14,32 @@ public class RuledGenerationTests
 
     // Mirrors BulkCreatorTests.BuildSut — real collaborators, mocked service, ExecuteMultiple-only
     // fallback so every CreateRequest.Target is captured for payload inspection.
-    private static (BulkCreator sut, List<Entity> captured) BuildSut()
+    private static (BulkCreator sut, List<Entity> captured) BuildSut(
+        IReadOnlyList<Entity>? currencyEntities = null)
     {
         var serviceMock = new Mock<IOrganizationServiceAsync2>();
         serviceMock
             .Setup(s => s.RetrieveMultipleAsync(It.IsAny<QueryBase>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new EntityCollection());
+            .ReturnsAsync((QueryBase q, CancellationToken _) =>
+            {
+                if (currencyEntities is not null
+                    && q is QueryExpression qe
+                    && string.Equals(qe.EntityName, "transactioncurrency", StringComparison.OrdinalIgnoreCase))
+                    return new EntityCollection([.. currencyEntities]);
+                return new EntityCollection();
+            });
 
         var captured = new List<Entity>();
         serviceMock
             .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
             {
+                if (req is CreateMultipleRequest cmr)
+                {
+                    foreach (var entity in cmr.Targets.Entities)
+                        captured.Add(entity);
+                    return new OrganizationResponse();
+                }
                 if (req is ExecuteMultipleRequest emr)
                 {
                     var responses = new ExecuteMultipleResponseItemCollection();
@@ -235,7 +249,38 @@ public class RuledGenerationTests
     }
 
     [Fact]
-    public async Task Status_alternate_key_lookup_and_multiselect_rules_fail_before_any_create_call()
+    public async Task System_required_lookup_accepts_valid_explicit_constant()
+    {
+        var attr = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid", Targets = ["account"], IsValidForCreate = true,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired),
+        };
+        var graph = new DependencyGraph();
+        graph.AddNode("ruled_ineligible");
+        var (sut, captured) = BuildSut();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["ruled_ineligible"],
+            RecordCounts = new() { ["ruled_ineligible"] = 2 },
+            FieldRules = new()
+            {
+                ["ruled_ineligible"] = new()
+                {
+                    ["parentaccountid"] = new ConstantRule(J(
+                        """{"entity":"account","id":"11111111-1111-1111-1111-111111111111"}""")),
+                },
+            },
+        };
+        await sut.CreateAsync(config,
+            new Dictionary<string, EntityMetadata> { ["ruled_ineligible"] = BuildMetaWithAttribute(attr) }, graph);
+        Assert.Equal(2, captured.Count);
+        Assert.All(captured, e => Assert.Equal(Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Assert.IsType<EntityReference>(e["parentaccountid"]).Id));
+    }
+
+    [Fact]
+    public async Task Status_alternate_key_malformed_lookup_and_multiselect_rules_fail_before_any_create_call()
     {
         // statecode is platform-owned state — RuleEligibility.StateCode.
         var statecodeAttr = new StateAttributeMetadata { LogicalName = "statecode" };
@@ -247,9 +292,17 @@ public class RuledGenerationTests
         var altKey = new EntityKeyMetadata { LogicalName = "externalid_key", KeyAttributes = ["externalid"] };
         var altKeyMeta = BuildMetaWithAttribute(altKeyAttr, [altKey]);
 
-        // Lookups are out of scope in v1 — RuleEligibility.Lookup.
+        // Numeric lookup values are malformed lookup data, not a blanket lookup ban.
         var lookupAttr = new LookupAttributeMetadata { LogicalName = "parentcustomerid", Targets = ["account"] };
         var lookupMeta = BuildMetaWithAttribute(lookupAttr);
+
+        // Owner is assigned by the platform — RuleEligibility.OwnerAssigned.
+        var ownerAttr = new LookupAttributeMetadata { LogicalName = "ownerid", Targets = ["systemuser", "team"] };
+        var ownerMeta = BuildMetaWithAttribute(ownerAttr);
+
+        // Non-customer multi-target lookups are unsupported — RuleEligibility.Lookup.
+        var regardingAttr = new LookupAttributeMetadata { LogicalName = "regardingobjectid", Targets = ["account", "contact"] };
+        var regardingMeta = BuildMetaWithAttribute(regardingAttr);
 
         // MultiSelect editing is v2 — RuleEligibility.MultiSelectV2.
         var multiSelectAttr = new MultiSelectPicklistAttributeMetadata { LogicalName = "multipick" };
@@ -260,6 +313,8 @@ public class RuledGenerationTests
             ("ruled_ineligible", statecodeMeta, "statecode"),
             ("ruled_ineligible", altKeyMeta, "externalid"),
             ("ruled_ineligible", lookupMeta, "parentcustomerid"),
+            ("ruled_ineligible", ownerMeta, "ownerid"),
+            ("ruled_ineligible", regardingMeta, "regardingobjectid"),
             ("ruled_ineligible", multiSelectMeta, "multipick"),
         };
 
@@ -284,6 +339,220 @@ public class RuledGenerationTests
             Assert.False(string.IsNullOrWhiteSpace(ex.Message));
             Assert.Contains(logicalName, ex.Message);
             Assert.Empty(captured);
+        }
+    }
+
+    private static EntityMetadata BuildNamedMeta(string logicalName, params AttributeMetadata[] attrs)
+    {
+        var meta = new EntityMetadata { LogicalName = logicalName };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, attrs);
+        return meta;
+    }
+
+    [Fact]
+    public async Task Explicit_constant_breaks_an_otherwise_required_cycle()
+    {
+        var alphaLookup = new LookupAttributeMetadata
+        {
+            LogicalName = "betaid",
+            Targets = ["beta"],
+            IsValidForCreate = true,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired),
+        };
+        var betaLookup = new LookupAttributeMetadata
+        {
+            LogicalName = "alphaid",
+            Targets = ["alpha"],
+            IsValidForCreate = true,
+            RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired),
+        };
+        var meta = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["alpha"] = BuildNamedMeta("alpha", alphaLookup),
+            ["beta"] = BuildNamedMeta("beta", betaLookup),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["alpha", "beta"],
+            RecordCounts = new() { ["alpha"] = 2, ["beta"] = 0 },
+            FieldRules = new()
+            {
+                ["alpha"] = new()
+                {
+                    ["betaid"] = new ConstantRule(J(
+                        """{"entity":"beta","id":"11111111-1111-1111-1111-111111111111"}""")),
+                },
+            },
+        };
+
+        var builder = new GraphBuilder(NullLogger<GraphBuilder>.Instance);
+        var detector = new CycleDetector(NullLogger<CycleDetector>.Instance);
+        var unruledGraph = builder.Build(meta);
+        var unruledCycles = detector.FindStronglyConnectedComponents(unruledGraph);
+        Assert.NotEmpty(unruledCycles);
+        Assert.Throws<UnbreakableCycleException>(() => detector.BreakCycles(unruledGraph, unruledCycles, meta));
+
+        bool IsExplicitLookup(string table, string column) =>
+            LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
+        var graph = builder.Build(meta, IsExplicitLookup);
+        var cycles = detector.FindStronglyConnectedComponents(graph);
+        if (cycles.Count > 0)
+            detector.BreakCycles(graph, cycles, meta, IsExplicitLookup);
+
+        var (sut, captured) = BuildSut();
+        await sut.CreateAsync(config, meta, graph);
+        Assert.Equal(2, captured.Count);
+        Assert.All(captured, e => Assert.Equal(Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Assert.IsType<EntityReference>(e["betaid"]).Id));
+    }
+
+    [Fact]
+    public async Task Explicit_currency_rule_wins_after_money_generation()
+    {
+        var poolCurrencyId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var ruledCurrencyId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var altCurrencyId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var money = new MoneyAttributeMetadata { LogicalName = "revenue", MinValue = 0, MaxValue = 100_000, Precision = 2 };
+        var currencyLookup = new LookupAttributeMetadata
+        {
+            LogicalName = "transactioncurrencyid",
+            Targets = ["transactioncurrency"],
+            IsValidForCreate = true,
+        };
+
+        async Task<List<Entity>> RunAsync(FieldRule rule)
+        {
+            var graph = new DependencyGraph();
+            graph.AddNode("ruled_special");
+            var (sut, captured) = BuildSut([new Entity("transactioncurrency") { Id = poolCurrencyId }]);
+            var config = new GenerationConfig
+            {
+                EntityLogicalNames = ["ruled_special"],
+                RecordCounts = new() { ["ruled_special"] = 2 },
+                FieldRules = new()
+                {
+                    ["ruled_special"] = new() { ["transactioncurrencyid"] = rule },
+                },
+            };
+            await sut.CreateAsync(config,
+                new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["ruled_special"] = BuildNamedMeta("ruled_special", money, currencyLookup),
+                }, graph);
+            return captured;
+        }
+
+        var constantCaptured = await RunAsync(new ConstantRule(J(
+            """{"entity":"transactioncurrency","id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}""")));
+        Assert.Equal(2, constantCaptured.Count);
+        Assert.All(constantCaptured, e =>
+        {
+            var eref = Assert.IsType<EntityReference>(e["transactioncurrencyid"]);
+            Assert.Equal("transactioncurrency", eref.LogicalName);
+            Assert.Equal(ruledCurrencyId, eref.Id);
+            Assert.NotEqual(poolCurrencyId, eref.Id);
+        });
+
+        var oneOfCaptured = await RunAsync(new OneOfRule(
+        [
+            J("""{"entity":"transactioncurrency","id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}"""),
+            J("""{"entity":"transactioncurrency","id":"cccccccc-cccc-cccc-cccc-cccccccccccc"}"""),
+        ], OneOfPick.Cycle));
+        Assert.Equal(2, oneOfCaptured.Count);
+        Assert.All(oneOfCaptured, e =>
+        {
+            var eref = Assert.IsType<EntityReference>(e["transactioncurrencyid"]);
+            Assert.Equal("transactioncurrency", eref.LogicalName);
+            Assert.Contains(eref.Id, (Guid[])[ruledCurrencyId, altCurrencyId]);
+            Assert.NotEqual(poolCurrencyId, eref.Id);
+        });
+
+        var nullCaptured = await RunAsync(new NullRule());
+        Assert.Equal(2, nullCaptured.Count);
+        Assert.All(nullCaptured, e => Assert.False(e.Contains("transactioncurrencyid")));
+    }
+
+    [Fact]
+    public async Task Invalid_lookup_on_later_table_prevents_every_create()
+    {
+        var accountName = new StringAttributeMetadata { LogicalName = "name", MaxLength = 100, IsValidForCreate = true };
+        var contactLookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            Targets = ["account"],
+            IsValidForCreate = true,
+        };
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var (sut, captured) = BuildSut();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new() { ["account"] = 3, ["contact"] = 2 },
+            FieldRules = new()
+            {
+                ["contact"] = new() { ["parentaccountid"] = new ConstantRule(J("1")) },
+            },
+        };
+        var meta = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = BuildNamedMeta("account", accountName),
+            ["contact"] = BuildNamedMeta("contact", contactLookup),
+        };
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() => sut.CreateAsync(config, meta, graph));
+        Assert.Contains("parentaccountid", ex.Message);
+        Assert.Empty(captured);
+    }
+
+    [Fact]
+    public async Task Lookup_before_unruled_text_preserves_legacy_stream_for_fixed_topology()
+    {
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            Targets = ["account"],
+            IsValidForCreate = true,
+        };
+        var name = new StringAttributeMetadata { LogicalName = "name", MaxLength = 100, IsValidForCreate = true };
+        var meta = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = BuildNamedMeta("contact", lookup, name),
+        };
+
+        var graphA = new DependencyGraph();
+        graphA.AddNode("contact");
+        var (sutA, capturedA) = BuildSut();
+        await sutA.CreateAsync(new GenerationConfig
+        {
+            EntityLogicalNames = ["contact"],
+            RecordCounts = new() { ["contact"] = 5 },
+        }, meta, graphA);
+
+        var graphB = new DependencyGraph();
+        graphB.AddNode("contact");
+        var (sutB, capturedB) = BuildSut();
+        await sutB.CreateAsync(new GenerationConfig
+        {
+            EntityLogicalNames = ["contact"],
+            RecordCounts = new() { ["contact"] = 5 },
+            FieldRules = new()
+            {
+                ["contact"] = new()
+                {
+                    ["parentaccountid"] = new ConstantRule(J(
+                        """{"entity":"account","id":"11111111-1111-1111-1111-111111111111"}""")),
+                },
+            },
+        }, meta, graphB);
+
+        Assert.Equal(5, capturedA.Count);
+        Assert.Equal(capturedA.Count, capturedB.Count);
+        for (int i = 0; i < capturedA.Count; i++)
+        {
+            Assert.Equal(capturedA[i]["name"], capturedB[i]["name"]);
+            var ruled = Assert.IsType<EntityReference>(capturedB[i]["parentaccountid"]);
+            Assert.Equal(Guid.Parse("11111111-1111-1111-1111-111111111111"), ruled.Id);
         }
     }
 }

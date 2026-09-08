@@ -40,6 +40,10 @@ public class DeferredLookupBackfill(
     /// <param name="seed">RNG seed for deterministic target selection. Should match the generation seed.</param>
     /// <param name="maxRetries">Maximum number of retry attempts for throttle faults.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="isExplicitLookup">
+    /// Optional predicate identifying lookup columns that supply their own value or omission
+    /// and must not be overwritten during backfill. Arguments are source table and column logical names.
+    /// </param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> BackfillLookupsAsync(
         DependencyGraph graph,
@@ -47,7 +51,8 @@ public class DeferredLookupBackfill(
         int batchSize,
         int seed = 42,
         int maxRetries = 3,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<string, string, bool>? isExplicitLookup = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(pool);
@@ -94,13 +99,17 @@ public class DeferredLookupBackfill(
                         if (targetIds.Count > 0)
                         {
                             var targetId = targetIds[rng.Next(targetIds.Count)];
-                            update[deferred.FieldLogicalName] = new EntityReference(targetEntity, targetId);
+                            if (isExplicitLookup?.Invoke(sourceEntity, deferred.FieldLogicalName) != true)
+                                update[deferred.FieldLogicalName] = new EntityReference(targetEntity, targetId);
                             break;
                         }
                     }
                 }
                 return update;
-            }).ToList();
+            }).Where(u => u.Attributes.Count > 0).ToList();
+
+            if (updates.Count == 0)
+                continue;
 
             var useUpdateMultiple = await _messageAvailabilityChecker.IsUpdateMultipleAvailableAsync(sourceEntity, ct).ConfigureAwait(false);
             var batchErrors = useUpdateMultiple

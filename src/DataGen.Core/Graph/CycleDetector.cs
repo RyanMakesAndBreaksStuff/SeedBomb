@@ -100,10 +100,15 @@ public class CycleDetector(ILogger<CycleDetector> logger)
     /// <param name="graph">The dependency graph to modify.</param>
     /// <param name="cycles">The SCCs to break.</param>
     /// <param name="entityMetadata">Metadata for looking up field required levels.</param>
+    /// <param name="isExplicitLookup">
+    /// Optional predicate identifying lookup columns that supply their own value or omission
+    /// and must not be selected for deferral. Arguments are source table and column logical names.
+    /// </param>
     public void BreakCycles(
         DependencyGraph graph,
         IReadOnlyList<IReadOnlyList<string>> cycles,
-        IReadOnlyDictionary<string, EntityMetadata> entityMetadata)
+        IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
+        Func<string, string, bool>? isExplicitLookup = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(cycles);
@@ -133,6 +138,11 @@ public class CycleDetector(ILogger<CycleDetector> logger)
 
                 foreach (var lookup in lookups)
                 {
+                    if (lookup.LogicalName is null)
+                        continue;
+                    if (isExplicitLookup?.Invoke(entity, lookup.LogicalName) == true)
+                        continue;
+
                     var cycleTargets = lookup.Targets!
                         .Where(t => cycleSet.Contains(t) && targets.Contains(t))
                         .ToArray();

@@ -148,4 +148,48 @@ public class CycleDetectorTests
         Assert.Throws<ArgumentNullException>(() =>
             _detector.BreakCycles(graph, [], null!));
     }
+
+    [Fact]
+    public void Cycle_breaking_never_defers_a_ruled_sibling()
+    {
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        graph.AddEdge("account", "contact");
+
+        var contact = new EntityMetadata { LogicalName = "contact" };
+        SetReadOnlyProperty(contact, "Attributes", new AttributeMetadata[]
+        {
+            new LookupAttributeMetadata
+            {
+                LogicalName = "ruledaccountid",
+                IsValidForCreate = true,
+                Targets = ["account"],
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            },
+            new LookupAttributeMetadata
+            {
+                LogicalName = "unruledaccountid",
+                IsValidForCreate = true,
+                Targets = ["account"],
+                RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None),
+            },
+        });
+
+        var entityMetadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = contact,
+            ["account"] = MakeEntityWithLookup("account", "primarycontactid", ["contact"],
+                AttributeRequiredLevel.SystemRequired),
+        };
+
+        var cycles = _detector.FindStronglyConnectedComponents(graph);
+        _detector.BreakCycles(graph, cycles, entityMetadata,
+            (table, column) => string.Equals(table, "contact", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(column, "ruledaccountid", StringComparison.OrdinalIgnoreCase));
+
+        var deferred = Assert.Single(graph.DeferredEdges["contact"]);
+        Assert.Equal("unruledaccountid", deferred.FieldLogicalName);
+        Assert.DoesNotContain(graph.DeferredEdges.SelectMany(p => p.Value),
+            d => string.Equals(d.FieldLogicalName, "ruledaccountid", StringComparison.OrdinalIgnoreCase));
+    }
 }
