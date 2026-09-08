@@ -76,6 +76,9 @@ public class BulkCreator : IBulkCreator
 
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
+            var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata,
+                _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
+
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
             await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
@@ -117,7 +120,7 @@ public class BulkCreator : IBulkCreator
                     recordCount, entityName);
 
                 var (createdIds, errors) = await CreateEntityRecordsAsync(
-                    entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, progress, ct).ConfigureAwait(false);
+                    entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, lookupRun, progress, ct).ConfigureAwait(false);
 
                 pool.Add(entityName, createdIds);
                 allCreatedRecords[entityName] = createdIds.AsReadOnly();
@@ -181,6 +184,7 @@ public class BulkCreator : IBulkCreator
         int effectiveDop,
         DataverseRecordPool pool,
         PreparedBogusRun? preparedRun,
+        PreparedLookupRun lookupRun,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
@@ -272,7 +276,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
@@ -284,7 +288,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -295,7 +299,7 @@ public class BulkCreator : IBulkCreator
             {
                 if (attr.LogicalName is null || !tableRules.TryGetValue(attr.LogicalName, out var rule))
                     continue;
-                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
+                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -779,8 +783,14 @@ public class BulkCreator : IBulkCreator
         RuleEvaluationContext context,
         int rowIndex,
         PreparedBogusRun? preparedRun,
+        PreparedLookupRun lookupRun,
         BogusEvaluatorSession session)
     {
+        if (rule is LookupRandomRule)
+            return RuleValueGenerator.EvaluateLookupRandom(
+                lookupRun.Get(context.Table, attr.LogicalName!), context.Seed,
+                context.Table, attr.LogicalName!, rowIndex);
+
         if (rule is not BogusRule bogus)
             return RuleValueGenerator.Evaluate(rule, attr, context.Seed, context.Table, rowIndex, context.RunId);
 

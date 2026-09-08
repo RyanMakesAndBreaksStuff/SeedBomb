@@ -221,6 +221,28 @@ public sealed class LookupRuleTests
         var ex = Assert.Throws<InvalidOperationException>(() =>
             RuleValueGenerator.EvaluateLookupRandom([], 42, "contact", "parentaccountid", 0));
         Assert.Contains("No prepared candidates", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("contact.parentaccountid", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EvaluateLookupRandom_is_stable_when_rows_are_evaluated_out_of_order()
+    {
+        var candidates = new LookupRuleValue[]
+        {
+            new("account", Guid.Parse("11111111-1111-1111-1111-111111111111")),
+            new("account", Guid.Parse("22222222-2222-2222-2222-222222222222")),
+            new("contact", Guid.Parse("33333333-3333-3333-3333-333333333333")),
+        };
+        var row1 = RuleValueGenerator.EvaluateLookupRandom(candidates, 42, "contact", "customerid", 1);
+        var row0 = RuleValueGenerator.EvaluateLookupRandom(candidates, 42, "contact", "customerid", 0);
+        var row1Again = RuleValueGenerator.EvaluateLookupRandom(candidates, 42, "contact", "customerid", 1);
+        var row0Again = RuleValueGenerator.EvaluateLookupRandom(candidates, 42, "contact", "customerid", 0);
+        Assert.Equal(row1.LogicalName, row1Again.LogicalName);
+        Assert.Equal(row1.Id, row1Again.Id);
+        Assert.Equal(row0.LogicalName, row0Again.LogicalName);
+        Assert.Equal(row0.Id, row0Again.Id);
+        Assert.Contains(candidates, c => c.Id == row0.Id && c.Entity == row0.LogicalName);
+        Assert.Contains(candidates, c => c.Id == row1.Id && c.Entity == row1.LogicalName);
     }
 
     private static LookupAttributeMetadata SingleTargetLookup() => new()
