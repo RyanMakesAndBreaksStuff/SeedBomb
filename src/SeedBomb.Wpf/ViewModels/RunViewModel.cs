@@ -122,8 +122,8 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Finished timestamp, duration, seed.</summary>
     [ObservableProperty] private string _runMetaLine = "";
 
-    /// <summary>Resource key for the outcome banner style.</summary>
-    [ObservableProperty] private string _outcomeBannerStyle = "DG.InfoBanner";
+    /// <summary>False when the last run produced rejected rows. Drives the outcome banner style.</summary>
+    [ObservableProperty] private bool _lastRunSucceeded = true;
 
     /// <summary>Outcome glyph. Enum, not a Brush.</summary>
     [ObservableProperty] private SymbolRegular _outcomeGlyph = SymbolRegular.CheckmarkCircle24;
@@ -600,7 +600,7 @@ public sealed partial class RunViewModel : ObservableObject
     private void ApplyOutcome(int written, int rejected, TimeSpan elapsed, int tableCount)
     {
         var hasRejects = rejected > 0;
-        OutcomeBannerStyle = hasRejects ? "DG.WarningBanner" : "DG.InfoBanner";
+        LastRunSucceeded = !hasRejects;
         OutcomeGlyph = hasRejects ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24;
         OutcomeHeadline = hasRejects
             ? $"Completed with {rejected:N0} rejected rows"

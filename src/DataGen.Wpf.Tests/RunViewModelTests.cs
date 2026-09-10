@@ -246,4 +246,26 @@ public sealed class RunViewModelTests
             try { Directory.Delete(root, recursive: true); } catch (IOException) { }
         }
     }
+
+    [Fact]
+    public void ApplyResult_SetsLastRunSucceeded_FromRejectionCount()
+    {
+        var clean = new RunViewModel();
+        clean.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [],
+        }, seed: 1, environmentHost: "contoso-dev");
+        Assert.True(clean.LastRunSucceeded);
+
+        var rejected = new RunViewModel();
+        rejected.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [new BatchError("account", 0, "Duplicate key on emailaddress1", null)],
+        }, seed: 1, environmentHost: "contoso-dev");
+        Assert.False(rejected.LastRunSucceeded);
+    }
 }
