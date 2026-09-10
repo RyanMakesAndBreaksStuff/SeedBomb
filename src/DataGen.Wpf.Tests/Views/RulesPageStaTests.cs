@@ -14,7 +14,6 @@ using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Dataverse;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Behaviors;
 using Seedbomb.Views.Controls;
 using Seedbomb.Views.Pages;
 using Wpf.Ui;
@@ -135,25 +134,6 @@ public sealed class RulesPageStaTests : IDisposable
         Assert.Equal("", vm.BogusLengthText);
         Assert.False(lengthBox.IsVisible);
         Assert.True(vm.CanSave);
-        Assert.Empty(CapturedBindingErrors);
-    }
-
-    [StaFact]
-    public void FocusFirstError_FocusesVisibleTarget_AndSkipsCollapsed()
-    {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
-        vm.SelectedOp = "bogus";
-        vm.SelectedBogusApi = "NAME";
-        Flush();
-
-        var endpoint = (ComboBox)page.FindName("BogusEndpointComboBox")!;
-        var lengthBox = (TextBox)page.FindName("BogusLengthTextBox")!;
-        Assert.False(lengthBox.IsVisible);
-        Assert.False(ValidationFocusBehavior.FocusFirst(page, RuleInputTarget.Length));
-        Assert.False(lengthBox.IsKeyboardFocusWithin);
-
-        Assert.True(ValidationFocusBehavior.FocusFirstError(page, vm.Messages));
-        Assert.True(endpoint.IsKeyboardFocused || endpoint.IsFocused || endpoint.IsKeyboardFocusWithin);
         Assert.Empty(CapturedBindingErrors);
     }
 

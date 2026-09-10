@@ -10,7 +10,6 @@
       xmlns:vm="clr-namespace:Seedbomb.ViewModels"
       xmlns:sys="clr-namespace:System;assembly=mscorlib"
       xmlns:rules="clr-namespace:DataGen.Core.Rules;assembly=DataGen.Core"
-      xmlns:behaviors="clr-namespace:Seedbomb.Views.Behaviors"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:RuleEditorViewModel}"
@@ -595,7 +594,6 @@
                                           SelectedItem="{Binding SelectedBogusApi, Mode=TwoWay}"
                                           AutomationProperties.LabeledBy="{Binding ElementName=BogusApiLabel}"
                                           AutomationProperties.Name="API"
-                                          behaviors:ValidationFocusBehavior.InputTarget="Api"
                                           TabIndex="0"/>
 
                                 <TextBlock x:Name="BogusEndpointLabel"
@@ -610,7 +608,6 @@
                                           SelectedValue="{Binding SelectedBogusEndpoint, Mode=TwoWay}"
                                           AutomationProperties.LabeledBy="{Binding ElementName=BogusEndpointLabel}"
                                           AutomationProperties.Name="Endpoint"
-                                          behaviors:ValidationFocusBehavior.InputTarget="Endpoint"
                                           TabIndex="1"/>
 
                                 <Grid Margin="0,8,0,0"
@@ -630,7 +627,6 @@
                                                  Text="{Binding BogusMinNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                                                  AutomationProperties.LabeledBy="{Binding ElementName=BogusMinNumberLabel}"
                                                  AutomationProperties.Name="Minimum"
-                                                 behaviors:ValidationFocusBehavior.InputTarget="Minimum"
                                                  TabIndex="2"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
@@ -642,7 +638,6 @@
                                                  Text="{Binding BogusMaxNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                                                  AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxNumberLabel}"
                                                  AutomationProperties.Name="Maximum"
-                                                 behaviors:ValidationFocusBehavior.InputTarget="Maximum"
                                                  TabIndex="3"/>
                                     </StackPanel>
                                 </Grid>
@@ -658,7 +653,6 @@
                                              Text="{Binding BogusLengthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                                              AutomationProperties.LabeledBy="{Binding ElementName=BogusLengthLabel}"
                                              AutomationProperties.Name="Length"
-                                             behaviors:ValidationFocusBehavior.InputTarget="Length"
                                              TabIndex="2"/>
                                 </StackPanel>
 
@@ -684,7 +678,6 @@
                                                      Text="{Binding BogusMinDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
                                                      AutomationProperties.LabeledBy="{Binding ElementName=BogusMinDateLabel}"
                                                      AutomationProperties.Name="Minimum date"
-                                                     behaviors:ValidationFocusBehavior.InputTarget="MinimumDate"
                                                      TabIndex="2"/>
                                             <ui:CalendarDatePicker x:Name="BogusMinDatePicker" Grid.Column="1"
                                                                    Date="{Binding BogusMinDate, Mode=TwoWay}"
@@ -705,7 +698,6 @@
                                                      Text="{Binding BogusMaxDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
                                                      AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxDateLabel}"
                                                      AutomationProperties.Name="Maximum date"
-                                                     behaviors:ValidationFocusBehavior.InputTarget="MaximumDate"
                                                      TabIndex="3"/>
                                             <ui:CalendarDatePicker x:Name="BogusMaxDatePicker" Grid.Column="1"
                                                                    Date="{Binding BogusMaxDate, Mode=TwoWay}"
