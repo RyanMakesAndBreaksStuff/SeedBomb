@@ -16,6 +16,7 @@ using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Theme;
+using Seedbomb.Services.Diagnostics;
 using System.Windows;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
@@ -34,6 +35,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
         try
         {
 #if DEBUG
@@ -79,20 +81,28 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            try
-            {
-                var path = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "DataGen", "startup-error.log");
-                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-                System.IO.File.WriteAllText(path, ex.ToString());
-            }
-            catch { /* best-effort diagnostic */ }
-
+            CrashLog.Write(ex);
             MessageBox.Show($"Startup failed: {ex}", "DataGen",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    // Learn: DispatcherUnhandledException has no protected virtual counterpart, so an
+    // Application subclass must subscribe explicitly. Handled=true is set only for
+    // exceptions the process can actually continue past; the rest keep WPF's shutdown.
+    // https://learn.microsoft.com/dotnet/api/system.windows.application.dispatcherunhandledexception
+    private void OnDispatcherUnhandledException(
+        object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+    {
+        CrashLog.Write(e.Exception);
+        if (e.Exception is OutOfMemoryException or StackOverflowException or AccessViolationException)
+            return;
+
+        MessageBox.Show(
+            $"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to the crash log.",
+            "SeedBomb", MessageBoxButton.OK, MessageBoxImage.Error);
+        e.Handled = true;
     }
 
     /// <summary>Shows the main window and populates header user info.</summary>
