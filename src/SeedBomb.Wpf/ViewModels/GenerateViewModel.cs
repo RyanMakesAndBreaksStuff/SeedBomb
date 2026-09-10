@@ -9,7 +9,6 @@ using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk;
 using Seedbomb.ViewModels.Controls;
-using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui;
 using Wpf.Ui.Extensions;
@@ -984,21 +983,9 @@ public sealed partial class GenerateViewModel : ViewModelBase
             if (!Run.KeepWindowOpen)
                 _navigator?.Navigate(typeof(RunSummaryPage));
         }
-        catch (OperationCanceledException)
-        {
-            _snackbar.Show("Cancelled", "Generation cancelled",
-                Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(3));
-        }
-        catch (MsalUiRequiredException)
-        {
-            _snackbar.Show("Session expired", "Please sign in again",
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
-        }
         catch (Exception ex)
         {
-            _snackbar.Show("Error", "Generation failed — see logs for details",
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
-            _logger.LogError(ex, "Generation failed");
+            Run.ReportRunFailure(ex);
         }
         finally
         {

@@ -7,6 +7,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.Logging;
+using Microsoft.Identity.Client;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
@@ -42,6 +44,8 @@ public sealed partial class RunViewModel : ObservableObject
 
     private readonly IWpfGenerationService? _generation;
     private readonly IContentDialogService? _dialogs;
+    private readonly ISnackbarService? _snackbar;
+    private readonly ILogger<RunViewModel>? _logger;
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
 
@@ -65,16 +69,22 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="contentDialogService">Cancel and log dialogs. Null skips them.</param>
     /// <param name="settings">Persists <see cref="KeepWindowOpen"/>.</param>
     /// <param name="navigator">Used by <see cref="OpenInHistory"/>.</param>
+    /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
+    /// <param name="logger">Failure logging. Null suppresses it.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
         ISettingsService? settings = null,
-        IAppNavigator? navigator = null)
+        IAppNavigator? navigator = null,
+        ISnackbarService? snackbar = null,
+        ILogger<RunViewModel>? logger = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
         _settings = settings;
         _navigator = navigator;
+        _snackbar = snackbar;
+        _logger = logger;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
@@ -374,7 +384,39 @@ public sealed partial class RunViewModel : ObservableObject
             FieldRules = rules,
         };
 
-        await ExecuteAsync(retryConfig, _environmentHost, names, counts.Values.Sum());
+        try
+        {
+            await ExecuteAsync(retryConfig, _environmentHost, names, counts.Values.Sum());
+        }
+        catch (Exception ex)
+        {
+            ReportRunFailure(ex);
+        }
+    }
+
+    /// <summary>
+    /// Reports a failed or cancelled run. The single owner of run-failure UX — both
+    /// <see cref="GenerateViewModel"/>'s first run and <see cref="RetrySelectedAsync"/> call this.
+    /// </summary>
+    /// <param name="ex">The failure to report.</param>
+    internal void ReportRunFailure(Exception ex)
+    {
+        switch (ex)
+        {
+            case OperationCanceledException:
+                _snackbar?.Show("Cancelled", "Generation cancelled",
+                    ControlAppearance.Caution, null, TimeSpan.FromSeconds(3));
+                break;
+            case MsalUiRequiredException:
+                _snackbar?.Show("Session expired", "Please sign in again",
+                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
+                break;
+            default:
+                _snackbar?.Show("Error", "Generation failed — see logs for details",
+                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
+                _logger?.LogError(ex, "Generation failed");
+                break;
+        }
     }
 
     private async Task<bool> ConfirmRiskyBogusAsync()

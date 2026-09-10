@@ -140,10 +140,11 @@ public sealed class RunViewModelTests
             Errors = [new BatchError("account", 2, "request throttled", -2147220956)],
         }, seed: 7, environmentHost: "contoso-dev", config: config);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => vm.RetrySelectedCommand.ExecuteAsync(null));
+        // Retry swallows cancellation and reports via ReportRunFailure — the bound command must not throw.
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
 
         Assert.Equal(1, prompted);
+        Assert.False(vm.IsRunning);
         gen.Verify(g => g.GenerateAsync(
             It.IsAny<GenerationConfig>(),
             It.IsAny<IProgress<ProgressUpdate>>(),
@@ -170,5 +171,36 @@ public sealed class RunViewModelTests
         vm.StartRun("contoso-dev", seed: 2, plannedTotal: 10, tables: ["account"]);
 
         Assert.Empty(vm.RecentActivity);
+    }
+
+    [Fact]
+    public async Task RetrySelected_WhenGenerationThrows_ReportsAndDoesNotPropagate()
+    {
+        var gen = new Mock<IWpfGenerationService>();
+        gen.SetupSequence(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(),
+                It.IsAny<IProgress<ProgressUpdate>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "request throttled", -2147220956)],
+            })
+            .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
+
+        var vm = new RunViewModel(generation: gen.Object);
+        await vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            },
+            "contoso-dev", ["account"], 1, TestContext.Current.CancellationToken);
+
+        // Must not throw: the summary page's primary button is bound straight to this command.
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsRunning);
     }
 }
