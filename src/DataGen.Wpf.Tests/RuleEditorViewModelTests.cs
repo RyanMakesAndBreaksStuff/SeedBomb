@@ -400,6 +400,17 @@ public sealed class RuleEditorViewModelTests
         return (vm, navigator, profiles, saved);
     }
 
+    private static async Task<(RuleEditorViewModel Vm, Mock<IProfileService> Profiles)> ReadyEditorAsync()
+    {
+        var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm, _, profiles, _) = await LoadedEditorAsync(
+            existingProfileNames: ["working-set"],
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.ConfirmDeleteRule = _ => Task.FromResult(true);
+        return (vm, profiles);
+    }
+
     [Fact]
     public async Task SaveRuleCommand_commits_without_navigating()
     {
@@ -532,6 +543,32 @@ public sealed class RuleEditorViewModelTests
 
         await vm2.DeleteRuleCommand.ExecuteAsync(null);
         profiles2.Verify(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveRule_WhenStoreThrows_SetsMetadataErrorAndDoesNotPropagate()
+    {
+        var (vm, profiles) = await ReadyEditorAsync();
+        profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("profile file is locked"));
+
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasMetadataError);
+        Assert.Contains("profile file is locked", vm.MetadataError!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeleteRule_WhenStoreThrows_SetsMetadataErrorAndDoesNotPropagate()
+    {
+        var (vm, profiles) = await ReadyEditorAsync();
+        profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("profile is corrupt"));
+
+        await vm.DeleteRuleCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasMetadataError);
+        Assert.Contains("profile is corrupt", vm.MetadataError!, StringComparison.Ordinal);
     }
 
     [Fact]

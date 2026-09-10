@@ -983,9 +983,17 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _profile = _profile with { Tables = tables };
 
         // Generate working-set snapshots are not in the store — callback only, no disk write.
-        var names = await _profiles.ListAsync(ct);
-        if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
-            await _profiles.SaveAsync(_profile, ct);
+        try
+        {
+            var names = await _profiles.ListAsync(ct);
+            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+                await _profiles.SaveAsync(_profile, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FailProfileStore("save", ex);
+            return false;
+        }
 
         _onSaved?.Invoke(_profile);
 
@@ -1059,9 +1067,17 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         tables[idx] = tables[idx] with { Columns = cols };
         _profile = _profile with { Tables = tables };
 
-        var names = await _profiles.ListAsync(ct);
-        if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
-            await _profiles.SaveAsync(_profile, ct);
+        try
+        {
+            var names = await _profiles.ListAsync(ct);
+            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+                await _profiles.SaveAsync(_profile, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FailProfileStore("delete", ex);
+            return;
+        }
 
         _onSaved?.Invoke(_profile);
 
@@ -1934,6 +1950,15 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         NotifyCanSaveChanged();
         RetryMetadataCommand.NotifyCanExecuteChanged();
         PickLookupRecordsCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Routes a profile-store failure to the same banner + snackbar surface as <see cref="FailMetadata"/>.</summary>
+    private void FailProfileStore(string action, Exception ex)
+    {
+        _logger?.LogError(ex, "Failed to {Action} the rule profile", action);
+        _snackbar?.Show($"Couldn't {action} the rule", ex.Message,
+            ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
+        MetadataError = ex.Message;
     }
 
     private static string DescribeMetadataFailure(Exception ex) => ex switch
