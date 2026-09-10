@@ -188,10 +188,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(CanConfigure),
-        nameof(CanExecute),
-        nameof(HasEntities),
-        nameof(SelectedEntitiesSummary),
         nameof(Steps),
         nameof(PlannedTotal),
         nameof(SelectedTableRows),
@@ -204,7 +200,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private IReadOnlyList<EntitySummary> _selectedEntities = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel), nameof(StatusLabel), nameof(Steps), nameof(HasStarted))]
+    [NotifyPropertyChangedFor(nameof(Steps))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoToReviewCommand))]
@@ -213,14 +209,11 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isRunning;
 
     [ObservableProperty]
-    private bool _isCancelling;
-
-    [ObservableProperty]
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(HasResult), nameof(StatusLabel), nameof(Steps), nameof(HasStarted),
+        nameof(HasResult), nameof(Steps),
         nameof(LastRunHasErrors), nameof(LastRunStatusText))]
     private GenerationResult? _lastResult;
 
@@ -272,22 +265,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
     [ObservableProperty] private IReadOnlyList<ReviewPreviewRow> _reviewPreviewRows = [];
 
     // ── Derived ───────────────────────────────────────────────────────────────
-
-    /// <summary>Gets a value indicating whether step 2 (configure) should be visible.</summary>
-    public bool CanConfigure => SelectedEntities.Count > 0;
-
-    /// <summary>Gets a value indicating whether step 3 (execute) should be visible.</summary>
-    public bool CanExecute => CanConfigure;
-
-    /// <summary>Gets a value indicating whether entities have been selected.</summary>
-    public bool HasEntities => SelectedEntities.Count > 0;
-
-    /// <summary>Gets a compact selected-entity summary for step card headers.</summary>
-    public string SelectedEntitiesSummary =>
-        SelectedEntities.Count == 0
-            ? "Waiting"
-            : string.Join(" · ", SelectedEntities.Take(4).Select(e => e.DisplayName)) +
-              (SelectedEntities.Count > 4 ? $" · {SelectedEntities.Count} entities" : string.Empty);
 
     /// <summary>Owned field-rules draft. Tests may swap via <see cref="AttachFieldRules"/>.</summary>
     public FieldRulesViewModel FieldRules => _fieldRules;
@@ -384,9 +361,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         new("Locale", Locale),
     ];
 
-    /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
-    public bool IsGenerating => IsRunning;
-
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
 
@@ -400,15 +374,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 : LastResult.Errors.Count == 1
                     ? LastResult.Errors[0].ErrorMessage
                     : $"{LastResult.Errors.Count} batch errors";
-
-    /// <summary>Gets a value indicating whether generation has started (running or complete) — gates the Execute status card.</summary>
-    public bool HasStarted => IsRunning || HasResult;
-
-    /// <summary>Gets the label for the Generate button.</summary>
-    public string GenerateLabel => IsRunning ? "GENERATING…" : "GENERATE DATA";
-
-    /// <summary>Gets the status panel label.</summary>
-    public string StatusLabel => IsRunning ? "In progress" : (LastResult is null ? "Ready" : "Complete");
 
     /// <summary>Gets the collection of queued entity status dots.</summary>
     public ObservableCollection<QueuedEntityEntry> QueuedEntities { get; } = [];
@@ -923,7 +888,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IsRunning = true;
         CurrentProgress = null;
         LastResult = null;
-        IsCancelling = false;
         _cts = new CancellationTokenSource();
 
         _fieldRules?.Commit();
@@ -989,7 +953,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         finally
         {
             IsRunning = false;
-            IsCancelling = false;
             _cts?.Dispose();
             _cts = null;
         }
