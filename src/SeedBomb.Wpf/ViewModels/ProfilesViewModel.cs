@@ -310,8 +310,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         IEnumerable<ProfileListItem> ordered = _sortMode switch
         {
-            1 => projected.OrderByDescending(p => p.Name, StringComparer.OrdinalIgnoreCase), // placeholder: no mtime
-            2 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
+            1 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
             _ => projected.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
         };
 
@@ -511,7 +510,15 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             return;
         }
 
-        await RefreshAsync(ct);
+        try
+        {
+            await RefreshAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+            return;
+        }
 
         if (GetMetadata is null)
         {
@@ -589,8 +596,15 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     [RelayCommand]
     private async Task CycleSortAsync()
     {
-        _sortMode = (_sortMode + 1) % 3;
-        await RefreshAsync();
+        _sortMode = (_sortMode + 1) % 2;
+        try
+        {
+            await RefreshAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+        }
     }
 
     // A profile with zero tables fails the exact same schema check LoadAsync enforces (see
@@ -637,7 +651,16 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         if (_rulesRequest is null || _navigator is null)
             return;
 
-        _rulesRequest.Profile = await _profiles.LoadAsync(name);
+        try
+        {
+            _rulesRequest.Profile = await _profiles.LoadAsync(name);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+            return;
+        }
+
         _navigator.Navigate(typeof(RulesPage));
     }
 
