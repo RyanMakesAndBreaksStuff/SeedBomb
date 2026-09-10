@@ -264,7 +264,7 @@ public sealed partial class RunViewModel : ObservableObject
     }
 
     /// <summary>Projects a pipeline snapshot onto the sheet.</summary>
-    public void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
+    private void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
     {
         ArgumentNullException.ThrowIfNull(u);
         ArgumentNullException.ThrowIfNull(plannedTables);

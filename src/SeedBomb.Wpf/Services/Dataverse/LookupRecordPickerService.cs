@@ -39,7 +39,6 @@ public sealed class LookupRecordPickerService(IContentDialogService dialogs,
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { return null; }
         finally
         {
-            vm.Dispose();
             // LoadPageAsync observes/logs all failures; closing does not await an uncooperative read.
             _ = load;
         }
