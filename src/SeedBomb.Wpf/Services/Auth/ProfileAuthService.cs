@@ -349,13 +349,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
         else
         {
-            var authority = string.IsNullOrWhiteSpace(profile.TenantId)
-                ? "https://login.microsoftonline.com/common"
-                : $"https://login.microsoftonline.com/{profile.TenantId}";
-
             newPca = PublicClientApplicationBuilder
                 .Create(profile.ClientId)
-                .WithAuthority(authority)
+                .WithAuthority(ResolveCloud(profile), ResolveTenant(profile))
                 .WithDefaultRedirectUri()
                 .Build();
 
@@ -388,13 +384,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
         else
         {
-            var authority = string.IsNullOrWhiteSpace(profile.TenantId)
-                ? "https://login.microsoftonline.com/common"
-                : $"https://login.microsoftonline.com/{profile.TenantId}";
-
             var ccaBuilder = ConfidentialClientApplicationBuilder
                 .Create(profile.ClientId)
-                .WithAuthority(authority);
+                .WithAuthority(ResolveCloud(profile), ResolveTenant(profile));
 
             ccaBuilder = profile.AuthType == AuthType.Certificate
                 ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
@@ -411,6 +403,32 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         return newCca;
     }
+
+    /// <summary>
+    /// Maps a profile's Dataverse host suffix onto its Entra cloud. Public cloud is the
+    /// fallback for anything unrecognised, matching the previous hardcoded behaviour.
+    /// </summary>
+    /// <param name="profile">Profile whose <see cref="ConnectionProfile.EnvironmentUrl"/> selects the cloud.</param>
+    internal static AzureCloudInstance ResolveCloud(ConnectionProfile profile)
+    {
+        if (!Uri.TryCreate(profile.EnvironmentUrl, UriKind.Absolute, out var uri))
+            return AzureCloudInstance.AzurePublic;
+
+        return uri.Host switch
+        {
+            var h when h.EndsWith(".crm.microsoftdynamics.us", StringComparison.OrdinalIgnoreCase)
+                    || h.EndsWith(".crm.appsplatform.us", StringComparison.OrdinalIgnoreCase)
+                    || h.EndsWith(".crm.microsoftdynamics.de", StringComparison.OrdinalIgnoreCase)
+                => AzureCloudInstance.AzureUsGovernment,
+            var h when h.EndsWith(".crm.dynamics.cn", StringComparison.OrdinalIgnoreCase)
+                => AzureCloudInstance.AzureChina,
+            _ => AzureCloudInstance.AzurePublic,
+        };
+    }
+
+    /// <summary>Tenant segment for the authority: the profile's tenant, or "common" when blank.</summary>
+    private static string ResolveTenant(ConnectionProfile profile) =>
+        string.IsNullOrWhiteSpace(profile.TenantId) ? "common" : profile.TenantId;
 
     private static void ValidateProfile(ConnectionProfile profile)
     {
