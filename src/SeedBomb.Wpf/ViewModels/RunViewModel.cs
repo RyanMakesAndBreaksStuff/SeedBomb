@@ -261,7 +261,6 @@ public sealed partial class RunViewModel : ObservableObject
         Metrics.Add(new RunValueRow("Elapsed", "0s", "Normal"));
         Metrics.Add(new RunValueRow("Remaining", "—", "Muted"));
         Metrics.Add(new RunValueRow("Throughput", "0/min", "Normal"));
-        Metrics.Add(new RunValueRow("Rejected", "0", "Normal"));
     }
 
     /// <summary>Projects a pipeline snapshot onto the sheet.</summary>
@@ -742,7 +741,6 @@ public sealed partial class RunViewModel : ObservableObject
         Metrics.Add(new RunValueRow("Elapsed", FormatDuration(u.Elapsed), "Normal"));
         Metrics.Add(new RunValueRow("Remaining", remaining, remainingKind));
         Metrics.Add(new RunValueRow("Throughput", $"{u.RecordsPerMinute:N0}/min", "Normal"));
-        Metrics.Add(new RunValueRow("Rejected", "0", "Normal"));
     }
 
     private void AppendActivity(string line)

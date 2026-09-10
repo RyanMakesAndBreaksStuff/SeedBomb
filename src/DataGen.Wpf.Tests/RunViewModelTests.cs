@@ -301,4 +301,14 @@ public sealed class RunViewModelTests
         Assert.Contains("contoso-uat.crm.dynamics.com", vm.RunDescription, StringComparison.Ordinal);
         Assert.DoesNotContain("written to Dataverse", vm.RunDescription, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void StartRun_DoesNotPublishARejectedMetricTile()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 10, ["account"]);
+
+        Assert.Equal(3, vm.Metrics.Count);
+        Assert.DoesNotContain(vm.Metrics, m => m.Label == "Rejected");
+    }
 }
