@@ -225,9 +225,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         set => SearchText = value;
     }
 
-    /// <summary>Handoff alias for <see cref="AvailableOps"/>.</summary>
-    public IReadOnlyList<string> AvailableOperations => AvailableOps;
-
     /// <summary>Handoff alias for <see cref="SelectedOp"/>.</summary>
     public string SelectedOperation
     {
@@ -377,7 +374,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
             OnPropertyChanged(nameof(AvailableOps));
             OnPropertyChanged(nameof(AvailableOpOptions));
-            OnPropertyChanged(nameof(AvailableOperations));
             NotifyLookupPresentation();
             SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
             if (column is not null

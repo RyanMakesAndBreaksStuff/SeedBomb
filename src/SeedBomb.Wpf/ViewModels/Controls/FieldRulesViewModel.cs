@@ -32,14 +32,11 @@ public sealed partial class FieldRulesViewModel : ObservableObject
     public event EventHandler? DraftChanged;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Rows), nameof(ActiveRuleCount))]
+    [NotifyPropertyChangedFor(nameof(Rows))]
     private string _selectedTable = "";
 
     /// <summary>Rows for the selected table — active rules only; empty list = fully-automatic table (F1b).</summary>
     public ObservableCollection<RuleRow> Rows { get; } = [];
-
-    /// <summary>Active-rule count for the selected table (tab badge).</summary>
-    public int ActiveRuleCount => Rows.Count;
 
     /// <summary>Selects the table whose rules the board shows.</summary>
     public void SelectTable(string table) { SelectedTable = table; RebuildRows(); }
@@ -128,7 +125,6 @@ public sealed partial class FieldRulesViewModel : ObservableObject
             foreach (var (column, entry) in cols.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
                 Rows.Add(new RuleRow(SelectedTable, column, entry.DisplayName, OpBadge(entry.Rule),
                     Summary(entry.Rule), entry.Preview, entry.Rule));
-        OnPropertyChanged(nameof(ActiveRuleCount));
     }
 
     private static Dictionary<string, Dictionary<string, RuleDraftEntry>> Clone(

@@ -62,10 +62,6 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <summary>Flattened day headers and run rows for the virtualized History list.</summary>
     public ObservableCollection<object> FlatItems { get; } = [];
 
-    /// <summary>Currently selected history row.</summary>
-    [ObservableProperty]
-    private RunRecord? _selectedRun;
-
     [ObservableProperty]
     private string _searchText = string.Empty;
 
@@ -193,8 +189,6 @@ public sealed partial class HistoryViewModel : ViewModelBase
     {
         if (run is null)
             return;
-
-        SelectedRun = run;
 
         if (_run is not null && run.Id == _run.CurrentRunId)
         {

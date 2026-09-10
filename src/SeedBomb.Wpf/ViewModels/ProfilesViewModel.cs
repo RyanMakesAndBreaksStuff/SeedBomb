@@ -261,9 +261,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
 
-    /// <summary>Raised when the page should open Rules for the named profile.</summary>
-    public event EventHandler<string>? EditRulesRequested;
-
     /// <summary>Raised when the user confirms an import preview. Arg is the validated report.</summary>
     public event EventHandler<ProfileImportReport>? ProfileApplied;
 
@@ -631,22 +628,17 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private async Task EditRulesAsync()
     {
         if (SelectedItem is null) return;
-        var name = SelectedItem.Name;
-        EditRulesRequested?.Invoke(this, name);
-
         if (_rulesRequest is null || _navigator is null)
             return;
-
         try
         {
-            _rulesRequest.Profile = await _profiles.LoadAsync(name);
+            _rulesRequest.Profile = await _profiles.LoadAsync(SelectedItem.Name);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             SetError(ex.Message);
             return;
         }
-
         _navigator.Navigate(typeof(RulesPage));
     }
 

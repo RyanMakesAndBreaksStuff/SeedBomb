@@ -50,9 +50,6 @@ public static class DesignThemeManager
         return new ThemePaletteOption(id, displayName, light, dark);
     }
 
-    /// <summary>Applies the selected light or dark visual theme using the default palette.</summary>
-    public static void Apply(bool isDark) => Apply(isDark, DefaultPaletteId);
-
     /// <summary>Applies the selected light or dark visual theme for the given palette.</summary>
     /// <param name="isDark">True to apply dark theme resources; false for light.</param>
     /// <param name="paletteId">One of <see cref="AvailablePalettes"/>; unknown IDs fall back to <see cref="DefaultPaletteId"/>.</param>
