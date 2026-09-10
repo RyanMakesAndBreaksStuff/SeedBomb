@@ -36,9 +36,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         _dialogs = dialogs;
     }
 
-    /// <summary>Raised when the drawer should close.</summary>
-    public event EventHandler? DrawerCloseRequested;
-
     /// <summary>Raised after a profile is selected and sign-in succeeds.</summary>
     public event EventHandler<(ConnectionProfile Profile, AuthResult Result)>? ConnectionSwitched;
 
@@ -355,10 +352,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         if (EditingProfile is null) return;
         EditingProfile.ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
     }
-
-    /// <summary>Requests the drawer to close.</summary>
-    [RelayCommand]
-    private void Close() => DrawerCloseRequested?.Invoke(this, EventArgs.Empty);
 
     partial void OnEditingProfileChanging(ConnectionProfile? oldValue, ConnectionProfile? newValue)
     {

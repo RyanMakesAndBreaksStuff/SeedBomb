@@ -4,7 +4,7 @@
 
     Every binding is an existing ConnectionManagerViewModel member: Profiles, SelectedProfile,
     EditingProfile, IsEditing, IsTesting, TestResult, TestSucceeded, IsSwitchingConnection,
-    SwitchError, HasSwitchError + the commands. DrawerCloseRequested is simply unused here.
+    SwitchError, HasSwitchError + the commands.
 -->
 <Page x:Class="Seedbomb.Views.Pages.ConnectionsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
