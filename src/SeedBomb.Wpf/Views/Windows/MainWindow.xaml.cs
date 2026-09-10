@@ -109,9 +109,18 @@ public partial class MainWindow : FluentWindow
 
     private async void OnSignInRequested(object? sender, EventArgs e)
     {
-        var last = await _profileService.GetLastUsedAsync();
-        if (last is not null)
-            await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
+        try
+        {
+            var last = await _profileService.GetLastUsedAsync();
+            if (last is not null)
+                await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
+        }
+        catch (Exception ex)
+        {
+            // async void: nothing above this frame can catch. SwitchError is already bound to
+            // SignInErrorBanner/SignInErrorText via the explicit-source bindings at :100-107.
+            _connectionManagerViewModel.SwitchError = ex.Message;
+        }
     }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
