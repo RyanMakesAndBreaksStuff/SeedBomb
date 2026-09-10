@@ -9,6 +9,7 @@ using DataGen.Core.Contracts;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
+using Seedbomb.Services.Export;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
@@ -63,6 +64,9 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
     internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
+
+    /// <summary>Test seam: overrides the export destination. Null uses the real Downloads folder.</summary>
+    internal string? ExportDirectoryOverride { get; set; }
 
     /// <summary>Optional services so grouping tests can <c>new RunViewModel()</c> and retry can pass a mock.</summary>
     /// <param name="generation">Pipeline used for first run and retry. Null disables retry.</param>
@@ -489,24 +493,33 @@ public sealed partial class RunViewModel : ObservableObject
     [RelayCommand]
     private void ExportRejectedCsv()
     {
-        var downloads = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Downloads");
-        Directory.CreateDirectory(downloads);
-        var path = Path.Combine(downloads, $"seedbomb-rejected-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-
-        var sb = new StringBuilder();
-        sb.AppendLine("Table,Cause,Rows,Disposition,Retryable");
-        foreach (var group in _allRejectionGroups)
+        try
         {
-            sb.Append(Csv(group.TableName)).Append(',');
-            sb.Append(Csv(group.CauseText)).Append(',');
-            sb.Append(group.RowCount).Append(',');
-            sb.Append(Csv(group.DispositionLabel)).Append(',');
-            sb.AppendLine(group.IsRetryable ? "true" : "false");
-        }
+            var directory = ExportDirectoryOverride ?? ExportPaths.Downloads();
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, $"seedbomb-rejected-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
 
-        File.WriteAllText(path, sb.ToString());
+            var sb = new StringBuilder();
+            sb.AppendLine("Table,Cause,Rows,Disposition,Retryable");
+            foreach (var group in _allRejectionGroups)
+            {
+                sb.Append(Csv(group.TableName)).Append(',');
+                sb.Append(Csv(group.CauseText)).Append(',');
+                sb.Append(group.RowCount).Append(',');
+                sb.Append(Csv(group.DispositionLabel)).Append(',');
+                sb.AppendLine(group.IsRetryable ? "true" : "false");
+            }
+
+            File.WriteAllText(path, sb.ToString());
+            _snackbar?.Show("Rejections exported", path,
+                ControlAppearance.Success, null, TimeSpan.FromSeconds(6));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to export rejected rows CSV");
+            _snackbar?.Show("Export failed", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
+        }
     }
 
     [RelayCommand]

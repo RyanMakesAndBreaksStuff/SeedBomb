@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Services.Export;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Views.Pages;
@@ -150,9 +151,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
     {
         try
         {
-            var directory = ExportDirectoryOverride ?? System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads");
+            var directory = ExportDirectoryOverride ?? ExportPaths.Downloads();
             var path = System.IO.Path.Combine(
                 directory,
                 $"datagen-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
