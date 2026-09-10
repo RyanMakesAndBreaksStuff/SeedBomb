@@ -280,17 +280,20 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private async Task<AuthResult> SignInAppOnlyAsync(
         ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
+        string? clientSecret = profile.ClientSecret;
         if (profile.AuthType == AuthType.Certificate)
         {
             if (string.IsNullOrWhiteSpace(profile.CertificateThumbprint))
                 return new AuthResult(false, null, "Certificate thumbprint is not configured for this profile.");
         }
-        else if (string.IsNullOrWhiteSpace(profile.ClientSecret))
+        else
         {
-            return new AuthResult(false, null, "Client Secret is not configured for this profile.");
+            clientSecret ??= await _profiles.GetSecretAsync(profile.Id, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(clientSecret))
+                return new AuthResult(false, null, "Client Secret is not configured for this profile.");
         }
 
-        var cca = await GetOrCreateCca(profile, commitSession).ConfigureAwait(false);
+        var cca = await GetOrCreateCca(profile, commitSession, clientSecret).ConfigureAwait(false);
         var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
         try
@@ -321,11 +324,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// a SHA-256 hash of the secret or certificate thumbprint currently in use. Hashing keeps
     /// the raw secret out of the cache key/comparison state.
     /// </summary>
-    private static string ComputeCcaFingerprint(ConnectionProfile profile)
+    private static string ComputeCcaFingerprint(ConnectionProfile profile, string? clientSecret)
     {
         var credential = profile.AuthType == AuthType.Certificate
             ? profile.CertificateThumbprint
-            : profile.ClientSecret;
+            : clientSecret;
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(credential ?? string.Empty));
         return $"{profile.AuthType}:{Convert.ToHexString(hash)}";
     }
@@ -365,9 +368,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         return newPca;
     }
 
-    internal async Task<IConfidentialClientApplication> GetOrCreateCca(ConnectionProfile profile, bool commitSession)
+    internal async Task<IConfidentialClientApplication> GetOrCreateCca(
+        ConnectionProfile profile, bool commitSession, string? clientSecret = null)
     {
-        var fingerprint = ComputeCcaFingerprint(profile);
+        clientSecret ??= profile.ClientSecret;
+        var fingerprint = ComputeCcaFingerprint(profile, clientSecret);
 
         if (commitSession
             && _clients.TryGetValue(profile.Id, out var existing)
@@ -390,7 +395,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
             ccaBuilder = profile.AuthType == AuthType.Certificate
                 ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
-                : ccaBuilder.WithClientSecret(profile.ClientSecret!);
+                : ccaBuilder.WithClientSecret(clientSecret!);
 
             newCca = ccaBuilder.Build();
 

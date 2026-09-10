@@ -181,9 +181,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     private bool CanSelectProfile() => !IsSwitchingConnection;
 
-    /// <summary>Starts editing an existing profile.</summary>
+    /// <summary>Starts editing an existing profile, loading its secret on demand.</summary>
     [RelayCommand]
-    private void EditProfile(ConnectionProfile profile)
+    private async Task EditProfileAsync(ConnectionProfile profile)
     {
         EditingProfile = new ConnectionProfile
         {
@@ -194,7 +194,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             AuthType = profile.AuthType,
             ClientId = profile.ClientId,
             TenantId = profile.TenantId,
-            ClientSecret = profile.ClientSecret,
+            ClientSecret = await _profileService.GetSecretAsync(profile.Id),
             CertificateThumbprint = profile.CertificateThumbprint,
         };
         IsEditing = true;
@@ -379,6 +379,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     partial void OnSelectedProfileChanged(ConnectionProfile? value)
     {
         if (value is not null)
-            EditProfile(value);
+            _ = EditProfileAsync(value);
     }
 }

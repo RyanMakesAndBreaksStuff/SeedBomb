@@ -9,8 +9,10 @@ using Xunit;
 
 namespace DataGen.Wpf.Tests;
 
-public sealed class ConnectionManagerViewModelTests
+public sealed class ConnectionManagerViewModelTests : IDisposable
 {
+    private readonly List<string> _tempDirs = [];
+
     [Fact]
     public async Task TestConnectionDoesNotPersistAndUsesParentHwnd()
     {
@@ -147,7 +149,7 @@ public sealed class ConnectionManagerViewModelTests
     }
 
     [Fact]
-    public void EditProfile_ClonesCertificateThumbprintAndClientSecret()
+    public async Task EditProfile_ClonesCertificateThumbprintAndClientSecret()
     {
         var stored = new ConnectionProfile
         {
@@ -158,12 +160,15 @@ public sealed class ConnectionManagerViewModelTests
             CertificateThumbprint = "ABC123",
             ClientSecret = "s3cret",
         };
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetSecretAsync(stored.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("s3cret");
         var vm = new ConnectionManagerViewModel(
-            Mock.Of<IConnectionProfileService>(),
+            profiles.Object,
             Mock.Of<IAuthService>(),
             Mock.Of<IDataverseConnectionService>());
 
-        vm.EditProfileCommand.Execute(stored);
+        await vm.EditProfileCommand.ExecuteAsync(stored);
 
         Assert.NotSame(stored, vm.EditingProfile);
         Assert.Equal(AuthType.Certificate, vm.EditingProfile!.AuthType);
@@ -537,5 +542,58 @@ public sealed class ConnectionManagerViewModelTests
             profiles.Object, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
         await vm.LoadCommand.ExecuteAsync(null);
         return vm;
+    }
+
+    [Fact]
+    public async Task GetAllAsync_DoesNotReturnPlaintextSecrets()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (svc, id) = await StoreWithOneSecretProfileAsync();
+
+        var all = await svc.GetAllAsync(ct);
+
+        Assert.Null(Assert.Single(all).ClientSecret);
+        Assert.Equal("s3cret", await svc.GetSecretAsync(id, ct));
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithNullSecret_KeepsTheStoredSecret()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (svc, id) = await StoreWithOneSecretProfileAsync();
+
+        var listed = Assert.Single(await svc.GetAllAsync(ct));   // ClientSecret is null here
+        listed.Name = "renamed";
+        await svc.SaveAsync(listed, ct);
+
+        Assert.Equal("s3cret", await svc.GetSecretAsync(id, ct));
+    }
+
+    private async Task<(JsonConnectionProfileService svc, Guid id)> StoreWithOneSecretProfileAsync()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "DataGen.Wpf.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        _tempDirs.Add(dir);
+
+        var svc = new JsonConnectionProfileService(dir);
+        var profile = new ConnectionProfile
+        {
+            Name = "secret-profile",
+            EnvironmentUrl = "https://org.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            AuthType = AuthType.ClientSecret,
+            ClientSecret = "s3cret",
+        };
+        await svc.SaveAsync(profile, TestContext.Current.CancellationToken);
+        return (svc, profile.Id);
+    }
+
+    public void Dispose()
+    {
+        foreach (var dir in _tempDirs)
+        {
+            try { Directory.Delete(dir, recursive: true); }
+            catch (IOException) { /* best-effort temp cleanup */ }
+        }
     }
 }
