@@ -43,7 +43,6 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] private int _defaultBatchSize = 500;
     [ObservableProperty] private int _defaultDop;
     [ObservableProperty] private bool _darkTheme;
-    [ObservableProperty] private bool _reduceMotion;
     [ObservableProperty] private string _paletteId = DesignThemeManager.DefaultPaletteId;
 
     /// <summary>Gets the application version string.</summary>
@@ -61,13 +60,6 @@ public sealed partial class SettingsViewModel(
     {
         DesignThemeManager.Apply(value, PaletteId);
 
-        if (!_isLoadingSettings)
-            QueueAppearanceSave();
-    }
-
-    partial void OnReduceMotionChanged(bool value)
-    {
-        DesignThemeManager.ReduceMotion = value;
         if (!_isLoadingSettings)
             QueueAppearanceSave();
     }
@@ -117,7 +109,6 @@ public sealed partial class SettingsViewModel(
             DefaultBatchSize = s.DefaultBatchSize;
             DefaultDop = s.DefaultDop;
             DarkTheme = s.DarkTheme;
-            ReduceMotion = s.ReduceMotion;
             PaletteId = DesignThemeManager.ResolvePaletteId(s.PaletteId);
         }
         catch (OperationCanceledException)
@@ -141,7 +132,7 @@ public sealed partial class SettingsViewModel(
         {
             var settings = new AppSettings(
                 DefaultRecordCount, DefaultBatchSize, DefaultDop,
-                DarkTheme, ReduceMotion, PaletteId, _loadedSettings.KeepRunSheetOpen);
+                DarkTheme, PaletteId, _loadedSettings.KeepRunSheetOpen);
 
             CancelPendingAppearanceSave();
             await _settingsService.SaveAsync(settings);
@@ -210,7 +201,6 @@ public sealed partial class SettingsViewModel(
             var settings = _loadedSettings with
             {
                 DarkTheme = DarkTheme,
-                ReduceMotion = ReduceMotion,
                 PaletteId = PaletteId,
             };
 

@@ -1,6 +1,6 @@
 <!--
     Settings — restyle pass over the existing page. Structure and every binding are unchanged
-    (PaletteId, DarkTheme, ReduceMotion, DefaultRecordCount, DefaultBatchSize, DefaultDop,
+    (PaletteId, DarkTheme, DefaultRecordCount, DefaultBatchSize, DefaultDop,
     AppVersion, DotnetVersion, SaveCommand); this only moves it onto 1a's vocabulary.
 
     Changes: page header added to match the other destinations; leftover type sizes and
@@ -140,23 +140,6 @@
                                                      IsChecked="{Binding DarkTheme, Mode=TwoWay}"
                                                      VerticalAlignment="Center"
                                                      AutomationProperties.Name="Toggle dark theme"/>
-                                </Grid>
-
-                                <Grid Margin="0,14,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                                        <TextBlock Style="{DynamicResource DG.Body}" Text="Reduce motion"/>
-                                        <TextBlock Style="{DynamicResource DG.Tertiary}"
-                                                   Text="Stops the progress ring and page transitions from animating."
-                                                   Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                    <ui:ToggleSwitch Grid.Column="1"
-                                                     IsChecked="{Binding ReduceMotion, Mode=TwoWay}"
-                                                     VerticalAlignment="Center"
-                                                     AutomationProperties.Name="Toggle reduce motion"/>
                                 </Grid>
                             </StackPanel>
                         </Border>

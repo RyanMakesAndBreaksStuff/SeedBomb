@@ -55,7 +55,6 @@ public partial class App : Application
             // from the first frame.
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             var savedSettings = await settings.LoadAsync();
-            DesignThemeManager.ReduceMotion = savedSettings.ReduceMotion;
             DesignThemeManager.Apply(savedSettings.DarkTheme, savedSettings.PaletteId);
 
             // Attempt silent token acquisition before showing any window.

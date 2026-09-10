@@ -24,13 +24,6 @@ public static class DesignThemeManager
     /// <summary>Palette ID applied when none is configured. Matches the design of record.</summary>
     public const string DefaultPaletteId = "kiln";
 
-    /// <summary>When true, chrome animations use zero duration.</summary>
-    public static bool ReduceMotion { get; set; }
-
-    /// <summary>Drawer slide duration honoring <see cref="ReduceMotion"/>.</summary>
-    public static TimeSpan DrawerAnimationDuration =>
-        ReduceMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(250);
-
     /// <summary>Maps a persisted palette id onto the current palette set.</summary>
     public static string ResolvePaletteId(string? paletteId) => paletteId switch
     {

@@ -55,16 +55,6 @@ public sealed class ThemePaletteConfigurationTests
     ];
 
     [Fact]
-    public void DrawerAnimationDurationIsZeroWhenReduceMotion()
-    {
-        DesignThemeManager.ReduceMotion = true;
-        Assert.Equal(TimeSpan.Zero, DesignThemeManager.DrawerAnimationDuration);
-
-        DesignThemeManager.ReduceMotion = false;
-        Assert.Equal(TimeSpan.FromMilliseconds(250), DesignThemeManager.DrawerAnimationDuration);
-    }
-
-    [Fact]
     public void DefaultPaletteIsKilnAndTwoOptionsExist()
     {
         Assert.Equal("kiln", DesignThemeManager.DefaultPaletteId);
@@ -91,8 +81,6 @@ public sealed class ThemePaletteConfigurationTests
         Assert.Contains("DG.Series1", manager, StringComparison.Ordinal);
         Assert.Contains("DG.Focus", manager, StringComparison.Ordinal);
         Assert.Contains("DG.RunSweep", manager, StringComparison.Ordinal);
-        Assert.Contains("ReduceMotion", manager, StringComparison.Ordinal);
-        Assert.Contains("DrawerAnimationDuration", manager, StringComparison.Ordinal);
         Assert.Contains("DG.AccentLight", manager, StringComparison.Ordinal);
 
         foreach (var id in RetiredPaletteIds)
