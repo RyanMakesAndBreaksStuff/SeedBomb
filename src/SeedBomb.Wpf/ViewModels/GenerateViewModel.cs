@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
@@ -33,19 +31,11 @@ public record StepEntry(string Glyph, string Label, bool IsDone, bool IsActive, 
 /// <summary>One selected table in the step-1 aside.</summary>
 public sealed record SelectedTableRow(string DisplayName, string LogicalName, int Count);
 
-/// <summary>Entity queue status entry shown in the right-side queue dot list.</summary>
-public sealed partial class QueuedEntityEntry : ObservableObject
+/// <summary>Entity queue status entry. Rendering is the view's concern; this holds no brushes.</summary>
+public sealed class QueuedEntityEntry(EntitySummary entity)
 {
     /// <summary>Gets the entity summary.</summary>
-    public EntitySummary Entity { get; }
-
-    [ObservableProperty]
-    private System.Windows.Media.Brush _dotBrush =
-        System.Windows.Media.Brushes.LightGray;
-
-    /// <summary>Initialises the entry.</summary>
-    /// <param name="entity">The entity.</param>
-    public QueuedEntityEntry(EntitySummary entity) => Entity = entity;
+    public EntitySummary Entity { get; } = entity;
 }
 
 /// <summary>Review-card preview: first five <see cref="RuleValueGenerator"/> outputs for one ruled column.</summary>
@@ -75,8 +65,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _rulesCts;
-    private readonly HashSet<string> _queueCompletedEntities = new(StringComparer.OrdinalIgnoreCase);
-    private string? _queueCurrentEntity;
     private CancellationTokenSource? _draftSaveCts;
     private Task? _draftSaveTask;
     private Profile? _restoredDraft;
@@ -548,8 +536,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedTableRows));
 
         QueuedEntities.Clear();
-        _queueCompletedEntities.Clear();
-        _queueCurrentEntity = null;
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
 
@@ -564,52 +550,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
     }
-
-    partial void OnCurrentProgressChanged(ProgressUpdate? value)
-    {
-        if (value is null || string.IsNullOrEmpty(value.EntityName))
-            return;
-
-        if (_queueCurrentEntity is not null
-            && !string.Equals(_queueCurrentEntity, value.EntityName, StringComparison.OrdinalIgnoreCase))
-        {
-            _queueCompletedEntities.Add(_queueCurrentEntity);
-        }
-
-        _queueCurrentEntity = value.EntityName;
-        ApplyQueueDots();
-    }
-
-    partial void OnLastResultChanged(GenerationResult? value) => ApplyQueueDots();
-
-    private void ApplyQueueDots()
-    {
-        foreach (var entry in QueuedEntities)
-        {
-            var name = entry.Entity.LogicalName;
-            if (LastResult?.Errors.Any(err =>
-                    string.Equals(err.EntityLogicalName, name, StringComparison.OrdinalIgnoreCase)) == true)
-            {
-                entry.DotBrush = ThemeBrush("DG.Error", Brushes.IndianRed);
-            }
-            else if (LastResult?.CreatedRecords.ContainsKey(name) == true
-                     || _queueCompletedEntities.Contains(name))
-            {
-                entry.DotBrush = ThemeBrush("DG.Success", Brushes.ForestGreen);
-            }
-            else if (string.Equals(name, CurrentProgress?.EntityName, StringComparison.OrdinalIgnoreCase))
-            {
-                entry.DotBrush = ThemeBrush("DG.Accent", Brushes.DodgerBlue);
-            }
-            else
-            {
-                entry.DotBrush = Brushes.LightGray;
-            }
-        }
-    }
-
-    private static Brush ThemeBrush(string key, Brush fallback) =>
-        Application.Current?.TryFindResource(key) as Brush ?? fallback;
 
     /// <summary>
     /// Advances to the Rules step: loads full live metadata for the selected entities
@@ -837,8 +777,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         CurrentProgress = null;
         LastResult = null;
         QueuedEntities.Clear();
-        _queueCompletedEntities.Clear();
-        _queueCurrentEntity = null;
         _fieldOverrides?.SetEntities([]);
         OnPropertyChanged(nameof(SelectedTableRows));
 

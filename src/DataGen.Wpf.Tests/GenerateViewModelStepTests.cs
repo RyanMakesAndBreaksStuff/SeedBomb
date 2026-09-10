@@ -1,4 +1,3 @@
-using System.Windows.Media;
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
@@ -274,7 +273,7 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public void QueueDotBrushFollowsProgressAndErrors()
+    public void QueueTracksEntitiesAcrossProgressAndErrors()
     {
         var viewModel = CreateViewModel(out _, out _, out _);
         viewModel.OnEntitiesChanged(
@@ -283,13 +282,16 @@ public sealed class GenerateViewModelStepTests
             new EntitySummary("contact", "Contact", false),
         ]);
 
-        Assert.All(viewModel.QueuedEntities, e => Assert.Equal(Brushes.LightGray, e.DotBrush));
+        Assert.Equal(
+            ["account", "contact"],
+            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
 
         viewModel.CurrentProgress = new ProgressUpdate(
             "Generating", "account", 1, 10, 1, 2, 0, TimeSpan.Zero);
 
-        var accountDot = Assert.Single(viewModel.QueuedEntities, e => e.Entity.LogicalName == "account");
-        Assert.NotEqual(Brushes.LightGray, accountDot.DotBrush);
+        Assert.Equal(
+            ["account", "contact"],
+            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
 
         viewModel.LastResult = new GenerationResult
         {
@@ -300,11 +302,9 @@ public sealed class GenerateViewModelStepTests
             Errors = [new BatchError("contact", 0, "failed", null)],
         };
 
-        Assert.NotEqual(Brushes.LightGray, viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "account").DotBrush);
-        Assert.NotEqual(Brushes.LightGray, viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "contact").DotBrush);
-        Assert.NotEqual(
-            viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "account").DotBrush,
-            viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "contact").DotBrush);
+        Assert.Equal(
+            ["account", "contact"],
+            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
     }
 
     [Fact]
