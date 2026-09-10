@@ -729,63 +729,6 @@
                                     </Style>
                                 </ui:InfoBar.Style>
                             </ui:InfoBar>
-
-                            <Grid Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="14"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="On collision"/>
-                                    <ComboBox Style="{DynamicResource DG.ComboBox}"
-                                              ItemsSource="{Binding CollisionStrategies}"
-                                              SelectedItem="{Binding SelectedCollisionStrategy}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Case"/>
-                                    <ComboBox Style="{DynamicResource DG.ComboBox}"
-                                              ItemsSource="{Binding CaseTransforms}"
-                                              SelectedItem="{Binding SelectedCaseTransform}"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <ui:ToggleSwitch Grid.Column="0"
-                                                 IsChecked="{Binding AllowBlanks}"
-                                                 VerticalAlignment="Top"/>
-                                <StackPanel Grid.Column="1" Margin="11,0,0,0">
-                                    <TextBlock Style="{DynamicResource DG.Body}"
-                                               Text="{Binding BlankRateLabel}"/>
-                                    <TextBlock Style="{DynamicResource DG.Tertiary}"
-                                               Text="Mimics incomplete real-world data"
-                                               Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Dependency note; only when the rule references another column. -->
-                            <Border Style="{DynamicResource DG.InfoBanner}"
-                                    Visibility="{Binding HasDependencyNote,
-                                                 Converter={StaticResource BoolToVisibilityConverter}}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ui:SymbolIcon Grid.Column="0" Symbol="Info24"
-                                                   FontSize="{DynamicResource DG.Type.Icon}"
-                                                   Foreground="{DynamicResource DG.Accent}"
-                                                   VerticalAlignment="Top"/>
-                                    <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
-                                               Foreground="{DynamicResource DG.TextBody}"
-                                               Text="{Binding DependencyNote}"
-                                               LineHeight="18" Margin="12,0,0,0"/>
-                                </Grid>
-                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

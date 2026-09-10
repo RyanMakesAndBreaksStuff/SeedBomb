@@ -305,31 +305,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <summary>Insertable pattern tokens.</summary>
     public ObservableCollection<TokenChip> AvailableTokens { get; } = [new("{seq}"), new("{runId}"), new("{n}")];
 
-    /// <summary>Collision strategies. Bind-only — Core has no FieldRule member (lock 16).</summary>
-    public IReadOnlyList<string> CollisionStrategies { get; } = ["Keep first"];
-
-    /// <summary>Case transforms. Bind-only — Core has no FieldRule member (lock 16).</summary>
-    public IReadOnlyList<string> CaseTransforms { get; } = ["None"];
-
-    [ObservableProperty]
-    private string _selectedCollisionStrategy = "Keep first";
-
-    [ObservableProperty]
-    private string _selectedCaseTransform = "None";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(BlankRateLabel))]
-    private bool _allowBlanks;
-
-    /// <summary>Derived AllowBlanks copy. Bind-only — no Core effect (lock 16).</summary>
-    public string BlankRateLabel => AllowBlanks ? "Leave blank for some rows" : "Never leave blank";
-
-    [ObservableProperty]
-    private bool _hasDependencyNote;
-
-    [ObservableProperty]
-    private string _dependencyNote = "";
-
     /// <summary>Preview pane footer — sampled from the table's planned row count.</summary>
     public string PreviewFooterLabel => $"Sampled from {_recordCount:N0} rows";
 
