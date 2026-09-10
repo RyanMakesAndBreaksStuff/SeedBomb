@@ -113,7 +113,6 @@ public static class DesignThemeManager
         // --- Status -----------------------------------------------------
         Set("DG.Success", p.Success);
         Set("DG.SuccessSoft", p.SuccessSoft);
-        Set("DG.SuccessBorder", p.SuccessBorder);
         Set("DG.Warning", p.Warning);
         Set("DG.WarningSoft", p.WarningSoft);
         Set("DG.WarningBorder", p.WarningBorder);
@@ -123,7 +122,6 @@ public static class DesignThemeManager
         Set("DG.ErrorBorder", p.ErrorBorder);
         Set("DG.Info", p.Info);
         Set("DG.InfoSoft", p.InfoSoft);
-        Set("DG.InfoBorder", p.InfoBorder);
 
         // --- Energy & series --------------------------------------------
         Set("DG.Energy", p.Energy);

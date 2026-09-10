@@ -63,7 +63,6 @@
 
     <SolidColorBrush x:Key="DG.Success"       Color="#5BD08D"/>
     <SolidColorBrush x:Key="DG.SuccessSoft"   Color="#14251C"/>
-    <SolidColorBrush x:Key="DG.SuccessBorder" Color="#595BD08D"/>
     <SolidColorBrush x:Key="DG.Warning"       Color="#E8B04B"/>
     <SolidColorBrush x:Key="DG.WarningSoft"   Color="#2C2313"/>
     <SolidColorBrush x:Key="DG.WarningBorder" Color="#59E8B04B"/>
@@ -73,7 +72,6 @@
     <SolidColorBrush x:Key="DG.ErrorBorder"   Color="#63302A"/>
     <SolidColorBrush x:Key="DG.Info"          Color="#BADD52"/>
     <SolidColorBrush x:Key="DG.InfoSoft"      Color="#24290F"/>
-    <SolidColorBrush x:Key="DG.InfoBorder"    Color="#3E4A18"/>
 
     <!-- Energy & series. Series brushes are published for future per-table charts. -->
     <SolidColorBrush x:Key="DG.Energy"        Color="#9DCB1F"/>
@@ -147,7 +145,6 @@
     <FontFamily x:Key="DG.Font.Mono">Consolas, Cascadia Mono</FontFamily>
 
     <sys:Double x:Key="DG.Type.PageTitle">26</sys:Double>
-    <sys:Double x:Key="DG.Type.Splash">24</sys:Double>
     <sys:Double x:Key="DG.Type.Hero">21</sys:Double>
     <sys:Double x:Key="DG.Type.Stat">19</sys:Double>
     <sys:Double x:Key="DG.Type.SheetTitle">17</sys:Double>
