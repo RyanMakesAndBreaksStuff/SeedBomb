@@ -9,6 +9,7 @@ using DataGen.Core.Contracts;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
+using Seedbomb.Services.Connections;
 using Seedbomb.Services.Export;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
@@ -49,6 +50,7 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly ILogger<RunViewModel>? _logger;
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
+    private readonly IConnectionProfileService? _connections;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
@@ -75,13 +77,15 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="navigator">Used by <see cref="OpenInHistory"/>.</param>
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
+    /// <param name="connections">Resolves the connected environment host. Null leaves it unknown.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
         ISettingsService? settings = null,
         IAppNavigator? navigator = null,
         ISnackbarService? snackbar = null,
-        ILogger<RunViewModel>? logger = null)
+        ILogger<RunViewModel>? logger = null,
+        IConnectionProfileService? connections = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
@@ -89,6 +93,7 @@ public sealed partial class RunViewModel : ObservableObject
         _navigator = navigator;
         _snackbar = snackbar;
         _logger = logger;
+        _connections = connections;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
@@ -181,7 +186,9 @@ public sealed partial class RunViewModel : ObservableObject
             throw new InvalidOperationException("Generation service is not configured.");
 
         _lastConfig = config with { AllowRiskyBogusValues = false };
-        _environmentHost = environmentHost;
+        _environmentHost = string.IsNullOrWhiteSpace(environmentHost)
+            ? await ResolveEnvironmentHostAsync(ct)
+            : environmentHost;
         _plannedTables = tables;
         _plannedTotal = plannedTotal;
         _seed = config.Seed;
@@ -195,7 +202,7 @@ public sealed partial class RunViewModel : ObservableObject
         }
 
         await LoadKeepWindowOpenAsync();
-        StartRun(environmentHost, config.Seed, plannedTotal, tables);
+        StartRun(_environmentHost, config.Seed, plannedTotal, tables);
 
         _runCts?.Dispose();
         _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -204,7 +211,7 @@ public sealed partial class RunViewModel : ObservableObject
         try
         {
             var result = await _generation.GenerateAsync(config, progress, _runCts.Token);
-            ApplyResult(result, config.Seed, environmentHost, config);
+            ApplyResult(result, config.Seed, _environmentHost, config);
             return result;
         }
         catch (OperationCanceledException)
@@ -754,6 +761,25 @@ public sealed partial class RunViewModel : ObservableObject
         var rules = _lastConfig?.FieldRules?.Sum(t => t.Value.Count) ?? 0;
         var dest = string.IsNullOrWhiteSpace(host) ? "Dataverse" : host;
         return $"{written:N0} of {planned:N0} rows written to {dest} · {rules} rules · seed {seed}";
+    }
+
+    /// <summary>Host of the connected environment, or "" when it cannot be determined.</summary>
+    private async Task<string> ResolveEnvironmentHostAsync(CancellationToken ct)
+    {
+        if (_connections is null)
+            return string.Empty;
+        try
+        {
+            var profile = await _connections.GetLastUsedAsync(ct);
+            return Uri.TryCreate(profile?.EnvironmentUrl, UriKind.Absolute, out var uri)
+                ? uri.Host
+                : string.Empty;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger?.LogDebug(ex, "Could not resolve the environment host for the run description");
+            return string.Empty;
+        }
     }
 
     private static int CountTables(GenerationResult result, IReadOnlyList<string> planned)

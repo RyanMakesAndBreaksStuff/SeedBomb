@@ -1,5 +1,6 @@
 using DataGen.Core.Contracts;
 using Moq;
+using Seedbomb.Services.Connections;
 using Seedbomb.Services.Generation;
 using Seedbomb.ViewModels;
 using Xunit;
@@ -267,5 +268,37 @@ public sealed class RunViewModelTests
             Errors = [new BatchError("account", 0, "Duplicate key on emailaddress1", null)],
         }, seed: 1, environmentHost: "contoso-dev");
         Assert.False(rejected.LastRunSucceeded);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithBlankHost_ResolvesTheConnectedEnvironmentHost()
+    {
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(),
+                It.IsAny<IProgress<ProgressUpdate>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [],
+            });
+
+        var connections = new Mock<IConnectionProfileService>();
+        connections.Setup(c => c.GetLastUsedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConnectionProfile { EnvironmentUrl = "https://contoso-uat.crm.dynamics.com" });
+
+        var vm = new RunViewModel(generation: gen.Object, connections: connections.Object);
+        await vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            },
+            environmentHost: "", ["account"], 1, TestContext.Current.CancellationToken);
+
+        Assert.Contains("contoso-uat.crm.dynamics.com", vm.RunDescription, StringComparison.Ordinal);
+        Assert.DoesNotContain("written to Dataverse", vm.RunDescription, StringComparison.Ordinal);
     }
 }

@@ -948,8 +948,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         try
         {
             var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
-            var host = "Dataverse";
-            LastResult = await Run.ExecuteAsync(config, host, names, PlannedTotal, _cts.Token);
+            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token);
             var result = LastResult!;
 
             await _historyService.AddRunAsync(new RunRecord(
