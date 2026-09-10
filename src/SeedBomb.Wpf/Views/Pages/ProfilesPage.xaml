@@ -298,10 +298,6 @@
                         <TabItem Header="Tables &amp; volume">
                             <ContentControl Content="{Binding TablesAndVolumeSummary}" Margin="20,12"/>
                         </TabItem>
-
-                        <TabItem Header="History">
-                            <ContentControl Content="{Binding ProfileRunHistory}" Margin="20,12"/>
-                        </TabItem>
                     </TabControl>
 
                     <Border Grid.Row="3" Style="{DynamicResource DG.CardFooter}" Padding="20,11">

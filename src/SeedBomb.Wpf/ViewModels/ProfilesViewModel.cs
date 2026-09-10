@@ -179,9 +179,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     [ObservableProperty]
     private string _tablesAndVolumeSummary = "";
 
-    [ObservableProperty]
-    private string _profileRunHistory = "";
-
     // ── Import summary pane (Mock F5 right) ───────────────────────────────────
 
     [ObservableProperty]
@@ -685,7 +682,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         SelectedProfileSeed = "";
         SelectedProfileEditedLabel = "";
         TablesAndVolumeSummary = "";
-        ProfileRunHistory = "";
         OnPropertyChanged(nameof(SelectedProfileRuleSummary));
 
         if (SelectedItem is null)
@@ -697,7 +693,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         SelectedProfileDescription = profile.Description ?? "";
         SelectedProfileSeed = profile.Seed?.ToString(CultureInfo.InvariantCulture) ?? "";
         SelectedProfileEditedLabel = "Local profile";
-        ProfileRunHistory = "No runs recorded for this profile.";
         TablesAndVolumeSummary = string.Join(
             "\n",
             profile.Tables.Select(t =>
