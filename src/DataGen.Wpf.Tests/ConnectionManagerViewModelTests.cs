@@ -111,7 +111,7 @@ public sealed class ConnectionManagerViewModelTests
         await vm.SelectProfileCommand.ExecuteAsync(profile);
 
         Assert.True(switched);
-        connection.Verify(c => c.Reset(), Times.Once);
+        connection.Verify(c => c.ResetAsync(), Times.Once);
         profiles.Verify(p => p.SetLastUsedAsync(profile.Id, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(profile.Id, vm.ConnectedProfileId);
     }

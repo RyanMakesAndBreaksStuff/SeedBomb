@@ -62,20 +62,24 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
         }
     }
 
-    private void OnConnectionReset(object? sender, EventArgs e)
+    private void OnConnectionReset(object? sender, EventArgs e) => _ = ResetCacheAsync();
+
+    private async Task ResetCacheAsync()
     {
-        _lock.Wait();
+        await _lock.WaitAsync().ConfigureAwait(false);
+        MemoryCache oldCache;
         try
         {
-            var oldCache = _cache;
+            oldCache = _cache;
             _cache = new MemoryCache(new MemoryCacheOptions());
             _inner = null;
-            oldCache.Dispose();
         }
         finally
         {
             _lock.Release();
         }
+
+        oldCache.Dispose();
     }
 
     /// <inheritdoc />

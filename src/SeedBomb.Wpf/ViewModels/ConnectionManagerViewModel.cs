@@ -160,7 +160,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
             if (result.Succeeded)
             {
-                _connectionService.Reset();
+                await _connectionService.ResetAsync();
                 ConnectedProfileId = profile.Id;
                 ConnectionSwitched?.Invoke(this, (profile, result));
             }

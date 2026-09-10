@@ -154,7 +154,8 @@ public sealed partial class SettingsViewModel(
         try
         {
             await _auth.SignOutAsync();
-            _connections?.Reset();
+            if (_connections is not null)
+                await _connections.ResetAsync();
 
             // WR-T7: app-only profiles (client secret / certificate) have no user account to sign
             // out of - the credential stays on disk and the profile stays last-used, so the next
