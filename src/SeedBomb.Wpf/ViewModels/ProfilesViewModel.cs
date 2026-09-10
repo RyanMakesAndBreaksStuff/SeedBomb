@@ -138,9 +138,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private ProfileListItem? _selectedItem;
 
     [ObservableProperty]
-    private string _newProfileName = "";
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
     private string? _statusMessage;
 
@@ -424,41 +421,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Snapshots the current board as a new named profile.</summary>
-    [RelayCommand]
-    private async Task SaveCurrentAsNewAsync()
-    {
-        if (CaptureCurrent is null)
-        {
-            SetError("No current board is available to save.");
-            return;
-        }
-
-        var name = !string.IsNullOrWhiteSpace(NewProfileName)
-            ? NewProfileName.Trim()
-            : await AskNameAsync("new-profile");
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            SetError("Enter a name for the new profile.");
-            return;
-        }
-
-        try
-        {
-            var profile = CaptureCurrent(name.Trim());
-            await _profiles.SaveAsync(profile);
-            NewProfileName = "";
-            await RefreshAsync();
-            SelectedItem = Items.FirstOrDefault(i =>
-                string.Equals(i.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
-            SetStatus($"Saved “{profile.Name}”.");
-        }
-        catch (Exception ex)
-        {
-            SetError(ex.Message);
-        }
-    }
-
     /// <summary>
     /// Import from file: schema stage (Task 10) then metadata stage → visual summary only.
     /// </summary>
@@ -590,13 +552,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         }
     }
 
-    // A profile with zero tables fails the exact same schema check LoadAsync enforces (see
-    // JsonProfileService.TryParse), so saving one blind — as this used to do — wrote a file
-    // that then threw the moment RefreshAsync tried to reload it, silently discarding the new
-    // entry and leaving no error visible on this command's own failure path. Reusing
-    // CaptureCurrent (the same snapshot SaveCurrentAsNewAsync already uses) guarantees a
-    // schema-valid profile: BuildProfileSnapshot falls back to a placeholder "account" table
-    // when nothing is selected, so this never produces an empty table list.
+    // Reusing CaptureCurrent guarantees a schema-valid profile: BuildProfileSnapshot falls
+    // back to a placeholder "account" table when nothing is selected, so this never produces
+    // an empty table list — which LoadAsync's schema check would reject on the next refresh.
     [RelayCommand]
     private async Task NewProfileAsync()
     {
