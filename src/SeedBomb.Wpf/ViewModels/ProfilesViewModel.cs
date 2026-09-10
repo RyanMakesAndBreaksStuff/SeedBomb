@@ -21,15 +21,13 @@ namespace Seedbomb.ViewModels;
 /// <param name="Description">Optional profile description.</param>
 /// <param name="Seed">Pinned seed, if any.</param>
 /// <param name="RuleCount">Active column rules.</param>
-/// <param name="UnmappedRequiredHint">Footer hint when unmapped required columns exist. Empty until metadata is wired.</param>
 public sealed record ProfileListItem(
     string Name,
     string VersionLabel,
     string SummaryLine,
     string? Description = null,
     int? Seed = null,
-    int RuleCount = 0,
-    string UnmappedRequiredHint = "");
+    int RuleCount = 0);
 
 /// <summary>One ruled column in the selected profile's detail table.</summary>
 /// <param name="Table">Table logical name.</param>
@@ -126,18 +124,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Flattened rules of the selected profile.</summary>
     public ObservableCollection<ProfileRuleRow> SelectedProfileRules { get; } = [];
 
-    /// <summary>Footer rule count plus optional unmapped hint.</summary>
-    public string SelectedProfileRuleSummary
-    {
-        get
-        {
-            if (SelectedItem is null) return "";
-            var unmapped = string.IsNullOrEmpty(SelectedItem.UnmappedRequiredHint)
-                ? ""
-                : " · " + SelectedItem.UnmappedRequiredHint;
-            return $"{SelectedItem.RuleCount} rules{unmapped}";
-        }
-    }
+    /// <summary>Footer rule count for the selected profile.</summary>
+    public string SelectedProfileRuleSummary =>
+        SelectedItem is null ? "" : $"{SelectedItem.RuleCount} rules";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
