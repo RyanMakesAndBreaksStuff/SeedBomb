@@ -33,16 +33,6 @@ public partial class RulesPage : Page, INavigableView<RuleEditorViewModel>, INav
             SetBinding(HeightProperty, new Binding(nameof(ActualHeight)) { Source = host });
     }
 
-    // ContextMenu only opens on right-click by default — open it on left-click instead.
-    private void OnMoreButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { ContextMenu: { } menu } button)
-        {
-            menu.PlacementTarget = button;
-            menu.IsOpen = true;
-        }
-    }
-
     /// <inheritdoc />
     public async Task OnNavigatedToAsync()
     {

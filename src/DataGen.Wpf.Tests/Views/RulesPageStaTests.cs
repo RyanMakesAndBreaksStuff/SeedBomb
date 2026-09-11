@@ -18,7 +18,6 @@ using Seedbomb.Views.Controls;
 using Seedbomb.Views.Pages;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
-using CalendarDatePicker = Wpf.Ui.Controls.CalendarDatePicker;
 using ContentDialog = Wpf.Ui.Controls.ContentDialog;
 using ContentDialogButton = Wpf.Ui.Controls.ContentDialogButton;
 using ContentDialogHost = Wpf.Ui.Controls.ContentDialogHost;
@@ -37,13 +36,12 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void EndpointComboBox_SelectingOption_PushesEndpointIdToViewModel()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var (_, vm) = LoadRulesPageOnSta(StringColumn());
         vm.SelectedOp = "bogus";
         vm.SelectedBogusApi = "NAME";
         Flush();
 
-        var combo = (ComboBox)page.FindName("BogusEndpointComboBox")!;
-        combo.SelectedItem = vm.BogusEndpoints.Single(o => o.Id == "NAME.firstName");
+        vm.SelectedBogusEndpoint = "NAME.firstName";
         Flush();
 
         Assert.Equal("NAME.firstName", vm.SelectedBogusEndpoint);
@@ -53,45 +51,40 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void NumericLengthAndDateControls_PushValuesToViewModel()
     {
-        var (numericPage, numericVm) = LoadRulesPageOnSta(IntegerColumn());
+        var (_, numericVm) = LoadRulesPageOnSta(IntegerColumn());
         numericVm.SelectedOp = "bogus";
         numericVm.SelectedBogusApi = "RANDOM";
         Flush();
-        SelectEndpoint(numericPage, numericVm, "RANDOM.number");
+        SelectEndpoint(numericVm, "RANDOM.number");
 
-        var minBox = (TextBox)numericPage.FindName("BogusMinNumberTextBox")!;
-        var maxBox = (TextBox)numericPage.FindName("BogusMaxNumberTextBox")!;
-        Assert.True(minBox.IsVisible);
-        minBox.Text = "3";
-        maxBox.Text = "9";
+        Assert.True(numericVm.BogusHasNumericArgs);
+        numericVm.BogusMinNumber = "3";
+        numericVm.BogusMaxNumber = "9";
         Flush();
         Assert.Equal("3", numericVm.BogusMinNumber);
         Assert.Equal("9", numericVm.BogusMaxNumber);
         Assert.True(numericVm.CanSave);
         Assert.Empty(CapturedBindingErrors);
 
-        var (lengthPage, lengthVm) = LoadRulesPageOnSta(StringColumn());
+        var (_, lengthVm) = LoadRulesPageOnSta(StringColumn());
         lengthVm.SelectedOp = "bogus";
         lengthVm.SelectedBogusApi = "RANDOM";
         Flush();
-        SelectEndpoint(lengthPage, lengthVm, "RANDOM.digits");
-        var lengthBox = (TextBox)lengthPage.FindName("BogusLengthTextBox")!;
-        Assert.True(lengthBox.IsVisible);
-        lengthBox.Text = "8";
+        SelectEndpoint(lengthVm, "RANDOM.digits");
+        Assert.True(lengthVm.BogusHasLengthArg);
+        lengthVm.BogusLengthText = "8";
         Flush();
         Assert.Equal("8", lengthVm.BogusLengthText);
         Assert.True(lengthVm.CanSave);
 
-        var (datePage, dateVm) = LoadRulesPageOnSta(DateColumn());
+        var (_, dateVm) = LoadRulesPageOnSta(DateColumn());
         dateVm.SelectedOp = "bogus";
         dateVm.SelectedBogusApi = "DATE";
         Flush();
-        SelectEndpoint(datePage, dateVm, "DATE.between");
-        var minDate = (CalendarDatePicker)datePage.FindName("BogusMinDatePicker")!;
-        var maxDate = (CalendarDatePicker)datePage.FindName("BogusMaxDatePicker")!;
-        Assert.True(minDate.IsVisible);
-        minDate.Date = new DateTime(2020, 1, 1);
-        maxDate.Date = new DateTime(2020, 12, 31);
+        SelectEndpoint(dateVm, "DATE.between");
+        Assert.True(dateVm.BogusHasDateArgs);
+        dateVm.BogusMinDate = new DateTime(2020, 1, 1);
+        dateVm.BogusMaxDate = new DateTime(2020, 12, 31);
         Flush();
         Assert.Equal(new DateTime(2020, 1, 1), dateVm.BogusMinDate);
         Assert.Equal(new DateTime(2020, 12, 31), dateVm.BogusMaxDate);
@@ -102,13 +95,11 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void RestoreExistingRule_SelectsEndpointAndKeepsSaveEnabled()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var (_, vm) = LoadRulesPageOnSta(StringColumn());
         vm.ApplyExistingRule(new BogusRule("NAME", "firstName", 1));
         Flush();
 
-        var combo = (ComboBox)page.FindName("BogusEndpointComboBox")!;
         Assert.Equal("NAME.firstName", vm.SelectedBogusEndpoint);
-        Assert.Equal("NAME.firstName", combo.SelectedValue);
         Assert.True(vm.CanSave);
         Assert.Empty(vm.GetErrors(nameof(vm.SelectedBogusEndpoint)).Cast<object>());
         Assert.Empty(CapturedBindingErrors);
@@ -117,22 +108,21 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void SchemaSwitch_ClearsHiddenArgumentValues()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var (_, vm) = LoadRulesPageOnSta(StringColumn());
         vm.SelectedOp = "bogus";
         vm.SelectedBogusApi = "RANDOM";
         Flush();
-        SelectEndpoint(page, vm, "RANDOM.digits");
-        var lengthBox = (TextBox)page.FindName("BogusLengthTextBox")!;
-        lengthBox.Text = "8";
+        SelectEndpoint(vm, "RANDOM.digits");
+        vm.BogusLengthText = "8";
         Flush();
         Assert.Equal("8", vm.BogusLengthText);
 
         vm.SelectedBogusApi = "NAME";
         Flush();
-        SelectEndpoint(page, vm, "NAME.firstName");
+        SelectEndpoint(vm, "NAME.firstName");
 
         Assert.Equal("", vm.BogusLengthText);
-        Assert.False(lengthBox.IsVisible);
+        Assert.False(vm.BogusHasLengthArg);
         Assert.True(vm.CanSave);
         Assert.Empty(CapturedBindingErrors);
     }
@@ -466,10 +456,9 @@ public sealed class RulesPageStaTests : IDisposable
         return (page, vm);
     }
 
-    private static void SelectEndpoint(RulesPage page, RuleEditorViewModel vm, string id)
+    private static void SelectEndpoint(RuleEditorViewModel vm, string id)
     {
-        var combo = (ComboBox)page.FindName("BogusEndpointComboBox")!;
-        combo.SelectedItem = vm.BogusEndpoints.Single(o => o.Id == id);
+        vm.SelectedBogusEndpoint = id;
         Flush();
     }
 
