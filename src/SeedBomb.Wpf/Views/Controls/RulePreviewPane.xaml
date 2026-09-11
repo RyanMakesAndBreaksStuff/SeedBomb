@@ -1,0 +1,89 @@
+<UserControl x:Class="Seedbomb.Views.Controls.RulePreviewPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <Border Style="{DynamicResource DG.CardBorder}"
+            Width="{DynamicResource DG.Size.PreviewPane}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
+                    BorderThickness="0,0,0,1" Padding="16,13">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Style="{DynamicResource DG.CardTitle}"
+                               FontSize="{DynamicResource DG.Type.Subtitle}"
+                               Text="Preview" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Style="{DynamicResource DG.Button}"
+                            Height="26" Padding="10,0"
+                            Command="{Binding RerollPreviewCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowSync24"
+                                           FontSize="{DynamicResource DG.Type.Caption}"
+                                           Margin="0,0,6,0"/>
+                            <TextBlock Text="Reroll" FontSize="{DynamicResource DG.Type.Small}"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ItemsControl Grid.Row="1" ItemsSource="{Binding PreviewRows}" Padding="10,8">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter/>
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="{DynamicResource DG.Divider}"
+                                BorderThickness="0,0,0,1" Padding="8">
+                            <TextBlock Text="{Binding DisplayValue}"
+                                       TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Mono}">
+                                        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ValueKind}" Value="Blank">
+                                                <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}">
+                <TextBlock Style="{DynamicResource DG.Tertiary}"
+                           Text="{Binding PreviewFooterLabel}"
+                           TextWrapping="Wrap" LineHeight="17"/>
+            </Border>
+
+            <!-- Per-rule commit, decoupled from "Save profile" (header) which also
+                 navigates away — this is the "true rule cancel/save" the mock called for. -->
+            <Border Grid.Row="3" Style="{DynamicResource DG.CardFooter}">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{DynamicResource DG.Button}"
+                            Command="{Binding SaveRuleCommand}"
+                            Content="Save" Margin="0,0,8,0"/>
+                    <Button Style="{DynamicResource DG.Button}"
+                            Command="{Binding CancelRuleCommand}"
+                            Content="Cancel"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
