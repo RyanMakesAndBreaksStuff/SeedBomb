@@ -198,6 +198,12 @@ public partial class App : Application
         sc.AddSingleton<IAppNavigator, NavigationViewNavigator>();
         sc.AddSingleton<RulesNavigationRequest>();
         sc.AddSingleton<RunViewModel>();
+        sc.AddTransient<RuleMetadataLoader>();
+        sc.AddTransient(sp => new RuleEditorServices(
+            sp.GetService<IContentDialogService>(),
+            sp.GetService<ISnackbarService>(),
+            sp.GetService<Microsoft.Extensions.Logging.ILogger<RuleEditorViewModel>>(),
+            sp.GetService<ILookupRecordPicker>()));
         sc.AddTransient<RuleEditorViewModel>();
 
         // Real pages — NavigationView resolves these from DI via SetServiceProvider
