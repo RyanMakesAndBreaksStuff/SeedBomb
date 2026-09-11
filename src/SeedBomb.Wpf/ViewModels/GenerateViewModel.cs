@@ -50,7 +50,7 @@ public sealed record ReviewPreviewRow(
 }
 
 /// <summary>ViewModel for the Generate wizard page.</summary>
-public sealed partial class GenerateViewModel : ViewModelBase
+public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 {
     private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
@@ -59,6 +59,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private readonly IContentDialogService _contentDialogService;
     private readonly ILogger<GenerateViewModel> _logger;
     private readonly IAppNavigator? _navigator;
+    private readonly MainWindowViewModel? _mainWindow;
     private readonly GenerateDraftAutosave _draftAutosave;
     private readonly GenerateProfileBridge _profileBridge;
 
@@ -83,6 +84,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="run">Singleton run sheet / first-run executor. Required.</param>
     /// <param name="rulesRequest">Optional payload for navigating to <see cref="RulesPage"/>.</param>
     /// <param name="navigator">Optional shell navigator.</param>
+    /// <param name="mainWindow">Shell view-model; when provided, Generate reloads on connection switch.</param>
     public GenerateViewModel(
         IRunHistoryService historyService,
         ISettingsService settingsService,
@@ -93,7 +95,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IContentDialogService contentDialogService,
         RunViewModel run,
         RulesNavigationRequest? rulesRequest = null,
-        IAppNavigator? navigator = null)
+        IAppNavigator? navigator = null,
+        MainWindowViewModel? mainWindow = null)
     {
         ArgumentNullException.ThrowIfNull(run);
         _historyService = historyService;
@@ -103,6 +106,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _metadataProvider = metadataProvider;
         _contentDialogService = contentDialogService;
         _navigator = navigator;
+        _mainWindow = mainWindow;
         Run = run;
         _fieldRules = new FieldRulesViewModel();
         AttachFieldRules(_fieldRules);
@@ -112,6 +116,32 @@ public sealed partial class GenerateViewModel : ViewModelBase
             logger,
             () => SelectedEntities.Count > 0 || (_fieldRules is not null && _fieldRules.GetRules().Count > 0),
             BuildProfileSnapshot);
+        if (_mainWindow is not null)
+            _mainWindow.ConnectionReloadRequested += OnConnectionReloadRequested;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_mainWindow is not null)
+            _mainWindow.ConnectionReloadRequested -= OnConnectionReloadRequested;
+    }
+
+    private void OnConnectionReloadRequested(object? sender, EventArgs e) =>
+        _ = ReloadForConnectionSwitchAsync();
+
+    private async Task ReloadForConnectionSwitchAsync()
+    {
+        try
+        {
+            _entitySelector?.ClearSelection();
+            await ResetWithoutPromptAsync();
+            _entitySelector?.LoadEntitiesCommand.Execute(null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reload Generate after a connection switch");
+        }
     }
 
     /// <inheritdoc />
