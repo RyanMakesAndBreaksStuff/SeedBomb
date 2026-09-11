@@ -8,8 +8,8 @@
     <RootNamespace>Seedbomb</RootNamespace>
     <AssemblyName>SeedBomb</AssemblyName>
     <Product>SeedBomb</Product>
-    <!-- Embeds seedbomb.ico as the Win32 EXE resource: taskbar, Alt+Tab, and Explorer all read this. -->
-    <ApplicationIcon>seedbomb.ico</ApplicationIcon>
+    <!-- Embeds SB_logo.ico as the Win32 EXE resource: taskbar, Alt+Tab, and Explorer all read this. -->
+    <ApplicationIcon>Resources\SB_logo.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
@@ -59,13 +59,11 @@
   <ItemGroup>
     <!-- Native WPF startup splash (Build Action=SplashScreen): shown by the OS-level app host
          before OnStartup runs and auto-closed on first window render. No custom code needed. -->
-    <SplashScreen Include="..\..\Assets\logos\seedbomb_splash.png" />
+    <SplashScreen Include="Resources\SB_logo_preview_256.png" />
 
-    <!-- Embedded as pack://application:,,,/<filename> (Link flattens path). Matches MainWindow/TrayIconService. -->
-    <Resource Include="..\..\Assets\logos\seedbomb.ico" Link="seedbomb.ico" />
-    <Resource Include="..\..\Assets\logos\seedbomb_32x32.png" Link="seedbomb_32x32.png" />
-    <Resource Include="..\..\Assets\logos\seedbomb_tray_colored.ico" Link="seedbomb_tray_colored.ico" />
-    <Resource Include="..\..\Assets\logos\seedbomb_tray_white.ico" Link="seedbomb_tray_white.ico" />
+    <!-- Embedded as pack://application:,,,/Resources/<filename>. Matches MainWindow/TrayIconService. -->
+    <Resource Include="Resources\SB_logo.ico" />
+    <Resource Include="Resources\SB_logo_darkbg.ico" />
   </ItemGroup>
 
 </Project>

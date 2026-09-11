@@ -53,7 +53,7 @@
                      Title="SeedBomb — Mock data explosion"
                      ShowMaximize="True" ShowMinimize="True" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/seedbomb.ico" Width="16" Height="16"/>
+                <ui:ImageIcon Source="pack://application:,,,/Resources/SB_logo.ico" Width="16" Height="16"/>
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
