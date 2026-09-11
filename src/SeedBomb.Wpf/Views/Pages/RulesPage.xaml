@@ -52,7 +52,7 @@
                 </StackPanel>
                 <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Rules"/>
             </StackPanel>
-
+                                                      
             <ComboBox Grid.Column="1" Style="{DynamicResource DG.ComboBox}"
                       VerticalAlignment="Bottom" Margin="16,0,8,0"
                       MinWidth="180"
