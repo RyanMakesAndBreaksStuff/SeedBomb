@@ -1,15 +1,26 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Xrm.Sdk.Metadata;
+using Seedbomb.Services.Dataverse;
 using Seedbomb.ViewModels;
-using Seedbomb.Views.Behaviors;
+using Seedbomb.ViewModels.Controls;
+using Seedbomb.Views.Controls;
 using Seedbomb.Views.Pages;
+using Wpf.Ui;
 using Wpf.Ui.Appearance;
-using CalendarDatePicker = Wpf.Ui.Controls.CalendarDatePicker;
+using ContentDialog = Wpf.Ui.Controls.ContentDialog;
+using ContentDialogButton = Wpf.Ui.Controls.ContentDialogButton;
+using ContentDialogHost = Wpf.Ui.Controls.ContentDialogHost;
 using Wpf.Ui.Markup;
 using Xunit;
 using Xunit.Sdk;
@@ -25,13 +36,12 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void EndpointComboBox_SelectingOption_PushesEndpointIdToViewModel()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var (_, vm) = LoadRulesPageOnSta(StringColumn());
         vm.SelectedOp = "bogus";
         vm.SelectedBogusApi = "NAME";
         Flush();
 
-        var combo = (ComboBox)page.FindName("BogusEndpointComboBox")!;
-        combo.SelectedItem = vm.BogusEndpoints.Single(o => o.Id == "NAME.firstName");
+        vm.SelectedBogusEndpoint = "NAME.firstName";
         Flush();
 
         Assert.Equal("NAME.firstName", vm.SelectedBogusEndpoint);
@@ -41,45 +51,40 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void NumericLengthAndDateControls_PushValuesToViewModel()
     {
-        var (numericPage, numericVm) = LoadRulesPageOnSta(IntegerColumn());
+        var (_, numericVm) = LoadRulesPageOnSta(IntegerColumn());
         numericVm.SelectedOp = "bogus";
         numericVm.SelectedBogusApi = "RANDOM";
         Flush();
-        SelectEndpoint(numericPage, numericVm, "RANDOM.number");
+        SelectEndpoint(numericVm, "RANDOM.number");
 
-        var minBox = (TextBox)numericPage.FindName("BogusMinNumberTextBox")!;
-        var maxBox = (TextBox)numericPage.FindName("BogusMaxNumberTextBox")!;
-        Assert.True(minBox.IsVisible);
-        minBox.Text = "3";
-        maxBox.Text = "9";
+        Assert.True(numericVm.BogusHasNumericArgs);
+        numericVm.BogusMinNumber = "3";
+        numericVm.BogusMaxNumber = "9";
         Flush();
         Assert.Equal("3", numericVm.BogusMinNumber);
         Assert.Equal("9", numericVm.BogusMaxNumber);
         Assert.True(numericVm.CanSave);
         Assert.Empty(CapturedBindingErrors);
 
-        var (lengthPage, lengthVm) = LoadRulesPageOnSta(StringColumn());
+        var (_, lengthVm) = LoadRulesPageOnSta(StringColumn());
         lengthVm.SelectedOp = "bogus";
         lengthVm.SelectedBogusApi = "RANDOM";
         Flush();
-        SelectEndpoint(lengthPage, lengthVm, "RANDOM.digits");
-        var lengthBox = (TextBox)lengthPage.FindName("BogusLengthTextBox")!;
-        Assert.True(lengthBox.IsVisible);
-        lengthBox.Text = "8";
+        SelectEndpoint(lengthVm, "RANDOM.digits");
+        Assert.True(lengthVm.BogusHasLengthArg);
+        lengthVm.BogusLengthText = "8";
         Flush();
         Assert.Equal("8", lengthVm.BogusLengthText);
         Assert.True(lengthVm.CanSave);
 
-        var (datePage, dateVm) = LoadRulesPageOnSta(DateColumn());
+        var (_, dateVm) = LoadRulesPageOnSta(DateColumn());
         dateVm.SelectedOp = "bogus";
         dateVm.SelectedBogusApi = "DATE";
         Flush();
-        SelectEndpoint(datePage, dateVm, "DATE.between");
-        var minDate = (CalendarDatePicker)datePage.FindName("BogusMinDatePicker")!;
-        var maxDate = (CalendarDatePicker)datePage.FindName("BogusMaxDatePicker")!;
-        Assert.True(minDate.IsVisible);
-        minDate.Date = new DateTime(2020, 1, 1);
-        maxDate.Date = new DateTime(2020, 12, 31);
+        SelectEndpoint(dateVm, "DATE.between");
+        Assert.True(dateVm.BogusHasDateArgs);
+        dateVm.BogusMinDate = new DateTime(2020, 1, 1);
+        dateVm.BogusMaxDate = new DateTime(2020, 12, 31);
         Flush();
         Assert.Equal(new DateTime(2020, 1, 1), dateVm.BogusMinDate);
         Assert.Equal(new DateTime(2020, 12, 31), dateVm.BogusMaxDate);
@@ -90,13 +95,11 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void RestoreExistingRule_SelectsEndpointAndKeepsSaveEnabled()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var (_, vm) = LoadRulesPageOnSta(StringColumn());
         vm.ApplyExistingRule(new BogusRule("NAME", "firstName", 1));
         Flush();
 
-        var combo = (ComboBox)page.FindName("BogusEndpointComboBox")!;
         Assert.Equal("NAME.firstName", vm.SelectedBogusEndpoint);
-        Assert.Equal("NAME.firstName", combo.SelectedValue);
         Assert.True(vm.CanSave);
         Assert.Empty(vm.GetErrors(nameof(vm.SelectedBogusEndpoint)).Cast<object>());
         Assert.Empty(CapturedBindingErrors);
@@ -105,42 +108,221 @@ public sealed class RulesPageStaTests : IDisposable
     [StaFact]
     public void SchemaSwitch_ClearsHiddenArgumentValues()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var (_, vm) = LoadRulesPageOnSta(StringColumn());
         vm.SelectedOp = "bogus";
         vm.SelectedBogusApi = "RANDOM";
         Flush();
-        SelectEndpoint(page, vm, "RANDOM.digits");
-        var lengthBox = (TextBox)page.FindName("BogusLengthTextBox")!;
-        lengthBox.Text = "8";
+        SelectEndpoint(vm, "RANDOM.digits");
+        vm.BogusLengthText = "8";
         Flush();
         Assert.Equal("8", vm.BogusLengthText);
 
         vm.SelectedBogusApi = "NAME";
         Flush();
-        SelectEndpoint(page, vm, "NAME.firstName");
+        SelectEndpoint(vm, "NAME.firstName");
 
         Assert.Equal("", vm.BogusLengthText);
-        Assert.False(lengthBox.IsVisible);
+        Assert.False(vm.BogusHasLengthArg);
         Assert.True(vm.CanSave);
         Assert.Empty(CapturedBindingErrors);
     }
 
     [StaFact]
-    public void FocusFirstError_FocusesVisibleTarget_AndSkipsCollapsed()
+    public void OperationComboBox_BindsAvailableOpOptions_WithoutSplitOneOfIds()
     {
-        var (page, vm) = LoadRulesPageOnSta(StringColumn());
-        vm.SelectedOp = "bogus";
-        vm.SelectedBogusApi = "NAME";
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(lookup, AttributeTypeCode.Lookup);
+        var (page, vm) = LoadRulesPageOnSta(lookup);
         Flush();
 
-        var endpoint = (ComboBox)page.FindName("BogusEndpointComboBox")!;
-        var lengthBox = (TextBox)page.FindName("BogusLengthTextBox")!;
-        Assert.False(lengthBox.IsVisible);
-        Assert.False(ValidationFocusBehavior.FocusFirst(page, RuleInputTarget.Length));
-        Assert.False(lengthBox.IsKeyboardFocusWithin);
+        var combo = FindVisualChildren<ComboBox>(page)
+            .Single(c => AutomationProperties.GetName(c) == "Operation");
+        Assert.Equal(vm.AvailableOpOptions, combo.ItemsSource);
+        Assert.Equal(["constant", "oneOf", "lookupRandom", "null"], vm.AvailableOps);
+        Assert.DoesNotContain(vm.AvailableOpOptions, o => o.Op is "oneOfManual" or "oneOfPicker");
+        Assert.Contains(vm.AvailableOpOptions, o => o.Op == "oneOf" && o.Title == "one-of");
+        Assert.Contains(vm.AvailableOpOptions, o => o.Op == "lookupRandom" && o.Title == "random (existing records)");
+        Assert.Equal("constant", combo.SelectedValue);
 
-        Assert.True(ValidationFocusBehavior.FocusFirstError(page, vm.Messages));
-        Assert.True(endpoint.IsKeyboardFocused || endpoint.IsFocused || endpoint.IsKeyboardFocusWithin);
+        vm.SelectedOp = "lookupRandom";
+        Flush();
+        Assert.Equal("lookupRandom", combo.SelectedValue);
+        Assert.Equal("lookupRandom", vm.SelectedOp);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void LookupPicker_Buttons_BindToViewModelCommands()
+    {
+        var source = new ScriptedLookupSource();
+        using var vm = new LookupRecordPickerViewModel(source, NullLogger<LookupRecordPickerViewModel>.Instance);
+        var selected = new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Acme");
+        vm.Initialize(new LookupAttributeMetadata { LogicalName = "parentaccountid", Targets = ["account"] },
+            [selected], single: true, CancellationToken.None);
+        var picker = LoadPicker(vm);
+
+        var search = FindButtons(picker).Single(b => Equals(b.Content, "Search / Retry"));
+        var addHighlighted = FindButtons(picker).Single(b => Equals(b.Content, "Select highlighted record"));
+        var next = FindButtons(picker).Single(b => Equals(b.Content, "Next page"));
+        var remove = FindButtons(picker).Single(b => Equals(b.Content, "Remove"));
+        Assert.Same(vm.SearchCommand, search.Command);
+        Assert.Same(vm.AddHighlightedCommand, addHighlighted.Command);
+        Assert.Same(vm.NextPageCommand, next.Command);
+        Assert.Same(vm.RemoveCommand, remove.Command);
+        Assert.Same(vm.Selected[0], remove.CommandParameter);
+        Assert.False(next.IsEnabled);
+
+        var enter = picker.InputBindings.OfType<KeyBinding>().Single(k => k.Key == Key.Enter);
+        Assert.Same(vm.SearchCommand, enter.Command);
+
+        var searchBox = FindVisualChildren<TextBox>(picker).Single(t => t.MaxLength == 200);
+        searchBox.Focus();
+        Flush();
+        Assert.True(searchBox.IsKeyboardFocused || searchBox.IsFocused || searchBox.IsKeyboardFocusWithin);
+
+        InvokeClick(search);
+        Assert.Single(source.Requests);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void LookupPicker_Results_VirtualizeToFiniteViewport()
+    {
+        using var vm = new LookupRecordPickerViewModel(new ScriptedLookupSource(),
+            NullLogger<LookupRecordPickerViewModel>.Instance);
+        vm.Initialize(new LookupAttributeMetadata { LogicalName = "parentaccountid", Targets = ["account"] },
+            [], single: true, CancellationToken.None);
+        var picker = LoadPicker(vm);
+        for (var i = 0; i < 80; i++)
+        {
+            var id = Guid.Parse($"00000000-0000-0000-0000-{i + 1:D12}");
+            vm.Results.Add(new LookupRecord(new LookupRuleValue("account", id, $"Row {i}"), "—", "—"));
+        }
+        picker.UpdateLayout();
+        Flush();
+        Flush();
+
+        var list = FindVisualChildren<ListView>(picker).Single();
+        list.UpdateLayout();
+        Flush();
+        Assert.True(list.ActualHeight > 40);
+        Assert.True(VirtualizingPanel.GetIsVirtualizing(list));
+        Assert.Equal(VirtualizationMode.Recycling, VirtualizingPanel.GetVirtualizationMode(list));
+        Assert.Equal(80, list.Items.Count);
+        var generated = CountGeneratedContainers(list);
+        Assert.True(generated > 0, "Expected at least one generated row container.");
+        Assert.True(generated < list.Items.Count,
+            $"Expected a finite viewport, generated {generated} of {list.Items.Count}.");
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void LookupPicker_DialogHost_EnterSearch_EscapeCancel_AndPrimaryAdd()
+    {
+        EnsureApplication();
+        if (SynchronizationContext.Current is null)
+            SynchronizationContext.SetSynchronizationContext(
+                new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+        StartBindingTrace();
+        CapturedBindingErrors.Clear();
+
+        var host = new ContentDialogHost();
+        var window = new Window
+        {
+            Content = host,
+            Width = 900,
+            Height = 700,
+            ShowInTaskbar = false,
+            ShowActivated = false,
+            WindowStyle = WindowStyle.ToolWindow,
+        };
+        _windows.Add(window);
+        window.Show();
+        window.UpdateLayout();
+        Flush();
+
+        var dialogs = new ContentDialogService();
+        dialogs.SetDialogHost(host);
+        var source = new ScriptedLookupSource();
+        var service = new LookupRecordPickerService(dialogs,
+            () => new LookupRecordPickerViewModel(source, NullLogger<LookupRecordPickerViewModel>.Instance));
+        var original = new[]
+        {
+            new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Acme"),
+        };
+        var lookup = new LookupAttributeMetadata { LogicalName = "parentaccountid", Targets = ["account"] };
+
+        var cancelTask = service.PickAsync(lookup, original, single: true, CancellationToken.None);
+        PumpUntil(() => host.Content is ContentDialog || cancelTask.IsCompleted);
+        if (cancelTask.IsFaulted)
+            cancelTask.GetAwaiter().GetResult();
+        var cancelDialog = Assert.IsType<ContentDialog>(host.Content);
+        Assert.Equal("Add", cancelDialog.PrimaryButtonText);
+        Assert.Equal("Cancel", cancelDialog.CloseButtonText);
+        RealizeDialog(window, cancelDialog);
+        var cancelPicker = Assert.IsType<LookupRecordPicker>(cancelDialog.Content);
+        var cancelVm = Assert.IsType<LookupRecordPickerViewModel>(cancelPicker.DataContext);
+        cancelVm.Selected.Add(new LookupRuleValue("account", Guid.Parse("22222222-2222-2222-2222-222222222222")));
+        var cancelButton = FindButtons(window).Single(b => Equals(b.Content, "Cancel"));
+        Assert.True(cancelButton.IsCancel);
+        InvokeClick(cancelButton);
+        PumpUntil(() => cancelTask.IsCompleted);
+        Assert.Null(cancelTask.GetAwaiter().GetResult());
+        Assert.Single(original);
+
+        var addTask = service.PickAsync(lookup, original, single: true, CancellationToken.None);
+        PumpUntil(() => host.Content is ContentDialog || addTask.IsCompleted);
+        if (addTask.IsFaulted)
+            addTask.GetAwaiter().GetResult();
+        var addDialog = Assert.IsType<ContentDialog>(host.Content);
+        RealizeDialog(window, addDialog);
+        var addPicker = Assert.IsType<LookupRecordPicker>(addDialog.Content);
+        var addVm = Assert.IsType<LookupRecordPickerViewModel>(addPicker.DataContext);
+        PumpUntil(() => source.Completions.Count >= 2);
+        source.Completions[^1].SetResult(new LookupRecordPage([], false, null));
+        PumpUntil(() => !addVm.IsBusy && addVm.CanAccept);
+        Flush();
+        Assert.True(addDialog.IsPrimaryButtonEnabled);
+
+        var searchBox = FindVisualChildren<TextBox>(addPicker).Single(t => t.MaxLength == 200);
+        searchBox.Focus();
+        Flush();
+        Assert.True(searchBox.IsKeyboardFocused || searchBox.IsFocused || searchBox.IsKeyboardFocusWithin);
+        searchBox.Text = "Acme";
+        Flush();
+        var requestsBeforeEnter = source.Requests.Count;
+        var enter = addPicker.InputBindings.OfType<KeyBinding>().Single(k => k.Key == Key.Enter);
+        Assert.Same(addVm.SearchCommand, enter.Command);
+        enter.Command.Execute(null);
+        Assert.True(source.Requests.Count > requestsBeforeEnter);
+        source.Completions[^1].SetResult(new LookupRecordPage([], false, null));
+        PumpUntil(() => !addVm.IsBusy && addVm.CanAccept);
+        Flush();
+
+        var addButton = FindButtons(window).Single(b => Equals(b.Content, "Add"));
+        InvokeClick(addButton);
+        PumpUntil(() => addTask.IsCompleted);
+        var accepted = addTask.GetAwaiter().GetResult();
+        Assert.NotNull(accepted);
+        Assert.Equal(original[0].Id, Assert.Single(accepted).Id);
+        Assert.NotSame(original[0], accepted[0]);
+        Assert.Single(original);
+
+        var secondCancel = service.PickAsync(lookup, original, single: true, CancellationToken.None);
+        PumpUntil(() => host.Content is ContentDialog || secondCancel.IsCompleted);
+        if (secondCancel.IsFaulted)
+            secondCancel.GetAwaiter().GetResult();
+        var secondDialog = Assert.IsType<ContentDialog>(host.Content);
+        RealizeDialog(window, secondDialog);
+        secondDialog.TemplateButtonCommand.Execute(ContentDialogButton.Close);
+        PumpUntil(() => secondCancel.IsCompleted);
+        Assert.Null(secondCancel.GetAwaiter().GetResult());
         Assert.Empty(CapturedBindingErrors);
     }
 
@@ -149,6 +331,102 @@ public sealed class RulesPageStaTests : IDisposable
         foreach (var window in _windows)
             window.Close();
         _windows.Clear();
+    }
+
+    private LookupRecordPicker LoadPicker(LookupRecordPickerViewModel vm)
+    {
+        EnsureApplication();
+        StartBindingTrace();
+        CapturedBindingErrors.Clear();
+        var picker = new LookupRecordPicker { DataContext = vm };
+        var window = new Window
+        {
+            Content = picker,
+            Width = 700,
+            Height = 520,
+            ShowInTaskbar = false,
+            ShowActivated = false,
+            WindowStyle = WindowStyle.ToolWindow,
+        };
+        _windows.Add(window);
+        window.Show();
+        picker.UpdateLayout();
+        window.UpdateLayout();
+        Flush();
+        return picker;
+    }
+
+    private static void RealizeDialog(Window window, ContentDialog dialog)
+    {
+        window.UpdateLayout();
+        dialog.ApplyTemplate();
+        dialog.UpdateLayout();
+        Flush();
+    }
+
+    private static void InvokeClick(ButtonBase button)
+    {
+        typeof(ButtonBase).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(button, null);
+    }
+
+    private static IEnumerable<Button> FindButtons(DependencyObject root) => FindVisualChildren<Button>(root);
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                yield return match;
+            foreach (var nested in FindVisualChildren<T>(child))
+                yield return nested;
+        }
+    }
+
+    private static int CountGeneratedContainers(ItemsControl items)
+    {
+        var generated = 0;
+        for (var i = 0; i < items.Items.Count; i++)
+        {
+            if (items.ItemContainerGenerator.ContainerFromIndex(i) is not null)
+                generated++;
+        }
+        return generated;
+    }
+
+    private static void PumpUntil(Func<bool> condition)
+    {
+        var start = DateTime.UtcNow;
+        var timeout = TimeSpan.FromSeconds(5);
+        while (!condition())
+        {
+            if (DateTime.UtcNow - start > timeout)
+                throw new TimeoutException("Timed out waiting for UI condition.");
+            PumpDispatcher();
+        }
+    }
+
+    private static void PumpDispatcher()
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
+    }
+
+    private sealed class ScriptedLookupSource : ILookupRecordSource
+    {
+        public List<LookupSearchRequest> Requests { get; } = [];
+        public List<TaskCompletionSource<LookupRecordPage>> Completions { get; } = [];
+
+        public Task<LookupRecordPage> ReadAsync(LookupSearchRequest request, CancellationToken ct)
+        {
+            Requests.Add(request);
+            var tcs = new TaskCompletionSource<LookupRecordPage>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Completions.Add(tcs);
+            return tcs.Task;
+        }
     }
 
     private (RulesPage page, RuleEditorViewModel vm) LoadRulesPageOnSta(AttributeMetadata column)
@@ -178,10 +456,9 @@ public sealed class RulesPageStaTests : IDisposable
         return (page, vm);
     }
 
-    private static void SelectEndpoint(RulesPage page, RuleEditorViewModel vm, string id)
+    private static void SelectEndpoint(RuleEditorViewModel vm, string id)
     {
-        var combo = (ComboBox)page.FindName("BogusEndpointComboBox")!;
-        combo.SelectedItem = vm.BogusEndpoints.Single(o => o.Id == id);
+        vm.SelectedBogusEndpoint = id;
         Flush();
     }
 

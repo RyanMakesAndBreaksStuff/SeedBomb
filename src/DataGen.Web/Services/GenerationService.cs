@@ -5,6 +5,7 @@ using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
+using DataGen.Core.Rules;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
@@ -77,7 +78,9 @@ public sealed class GenerationService
 
             uiProgress?.Report(new ProgressUpdate("Resolving dependencies", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
 
-            var graph = _graphBuilder!.Build(metadataDict);
+            bool IsExplicitLookup(string table, string column) =>
+                LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
+            var graph = _graphBuilder!.Build(metadataDict, IsExplicitLookup);
             var cycles = _cycleDetector!.FindStronglyConnectedComponents(graph);
             if (cycles.Count > 0)
             {
@@ -85,7 +88,7 @@ public sealed class GenerationService
                 {
                     _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
                 }
-                _cycleDetector.BreakCycles(graph, cycles, metadataDict);
+                _cycleDetector.BreakCycles(graph, cycles, metadataDict, IsExplicitLookup);
             }
 
             uiProgress?.Report(new ProgressUpdate("Generating records", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
@@ -180,7 +183,9 @@ public sealed class GenerationService
             var metadataList = await metadata.GetEntitiesAsync(config.EntityLogicalNames, ct).ConfigureAwait(false);
             var metadataDict = metadataList.ToDictionary(e => e.LogicalName);
 
-            var graph = graphBuilder.Build(metadataDict);
+            bool IsExplicitLookup(string table, string column) =>
+                LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
+            var graph = graphBuilder.Build(metadataDict, IsExplicitLookup);
             var cycles = cycleDetector.FindStronglyConnectedComponents(graph);
             if (cycles.Count > 0)
             {
@@ -188,7 +193,7 @@ public sealed class GenerationService
                 {
                     _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
                 }
-                cycleDetector.BreakCycles(graph, cycles, metadataDict);
+                cycleDetector.BreakCycles(graph, cycles, metadataDict, IsExplicitLookup);
             }
 
             var result = await bulkCreator.CreateAsync(config, metadataDict, graph, null, ct).ConfigureAwait(false);

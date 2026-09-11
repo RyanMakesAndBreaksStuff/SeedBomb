@@ -22,8 +22,14 @@ public class GraphBuilder(ILogger<GraphBuilder> logger)
     /// Self-referential lookups are flagged separately and are NOT treated as cycles.
     /// </summary>
     /// <param name="selectedEntities">The entities to include, keyed by logical name.</param>
+    /// <param name="isExplicitLookup">
+    /// Optional predicate identifying lookup columns that supply their own value or omission
+    /// and must not contribute graph edges. Arguments are source table and column logical names.
+    /// </param>
     /// <returns>The constructed dependency graph.</returns>
-    public DependencyGraph Build(IReadOnlyDictionary<string, EntityMetadata> selectedEntities)
+    public DependencyGraph Build(
+        IReadOnlyDictionary<string, EntityMetadata> selectedEntities,
+        Func<string, string, bool>? isExplicitLookup = null)
     {
         ArgumentNullException.ThrowIfNull(selectedEntities);
 
@@ -51,6 +57,10 @@ public class GraphBuilder(ILogger<GraphBuilder> logger)
 
             foreach (var lookup in lookups)
             {
+                if (lookup.LogicalName is not null
+                    && isExplicitLookup?.Invoke(entityLogicalName, lookup.LogicalName) == true)
+                    continue;
+
                 if (lookup.Targets is null || lookup.Targets.Length == 0)
                     continue;
 

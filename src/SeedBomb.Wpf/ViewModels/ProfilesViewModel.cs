@@ -21,15 +21,13 @@ namespace Seedbomb.ViewModels;
 /// <param name="Description">Optional profile description.</param>
 /// <param name="Seed">Pinned seed, if any.</param>
 /// <param name="RuleCount">Active column rules.</param>
-/// <param name="UnmappedRequiredHint">Footer hint when unmapped required columns exist. Empty until metadata is wired.</param>
 public sealed record ProfileListItem(
     string Name,
     string VersionLabel,
     string SummaryLine,
     string? Description = null,
     int? Seed = null,
-    int RuleCount = 0,
-    string UnmappedRequiredHint = "");
+    int RuleCount = 0);
 
 /// <summary>One ruled column in the selected profile's detail table.</summary>
 /// <param name="Table">Table logical name.</param>
@@ -126,18 +124,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Flattened rules of the selected profile.</summary>
     public ObservableCollection<ProfileRuleRow> SelectedProfileRules { get; } = [];
 
-    /// <summary>Footer rule count plus optional unmapped hint.</summary>
-    public string SelectedProfileRuleSummary
-    {
-        get
-        {
-            if (SelectedItem is null) return "";
-            var unmapped = string.IsNullOrEmpty(SelectedItem.UnmappedRequiredHint)
-                ? ""
-                : " · " + SelectedItem.UnmappedRequiredHint;
-            return $"{SelectedItem.RuleCount} rules{unmapped}";
-        }
-    }
+    /// <summary>Footer rule count for the selected profile.</summary>
+    public string SelectedProfileRuleSummary =>
+        SelectedItem is null ? "" : $"{SelectedItem.RuleCount} rules";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
@@ -147,9 +136,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(EditRulesCommand))]
     [NotifyPropertyChangedFor(nameof(SelectedProfileRuleSummary))]
     private ProfileListItem? _selectedItem;
-
-    [ObservableProperty]
-    private string _newProfileName = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
@@ -178,9 +164,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _tablesAndVolumeSummary = "";
-
-    [ObservableProperty]
-    private string _profileRunHistory = "";
 
     // ── Import summary pane (Mock F5 right) ───────────────────────────────────
 
@@ -275,9 +258,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
 
-    /// <summary>Raised when the page should open Rules for the named profile.</summary>
-    public event EventHandler<string>? EditRulesRequested;
-
     /// <summary>Raised when the user confirms an import preview. Arg is the validated report.</summary>
     public event EventHandler<ProfileImportReport>? ProfileApplied;
 
@@ -310,8 +290,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         IEnumerable<ProfileListItem> ordered = _sortMode switch
         {
-            1 => projected.OrderByDescending(p => p.Name, StringComparer.OrdinalIgnoreCase), // placeholder: no mtime
-            2 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
+            1 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
             _ => projected.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
         };
 
@@ -442,41 +421,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Snapshots the current board as a new named profile.</summary>
-    [RelayCommand]
-    private async Task SaveCurrentAsNewAsync()
-    {
-        if (CaptureCurrent is null)
-        {
-            SetError("No current board is available to save.");
-            return;
-        }
-
-        var name = !string.IsNullOrWhiteSpace(NewProfileName)
-            ? NewProfileName.Trim()
-            : await AskNameAsync("new-profile");
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            SetError("Enter a name for the new profile.");
-            return;
-        }
-
-        try
-        {
-            var profile = CaptureCurrent(name.Trim());
-            await _profiles.SaveAsync(profile);
-            NewProfileName = "";
-            await RefreshAsync();
-            SelectedItem = Items.FirstOrDefault(i =>
-                string.Equals(i.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
-            SetStatus($"Saved “{profile.Name}”.");
-        }
-        catch (Exception ex)
-        {
-            SetError(ex.Message);
-        }
-    }
-
     /// <summary>
     /// Import from file: schema stage (Task 10) then metadata stage → visual summary only.
     /// </summary>
@@ -511,7 +455,15 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             return;
         }
 
-        await RefreshAsync(ct);
+        try
+        {
+            await RefreshAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+            return;
+        }
 
         if (GetMetadata is null)
         {
@@ -589,17 +541,20 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     [RelayCommand]
     private async Task CycleSortAsync()
     {
-        _sortMode = (_sortMode + 1) % 3;
-        await RefreshAsync();
+        _sortMode = (_sortMode + 1) % 2;
+        try
+        {
+            await RefreshAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+        }
     }
 
-    // A profile with zero tables fails the exact same schema check LoadAsync enforces (see
-    // JsonProfileService.TryParse), so saving one blind — as this used to do — wrote a file
-    // that then threw the moment RefreshAsync tried to reload it, silently discarding the new
-    // entry and leaving no error visible on this command's own failure path. Reusing
-    // CaptureCurrent (the same snapshot SaveCurrentAsNewAsync already uses) guarantees a
-    // schema-valid profile: BuildProfileSnapshot falls back to a placeholder "account" table
-    // when nothing is selected, so this never produces an empty table list.
+    // Reusing CaptureCurrent guarantees a schema-valid profile: BuildProfileSnapshot falls
+    // back to a placeholder "account" table when nothing is selected, so this never produces
+    // an empty table list — which LoadAsync's schema check would reject on the next refresh.
     [RelayCommand]
     private async Task NewProfileAsync()
     {
@@ -631,13 +586,17 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private async Task EditRulesAsync()
     {
         if (SelectedItem is null) return;
-        var name = SelectedItem.Name;
-        EditRulesRequested?.Invoke(this, name);
-
         if (_rulesRequest is null || _navigator is null)
             return;
-
-        _rulesRequest.Profile = await _profiles.LoadAsync(name);
+        try
+        {
+            _rulesRequest.Profile = await _profiles.LoadAsync(SelectedItem.Name);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+            return;
+        }
         _navigator.Navigate(typeof(RulesPage));
     }
 
@@ -662,7 +621,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         SelectedProfileSeed = "";
         SelectedProfileEditedLabel = "";
         TablesAndVolumeSummary = "";
-        ProfileRunHistory = "";
         OnPropertyChanged(nameof(SelectedProfileRuleSummary));
 
         if (SelectedItem is null)
@@ -674,7 +632,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         SelectedProfileDescription = profile.Description ?? "";
         SelectedProfileSeed = profile.Seed?.ToString(CultureInfo.InvariantCulture) ?? "";
         SelectedProfileEditedLabel = "Local profile";
-        ProfileRunHistory = "No runs recorded for this profile.";
         TablesAndVolumeSummary = string.Join(
             "\n",
             profile.Tables.Select(t =>

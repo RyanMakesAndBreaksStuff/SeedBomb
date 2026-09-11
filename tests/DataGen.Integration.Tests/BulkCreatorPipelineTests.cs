@@ -330,4 +330,238 @@ public class BulkCreatorPipelineTests
         for (var row = 0; row < 5; row++)
             Assert.Equal(session.Evaluate(prepared, name, ctx, row), captured[row]["name"]);
     }
+
+    [Fact]
+    public async Task Serialized_lookup_oneof_reaches_pipeline_payload_without_backfill()
+    {
+        var existing1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var existing2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        FieldRule original = new OneOfRule(new[]
+        {
+            new LookupRuleValue("sourceb", existing1, "First existing row").ToJson(),
+            new LookupRuleValue("sourceb", existing2, "Second existing row").ToJson(),
+        }, OneOfPick.Cycle);
+        var json = System.Text.Json.JsonSerializer.Serialize(original, FieldRule.JsonOptions);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<FieldRule>(json, FieldRule.JsonOptions)!;
+        var sourceA = MakeEntity("sourcea", new LookupAttributeMetadata
+        {
+            LogicalName = "sourcebid", Targets = ["sourceb"], IsValidForCreate = true,
+        });
+        var sourceB = MakeEntity("sourceb", new LookupAttributeMetadata
+        {
+            LogicalName = "sourceaid", Targets = ["sourcea"], IsValidForCreate = true,
+        });
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { sourceA, sourceB });
+        var service = MakeServiceMock();
+        var requests = new System.Collections.Concurrent.ConcurrentQueue<OrganizationRequest>();
+        service.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest request, CancellationToken _) =>
+            {
+                if (request is not ExecuteMultipleRequest batch) return new OrganizationResponse();
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (var i = 0; i < batch.Requests.Count; i++)
+                {
+                    var item = batch.Requests[i];
+                    requests.Enqueue(item);
+                    responses.Add(new ExecuteMultipleResponseItem
+                    {
+                        RequestIndex = i,
+                        Response = item is CreateRequest
+                            ? new CreateResponse { Results = { ["id"] = Guid.NewGuid() } }
+                            : new OrganizationResponse(),
+                    });
+                }
+                return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+            });
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["sourcea", "sourceb"],
+            RecordCounts = new() { ["sourcea"] = 2, ["sourceb"] = 2 },
+            BatchSize = 5, MaxParallelism = 1,
+            FieldRules = new() { ["sourcea"] = new() { ["sourcebid"] = restored } },
+        };
+        var pipeline = new GenerationPipeline(metadata.Object, NullLoggerFactory.Instance);
+        var result = await pipeline.GenerateAsync(config, service.Object, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(4, result.TotalRecords);
+        var createdA = requests.OfType<CreateRequest>().Where(r => r.Target.LogicalName == "sourcea").ToArray();
+        Assert.Equal(new[] { existing1, existing2 }, createdA.Select(r =>
+            Assert.IsType<EntityReference>(r.Target["sourcebid"]).Id));
+        Assert.DoesNotContain(requests, r => r is UpdateRequest);
+    }
+
+    [Fact]
+    public async Task Serialized_lookup_oneof_reaches_createmultiple_payload_without_backfill()
+    {
+        var existing1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var existing2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        FieldRule original = new OneOfRule(new[]
+        {
+            new LookupRuleValue("sourceb", existing1, "First existing row").ToJson(),
+            new LookupRuleValue("sourceb", existing2, "Second existing row").ToJson(),
+        }, OneOfPick.Cycle);
+        var json = System.Text.Json.JsonSerializer.Serialize(original, FieldRule.JsonOptions);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<FieldRule>(json, FieldRule.JsonOptions)!;
+        var sourceA = MakeEntity("sourcea", new LookupAttributeMetadata
+        {
+            LogicalName = "sourcebid", Targets = ["sourceb"], IsValidForCreate = true,
+        });
+        var sourceB = MakeEntity("sourceb", new LookupAttributeMetadata
+        {
+            LogicalName = "sourceaid", Targets = ["sourcea"], IsValidForCreate = true,
+        });
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { sourceA, sourceB });
+        var service = MakeServiceMock(supportsCreateMultiple: true);
+        var requests = new System.Collections.Concurrent.ConcurrentQueue<OrganizationRequest>();
+        service.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest request, CancellationToken _) =>
+            {
+                if (request is CreateMultipleRequest createMultiple)
+                {
+                    requests.Enqueue(createMultiple);
+                    var ids = createMultiple.Targets.Entities.Select(_ => Guid.NewGuid()).ToArray();
+                    return new CreateMultipleResponse { Results = { ["Ids"] = ids } };
+                }
+
+                if (request is not ExecuteMultipleRequest batch) return new OrganizationResponse();
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (var i = 0; i < batch.Requests.Count; i++)
+                {
+                    var item = batch.Requests[i];
+                    requests.Enqueue(item);
+                    responses.Add(new ExecuteMultipleResponseItem
+                    {
+                        RequestIndex = i,
+                        Response = item is CreateRequest
+                            ? new CreateResponse { Results = { ["id"] = Guid.NewGuid() } }
+                            : new OrganizationResponse(),
+                    });
+                }
+                return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+            });
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["sourcea", "sourceb"],
+            RecordCounts = new() { ["sourcea"] = 2, ["sourceb"] = 2 },
+            BatchSize = 5, MaxParallelism = 1,
+            FieldRules = new() { ["sourcea"] = new() { ["sourcebid"] = restored } },
+        };
+        var pipeline = new GenerationPipeline(metadata.Object, NullLoggerFactory.Instance);
+        var result = await pipeline.GenerateAsync(config, service.Object, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(4, result.TotalRecords);
+        var createdA = requests.OfType<CreateMultipleRequest>()
+            .SelectMany(r => r.Targets.Entities)
+            .Where(e => e.LogicalName == "sourcea")
+            .ToArray();
+        Assert.Equal(new[] { existing1, existing2 }, createdA.Select(e =>
+            Assert.IsType<EntityReference>(e["sourcebid"]).Id));
+        Assert.All(createdA, e =>
+            Assert.Equal("sourceb", Assert.IsType<EntityReference>(e["sourcebid"]).LogicalName));
+        Assert.DoesNotContain(requests, r => r is UpdateRequest);
+    }
+
+    [Fact]
+    public async Task Serialized_lookup_random_reads_shared_target_once_before_pipeline_writes()
+    {
+        var existingAccountId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        FieldRule original = new LookupRandomRule();
+        var json = System.Text.Json.JsonSerializer.Serialize(original, FieldRule.JsonOptions);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<FieldRule>(json, FieldRule.JsonOptions)!;
+        var sourceA = MakeEntity("sourcea", new LookupAttributeMetadata
+        {
+            LogicalName = "accountid", Targets = ["account"], IsValidForCreate = true,
+        });
+        var sourceB = MakeEntity("sourceb", new LookupAttributeMetadata
+        {
+            LogicalName = "accountid", Targets = ["account"], IsValidForCreate = true,
+        });
+        var account = MakeEntity("account",
+            new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 100 });
+        SetReadOnly(account, "PrimaryIdAttribute", "accountid");
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { sourceA, sourceB, account });
+        var service = MakeServiceMock();
+        var ops = new List<string>();
+        var requests = new System.Collections.Concurrent.ConcurrentQueue<OrganizationRequest>();
+        service.Setup(s => s.RetrieveMultipleAsync(
+                It.IsAny<Microsoft.Xrm.Sdk.Query.QueryBase>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Microsoft.Xrm.Sdk.Query.QueryBase query, CancellationToken _) =>
+            {
+                if (query is Microsoft.Xrm.Sdk.Query.QueryExpression qe
+                    && string.Equals(qe.EntityName, "account", StringComparison.OrdinalIgnoreCase))
+                {
+                    ops.Add("query:account");
+                    return new EntityCollection(
+                    [
+                        new Entity("account") { Id = existingAccountId },
+                    ])
+                    { MoreRecords = false };
+                }
+
+                return new EntityCollection();
+            });
+        service.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest request, CancellationToken _) =>
+            {
+                if (request is CreateMultipleRequest createMultiple)
+                {
+                    ops.Add("write");
+                    requests.Enqueue(createMultiple);
+                    var ids = createMultiple.Targets.Entities.Select(_ => Guid.NewGuid()).ToArray();
+                    return new CreateMultipleResponse { Results = { ["Ids"] = ids } };
+                }
+
+                if (request is not ExecuteMultipleRequest batch) return new OrganizationResponse();
+                ops.Add("write");
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (var i = 0; i < batch.Requests.Count; i++)
+                {
+                    var item = batch.Requests[i];
+                    requests.Enqueue(item);
+                    responses.Add(new ExecuteMultipleResponseItem
+                    {
+                        RequestIndex = i,
+                        Response = item is CreateRequest
+                            ? new CreateResponse { Results = { ["id"] = Guid.NewGuid() } }
+                            : new OrganizationResponse(),
+                    });
+                }
+                return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+            });
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["sourcea", "sourceb", "account"],
+            RecordCounts = new() { ["sourcea"] = 2, ["sourceb"] = 2, ["account"] = 2 },
+            BatchSize = 5, MaxParallelism = 1,
+            FieldRules = new()
+            {
+                ["sourcea"] = new() { ["accountid"] = restored },
+                ["sourceb"] = new() { ["accountid"] = restored },
+            },
+        };
+        var pipeline = new GenerationPipeline(metadata.Object, NullLoggerFactory.Instance);
+        var result = await pipeline.GenerateAsync(config, service.Object, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(6, result.TotalRecords);
+        Assert.Equal(1, ops.Count(o => o == "query:account"));
+        Assert.Contains("write", ops);
+        var firstWrite = ops.IndexOf("write");
+        Assert.True(ops.IndexOf("query:account") < firstWrite);
+        Assert.DoesNotContain(ops.Skip(firstWrite), o => o == "query:account");
+        var createdSources = requests.OfType<CreateRequest>()
+            .Where(r => r.Target.LogicalName is "sourcea" or "sourceb")
+            .ToArray();
+        Assert.Equal(4, createdSources.Length);
+        Assert.All(createdSources, r =>
+        {
+            var reference = Assert.IsType<EntityReference>(r.Target["accountid"]);
+            Assert.Equal("account", reference.LogicalName);
+            Assert.Equal(existingAccountId, reference.Id);
+        });
+        Assert.DoesNotContain(requests, r => r is UpdateRequest);
+    }
 }

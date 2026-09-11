@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Threading;
-using Microsoft.Extensions.DependencyInjection;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Navigation;
@@ -23,7 +22,6 @@ public partial class MainWindow : FluentWindow
     private readonly ISnackbarService _snackbarService;
     private readonly IContentDialogService _contentDialogService;
     private readonly NavigationViewNavigator _navigator;
-    private readonly IServiceProvider _serviceProvider;
     private object? _currentPageContent;
 
     /// <summary>Initialises the window, sets DataContext, and wires NavigationView to DI.</summary>
@@ -44,13 +42,11 @@ public partial class MainWindow : FluentWindow
         _snackbarService = snackbarService;
         _contentDialogService = contentDialogService;
         _navigator = (NavigationViewNavigator)navigator;
-        _serviceProvider = serviceProvider;
 
         DataContext = viewModel;
         InitializeComponent();
         RootNavigation.SetServiceProvider(serviceProvider);
 
-        connectionManagerViewModel.ConnectionSwitched += OnConnectionSwitched;
         viewModel.OpenConnectionManagerRequested += (_, _) =>
         {
             _navigator.Navigate(typeof(ConnectionsPage));
@@ -88,7 +84,6 @@ public partial class MainWindow : FluentWindow
                 SyncSignInOverlay();
             }
         };
-        _profileService.ProfilesChanged += OnProfilesChanged;
         _authService.SignedOut += OnSignedOut;
         Loaded += OnWindowLoaded;
         Closed += OnWindowClosed;
@@ -109,9 +104,18 @@ public partial class MainWindow : FluentWindow
 
     private async void OnSignInRequested(object? sender, EventArgs e)
     {
-        var last = await _profileService.GetLastUsedAsync();
-        if (last is not null)
-            await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
+        try
+        {
+            var last = await _profileService.GetLastUsedAsync();
+            if (last is not null)
+                await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
+        }
+        catch (Exception ex)
+        {
+            // async void: nothing above this frame can catch. SwitchError is already bound to
+            // SignInErrorBanner/SignInErrorText via the explicit-source bindings at :100-107.
+            _connectionManagerViewModel.SwitchError = ex.Message;
+        }
     }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
@@ -130,7 +134,7 @@ public partial class MainWindow : FluentWindow
 
         _connectionManagerViewModel.ParentHwnd = new WindowInteropHelper(this).Handle;
         await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
-        SyncHasConnection();
+        _vm.SyncHasConnection();
 
         // Startup's silent sign-in (App.xaml.cs) never goes through SelectProfileAsync, so
         // ConnectedProfileId is only ever set there for later, in-session switches — seed it
@@ -147,12 +151,12 @@ public partial class MainWindow : FluentWindow
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
-        _profileService.ProfilesChanged -= OnProfilesChanged;
         _authService.SignedOut -= OnSignedOut;
+        _vm.Dispose();
     }
 
     // ProfileAuthService.SignOutAsync uses ConfigureAwait(false) throughout, so SignedOut can
-    // fire on a background thread — marshal before touching the ViewModel, same as OnProfilesChanged.
+    // fire on a background thread — marshal before touching the ViewModel.
     private void OnSignedOut(object? sender, EventArgs e)
     {
         if (Dispatcher.CheckAccess())
@@ -165,54 +169,6 @@ public partial class MainWindow : FluentWindow
             _vm.NeedsSignIn = true;
             _connectionManagerViewModel.ConnectedProfileId = null;
         }
-    }
-
-    // T4: react to saves/deletes (fired by the profile store) instead of ObservableCollection's
-    // CollectionChanged. LoadAsync does Profiles.Clear() then re-adds, so watching the collection
-    // directly drove HasConnection false for an instant on every routine reload (flashing the
-    // first-run overlay). ProfilesChanged can fire on a background thread (the store's disk write
-    // uses ConfigureAwait(false) throughout) — marshal to the UI thread before touching the
-    // ObservableCollection or any DependencyObject.
-    private void OnProfilesChanged(object? sender, EventArgs e)
-    {
-        if (Dispatcher.CheckAccess())
-            _ = ReloadAndSyncHasConnectionAsync();
-        else
-            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(OnProfilesChangedOnUiThread));
-    }
-
-    private void OnProfilesChangedOnUiThread() => _ = ReloadAndSyncHasConnectionAsync();
-
-    // HasConnection must be re-derived only after the reload fully settles, not mid-reload —
-    // that's the fix for the overlay flash.
-    private async Task ReloadAndSyncHasConnectionAsync()
-    {
-        await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
-        SyncHasConnection();
-    }
-
-    // WR-001: the profile count is the only source of truth. Deleting the last connection
-    // must re-show the first-run overlay and re-disable the nav items.
-    private void SyncHasConnection()
-        => _vm.HasConnection = _connectionManagerViewModel.Profiles.Count > 0;
-
-    private void OnConnectionSwitched(object? sender, (ConnectionProfile Profile, AuthResult Result) e)
-    {
-        if (!e.Result.Succeeded) return;
-
-        _vm.UserDisplayName = e.Result.DisplayName ?? _vm.UserDisplayName;
-        _vm.OrgUrl = e.Profile.EnvironmentUrl;
-        _vm.NeedsSignIn = false;
-        SyncHasConnection();
-
-        // GeneratePage and its ViewModel are DI singletons, so the entity picker's "load once on
-        // control load" cache otherwise survives a connection switch untouched whenever the switch
-        // happens from a different page (the normal case — switching lives on ConnectionsPage).
-        // Resolve the singleton directly instead of gating on _currentPageContent so a switch made
-        // from elsewhere still clears stale entities before the user next lands on Generate.
-        _serviceProvider.GetRequiredService<GeneratePage>().ReloadForConnectionSwitch();
-        SyncFirstRunOverlay();
-        SyncSignInOverlay();
     }
 
     private void SyncFirstRunOverlay()

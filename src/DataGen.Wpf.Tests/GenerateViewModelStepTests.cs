@@ -1,4 +1,3 @@
-using System.Windows.Media;
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
@@ -274,7 +273,7 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public void QueueDotBrushFollowsProgressAndErrors()
+    public void QueueTracksEntitiesAcrossProgressAndErrors()
     {
         var viewModel = CreateViewModel(out _, out _, out _);
         viewModel.OnEntitiesChanged(
@@ -283,13 +282,16 @@ public sealed class GenerateViewModelStepTests
             new EntitySummary("contact", "Contact", false),
         ]);
 
-        Assert.All(viewModel.QueuedEntities, e => Assert.Equal(Brushes.LightGray, e.DotBrush));
+        Assert.Equal(
+            ["account", "contact"],
+            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
 
         viewModel.CurrentProgress = new ProgressUpdate(
             "Generating", "account", 1, 10, 1, 2, 0, TimeSpan.Zero);
 
-        var accountDot = Assert.Single(viewModel.QueuedEntities, e => e.Entity.LogicalName == "account");
-        Assert.NotEqual(Brushes.LightGray, accountDot.DotBrush);
+        Assert.Equal(
+            ["account", "contact"],
+            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
 
         viewModel.LastResult = new GenerationResult
         {
@@ -300,11 +302,9 @@ public sealed class GenerateViewModelStepTests
             Errors = [new BatchError("contact", 0, "failed", null)],
         };
 
-        Assert.NotEqual(Brushes.LightGray, viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "account").DotBrush);
-        Assert.NotEqual(Brushes.LightGray, viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "contact").DotBrush);
-        Assert.NotEqual(
-            viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "account").DotBrush,
-            viewModel.QueuedEntities.Single(e => e.Entity.LogicalName == "contact").DotBrush);
+        Assert.Equal(
+            ["account", "contact"],
+            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
     }
 
     [Fact]
@@ -704,15 +704,80 @@ public sealed class GenerateViewModelStepTests
         }
     }
 
+    [Fact]
+    public async Task GoToReview_LookupRandomRule_KeepsRuleAndExplanatoryPreview()
+    {
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(lookup, AttributeTypeCode.Lookup);
+        var meta = BuildAccountMetadata(lookup);
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        fieldRules.SetRule("account", "parentaccountid", new LookupRandomRule(), "Parent Account", "preview");
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.False(viewModel.ReviewHasErrors);
+        Assert.IsType<LookupRandomRule>(viewModel.ReviewedRules!["account"]["parentaccountid"]);
+        var preview = Assert.Single(viewModel.ReviewPreviewRows.Single().Values);
+        Assert.Contains("1,000", preview);
+        Assert.Contains("Candidate validation happens at Start", preview);
+        Assert.DoesNotContain("11111111", preview);
+    }
+
+    [Fact]
+    public async Task GoToReview_LookupConstant_FormatsEntityReference()
+    {
+        var lookup = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(lookup, AttributeTypeCode.Lookup);
+        var meta = BuildAccountMetadata(lookup);
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        var id = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        fieldRules.SetRule("account", "parentaccountid",
+            new ConstantRule(new LookupRuleValue("account", id, "Acme").ToJson()),
+            "Parent Account", "preview");
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.False(viewModel.ReviewHasErrors);
+        Assert.Equal($"account · {id:D}", viewModel.ReviewPreviewRows.Single().Values[0]);
+    }
+
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
     // RuleEditorViewModelTests / DataGen.Bulk.Tests/RuledGenerationTests.
-    private static EntityMetadata BuildAccountMetadata()
+    private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)
     {
         var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 100 };
         var employees = new IntegerAttributeMetadata { LogicalName = "numberofemployees", IsValidForCreate = true, MinValue = 0, MaxValue = 1000 };
 
         var meta = new EntityMetadata { LogicalName = "account" };
-        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { name, employees });
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, extra.Length == 0
+            ? [name, employees]
+            : extra.Concat<AttributeMetadata>([name, employees]).ToArray());
         return meta;
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Seedbomb.Services.Auth;
@@ -34,9 +35,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         _connectionService = connectionService;
         _dialogs = dialogs;
     }
-
-    /// <summary>Raised when the drawer should close.</summary>
-    public event EventHandler? DrawerCloseRequested;
 
     /// <summary>Raised after a profile is selected and sign-in succeeds.</summary>
     public event EventHandler<(ConnectionProfile Profile, AuthResult Result)>? ConnectionSwitched;
@@ -83,14 +81,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Test seam: the fire-and-forget toast task started by the last <see cref="ConnectAsync"/>.</summary>
     internal Task? ConnectedToastTask { get; private set; }
 
-    /// <summary>
-    /// True while <see cref="NewProfile"/>/<see cref="EditProfile"/>/<see cref="Cancel"/>/
-    /// <see cref="DeleteProfileAsync"/> are assigning <see cref="EditingProfile"/>. Assigning it
-    /// synchronously re-pushes its field values through the bound TextBoxes (raising TextChanged),
-    /// so code-behind's field-changed handlers check this and skip dirty-marking while it's set.
-    /// </summary>
-    internal bool IsAssigningEditingProfile { get; private set; }
-
     /// <summary>Gets whether the last connection switch failed.</summary>
     public bool HasSwitchError => SwitchError is not null;
 
@@ -114,7 +104,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private static bool IsValidHttpsUrl(string? url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 
-    /// <summary>Re-evaluates <see cref="EnvironmentUrlError"/>. EnvironmentUrl's setter doesn't raise PropertyChanged.</summary>
+    /// <summary>Re-evaluates <see cref="EnvironmentUrlError"/> after an EnvironmentUrl edit.</summary>
     internal void RefreshEnvironmentUrlValidation() => OnPropertyChanged(nameof(EnvironmentUrlError));
 
     /// <summary>Loads profiles from storage and marks the active profile.</summary>
@@ -144,21 +134,13 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void NewProfile()
     {
-        IsAssigningEditingProfile = true;
-        try
+        EditingProfile = new ConnectionProfile
         {
-            EditingProfile = new ConnectionProfile
-            {
-                // Microsoft's well-known public client ID for Dynamics 365 / Power Platform
-                ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
-            };
-            IsEditing = true;
-            IsDirty = false;
-        }
-        finally
-        {
-            IsAssigningEditingProfile = false;
-        }
+            // Microsoft's well-known public client ID for Dynamics 365 / Power Platform
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+        };
+        IsEditing = true;
+        IsDirty = false;
     }
 
     /// <summary>Sets a profile as the active connection and re-authenticates against it.</summary>
@@ -175,7 +157,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
             if (result.Succeeded)
             {
-                _connectionService.Reset();
+                await _connectionService.ResetAsync();
                 ConnectedProfileId = profile.Id;
                 ConnectionSwitched?.Invoke(this, (profile, result));
             }
@@ -196,32 +178,24 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     private bool CanSelectProfile() => !IsSwitchingConnection;
 
-    /// <summary>Starts editing an existing profile.</summary>
+    /// <summary>Starts editing an existing profile, loading its secret on demand.</summary>
     [RelayCommand]
-    private void EditProfile(ConnectionProfile profile)
+    private async Task EditProfileAsync(ConnectionProfile profile)
     {
-        IsAssigningEditingProfile = true;
-        try
+        EditingProfile = new ConnectionProfile
         {
-            EditingProfile = new ConnectionProfile
-            {
-                Id = profile.Id,
-                Name = profile.Name,
-                EnvironmentUrl = profile.EnvironmentUrl,
-                EnvironmentType = profile.EnvironmentType,
-                AuthType = profile.AuthType,
-                ClientId = profile.ClientId,
-                TenantId = profile.TenantId,
-                ClientSecret = profile.ClientSecret,
-                CertificateThumbprint = profile.CertificateThumbprint,
-            };
-            IsEditing = true;
-            IsDirty = false;
-        }
-        finally
-        {
-            IsAssigningEditingProfile = false;
-        }
+            Id = profile.Id,
+            Name = profile.Name,
+            EnvironmentUrl = profile.EnvironmentUrl,
+            EnvironmentType = profile.EnvironmentType,
+            AuthType = profile.AuthType,
+            ClientId = profile.ClientId,
+            TenantId = profile.TenantId,
+            ClientSecret = await _profileService.GetSecretAsync(profile.Id),
+            CertificateThumbprint = profile.CertificateThumbprint,
+        };
+        IsEditing = true;
+        IsDirty = false;
     }
 
     /// <summary>Persists the editing profile. Connecting is a separate, explicit step (<see cref="ConnectAsync"/>).</summary>
@@ -296,16 +270,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             // profile stays visible/editable after it no longer exists in the store.
             if (EditingProfile?.Id == profile.Id)
             {
-                IsAssigningEditingProfile = true;
-                try
-                {
-                    EditingProfile = null;
-                    IsEditing = false;
-                }
-                finally
-                {
-                    IsAssigningEditingProfile = false;
-                }
+                EditingProfile = null;
+                IsEditing = false;
             }
 
             if (ConnectedProfileId == profile.Id)
@@ -347,18 +313,10 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
     {
-        IsAssigningEditingProfile = true;
-        try
-        {
-            IsEditing = false;
-            EditingProfile = null;
-            TestResult = null;
-            IsDirty = false;
-        }
-        finally
-        {
-            IsAssigningEditingProfile = false;
-        }
+        IsEditing = false;
+        EditingProfile = null;
+        TestResult = null;
+        IsDirty = false;
     }
 
     /// <summary>Connects to the saved, clean editing profile. Separate from Save — see <see cref="ShowConnectButton"/>.</summary>
@@ -393,18 +351,27 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     {
         if (EditingProfile is null) return;
         EditingProfile.ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
-        IsDirty = true;
-        OnPropertyChanged(nameof(EditingProfile));
-        SaveProfileCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Requests the drawer to close.</summary>
-    [RelayCommand]
-    private void Close() => DrawerCloseRequested?.Invoke(this, EventArgs.Empty);
+    partial void OnEditingProfileChanging(ConnectionProfile? oldValue, ConnectionProfile? newValue)
+    {
+        if (oldValue is not null)
+            oldValue.PropertyChanged -= OnEditingProfileFieldChanged;
+        if (newValue is not null)
+            newValue.PropertyChanged += OnEditingProfileFieldChanged;
+    }
+
+    private void OnEditingProfileFieldChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        IsDirty = true;
+        SaveProfileCommand.NotifyCanExecuteChanged();
+        if (e.PropertyName is nameof(ConnectionProfile.EnvironmentUrl))
+            RefreshEnvironmentUrlValidation();
+    }
 
     partial void OnSelectedProfileChanged(ConnectionProfile? value)
     {
         if (value is not null)
-            EditProfile(value);
+            _ = EditProfileAsync(value);
     }
 }

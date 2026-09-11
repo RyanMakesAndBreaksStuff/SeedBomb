@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
@@ -9,7 +7,6 @@ using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk;
 using Seedbomb.ViewModels.Controls;
-using Microsoft.Identity.Client;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui;
 using Wpf.Ui.Extensions;
@@ -18,7 +15,6 @@ using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
-using Seedbomb.ViewModels;
 using Seedbomb.Views.Pages;
 
 namespace Seedbomb.ViewModels;
@@ -34,19 +30,11 @@ public record StepEntry(string Glyph, string Label, bool IsDone, bool IsActive, 
 /// <summary>One selected table in the step-1 aside.</summary>
 public sealed record SelectedTableRow(string DisplayName, string LogicalName, int Count);
 
-/// <summary>Entity queue status entry shown in the right-side queue dot list.</summary>
-public sealed partial class QueuedEntityEntry : ObservableObject
+/// <summary>Entity queue status entry. Rendering is the view's concern; this holds no brushes.</summary>
+public sealed class QueuedEntityEntry(EntitySummary entity)
 {
     /// <summary>Gets the entity summary.</summary>
-    public EntitySummary Entity { get; }
-
-    [ObservableProperty]
-    private System.Windows.Media.Brush _dotBrush =
-        System.Windows.Media.Brushes.LightGray;
-
-    /// <summary>Initialises the entry.</summary>
-    /// <param name="entity">The entity.</param>
-    public QueuedEntityEntry(EntitySummary entity) => Entity = entity;
+    public EntitySummary Entity { get; } = entity;
 }
 
 /// <summary>Review-card preview: first five <see cref="RuleValueGenerator"/> outputs for one ruled column.</summary>
@@ -62,25 +50,21 @@ public sealed record ReviewPreviewRow(
 }
 
 /// <summary>ViewModel for the Generate wizard page.</summary>
-public sealed partial class GenerateViewModel : ViewModelBase
+public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 {
     private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
     private readonly IMetadataProvider _metadataProvider;
-    private readonly IProfileService _profileService;
     private readonly IContentDialogService _contentDialogService;
     private readonly ILogger<GenerateViewModel> _logger;
-    private readonly RulesNavigationRequest? _rulesRequest;
     private readonly IAppNavigator? _navigator;
+    private readonly MainWindowViewModel? _mainWindow;
+    private readonly GenerateDraftAutosave _draftAutosave;
+    private readonly GenerateProfileBridge _profileBridge;
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _rulesCts;
-    private readonly HashSet<string> _queueCompletedEntities = new(StringComparer.OrdinalIgnoreCase);
-    private string? _queueCurrentEntity;
-    private CancellationTokenSource? _draftSaveCts;
-    private Task? _draftSaveTask;
-    private Profile? _restoredDraft;
     private FieldOverridesViewModel? _fieldOverrides;
     private FieldRulesViewModel _fieldRules;
     private EntitySelectorViewModel? _entitySelector;
@@ -100,6 +84,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <param name="run">Singleton run sheet / first-run executor. Required.</param>
     /// <param name="rulesRequest">Optional payload for navigating to <see cref="RulesPage"/>.</param>
     /// <param name="navigator">Optional shell navigator.</param>
+    /// <param name="mainWindow">Shell view-model; when provided, Generate reloads on connection switch.</param>
     public GenerateViewModel(
         IRunHistoryService historyService,
         ISettingsService settingsService,
@@ -110,7 +95,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IContentDialogService contentDialogService,
         RunViewModel run,
         RulesNavigationRequest? rulesRequest = null,
-        IAppNavigator? navigator = null)
+        IAppNavigator? navigator = null,
+        MainWindowViewModel? mainWindow = null)
     {
         ArgumentNullException.ThrowIfNull(run);
         _historyService = historyService;
@@ -118,13 +104,44 @@ public sealed partial class GenerateViewModel : ViewModelBase
         _snackbar = snackbar;
         _logger = logger;
         _metadataProvider = metadataProvider;
-        _profileService = profileService;
         _contentDialogService = contentDialogService;
-        _rulesRequest = rulesRequest;
         _navigator = navigator;
+        _mainWindow = mainWindow;
         Run = run;
         _fieldRules = new FieldRulesViewModel();
         AttachFieldRules(_fieldRules);
+        _profileBridge = new GenerateProfileBridge(this, profileService, rulesRequest, logger);
+        _draftAutosave = new GenerateDraftAutosave(
+            profileService,
+            logger,
+            () => SelectedEntities.Count > 0 || (_fieldRules is not null && _fieldRules.GetRules().Count > 0),
+            BuildProfileSnapshot);
+        if (_mainWindow is not null)
+            _mainWindow.ConnectionReloadRequested += OnConnectionReloadRequested;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_mainWindow is not null)
+            _mainWindow.ConnectionReloadRequested -= OnConnectionReloadRequested;
+    }
+
+    private void OnConnectionReloadRequested(object? sender, EventArgs e) =>
+        _ = ReloadForConnectionSwitchAsync();
+
+    private async Task ReloadForConnectionSwitchAsync()
+    {
+        try
+        {
+            _entitySelector?.ClearSelection();
+            await ResetWithoutPromptAsync();
+            _entitySelector?.LoadEntitiesCommand.Execute(null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reload Generate after a connection switch");
+        }
     }
 
     /// <inheritdoc />
@@ -145,17 +162,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             if (wizardDirty)
                 return;
 
-            try
-            {
-                _restoredDraft = await _profileService.LoadDraftAsync();
-                if (_restoredDraft?.Seed is int seed)
-                    Seed = seed;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Draft profile load skipped");
-                _restoredDraft = null;
-            }
+            await _profileBridge.LoadDraftAsync();
         }
         catch (OperationCanceledException)
         {
@@ -171,17 +178,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     /// <inheritdoc />
     public override Task OnNavigatedFromAsync()
     {
-        if (_rulesRequest is not null && SelectedEntities.Count > 0)
-        {
-            _rulesRequest.Profile = BuildProfileSnapshot(
-                string.Equals(ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
-                    ? "working-set"
-                    : ActiveProfileName);
-            _rulesRequest.TableName = SelectedEntities[0].LogicalName;
-            _rulesRequest.OnSaved = ApplySavedRulesProfile;
-            _rulesRequest.ReturnPage = typeof(GeneratePage);
-        }
-
+        _profileBridge.CaptureWorkingSetIfNeeded();
         return Task.CompletedTask;
     }
 
@@ -189,10 +186,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(CanConfigure),
-        nameof(CanExecute),
-        nameof(HasEntities),
-        nameof(SelectedEntitiesSummary),
         nameof(Steps),
         nameof(PlannedTotal),
         nameof(SelectedTableRows),
@@ -205,7 +198,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private IReadOnlyList<EntitySummary> _selectedEntities = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGenerating), nameof(GenerateLabel), nameof(StatusLabel), nameof(Steps), nameof(HasStarted))]
+    [NotifyPropertyChangedFor(nameof(Steps))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoToReviewCommand))]
@@ -214,14 +207,11 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private bool _isRunning;
 
     [ObservableProperty]
-    private bool _isCancelling;
-
-    [ObservableProperty]
     private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(HasResult), nameof(StatusLabel), nameof(Steps), nameof(HasStarted),
+        nameof(HasResult), nameof(Steps),
         nameof(LastRunHasErrors), nameof(LastRunStatusText))]
     private GenerationResult? _lastResult;
 
@@ -274,24 +264,12 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     // ── Derived ───────────────────────────────────────────────────────────────
 
-    /// <summary>Gets a value indicating whether step 2 (configure) should be visible.</summary>
-    public bool CanConfigure => SelectedEntities.Count > 0;
-
-    /// <summary>Gets a value indicating whether step 3 (execute) should be visible.</summary>
-    public bool CanExecute => CanConfigure;
-
-    /// <summary>Gets a value indicating whether entities have been selected.</summary>
-    public bool HasEntities => SelectedEntities.Count > 0;
-
-    /// <summary>Gets a compact selected-entity summary for step card headers.</summary>
-    public string SelectedEntitiesSummary =>
-        SelectedEntities.Count == 0
-            ? "Waiting"
-            : string.Join(" · ", SelectedEntities.Take(4).Select(e => e.DisplayName)) +
-              (SelectedEntities.Count > 4 ? $" · {SelectedEntities.Count} entities" : string.Empty);
-
     /// <summary>Owned field-rules draft. Tests may swap via <see cref="AttachFieldRules"/>.</summary>
     public FieldRulesViewModel FieldRules => _fieldRules;
+
+    internal FieldOverridesViewModel? FieldOverrides => _fieldOverrides;
+    internal EntitySelectorViewModel? EntitySelector => _entitySelector;
+    internal IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> LiveEntityMetadata => _entityMetadata;
 
     /// <summary>Singleton run sheet bound by the overlay.</summary>
     public RunViewModel Run { get; }
@@ -385,9 +363,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         new("Locale", Locale),
     ];
 
-    /// <summary>Gets a value indicating whether a generation run is in progress.</summary>
-    public bool IsGenerating => IsRunning;
-
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
 
@@ -401,15 +376,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
                 : LastResult.Errors.Count == 1
                     ? LastResult.Errors[0].ErrorMessage
                     : $"{LastResult.Errors.Count} batch errors";
-
-    /// <summary>Gets a value indicating whether generation has started (running or complete) — gates the Execute status card.</summary>
-    public bool HasStarted => IsRunning || HasResult;
-
-    /// <summary>Gets the label for the Generate button.</summary>
-    public string GenerateLabel => IsRunning ? "GENERATING…" : "GENERATE DATA";
-
-    /// <summary>Gets the status panel label.</summary>
-    public string StatusLabel => IsRunning ? "In progress" : (LastResult is null ? "Ready" : "Complete");
 
     /// <summary>Gets the collection of queued entity status dots.</summary>
     public ObservableCollection<QueuedEntityEntry> QueuedEntities { get; } = [];
@@ -568,7 +534,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
         OnPropertyChanged(nameof(DraftRuleCount));
         OnPropertyChanged(nameof(RulesLinkLabel));
         OnPropertyChanged(nameof(ProfileSummaryLine));
-        ScheduleDraftAutosave();
+        _draftAutosave.Schedule();
     }
 
     /// <summary>Called by the page when entity selection changes.</summary>
@@ -584,8 +550,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedTableRows));
 
         QueuedEntities.Clear();
-        _queueCompletedEntities.Clear();
-        _queueCurrentEntity = null;
         foreach (var e in entities)
             QueuedEntities.Add(new QueuedEntityEntry(e));
 
@@ -600,52 +564,6 @@ public sealed partial class GenerateViewModel : ViewModelBase
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
     }
-
-    partial void OnCurrentProgressChanged(ProgressUpdate? value)
-    {
-        if (value is null || string.IsNullOrEmpty(value.EntityName))
-            return;
-
-        if (_queueCurrentEntity is not null
-            && !string.Equals(_queueCurrentEntity, value.EntityName, StringComparison.OrdinalIgnoreCase))
-        {
-            _queueCompletedEntities.Add(_queueCurrentEntity);
-        }
-
-        _queueCurrentEntity = value.EntityName;
-        ApplyQueueDots();
-    }
-
-    partial void OnLastResultChanged(GenerationResult? value) => ApplyQueueDots();
-
-    private void ApplyQueueDots()
-    {
-        foreach (var entry in QueuedEntities)
-        {
-            var name = entry.Entity.LogicalName;
-            if (LastResult?.Errors.Any(err =>
-                    string.Equals(err.EntityLogicalName, name, StringComparison.OrdinalIgnoreCase)) == true)
-            {
-                entry.DotBrush = ThemeBrush("DG.Error", Brushes.IndianRed);
-            }
-            else if (LastResult?.CreatedRecords.ContainsKey(name) == true
-                     || _queueCompletedEntities.Contains(name))
-            {
-                entry.DotBrush = ThemeBrush("DG.Success", Brushes.ForestGreen);
-            }
-            else if (string.Equals(name, CurrentProgress?.EntityName, StringComparison.OrdinalIgnoreCase))
-            {
-                entry.DotBrush = ThemeBrush("DG.Accent", Brushes.DodgerBlue);
-            }
-            else
-            {
-                entry.DotBrush = Brushes.LightGray;
-            }
-        }
-    }
-
-    private static Brush ThemeBrush(string key, Brush fallback) =>
-        Application.Current?.TryFindResource(key) as Brush ?? fallback;
 
     /// <summary>
     /// Advances to the Rules step: loads full live metadata for the selected entities
@@ -670,7 +588,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             RunId = $"run-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
             IsRulesLoaded = true;
             _fieldRules?.SelectTable(SelectedEntities.FirstOrDefault()?.LogicalName ?? string.Empty);
-            TryApplyRestoredDraft();
+            _profileBridge.TryApplyRestoredDraft();
         }
         catch (OperationCanceledException)
         {
@@ -741,19 +659,27 @@ public sealed partial class GenerateViewModel : ViewModelBase
                     tableRules[column] = result.EffectiveRule;
 
                     var values = new List<string>(5);
-                    var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
-                    using var session = result.EffectiveRule is BogusRule
-                        ? new BogusEvaluatorSession(Locale)
-                        : null;
-                    PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
-                        ? BogusRulePreparer.CompileRule(bogus, attr, eval)
-                        : null;
-                    for (var row = 0; row < 5; row++)
+                    if (result.EffectiveRule is LookupRandomRule)
                     {
-                        var value = prepared is not null && session is not null
-                            ? session.Evaluate(prepared, attr, eval, row)
-                            : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
-                        values.Add(FormatPreview(value));
+                        values.Add(
+                            $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
+                    }
+                    else
+                    {
+                        var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
+                        using var session = result.EffectiveRule is BogusRule
+                            ? new BogusEvaluatorSession(Locale)
+                            : null;
+                        PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
+                            ? BogusRulePreparer.CompileRule(bogus, attr, eval)
+                            : null;
+                        for (var row = 0; row < 5; row++)
+                        {
+                            var value = prepared is not null && session is not null
+                                ? session.Evaluate(prepared, attr, eval, row)
+                                : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
+                            values.Add(FormatPreview(value));
+                        }
                     }
 
                     var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
@@ -812,6 +738,7 @@ public sealed partial class GenerateViewModel : ViewModelBase
             OptionSetValue osv => osv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             Money m => m.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            EntityReference r => $"{r.LogicalName} · {r.Id:D}",
             _ => value.ToString() ?? string.Empty,
         };
     }
@@ -857,15 +784,13 @@ public sealed partial class GenerateViewModel : ViewModelBase
 
     private async Task WipeWizardAsync()
     {
-        await CancelPendingAutosaveAsync();
+        await _draftAutosave.CancelPendingAsync();
 
         SelectedEntities = [];
         _entitySelector?.ClearSelection();
         CurrentProgress = null;
         LastResult = null;
         QueuedEntities.Clear();
-        _queueCompletedEntities.Clear();
-        _queueCurrentEntity = null;
         _fieldOverrides?.SetEntities([]);
         OnPropertyChanged(nameof(SelectedTableRows));
 
@@ -881,21 +806,13 @@ public sealed partial class GenerateViewModel : ViewModelBase
         RunId = "";
         Seed = 42;
         ActiveProfileName = "No profile loaded";
-        _restoredDraft = null;
         _fieldRules?.HardReset();
 
-        _rulesRequest?.Clear();
+        _profileBridge.ResetSession();
 
-        await CancelPendingAutosaveAsync();
+        await _draftAutosave.CancelPendingAsync();
 
-        try
-        {
-            await _profileService.ClearDraftAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Draft clear skipped");
-        }
+        await _profileBridge.ClearDraftAsync();
 
         try
         {
@@ -915,15 +832,44 @@ public sealed partial class GenerateViewModel : ViewModelBase
         IsRunning = true;
         CurrentProgress = null;
         LastResult = null;
-        IsCancelling = false;
         _cts = new CancellationTokenSource();
-
         _fieldRules?.Commit();
         // §07: Start promotes draft (Commit) and persists the promoted snapshot.
-        _ = PersistDraftAsync();
+        await _draftAutosave.PersistAsync();
+        var config = BuildConfig();
+        try
+        {
+            var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
+            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token);
+            var result = LastResult!;
+            await _historyService.AddRunAsync(new RunRecord(
+                Run.CurrentRunId,
+                DateTimeOffset.Now,
+                SelectedEntities.Select(e => e.DisplayName).ToArray(),
+                result.TotalRecords,
+                result.Elapsed,
+                result.Errors.Count == 0,
+                result.Errors.Count));
+            ReportOutcome(result);
+            if (!Run.KeepWindowOpen)
+                _navigator?.Navigate(typeof(RunSummaryPage));
+        }
+        catch (Exception ex)
+        {
+            Run.ReportRunFailure(ex);
+        }
+        finally
+        {
+            IsRunning = false;
+            _cts?.Dispose();
+            _cts = null;
+        }
+    }
 
+    private GenerationConfig BuildConfig()
+    {
         var rawCounts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
-        var config = new GenerationConfig
+        return new GenerationConfig
         {
             EntityLogicalNames = [.. SelectedEntities.Select(e => e.LogicalName)],
             RecordCounts = SelectedEntities.ToDictionary(
@@ -936,69 +882,19 @@ public sealed partial class GenerateViewModel : ViewModelBase
             FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
             RunId = RunId,
         };
-
-        try
-        {
-            var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
-            var host = "Dataverse";
-            LastResult = await Run.ExecuteAsync(config, host, names, PlannedTotal, _cts.Token);
-            var result = LastResult!;
-
-            await _historyService.AddRunAsync(new RunRecord(
-                Run.CurrentRunId,
-                DateTimeOffset.Now,
-                SelectedEntities.Select(e => e.DisplayName).ToArray(),
-                result.TotalRecords,
-                result.Elapsed,
-                result.Errors.Count == 0,
-                result.Errors.Count));
-
-            if (result.Errors.Count == 0)
-            {
-                _snackbar.Show(
-                    "Success",
-                    $"Created {result.TotalRecords:N0} records",
-                    Wpf.Ui.Controls.ControlAppearance.Success,
-                    null,
-                    TimeSpan.FromSeconds(3));
-            }
-            else
-            {
-                _snackbar.Show(
-                    "Completed with errors",
-                    $"Created {result.TotalRecords:N0} records with {result.Errors.Count} error(s)",
-                    Wpf.Ui.Controls.ControlAppearance.Caution,
-                    null,
-                    TimeSpan.FromSeconds(5));
-            }
-
-            if (!Run.KeepWindowOpen)
-                _navigator?.Navigate(typeof(RunSummaryPage));
-        }
-        catch (OperationCanceledException)
-        {
-            _snackbar.Show("Cancelled", "Generation cancelled",
-                Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(3));
-        }
-        catch (MsalUiRequiredException)
-        {
-            _snackbar.Show("Session expired", "Please sign in again",
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
-        }
-        catch (Exception ex)
-        {
-            _snackbar.Show("Error", "Generation failed — see logs for details",
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
-            _logger.LogError(ex, "Generation failed");
-        }
-        finally
-        {
-            IsRunning = false;
-            IsCancelling = false;
-            _cts?.Dispose();
-            _cts = null;
-        }
     }
+
+    private void ReportOutcome(GenerationResult result) =>
+        _snackbar.Show(
+            result.Errors.Count == 0 ? "Success" : "Completed with errors",
+            result.Errors.Count == 0
+                ? $"Created {result.TotalRecords:N0} records"
+                : $"Created {result.TotalRecords:N0} records with {result.Errors.Count} error(s)",
+            result.Errors.Count == 0
+                ? Wpf.Ui.Controls.ControlAppearance.Success
+                : Wpf.Ui.Controls.ControlAppearance.Caution,
+            null,
+            TimeSpan.FromSeconds(result.Errors.Count == 0 ? 3 : 5));
 
     private bool CanStartGenerate() =>
         !IsRunning
@@ -1014,47 +910,10 @@ public sealed partial class GenerateViewModel : ViewModelBase
     [RelayCommand]
     private void EditRules()
     {
-        if (_rulesRequest is null || _navigator is null)
+        if (_navigator is null || !_profileBridge.TryPrepareRulesEdit())
             return;
 
-        _rulesRequest.Profile = BuildProfileSnapshot("working-set");
-        _rulesRequest.TableName = SelectedEntities.FirstOrDefault()?.LogicalName;
-        _rulesRequest.OnSaved = ApplySavedRulesProfile;
-        _rulesRequest.ReturnPage = typeof(GeneratePage);
         _navigator.Navigate(typeof(RulesPage));
-    }
-
-    private void ApplySavedRulesProfile(Profile profile)
-    {
-        ActiveProfileName = profile.Name;
-        if (_entityMetadata.Count > 0)
-        {
-            var report = ProfileImport.ValidateAgainstMetadata(profile, _entityMetadata, RunId);
-            ApplyImportReport(report);
-            return;
-        }
-
-        if (profile.Seed is int seed)
-            Seed = seed;
-
-        foreach (var table in profile.Tables)
-            _fieldOverrides?.SetCount(table.Table, table.Count);
-
-        var draft = new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var table in profile.Tables)
-        {
-            if (table.Columns is null || table.Columns.Count == 0)
-                continue;
-
-            var cols = new Dictionary<string, RuleDraftEntry>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (column, rule) in table.Columns)
-                cols[column] = new RuleDraftEntry(rule, column, "");
-            draft[table.Table] = cols;
-        }
-
-        _fieldRules.ReplaceDraft(draft);
-        if (SelectedEntities.Count > 0)
-            _fieldRules.SelectTable(SelectedEntities[0].LogicalName);
     }
 
     /// <summary>Navigates to <see cref="ProfilesPage"/> to browse/load/manage profiles.</summary>
@@ -1062,195 +921,8 @@ public sealed partial class GenerateViewModel : ViewModelBase
     private void OpenProfiles() => _navigator?.Navigate(typeof(ProfilesPage));
 
     /// <summary>Builds a profile snapshot of the current wizard selection, counts, rules, and seed.</summary>
-    public Profile BuildProfileSnapshot(string name)
-    {
-        var counts = _fieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
-        var rules = _fieldRules?.GetRules()
-            ?? new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
-
-        var tables = new List<ProfileTable>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var entity in SelectedEntities)
-        {
-            seen.Add(entity.LogicalName);
-            Dictionary<string, FieldRule>? cols = null;
-            if (rules.TryGetValue(entity.LogicalName, out var r) && r.Count > 0)
-                cols = new Dictionary<string, FieldRule>(r, StringComparer.OrdinalIgnoreCase);
-            tables.Add(new ProfileTable(
-                entity.LogicalName,
-                counts.GetValueOrDefault(entity.LogicalName, DefaultRecordCount),
-                cols));
-        }
-
-        foreach (var (table, cols) in rules)
-        {
-            if (seen.Contains(table) || cols.Count == 0) continue;
-            tables.Add(new ProfileTable(
-                table,
-                counts.GetValueOrDefault(table, DefaultRecordCount),
-                new Dictionary<string, FieldRule>(cols, StringComparer.OrdinalIgnoreCase)));
-        }
-
-        if (tables.Count == 0)
-            tables.Add(new ProfileTable("account", DefaultRecordCount, null));
-
-        return new Profile(1, name, Description: null, Seed, tables);
-    }
-
-    /// <summary>
-    /// Ensures every table named by an applied import report is present in
-    /// <see cref="SelectedEntities"/> — a set-union/upsert against the current selection, so
-    /// tables already selected are left exactly where they are (no duplicates, no reordering).
-    /// Tables the report names but this run has no metadata for are skipped: there is no
-    /// <see cref="EntitySummary"/> to build for them and counts/rules for such tables never
-    /// reach the board anyway (see <see cref="Services.Profiles.ProfileImport"/>).
-    /// </summary>
-    /// <param name="tableNames">Logical names of tables named by the report.</param>
-    private void SelectReportTables(IEnumerable<string> tableNames)
-    {
-        var merged = SelectedEntities.ToList();
-        var seen = new HashSet<string>(merged.Select(e => e.LogicalName), StringComparer.OrdinalIgnoreCase);
-        var changed = false;
-
-        foreach (var table in tableNames)
-        {
-            if (seen.Contains(table) || !_entityMetadata.TryGetValue(table, out var meta) || meta.LogicalName is null)
-                continue;
-
-            merged.Add(new EntitySummary(
-                meta.LogicalName,
-                meta.DisplayName?.UserLocalizedLabel?.Label ?? meta.LogicalName,
-                EntitySummary.IsUserCreated(meta.LogicalName, meta.IsCustomEntity == true)));
-            seen.Add(meta.LogicalName);
-            changed = true;
-        }
-
-        if (!changed)
-            return;
-
-        OnEntitiesChanged(merged);
-        _entitySelector?.SetSelection(merged);
-    }
+    public Profile BuildProfileSnapshot(string name) => _profileBridge.BuildProfileSnapshot(name);
 
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
-    public void ApplyImportReport(ProfileImportReport report)
-    {
-        ArgumentNullException.ThrowIfNull(report);
-
-        // The Profiles page applies a report directly (no ApplySavedRulesProfile hop), so the
-        // Profile card's name has to come off the report or it stays "No profile loaded".
-        if (!string.IsNullOrEmpty(report.ProfileName))
-            ActiveProfileName = report.ProfileName;
-
-        if (report.Seed is int seed)
-            Seed = seed;
-
-        // Select the report's tables first: FieldOverridesViewModel.SetCount() is a no-op for a
-        // table that isn't a selected entry yet, so the counts loop below would silently drop
-        // counts for tables the board doesn't already have selected.
-        SelectReportTables(report.TableCounts.Keys);
-
-        foreach (var (table, count) in report.TableCounts)
-            _fieldOverrides?.SetCount(table, count);
-
-        if (_fieldRules is null)
-            return;
-
-        var draft = new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (table, columns) in report.BoardRules)
-        {
-            _entityMetadata.TryGetValue(table, out var meta);
-            var attrs = (meta?.Attributes ?? [])
-                .Where(a => a.LogicalName is not null)
-                .ToDictionary(a => a.LogicalName!, StringComparer.OrdinalIgnoreCase);
-
-            var tableDraft = new Dictionary<string, RuleDraftEntry>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (column, rule) in columns)
-            {
-                var display = column;
-                if (attrs.TryGetValue(column, out var attr))
-                    display = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
-                tableDraft[column] = new RuleDraftEntry(rule, display, "");
-            }
-
-            if (tableDraft.Count > 0)
-                draft[table] = tableDraft;
-        }
-
-        _fieldRules.ReplaceDraft(draft);
-        if (SelectedEntities.Count > 0)
-            _fieldRules.SelectTable(SelectedEntities[0].LogicalName);
-    }
-
-    private void TryApplyRestoredDraft()
-    {
-        if (_restoredDraft is null || _fieldRules is null || _entityMetadata.Count == 0)
-            return;
-
-        var hasTables = _restoredDraft.Tables.Count > 0;
-        var report = ProfileImport.ValidateAgainstMetadata(_restoredDraft, _entityMetadata, RunId);
-        ApplyImportReport(report);
-        _restoredDraft = null;
-        if (hasTables)
-            CurrentStep = 1;
-    }
-
-    private void ScheduleDraftAutosave()
-    {
-        _draftSaveCts?.Cancel();
-        _draftSaveCts?.Dispose();
-        _draftSaveCts = new CancellationTokenSource();
-        _draftSaveTask = DebouncedSaveDraftAsync(_draftSaveCts.Token);
-    }
-
-    private async Task CancelPendingAutosaveAsync()
-    {
-        _draftSaveCts?.Cancel();
-        if (_draftSaveTask is { } pending)
-        {
-            try { await pending; }
-            catch (OperationCanceledException) { }
-        }
-
-        _draftSaveCts?.Dispose();
-        _draftSaveCts = null;
-        _draftSaveTask = null;
-    }
-
-    private async Task DebouncedSaveDraftAsync(CancellationToken ct)
-    {
-        try
-        {
-            await Task.Delay(400, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            return; // coalesced by a newer edit
-        }
-
-        await PersistDraftAsync(ct);
-    }
-
-    // WR-006: GenerateAsync calls this as `_ = PersistDraftAsync()`, bypassing the
-    // debounce wrapper. The handler has to live here or that call is unobserved.
-    private async Task PersistDraftAsync(CancellationToken ct = default)
-    {
-        if (SelectedEntities.Count == 0 && (_fieldRules is null || _fieldRules.GetRules().Count == 0))
-            return;
-
-        try
-        {
-            var profile = BuildProfileSnapshot("draft");
-            await _profileService.SaveDraftAsync(profile, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            // coalesced
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Draft autosave failed");
-        }
-    }
+    public void ApplyImportReport(ProfileImportReport report) => _profileBridge.ApplyImportReport(report);
 }

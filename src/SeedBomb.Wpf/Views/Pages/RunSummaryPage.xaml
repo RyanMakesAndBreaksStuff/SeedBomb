@@ -32,7 +32,7 @@
             it is the first question every user asks.
         -->
         <Border Grid.Row="1" Margin="0,20,0,0"
-                Style="{Binding OutcomeBannerStyle}">
+                Style="{Binding LastRunSucceeded, Converter={StaticResource TestResultStyleConverter}}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>

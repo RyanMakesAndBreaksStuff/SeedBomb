@@ -120,20 +120,6 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         }
     }
 
-    /// <summary>Toggles the selection state of an entity.</summary>
-    /// <param name="entity">The entity to toggle.</param>
-    public void ToggleSelection(EntitySummary entity)
-    {
-        var item = EntityItems.FirstOrDefault(i => i.Entity == entity);
-        if (item is not null)
-        {
-            item.IsSelected = !item.IsSelected;
-            return;
-        }
-
-        ToggleSelectedEntity(entity);
-    }
-
     /// <summary>
     /// Programmatically sets the selection to exactly <paramref name="entities"/> — e.g. mirroring
     /// a profile import applied on the owning page's view-model. Checkbox state (<see cref="EntitySelectionItem.IsSelected"/>)
@@ -196,18 +182,6 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
     private void ClearChecked() => ClearSelection();
 
     private bool CanClearSelection() => SelectedEntities.Count > 0;
-
-    private void ToggleSelectedEntity(EntitySummary entity)
-    {
-        if (SelectedEntities.Contains(entity))
-            SelectedEntities.Remove(entity);
-        else
-            SelectedEntities.Add(entity);
-
-        SelectedEntitiesChanged?.Invoke(this, [.. SelectedEntities]);
-        ClearCheckedCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(FooterLabel));
-    }
 
     private void SetSelectedEntity(EntitySummary entity, bool isSelected)
     {

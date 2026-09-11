@@ -53,7 +53,7 @@
                      Title="SeedBomb — Mock data explosion"
                      ShowMaximize="True" ShowMinimize="True" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/seedbomb.ico" Width="16" Height="16"/>
+                <ui:ImageIcon Source="pack://application:,,,/Resources/SB_logo.ico" Width="16" Height="16"/>
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
@@ -69,15 +69,6 @@
                            PaneDisplayMode="Left"
                            FrameMargin="0"
                            Background="{DynamicResource DG.Surface1}" Grid.RowSpan="2" Grid.ColumnSpan="3">
-
-            <ui:NavigationView.AutoSuggestBox>
-                <ui:AutoSuggestBox PlaceholderText="Find a setting or table"
-                                   Margin="8,6,8,12">
-                    <ui:AutoSuggestBox.Icon>
-                        <ui:SymbolIcon Symbol="Search24"/>
-                    </ui:AutoSuggestBox.Icon>
-                </ui:AutoSuggestBox>
-            </ui:NavigationView.AutoSuggestBox>
 
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="Generate"

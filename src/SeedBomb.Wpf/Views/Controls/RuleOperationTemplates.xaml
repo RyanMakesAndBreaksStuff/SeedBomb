@@ -1,0 +1,310 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    xmlns:rules="clr-namespace:DataGen.Core.Rules;assembly=DataGen.Core"
+                    xmlns:controls="clr-namespace:Seedbomb.Views.Controls">
+
+    <ObjectDataProvider x:Key="OneOfPickValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
+        <ObjectDataProvider.MethodParameters>
+            <x:Type TypeName="rules:OneOfPick" />
+        </ObjectDataProvider.MethodParameters>
+    </ObjectDataProvider>
+
+    <DataTemplate x:Key="EmptyOpTemplate"/>
+
+    <DataTemplate x:Key="ConstantOpTemplate">
+        <StackPanel Margin="0,0,0,16">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding SelectedOp}" Value="constant"/>
+                                <Condition Binding="{Binding IsLookupColumn}" Value="False"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Value"/>
+            <TextBox Style="{DynamicResource DG.TextBox}"
+                     Text="{Binding ConstantText, UpdateSourceTrigger=PropertyChanged}"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="RangeOpTemplate">
+        <StackPanel Margin="0,0,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Min"/>
+                    <TextBox Style="{DynamicResource DG.TextBox}"
+                             Text="{Binding MinText, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max"/>
+                    <TextBox Style="{DynamicResource DG.TextBox}"
+                             Text="{Binding MaxText, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="SequenceOpTemplate">
+        <StackPanel Margin="0,0,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Start"/>
+                    <TextBox Style="{DynamicResource DG.TextBox}"
+                             Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Step"/>
+                    <TextBox Style="{DynamicResource DG.TextBox}"
+                             Text="{Binding StepText, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="PatternOpTemplate">
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Template"/>
+            <Border Style="{DynamicResource DG.CodeBox}">
+                <TextBox Text="{Binding TemplateExpression, UpdateSourceTrigger=PropertyChanged}"
+                         Background="Transparent" BorderThickness="0"
+                         FontFamily="{DynamicResource DG.Font.Mono}"
+                         FontSize="{DynamicResource DG.Type.Body}"
+                         Foreground="{DynamicResource DG.TextBody}"
+                         CaretBrush="{DynamicResource DG.Text1}"
+                         TextWrapping="Wrap" AcceptsReturn="False"/>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding AvailableTokens}" Margin="0,8,0,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{DynamicResource DG.LinkButton}"
+                                Command="{Binding DataContext.InsertTokenCommand,
+                                          RelativeSource={RelativeSource AncestorType=Page}}"
+                                CommandParameter="{Binding}"
+                                Margin="0,0,6,6">
+                            <Border Background="{DynamicResource DG.ItemSelected}"
+                                    BorderBrush="{DynamicResource DG.ControlBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource DG.Radius.Control}"
+                                    Height="{DynamicResource DG.Size.Chip}"
+                                    Padding="9,0">
+                                <TextBlock VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource DG.Font.Mono}"
+                                           FontSize="{DynamicResource DG.Type.Micro}"
+                                           Foreground="{DynamicResource DG.AccentText}"
+                                           Text="{Binding Name}"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxWidth="150"/>
+                            </Border>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="OneOfOpTemplate">
+        <StackPanel>
+            <StackPanel Margin="0,0,0,16">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding SelectedOp}" Value="oneOf"/>
+                                    <Condition Binding="{Binding IsLookupColumn}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Values"/>
+                <ItemsControl ItemsSource="{Binding Options}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Content="{Binding Label}"
+                                      IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}"
+                                      Margin="0,2,0,0"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBox Style="{DynamicResource DG.TextBox}"
+                         Text="{Binding ConstantText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,8,0,0"/>
+                <TextBlock Style="{DynamicResource DG.Tertiary}"
+                           Text="Or comma-separated values for non-choice columns"
+                           Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <StackPanel Margin="0,0,0,16">
+                <ComboBox Style="{DynamicResource DG.ComboBox}"
+                          ItemsSource="{Binding Source={StaticResource OneOfPickValues}}"
+                          SelectedItem="{Binding Pick}"
+                          HorizontalAlignment="Left"
+                          MinWidth="120"
+                          Margin="0,8,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="LookupRandomOpTemplate">
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="{Binding LookupRandomExplanation}" TextWrapping="Wrap"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate x:Key="BogusOpTemplate">
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock x:Name="BogusApiLabel"
+                       Style="{DynamicResource DG.GroupLabel}"
+                       Text="API"/>
+            <ComboBox Style="{DynamicResource DG.ComboBox}"
+                      ItemsSource="{Binding BogusInput.BogusApis}"
+                      SelectedItem="{Binding BogusInput.SelectedBogusApi, Mode=TwoWay}"
+                      AutomationProperties.LabeledBy="{Binding ElementName=BogusApiLabel}"
+                      AutomationProperties.Name="API"
+                      TabIndex="0"/>
+
+            <TextBlock x:Name="BogusEndpointLabel"
+                       Style="{DynamicResource DG.GroupLabel}"
+                       Text="Endpoint"
+                       Margin="0,8,0,0"/>
+            <ComboBox Style="{DynamicResource DG.ComboBox}"
+                      ItemsSource="{Binding BogusInput.BogusEndpoints}"
+                      DisplayMemberPath="DisplayName"
+                      SelectedValuePath="Id"
+                      SelectedValue="{Binding BogusInput.SelectedBogusEndpoint, Mode=TwoWay}"
+                      AutomationProperties.LabeledBy="{Binding ElementName=BogusEndpointLabel}"
+                      AutomationProperties.Name="Endpoint"
+                      TabIndex="1"/>
+
+            <Grid Margin="0,8,0,0"
+                  Visibility="{Binding BogusInput.BogusHasNumericArgs,
+                               Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock x:Name="BogusMinNumberLabel"
+                               Style="{DynamicResource DG.GroupLabel}"
+                               Text="Minimum"/>
+                    <TextBox Style="{DynamicResource DG.TextBox}"
+                             Text="{Binding BogusMinNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                             AutomationProperties.LabeledBy="{Binding ElementName=BogusMinNumberLabel}"
+                             AutomationProperties.Name="Minimum"
+                             TabIndex="2"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock x:Name="BogusMaxNumberLabel"
+                               Style="{DynamicResource DG.GroupLabel}"
+                               Text="Maximum"/>
+                    <TextBox Style="{DynamicResource DG.TextBox}"
+                             Text="{Binding BogusMaxNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                             AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxNumberLabel}"
+                             AutomationProperties.Name="Maximum"
+                             TabIndex="3"/>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Margin="0,8,0,0"
+                        Visibility="{Binding BogusInput.BogusHasLengthArg,
+                                     Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock x:Name="BogusLengthLabel"
+                           Style="{DynamicResource DG.GroupLabel}"
+                           Text="Length"/>
+                <TextBox Style="{DynamicResource DG.TextBox}"
+                         Text="{Binding BogusLengthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                         AutomationProperties.LabeledBy="{Binding ElementName=BogusLengthLabel}"
+                         AutomationProperties.Name="Length"
+                         TabIndex="2"/>
+            </StackPanel>
+
+            <Grid Margin="0,8,0,0"
+                  Visibility="{Binding BogusInput.BogusHasDateArgs,
+                               Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock x:Name="BogusMinDateLabel"
+                               Style="{DynamicResource DG.GroupLabel}"
+                               Text="Minimum date"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Style="{DynamicResource DG.TextBox}"
+                                 Text="{Binding BogusMinDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
+                                 AutomationProperties.LabeledBy="{Binding ElementName=BogusMinDateLabel}"
+                                 AutomationProperties.Name="Minimum date"
+                                 TabIndex="2"/>
+                        <ui:CalendarDatePicker Grid.Column="1"
+                                               Date="{Binding BogusMinDate, Mode=TwoWay}"
+                                               Margin="6,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock x:Name="BogusMaxDateLabel"
+                               Style="{DynamicResource DG.GroupLabel}"
+                               Text="Maximum date"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Style="{DynamicResource DG.TextBox}"
+                                 Text="{Binding BogusMaxDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
+                                 AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxDateLabel}"
+                                 AutomationProperties.Name="Maximum date"
+                                 TabIndex="3"/>
+                        <ui:CalendarDatePicker Grid.Column="1"
+                                               Date="{Binding BogusMaxDate, Mode=TwoWay}"
+                                               Margin="6,0,0,0"/>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </DataTemplate>
+
+    <controls:RuleOperationTemplateSelector x:Key="RuleOperationTemplateSelector"
+                                            ConstantTemplate="{StaticResource ConstantOpTemplate}"
+                                            RangeTemplate="{StaticResource RangeOpTemplate}"
+                                            SequenceTemplate="{StaticResource SequenceOpTemplate}"
+                                            PatternTemplate="{StaticResource PatternOpTemplate}"
+                                            OneOfTemplate="{StaticResource OneOfOpTemplate}"
+                                            BogusTemplate="{StaticResource BogusOpTemplate}"
+                                            LookupRandomTemplate="{StaticResource LookupRandomOpTemplate}"
+                                            EmptyTemplate="{StaticResource EmptyOpTemplate}"/>
+</ResourceDictionary>

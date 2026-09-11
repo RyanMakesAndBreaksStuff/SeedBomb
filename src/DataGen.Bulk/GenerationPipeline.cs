@@ -4,6 +4,7 @@ using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
+using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
@@ -40,7 +41,9 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
         progress?.Report(new GenerationPipelineProgress { Phase = "Resolving dependencies" });
         var graphBuilder = new GraphBuilder(lf.CreateLogger<GraphBuilder>());
         var cycleDetector = new CycleDetector(lf.CreateLogger<CycleDetector>());
-        var graph = graphBuilder.Build(metaDict);
+        bool IsExplicitLookup(string table, string column) =>
+            LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
+        var graph = graphBuilder.Build(metaDict, IsExplicitLookup);
         var cycles = cycleDetector.FindStronglyConnectedComponents(graph);
         if (cycles.Count > 0)
         {
@@ -48,7 +51,7 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
             {
                 _logger.LogWarning("Breaking {Count} dependency cycle(s)", cycles.Count);
             }
-            cycleDetector.BreakCycles(graph, cycles, metaDict);
+            cycleDetector.BreakCycles(graph, cycles, metaDict, IsExplicitLookup);
         }
 
         progress?.Report(new GenerationPipelineProgress { Phase = "Generating records" });

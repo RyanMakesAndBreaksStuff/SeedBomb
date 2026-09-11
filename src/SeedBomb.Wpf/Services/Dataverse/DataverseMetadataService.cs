@@ -16,7 +16,7 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
 {
     private readonly IDataverseConnectionService _conn;
     private readonly ILogger<DataverseMetadataProvider> _innerLogger;
-    private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+    private MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _lock = new(1, 1);
     private DataverseMetadataProvider? _inner;
 
@@ -62,18 +62,24 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
         }
     }
 
-    private void OnConnectionReset(object? sender, EventArgs e)
+    private void OnConnectionReset(object? sender, EventArgs e) => _ = ResetCacheAsync();
+
+    private async Task ResetCacheAsync()
     {
-        _lock.Wait();
+        await _lock.WaitAsync().ConfigureAwait(false);
+        MemoryCache oldCache;
         try
         {
+            oldCache = _cache;
+            _cache = new MemoryCache(new MemoryCacheOptions());
             _inner = null;
-            _cache.Compact(1.0);
         }
         finally
         {
             _lock.Release();
         }
+
+        oldCache.Dispose();
     }
 
     /// <inheritdoc />

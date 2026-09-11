@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Services.Export;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Views.Pages;
@@ -60,10 +61,6 @@ public sealed partial class HistoryViewModel : ViewModelBase
 
     /// <summary>Flattened day headers and run rows for the virtualized History list.</summary>
     public ObservableCollection<object> FlatItems { get; } = [];
-
-    /// <summary>Currently selected history row.</summary>
-    [ObservableProperty]
-    private RunRecord? _selectedRun;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -150,9 +147,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
     {
         try
         {
-            var directory = ExportDirectoryOverride ?? System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads");
+            var directory = ExportDirectoryOverride ?? ExportPaths.Downloads();
             var path = System.IO.Path.Combine(
                 directory,
                 $"datagen-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
@@ -194,8 +189,6 @@ public sealed partial class HistoryViewModel : ViewModelBase
     {
         if (run is null)
             return;
-
-        SelectedRun = run;
 
         if (_run is not null && run.Id == _run.CurrentRunId)
         {

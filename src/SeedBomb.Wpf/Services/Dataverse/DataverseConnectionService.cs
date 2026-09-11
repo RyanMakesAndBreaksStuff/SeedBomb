@@ -70,10 +70,12 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         async _ => await _auth.GetTokenAsync(scopes, CancellationToken.None).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public void Reset()
+    public async Task ResetAsync()
     {
         ServiceClient? cached;
-        _lock.Wait();
+        // WaitAsync, not Wait: the same semaphore is held across GetOrganizationServiceAsync's
+        // network-bound ServiceClient construction, and both callers run on the dispatcher.
+        await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             cached = _cached;
@@ -84,11 +86,12 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             _lock.Release();
         }
 
-        SafeDispose(cached);
+        // ServiceClient.Dispose tears down gRPC/HTTP channels; keep it off the UI thread.
+        await Task.Run(() => SafeDispose(cached)).ConfigureAwait(false);
         ConnectionReset?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnProfilesChanged(object? sender, EventArgs e) => Reset();
+    private void OnProfilesChanged(object? sender, EventArgs e) => _ = ResetAsync();
 
     /// <inheritdoc />
     public void Dispose()

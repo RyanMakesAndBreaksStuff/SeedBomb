@@ -68,7 +68,7 @@
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
-                            BorderThickness="0,0,0,1" Padding="12,12,12,10">
+                            BorderThickness="0,0,0,1" Padding="8,8,8,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -84,7 +84,7 @@
                                     ToolTip="Sort"
                                     Width="{DynamicResource DG.Size.ControlSmall}"
                                     Height="{DynamicResource DG.Size.ControlSmall}"
-                                    Padding="0" Margin="8,0,0,0">
+                                    Padding="0" Margin="8,0,0,0" FontFamily="Segoe UI" FontSize="12">
                                 <ui:SymbolIcon Symbol="ArrowSortDownLines24" FontSize="{DynamicResource DG.Type.Icon}"/>
                             </Button>
                         </Grid>
@@ -297,10 +297,6 @@
 
                         <TabItem Header="Tables &amp; volume">
                             <ContentControl Content="{Binding TablesAndVolumeSummary}" Margin="20,12"/>
-                        </TabItem>
-
-                        <TabItem Header="History">
-                            <ContentControl Content="{Binding ProfileRunHistory}" Margin="20,12"/>
                         </TabItem>
                     </TabControl>
 

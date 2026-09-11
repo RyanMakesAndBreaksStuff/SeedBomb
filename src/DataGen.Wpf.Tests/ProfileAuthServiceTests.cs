@@ -261,4 +261,21 @@ public sealed class ProfileAuthServiceTests
         Assert.Same(first, second);
         Assert.Equal(1, buildCount);
     }
+
+    [Theory]
+    [InlineData("https://contoso.crm.dynamics.com", AzureCloudInstance.AzurePublic)]
+    [InlineData("https://contoso.crm.microsoftdynamics.us", AzureCloudInstance.AzureUsGovernment)]
+    [InlineData("https://contoso.crm.dynamics.cn", AzureCloudInstance.AzureChina)]
+    public void ResolveCloud_MapsTheEnvironmentHostSuffix(string url, AzureCloudInstance expected)
+    {
+        Assert.Equal(expected, ProfileAuthService.ResolveCloud(
+            new ConnectionProfile { EnvironmentUrl = url }));
+    }
+
+    [Fact]
+    public void ResolveCloud_FallsBackToPublicForAnUnrecognisedHost()
+    {
+        Assert.Equal(AzureCloudInstance.AzurePublic, ProfileAuthService.ResolveCloud(
+            new ConnectionProfile { EnvironmentUrl = "not-a-url" }));
+    }
 }

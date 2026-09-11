@@ -270,7 +270,8 @@
                         <StackPanel Grid.Column="6">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Parallelism"/>
                             <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
-                                          Value="{Binding MaxParallelism}" Minimum="1" Maximum="16"/>
+                                          Value="{Binding MaxParallelism}" Minimum="0" Maximum="16"
+                                          PlaceholderText="auto"/>
                         </StackPanel>
                     </Grid>
 

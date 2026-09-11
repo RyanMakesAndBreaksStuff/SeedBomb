@@ -7,6 +7,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.Logging;
+using Microsoft.Identity.Client;
+using Seedbomb.Services.Connections;
+using Seedbomb.Services.Export;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
@@ -42,8 +46,11 @@ public sealed partial class RunViewModel : ObservableObject
 
     private readonly IWpfGenerationService? _generation;
     private readonly IContentDialogService? _dialogs;
+    private readonly ISnackbarService? _snackbar;
+    private readonly ILogger<RunViewModel>? _logger;
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
+    private readonly IConnectionProfileService? _connections;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
@@ -60,21 +67,33 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
     internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
 
+    /// <summary>Test seam: overrides the export destination. Null uses the real Downloads folder.</summary>
+    internal string? ExportDirectoryOverride { get; set; }
+
     /// <summary>Optional services so grouping tests can <c>new RunViewModel()</c> and retry can pass a mock.</summary>
     /// <param name="generation">Pipeline used for first run and retry. Null disables retry.</param>
     /// <param name="contentDialogService">Cancel and log dialogs. Null skips them.</param>
     /// <param name="settings">Persists <see cref="KeepWindowOpen"/>.</param>
     /// <param name="navigator">Used by <see cref="OpenInHistory"/>.</param>
+    /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
+    /// <param name="logger">Failure logging. Null suppresses it.</param>
+    /// <param name="connections">Resolves the connected environment host. Null leaves it unknown.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
         ISettingsService? settings = null,
-        IAppNavigator? navigator = null)
+        IAppNavigator? navigator = null,
+        ISnackbarService? snackbar = null,
+        ILogger<RunViewModel>? logger = null,
+        IConnectionProfileService? connections = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
         _settings = settings;
         _navigator = navigator;
+        _snackbar = snackbar;
+        _logger = logger;
+        _connections = connections;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
@@ -108,8 +127,8 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Finished timestamp, duration, seed.</summary>
     [ObservableProperty] private string _runMetaLine = "";
 
-    /// <summary>Resource key for the outcome banner style.</summary>
-    [ObservableProperty] private string _outcomeBannerStyle = "DG.InfoBanner";
+    /// <summary>False when the last run produced rejected rows. Drives the outcome banner style.</summary>
+    [ObservableProperty] private bool _lastRunSucceeded = true;
 
     /// <summary>Outcome glyph. Enum, not a Brush.</summary>
     [ObservableProperty] private SymbolRegular _outcomeGlyph = SymbolRegular.CheckmarkCircle24;
@@ -167,7 +186,9 @@ public sealed partial class RunViewModel : ObservableObject
             throw new InvalidOperationException("Generation service is not configured.");
 
         _lastConfig = config with { AllowRiskyBogusValues = false };
-        _environmentHost = environmentHost;
+        _environmentHost = string.IsNullOrWhiteSpace(environmentHost)
+            ? await ResolveEnvironmentHostAsync(ct)
+            : environmentHost;
         _plannedTables = tables;
         _plannedTotal = plannedTotal;
         _seed = config.Seed;
@@ -181,7 +202,7 @@ public sealed partial class RunViewModel : ObservableObject
         }
 
         await LoadKeepWindowOpenAsync();
-        StartRun(environmentHost, config.Seed, plannedTotal, tables);
+        StartRun(_environmentHost, config.Seed, plannedTotal, tables);
 
         _runCts?.Dispose();
         _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -190,7 +211,7 @@ public sealed partial class RunViewModel : ObservableObject
         try
         {
             var result = await _generation.GenerateAsync(config, progress, _runCts.Token);
-            ApplyResult(result, config.Seed, environmentHost, config);
+            ApplyResult(result, config.Seed, _environmentHost, config);
             return result;
         }
         catch (OperationCanceledException)
@@ -240,11 +261,10 @@ public sealed partial class RunViewModel : ObservableObject
         Metrics.Add(new RunValueRow("Elapsed", "0s", "Normal"));
         Metrics.Add(new RunValueRow("Remaining", "—", "Muted"));
         Metrics.Add(new RunValueRow("Throughput", "0/min", "Normal"));
-        Metrics.Add(new RunValueRow("Rejected", "0", "Normal"));
     }
 
     /// <summary>Projects a pipeline snapshot onto the sheet.</summary>
-    public void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
+    private void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
     {
         ArgumentNullException.ThrowIfNull(u);
         ArgumentNullException.ThrowIfNull(plannedTables);
@@ -374,7 +394,39 @@ public sealed partial class RunViewModel : ObservableObject
             FieldRules = rules,
         };
 
-        await ExecuteAsync(retryConfig, _environmentHost, names, counts.Values.Sum());
+        try
+        {
+            await ExecuteAsync(retryConfig, _environmentHost, names, counts.Values.Sum());
+        }
+        catch (Exception ex)
+        {
+            ReportRunFailure(ex);
+        }
+    }
+
+    /// <summary>
+    /// Reports a failed or cancelled run. The single owner of run-failure UX — both
+    /// <see cref="GenerateViewModel"/>'s first run and <see cref="RetrySelectedAsync"/> call this.
+    /// </summary>
+    /// <param name="ex">The failure to report.</param>
+    internal void ReportRunFailure(Exception ex)
+    {
+        switch (ex)
+        {
+            case OperationCanceledException:
+                _snackbar?.Show("Cancelled", "Generation cancelled",
+                    ControlAppearance.Caution, null, TimeSpan.FromSeconds(3));
+                break;
+            case MsalUiRequiredException:
+                _snackbar?.Show("Session expired", "Please sign in again",
+                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
+                break;
+            default:
+                _snackbar?.Show("Error", "Generation failed — see logs for details",
+                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
+                _logger?.LogError(ex, "Generation failed");
+                break;
+        }
     }
 
     private async Task<bool> ConfirmRiskyBogusAsync()
@@ -447,24 +499,33 @@ public sealed partial class RunViewModel : ObservableObject
     [RelayCommand]
     private void ExportRejectedCsv()
     {
-        var downloads = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "Downloads");
-        Directory.CreateDirectory(downloads);
-        var path = Path.Combine(downloads, $"seedbomb-rejected-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-
-        var sb = new StringBuilder();
-        sb.AppendLine("Table,Cause,Rows,Disposition,Retryable");
-        foreach (var group in _allRejectionGroups)
+        try
         {
-            sb.Append(Csv(group.TableName)).Append(',');
-            sb.Append(Csv(group.CauseText)).Append(',');
-            sb.Append(group.RowCount).Append(',');
-            sb.Append(Csv(group.DispositionLabel)).Append(',');
-            sb.AppendLine(group.IsRetryable ? "true" : "false");
-        }
+            var directory = ExportDirectoryOverride ?? ExportPaths.Downloads();
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, $"seedbomb-rejected-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
 
-        File.WriteAllText(path, sb.ToString());
+            var sb = new StringBuilder();
+            sb.AppendLine("Table,Cause,Rows,Disposition,Retryable");
+            foreach (var group in _allRejectionGroups)
+            {
+                sb.Append(Csv(group.TableName)).Append(',');
+                sb.Append(Csv(group.CauseText)).Append(',');
+                sb.Append(group.RowCount).Append(',');
+                sb.Append(Csv(group.DispositionLabel)).Append(',');
+                sb.AppendLine(group.IsRetryable ? "true" : "false");
+            }
+
+            File.WriteAllText(path, sb.ToString());
+            _snackbar?.Show("Rejections exported", path,
+                ControlAppearance.Success, null, TimeSpan.FromSeconds(6));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to export rejected rows CSV");
+            _snackbar?.Show("Export failed", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
+        }
     }
 
     [RelayCommand]
@@ -545,7 +606,7 @@ public sealed partial class RunViewModel : ObservableObject
     private void ApplyOutcome(int written, int rejected, TimeSpan elapsed, int tableCount)
     {
         var hasRejects = rejected > 0;
-        OutcomeBannerStyle = hasRejects ? "DG.WarningBanner" : "DG.InfoBanner";
+        LastRunSucceeded = !hasRejects;
         OutcomeGlyph = hasRejects ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24;
         OutcomeHeadline = hasRejects
             ? $"Completed with {rejected:N0} rejected rows"
@@ -680,7 +741,6 @@ public sealed partial class RunViewModel : ObservableObject
         Metrics.Add(new RunValueRow("Elapsed", FormatDuration(u.Elapsed), "Normal"));
         Metrics.Add(new RunValueRow("Remaining", remaining, remainingKind));
         Metrics.Add(new RunValueRow("Throughput", $"{u.RecordsPerMinute:N0}/min", "Normal"));
-        Metrics.Add(new RunValueRow("Rejected", "0", "Normal"));
     }
 
     private void AppendActivity(string line)
@@ -699,6 +759,25 @@ public sealed partial class RunViewModel : ObservableObject
         var rules = _lastConfig?.FieldRules?.Sum(t => t.Value.Count) ?? 0;
         var dest = string.IsNullOrWhiteSpace(host) ? "Dataverse" : host;
         return $"{written:N0} of {planned:N0} rows written to {dest} · {rules} rules · seed {seed}";
+    }
+
+    /// <summary>Host of the connected environment, or "" when it cannot be determined.</summary>
+    private async Task<string> ResolveEnvironmentHostAsync(CancellationToken ct)
+    {
+        if (_connections is null)
+            return string.Empty;
+        try
+        {
+            var profile = await _connections.GetLastUsedAsync(ct);
+            return Uri.TryCreate(profile?.EnvironmentUrl, UriKind.Absolute, out var uri)
+                ? uri.Host
+                : string.Empty;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger?.LogDebug(ex, "Could not resolve the environment host for the run description");
+            return string.Empty;
+        }
     }
 
     private static int CountTables(GenerationResult result, IReadOnlyList<string> planned)

@@ -10,7 +10,6 @@ namespace Seedbomb.Views.Pages;
 public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerViewModel>, INavigationAware
 {
     private CancellationTokenSource? _loadCts;
-    private bool _syncingClientSecret;
 
     /// <inheritdoc />
     public ConnectionManagerViewModel ViewModel { get; }
@@ -64,40 +63,12 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
     {
         var secret = ViewModel.EditingProfile?.ClientSecret ?? string.Empty;
         if (ClientSecretBox.Password != secret)
-        {
-            // ConnectionsPage is Transient while ConnectionManagerViewModel is Singleton, so
-            // this runs against a brand-new, empty ClientSecretBox on every re-navigation to
-            // the page — without the guard, setting Password here fires PasswordChanged and
-            // OnClientSecretChanged would mark an untouched profile dirty.
-            _syncingClientSecret = true;
             ClientSecretBox.Password = secret;
-            _syncingClientSecret = false;
-        }
     }
 
     private void OnClientSecretChanged(object sender, RoutedEventArgs e)
     {
         if (ViewModel.EditingProfile is { } profile && sender is PasswordBox box)
             profile.ClientSecret = box.Password;
-        if (!_syncingClientSecret)
-            MarkDirty();
-    }
-
-    private void OnProfileFieldChanged(object sender, TextChangedEventArgs e)
-    {
-        ViewModel.RefreshEnvironmentUrlValidation();
-        MarkDirty();
-    }
-
-    private void OnAuthTypeChanged(object sender, SelectionChangedEventArgs e) => MarkDirty();
-
-    // NewProfile/EditProfile/Cancel/DeleteProfileAsync synchronously re-push EditingProfile's
-    // field values through these bound controls while IsAssigningEditingProfile is set — skip
-    // marking a freshly-opened, unedited profile dirty from that cascade.
-    private void MarkDirty()
-    {
-        if (ViewModel.IsAssigningEditingProfile) return;
-        ViewModel.IsDirty = true;
-        ViewModel.SaveProfileCommand.NotifyCanExecuteChanged();
     }
 }

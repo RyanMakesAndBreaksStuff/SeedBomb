@@ -1,4 +1,5 @@
 using Moq;
+using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels;
 using Xunit;
@@ -84,5 +85,49 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         vm.SelectedItem = vm.Items.Single(i => i.Name == "Beta");
         await vm.RefreshCommand.ExecuteAsync(null);
         Assert.Equal("Beta", vm.SelectedItem?.Name);
+    }
+
+    [Fact]
+    public async Task CycleSort_WhenStoreThrows_SetsErrorAndDoesNotPropagate()
+    {
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("connections store is corrupt"));
+        var vm = new ProfilesViewModel(profiles.Object);
+
+        await vm.CycleSortCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasError);
+        Assert.Contains("connections store is corrupt", vm.StatusMessage!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EditRules_WhenProfileUnreadable_SetsErrorAndDoesNotPropagate()
+    {
+        var (vm, profiles) = await ProfilesViewModelWithOneProfileAsync();
+        profiles.Setup(p => p.LoadAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("profile exceeds 1 MiB"));
+
+        await vm.EditRulesCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasError);
+        Assert.Contains("profile exceeds 1 MiB", vm.StatusMessage!, StringComparison.Ordinal);
+    }
+
+    private static async Task<(ProfilesViewModel Vm, Mock<IProfileService> Profiles)> ProfilesViewModelWithOneProfileAsync()
+    {
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { "Acme" });
+        profiles.Setup(p => p.LoadAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Profile(1, "Acme", null, null, [new ProfileTable("account", 1, null)]));
+
+        var vm = new ProfilesViewModel(
+            profiles.Object,
+            rulesRequest: new RulesNavigationRequest(),
+            navigator: Mock.Of<IAppNavigator>());
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = Assert.Single(vm.Items);
+        return (vm, profiles);
     }
 }

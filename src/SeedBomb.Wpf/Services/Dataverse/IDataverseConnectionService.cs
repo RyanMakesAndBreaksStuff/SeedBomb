@@ -19,7 +19,7 @@ public interface IDataverseConnectionService
 
     /// <summary>
     /// Disposes the cached connection so the next call to <see cref="GetOrganizationServiceAsync"/>
-    /// rebuilds it. Call when org URL or credentials change.
+    /// rebuilds it. Call when org URL or credentials change. Safe to await from the UI thread.
     /// </summary>
-    void Reset();
+    Task ResetAsync();
 }

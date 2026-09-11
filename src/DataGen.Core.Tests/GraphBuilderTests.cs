@@ -147,4 +147,29 @@ public class GraphBuilderTests
     {
         Assert.Throws<ArgumentNullException>(() => _builder.Build(null!));
     }
+
+    [Fact]
+    public void Explicit_lookup_removes_only_its_own_graph_contribution()
+    {
+        var entities = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = MakeEntity("contact", [MakeLookup("accountid", ["account"])]),
+            ["account"] = MakeEntity("account"),
+        };
+
+        bool RuledOnly(string table, string column) =>
+            string.Equals(table, "contact", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(column, "accountid", StringComparison.OrdinalIgnoreCase);
+
+        var ruledOnly = _builder.Build(entities, RuledOnly);
+        Assert.DoesNotContain("account", ruledOnly.Edges["contact"]);
+
+        entities["contact"] = MakeEntity("contact",
+        [
+            MakeLookup("accountid", ["account"]),
+            MakeLookup("parentaccountid", ["account"]),
+        ]);
+        var withUnruledSibling = _builder.Build(entities, RuledOnly);
+        Assert.Contains("account", withUnruledSibling.Edges["contact"]);
+    }
 }

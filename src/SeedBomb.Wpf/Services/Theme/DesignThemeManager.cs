@@ -24,13 +24,6 @@ public static class DesignThemeManager
     /// <summary>Palette ID applied when none is configured. Matches the design of record.</summary>
     public const string DefaultPaletteId = "kiln";
 
-    /// <summary>When true, chrome animations use zero duration.</summary>
-    public static bool ReduceMotion { get; set; }
-
-    /// <summary>Drawer slide duration honoring <see cref="ReduceMotion"/>.</summary>
-    public static TimeSpan DrawerAnimationDuration =>
-        ReduceMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(250);
-
     /// <summary>Maps a persisted palette id onto the current palette set.</summary>
     public static string ResolvePaletteId(string? paletteId) => paletteId switch
     {
@@ -56,9 +49,6 @@ public static class DesignThemeManager
         dark.Freeze();
         return new ThemePaletteOption(id, displayName, light, dark);
     }
-
-    /// <summary>Applies the selected light or dark visual theme using the default palette.</summary>
-    public static void Apply(bool isDark) => Apply(isDark, DefaultPaletteId);
 
     /// <summary>Applies the selected light or dark visual theme for the given palette.</summary>
     /// <param name="isDark">True to apply dark theme resources; false for light.</param>
@@ -123,7 +113,6 @@ public static class DesignThemeManager
         // --- Status -----------------------------------------------------
         Set("DG.Success", p.Success);
         Set("DG.SuccessSoft", p.SuccessSoft);
-        Set("DG.SuccessBorder", p.SuccessBorder);
         Set("DG.Warning", p.Warning);
         Set("DG.WarningSoft", p.WarningSoft);
         Set("DG.WarningBorder", p.WarningBorder);
@@ -133,7 +122,6 @@ public static class DesignThemeManager
         Set("DG.ErrorBorder", p.ErrorBorder);
         Set("DG.Info", p.Info);
         Set("DG.InfoSoft", p.InfoSoft);
-        Set("DG.InfoBorder", p.InfoBorder);
 
         // --- Energy & series --------------------------------------------
         Set("DG.Energy", p.Energy);

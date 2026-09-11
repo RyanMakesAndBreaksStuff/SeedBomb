@@ -42,4 +42,13 @@ public sealed class ProfilesViewModelTests : IDisposable
         vm.SelectedItem = Assert.Single(vm.Items);
         return vm;
     }
+
+    [Fact]
+    public void ProfileListItem_HasNoUnmappedHintParameter()
+    {
+        // Project() never supplied it, so the summary's " · {hint}" branch was unreachable.
+        Assert.DoesNotContain(
+            typeof(ProfileListItem).GetConstructors().Single().GetParameters(),
+            p => p.Name == "UnmappedRequiredHint");
+    }
 }

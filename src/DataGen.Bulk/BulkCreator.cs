@@ -71,7 +71,13 @@ public class BulkCreator : IBulkCreator
         PreparedBogusRun? preparedRun = null;
         try
         {
+            var validatedRules = ValidateConfiguredRules(config, entityMetadata);
+            config = config with { FieldRules = validatedRules };
+
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
+
+            var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata,
+                _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
 
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
@@ -114,7 +120,7 @@ public class BulkCreator : IBulkCreator
                     recordCount, entityName);
 
                 var (createdIds, errors) = await CreateEntityRecordsAsync(
-                    entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, progress, ct).ConfigureAwait(false);
+                    entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, lookupRun, progress, ct).ConfigureAwait(false);
 
                 pool.Add(entityName, createdIds);
                 allCreatedRecords[entityName] = createdIds.AsReadOnly();
@@ -142,7 +148,8 @@ public class BulkCreator : IBulkCreator
             // Phase 2: backfill deferred lookups
             _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
             var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
-                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
+                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
+                isExplicitLookup: (table, column) => LookupRulePolicy.IsExplicit(config.FieldRules, table, column)).ConfigureAwait(false);
             allErrors.AddRange(backfillErrors);
 
             // Phase 3: N:N associations
@@ -177,6 +184,7 @@ public class BulkCreator : IBulkCreator
         int effectiveDop,
         DataverseRecordPool pool,
         PreparedBogusRun? preparedRun,
+        PreparedLookupRun lookupRun,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
@@ -192,6 +200,11 @@ public class BulkCreator : IBulkCreator
                         entityName, attr.LogicalName);
             }
         }
+
+        var tableRules = config.FieldRules is not null
+            && config.FieldRules.TryGetValue(entityName, out var configuredRules)
+            ? configuredRules
+            : new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
 
         // T-25: pre-flight required-lookup validation
         if (meta.Attributes is not null)
@@ -212,6 +225,12 @@ public class BulkCreator : IBulkCreator
                             entityName);
                         continue;
                     }
+                    if (attr.LogicalName is not null
+                        && tableRules.TryGetValue(attr.LogicalName, out var explicitRule)
+                        && explicitRule is ConstantRule or OneOfRule or LookupRandomRule)
+                    {
+                        continue;
+                    }
                     throw new DataGenerationException(
                         $"Entity '{entityName}': required lookup '{attr.LogicalName}' (SystemRequired) has no generator — cannot create records.");
                 }
@@ -226,41 +245,29 @@ public class BulkCreator : IBulkCreator
         var attributesToGenerate = GetGeneratableAttributes(meta);
         var alternateKeyAttrs = GetAlternateKeyAttributes(meta);
         var specialHandlingAttrs = GetRoutableSpecialHandlingAttributes(meta);
+        var coveredLogicalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var attr in attributesToGenerate)
+        {
+            if (attr.LogicalName is not null)
+                coveredLogicalNames.Add(attr.LogicalName);
+        }
+        foreach (var attr in specialHandlingAttrs)
+        {
+            if (attr.LogicalName is not null)
+                coveredLogicalNames.Add(attr.LogicalName);
+        }
+        var explicitLookupAttrs = (meta.Attributes ?? [])
+            .OfType<LookupAttributeMetadata>()
+            .Where(a => a.LogicalName is not null
+                && !coveredLogicalNames.Contains(a.LogicalName)
+                && tableRules.TryGetValue(a.LogicalName, out var ruled)
+                && ruled is ConstantRule or OneOfRule or LookupRandomRule or NullRule)
+            .ToArray();
         var hasMoney = specialHandlingAttrs.Any(a => a is MoneyAttributeMetadata);
         var faker = DeterministicFaker.Create(config.Seed, entityIndex, config.Locale);
         using var bogusSession = new BogusEvaluatorSession(config.Locale);
         var evalContext = new RuleEvaluationContext(entityName, config.Seed, config.Locale, config.RunId, recordCount);
         var entities = new List<Entity>(recordCount);
-
-        // Task 6 preflight: resolve + validate every configured field rule for this table once,
-        // before any row is built. RuleEligibility can't see entity.Keys, so alternate-key targets
-        // are rejected here explicitly; everything else routes through the one-path RuleValidator.
-        var tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
-        if (config.FieldRules is not null && config.FieldRules.TryGetValue(entityName, out var configuredRules))
-        {
-            foreach (var (logicalName, rule) in configuredRules)
-            {
-                var ruleAttr = meta.Attributes?.FirstOrDefault(a =>
-                    string.Equals(a.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase));
-                if (ruleAttr is null)
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': field rule targets unknown attribute '{logicalName}'.");
-
-                var handling = _edgeCaseValidator.Validate(ruleAttr, meta);
-                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == "AlternateKeyUniqueness")
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
-
-                var validation = RuleValidator.Validate(
-                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId));
-                if (!validation.IsValid)
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': field rule for '{logicalName}' is invalid — " +
-                        string.Join(" ", validation.Messages.Select(m => m.Text)));
-
-                tableRules[logicalName] = validation.EffectiveRule!;
-            }
-        }
 
         for (int i = 0; i < recordCount; i++)
         {
@@ -269,7 +276,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
@@ -281,21 +288,35 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
                     entity[attr.LogicalName!] = value;
             }
 
+            foreach (var attr in explicitLookupAttrs)
+            {
+                if (attr.LogicalName is null || !tableRules.TryGetValue(attr.LogicalName, out var rule))
+                    continue;
+                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                if (ReferenceEquals(value, RuleValueGenerator.Omit))
+                    continue;
+                if (value is not null)
+                    entity[attr.LogicalName] = value;
+            }
+
             // Inject transactioncurrencyid for entities with money fields
             if (hasMoney)
             {
                 var currencyId = pool.GetRandom("transactioncurrency", faker);
-                if (currencyId.HasValue)
-                    entity["transactioncurrencyid"] = new EntityReference("transactioncurrency", currencyId.Value);
-                else
-                    _logger.LogWarning("No transactioncurrency in pool for {Entity} — money fields may be rejected by Dataverse", entityName);
+                if (!tableRules.ContainsKey("transactioncurrencyid"))
+                {
+                    if (currencyId.HasValue)
+                        entity["transactioncurrencyid"] = new EntityReference("transactioncurrency", currencyId.Value);
+                    else
+                        _logger.LogWarning("No transactioncurrency in pool for {Entity} — money fields may be rejected by Dataverse", entityName);
+                }
             }
 
             foreach (var attr in alternateKeyAttrs)
@@ -634,6 +655,81 @@ public class BulkCreator : IBulkCreator
         }
     }
 
+    private Dictionary<string, Dictionary<string, FieldRule>> ValidateConfiguredRules(
+        GenerationConfig config,
+        IReadOnlyDictionary<string, EntityMetadata> entityMetadata)
+    {
+        var validatedRules = new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entityName in config.EntityLogicalNames)
+        {
+            if (!config.RecordCounts.TryGetValue(entityName, out var recordCount) || recordCount <= 0)
+                continue;
+
+            if (config.FieldRules is null)
+                continue;
+
+            List<KeyValuePair<string, Dictionary<string, FieldRule>>> tableMatches = [];
+            foreach (var pair in config.FieldRules)
+            {
+                if (string.Equals(pair.Key, entityName, StringComparison.OrdinalIgnoreCase))
+                    tableMatches.Add(pair);
+            }
+
+            if (tableMatches.Count > 1)
+                throw new DataGenerationException(
+                    $"Entity '{entityName}': field rules contain duplicate table keys that differ only by case.");
+            if (tableMatches.Count == 0)
+                continue;
+
+            if (!entityMetadata.TryGetValue(entityName, out var meta))
+                throw new DataGenerationException($"Entity '{entityName}': metadata not found.");
+
+            var configuredRules = tableMatches[0].Value;
+            var tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+            var seenColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (logicalName, rule) in configuredRules)
+            {
+                if (!seenColumns.TryAdd(logicalName, logicalName))
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule targets duplicate attribute keys that differ only by case ('{logicalName}').");
+
+                var ruleAttr = meta.Attributes?.FirstOrDefault(a =>
+                    string.Equals(a.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase));
+                if (ruleAttr is null)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule targets unknown attribute '{logicalName}'.");
+
+                var handling = _edgeCaseValidator.Validate(ruleAttr, meta);
+                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == "AlternateKeyUniqueness")
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
+
+                var validation = RuleValidator.Validate(
+                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId));
+                if (!validation.IsValid)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': field rule for '{logicalName}' is invalid — " +
+                        string.Join(" ", validation.Messages.Select(m => m.Text)));
+
+                tableRules[logicalName] = CloneOwnedRule(validation.EffectiveRule ?? rule);
+            }
+
+            validatedRules[entityName] = tableRules;
+        }
+
+        return validatedRules;
+    }
+
+    private static FieldRule CloneOwnedRule(FieldRule rule) => rule switch
+    {
+        ConstantRule c => new ConstantRule(c.Value.Clone()),
+        OneOfRule o => new OneOfRule(o.Values.Select(static v => v.Clone()).ToArray().AsReadOnly(), o.Pick),
+        BogusRule b => new BogusRule(b.Api, b.Endpoint, b.EngineVersion, b.Args),
+        _ => rule,
+    };
+
     private static async Task<PreparedBogusRun?> PrepareBogusRunOrThrowAsync(
         GenerationConfig config,
         IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
@@ -687,8 +783,14 @@ public class BulkCreator : IBulkCreator
         RuleEvaluationContext context,
         int rowIndex,
         PreparedBogusRun? preparedRun,
+        PreparedLookupRun lookupRun,
         BogusEvaluatorSession session)
     {
+        if (rule is LookupRandomRule)
+            return RuleValueGenerator.EvaluateLookupRandom(
+                lookupRun.Get(context.Table, attr.LogicalName!), context.Seed,
+                context.Table, attr.LogicalName!, rowIndex);
+
         if (rule is not BogusRule bogus)
             return RuleValueGenerator.Evaluate(rule, attr, context.Seed, context.Table, rowIndex, context.RunId);
 

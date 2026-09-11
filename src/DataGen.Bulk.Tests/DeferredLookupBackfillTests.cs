@@ -454,4 +454,78 @@ public class DeferredLookupBackfillTests
             s => s.ExecuteAsync(It.IsAny<ExecuteMultipleRequest>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task Backfill_preserves_constant_oneof_random_and_null_ownership()
+    {
+        var captured = new List<ExecuteMultipleRequest>();
+        var serviceMock = BuildServiceMock(captured);
+        var sut = BuildSut(serviceMock.Object);
+
+        var graph = new DependencyGraph();
+        graph.AddNode("contact");
+        graph.AddNode("account");
+        graph.DeferEdge("contact", new DeferredLookup("contact", "constid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "oneofid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "randomid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "nullid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "unruledid", ["account"]));
+
+        var contactId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var pool = new DataverseRecordPool();
+        pool.Add("contact", [contactId]);
+        pool.Add("account", [accountId]);
+
+        bool IsExplicit(string table, string column) =>
+            string.Equals(table, "contact", StringComparison.OrdinalIgnoreCase)
+            && column is "constid" or "oneofid" or "randomid" or "nullid";
+
+        var errors = await sut.BackfillLookupsAsync(graph, pool, batchSize: 50, isExplicitLookup: IsExplicit);
+
+        Assert.Empty(errors);
+        Assert.NotEmpty(captured);
+        var update = Assert.IsType<UpdateRequest>(Assert.Single(Assert.Single(captured).Requests)).Target;
+        Assert.True(update.Contains("unruledid"));
+        var eref = Assert.IsType<EntityReference>(update["unruledid"]);
+        Assert.Equal("account", eref.LogicalName);
+        Assert.Equal(accountId, eref.Id);
+        Assert.False(update.Contains("constid"));
+        Assert.False(update.Contains("oneofid"));
+        Assert.False(update.Contains("randomid"));
+        Assert.False(update.Contains("nullid"));
+    }
+
+    [Fact]
+    public async Task Backfill_sends_no_empty_updates()
+    {
+        var captured = new List<ExecuteMultipleRequest>();
+        var serviceMock = BuildServiceMock(captured);
+        var sut = BuildSut(serviceMock.Object);
+
+        var graph = new DependencyGraph();
+        graph.AddNode("contact");
+        graph.AddNode("account");
+        graph.DeferEdge("contact", new DeferredLookup("contact", "constid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "oneofid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "randomid", ["account"]));
+        graph.DeferEdge("contact", new DeferredLookup("contact", "nullid", ["account"]));
+
+        var pool = new DataverseRecordPool();
+        pool.Add("contact", [Guid.NewGuid()]);
+        pool.Add("account", [Guid.NewGuid()]);
+
+        bool IsExplicit(string table, string column) =>
+            string.Equals(table, "contact", StringComparison.OrdinalIgnoreCase)
+            && column is "constid" or "oneofid" or "randomid" or "nullid";
+
+        var errors = await sut.BackfillLookupsAsync(graph, pool, batchSize: 50, isExplicitLookup: IsExplicit);
+
+        Assert.Empty(errors);
+        Assert.Empty(captured);
+        serviceMock.Verify(
+            s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.DoesNotContain(captured.SelectMany(r => r.Requests), r => r is UpdateRequest or UpdateMultipleRequest);
+    }
 }

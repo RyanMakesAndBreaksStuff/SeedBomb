@@ -8,7 +8,6 @@ namespace Seedbomb.Services.Settings;
 /// <param name="DefaultBatchSize">Default batch size for bulk creation.</param>
 /// <param name="DefaultDop">Default degree of parallelism; 0 means auto.</param>
 /// <param name="DarkTheme">Whether dark theme is enabled.</param>
-/// <param name="ReduceMotion">Whether animations should be suppressed.</param>
 /// <param name="PaletteId">Selected color palette; see <see cref="Theme.DesignThemeManager.AvailablePalettes"/>.</param>
 /// <param name="KeepRunSheetOpen">When true, the run sheet stays up until the run finishes.</param>
 public record AppSettings(
@@ -16,7 +15,6 @@ public record AppSettings(
     int DefaultBatchSize = 500,
     int DefaultDop = 0,
     bool DarkTheme = false,
-    bool ReduceMotion = false,
     string PaletteId = Theme.DesignThemeManager.DefaultPaletteId,
     bool KeepRunSheetOpen = true)
 {

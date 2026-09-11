@@ -36,8 +36,27 @@ public static class RuleValueGenerator
                 runId),
             BogusRule => throw new InvalidOperationException(
                 "Bogus rules evaluate through BogusEvaluatorSession with a prepared rule."),
+            LookupRandomRule => throw new InvalidOperationException(
+                "LookupRandom rules require prepared candidates."),
             _ => throw new InvalidOperationException($"Unhandled rule type {rule.GetType().Name}"),
         };
+    }
+
+    /// <summary>Selects from a non-empty, canonically ordered prepared candidate list.</summary>
+    /// <param name="candidates">Immutable identities from run preparation.</param>
+    /// <param name="seed">Run seed.</param>
+    /// <param name="table">Source table logical name.</param>
+    /// <param name="column">Source lookup logical name.</param>
+    /// <param name="rowIndex">Zero-based generated row.</param>
+    public static EntityReference EvaluateLookupRandom(IReadOnlyList<LookupRuleValue> candidates,
+        int seed, string table, string column, int rowIndex)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentOutOfRangeException.ThrowIfNegative(rowIndex);
+        if (candidates.Count == 0)
+            throw new InvalidOperationException($"No prepared candidates for '{table}.{column}'.");
+        var index = (int)(UniformDouble(seed, table, column, rowIndex) * candidates.Count);
+        return candidates[index].ToReference();
     }
 
     // ── substream: HMAC-SHA256(seed, table‖column‖rowIndex) → uniform doubles/chars ──
@@ -98,8 +117,14 @@ public static class RuleValueGenerator
         BigIntAttributeMetadata => value.GetInt64(),
         DecimalAttributeMetadata => value.GetDecimal(),
         DoubleAttributeMetadata => value.GetDouble(),
+        LookupAttributeMetadata lookup => ConvertLookup(value, lookup),
         _ => value.ValueKind == JsonValueKind.String ? value.GetString() : value.GetRawText(),
     };
+
+    private static EntityReference ConvertLookup(JsonElement json, LookupAttributeMetadata attr)
+        => LookupRuleValue.TryParse(json, attr, out var value, out var error)
+            ? value!.ToReference()
+            : throw new InvalidOperationException($"Invalid lookup value for '{attr.LogicalName}': {error}");
 
     private static object ConvertNumber(decimal n, AttributeMetadata attr) => attr switch
     {

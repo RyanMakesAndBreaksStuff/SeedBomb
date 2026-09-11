@@ -15,18 +15,29 @@ namespace Seedbomb.Services.Connections;
 /// </summary>
 public sealed class JsonConnectionProfileService : IConnectionProfileService, IDisposable
 {
-    private static readonly string StoragePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DataGen", "connections.json");
-
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() }
     };
 
+    private readonly string _storagePath;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private StoreDto? _cache;
+
+    /// <summary>Stores profiles under <c>%LOCALAPPDATA%\DataGen\connections.json</c>.</summary>
+    public JsonConnectionProfileService()
+        : this(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DataGen"))
+    {
+    }
+
+    /// <summary>Test seam: stores <c>connections.json</c> in <paramref name="storageDirectory"/>.</summary>
+    internal JsonConnectionProfileService(string storageDirectory)
+    {
+        _storagePath = Path.Combine(storageDirectory, "connections.json");
+    }
 
     /// <inheritdoc/>
     public event EventHandler? ProfilesChanged;
@@ -46,7 +57,8 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         {
             var store = await LoadLockedAsync(ct).ConfigureAwait(false);
             var idx = store.Profiles.FindIndex(p => p.Id == profile.Id);
-            var dto = Encrypt(profile);
+            var existing = idx >= 0 ? store.Profiles[idx] : null;
+            var dto = Encrypt(profile, existing);
             if (idx >= 0) store.Profiles[idx] = dto;
             else store.Profiles.Add(dto);
             await PersistAsync(store, ct).ConfigureAwait(false);
@@ -80,6 +92,14 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
     }
 
     /// <inheritdoc/>
+    public async Task<string?> GetSecretAsync(Guid id, CancellationToken ct = default)
+    {
+        var store = await LoadAsync(ct).ConfigureAwait(false);
+        var dto = store.Profiles.FirstOrDefault(p => p.Id == id);
+        return dto is null ? null : DecryptString(dto.EncryptedClientSecret);
+    }
+
+    /// <inheritdoc/>
     public async Task SetLastUsedAsync(Guid id, CancellationToken ct = default)
     {
         await _lock.WaitAsync(ct).ConfigureAwait(false);
@@ -103,12 +123,12 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
     private async Task<StoreDto> LoadLockedAsync(CancellationToken ct)
     {
         if (_cache is not null) return _cache;
-        if (!File.Exists(StoragePath))
+        if (!File.Exists(_storagePath))
         {
             _cache = new StoreDto();
             return _cache;
         }
-        var json = await File.ReadAllTextAsync(StoragePath, ct).ConfigureAwait(false);
+        var json = await File.ReadAllTextAsync(_storagePath, ct).ConfigureAwait(false);
         json = CoerceLegacyAuthJson(json);
         _cache = JsonSerializer.Deserialize<StoreDto>(json, JsonOpts) ?? new StoreDto();
         foreach (var profile in _cache.Profiles)
@@ -124,12 +144,12 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
     private async Task PersistAsync(StoreDto store, CancellationToken ct)
     {
         _cache = store;
-        Directory.CreateDirectory(Path.GetDirectoryName(StoragePath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var json = JsonSerializer.Serialize(store, JsonOpts);
-        await File.WriteAllTextAsync(StoragePath, json, ct).ConfigureAwait(false);
+        await File.WriteAllTextAsync(_storagePath, json, ct).ConfigureAwait(false);
     }
 
-    private static ProfileDto Encrypt(ConnectionProfile p) => new()
+    private static ProfileDto Encrypt(ConnectionProfile p, ProfileDto? existing) => new()
     {
         Id = p.Id,
         Name = p.Name,
@@ -138,7 +158,11 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         AuthType = p.AuthType,
         ClientId = p.ClientId,
         TenantId = p.TenantId,
-        EncryptedClientSecret = EncryptString(p.ClientSecret),
+        // null = caller did not load the secret (list projection); keep what is stored.
+        // "" = caller cleared it deliberately.
+        EncryptedClientSecret = p.ClientSecret is null
+            ? existing?.EncryptedClientSecret
+            : EncryptString(p.ClientSecret),
         CertificateThumbprint = p.CertificateThumbprint,
     };
 
@@ -151,7 +175,9 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         AuthType = d.AuthType,
         ClientId = d.ClientId,
         TenantId = d.TenantId,
-        ClientSecret = DecryptString(d.EncryptedClientSecret),
+        // Secrets are fetched per-profile via GetSecretAsync so at most one plaintext copy
+        // exists at a time; the singleton ConnectionManagerViewModel holds none.
+        ClientSecret = null,
         CertificateThumbprint = d.CertificateThumbprint,
     };
 

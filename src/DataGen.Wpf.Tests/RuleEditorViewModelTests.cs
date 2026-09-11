@@ -4,6 +4,7 @@ using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
+using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels;
@@ -82,7 +83,7 @@ public sealed class RuleEditorViewModelTests
         Assert.False(string.IsNullOrWhiteSpace(excluded["overriddencreatedon"].DisabledReason));
 
         Assert.False(excluded["ownerid"].IsSelectable);
-        Assert.Equal("Lookup — out of scope in v1.", excluded["ownerid"].DisabledReason);
+        Assert.Equal("Owner is assigned by Dataverse; owner rules are not supported.", excluded["ownerid"].DisabledReason);
 
         Assert.False(excluded["preferredcontactmethodcode"].IsSelectable);
         Assert.Contains("v2", excluded["preferredcontactmethodcode"].DisabledReason, StringComparison.OrdinalIgnoreCase);
@@ -399,6 +400,17 @@ public sealed class RuleEditorViewModelTests
         return (vm, navigator, profiles, saved);
     }
 
+    private static async Task<(RuleEditorViewModel Vm, Mock<IProfileService> Profiles)> ReadyEditorAsync()
+    {
+        var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
+        var (vm, _, profiles, _) = await LoadedEditorAsync(
+            existingProfileNames: ["working-set"],
+            nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.ConfirmDeleteRule = _ => Task.FromResult(true);
+        return (vm, profiles);
+    }
+
     [Fact]
     public async Task SaveRuleCommand_commits_without_navigating()
     {
@@ -531,6 +543,32 @@ public sealed class RuleEditorViewModelTests
 
         await vm2.DeleteRuleCommand.ExecuteAsync(null);
         profiles2.Verify(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveRule_WhenStoreThrows_SetsMetadataErrorAndDoesNotPropagate()
+    {
+        var (vm, profiles) = await ReadyEditorAsync();
+        profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("profile file is locked"));
+
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasMetadataError);
+        Assert.Contains("profile file is locked", vm.MetadataError!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeleteRule_WhenStoreThrows_SetsMetadataErrorAndDoesNotPropagate()
+    {
+        var (vm, profiles) = await ReadyEditorAsync();
+        profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidDataException("profile is corrupt"));
+
+        await vm.DeleteRuleCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasMetadataError);
+        Assert.Contains("profile is corrupt", vm.MetadataError!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -677,6 +715,503 @@ public sealed class RuleEditorViewModelTests
         await Task.Delay(250, TestContext.Current.CancellationToken);
         Assert.Equal(["fixed", "fixed", "fixed"], vm.PreviewValues);
         Assert.True(vm.CanSave);
+    }
+
+    [Fact]
+    public void Customer_manual_append_keeps_stamped_target_when_selector_changes()
+    {
+        var vm = new RuleEditorViewModel(BuildEntityWithLookups(), 3, 42, "lookup-test");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentcustomerid");
+        vm.SelectedOp = "oneOf";
+        vm.Pick = OneOfPick.Cycle;
+        vm.LookupInput.SelectedTarget = "account";
+        vm.LookupInput.GuidText = "11111111-1111-1111-1111-111111111111";
+        Assert.True(vm.LookupInput.AppendManualCommand.CanExecute(null));
+        vm.LookupInput.AppendManualCommand.Execute(null);
+
+        vm.LookupInput.SelectedTarget = "contact";
+        Assert.Equal("account", vm.LookupInput.Records.Single().Entity);
+        vm.LookupInput.GuidText = "22222222-2222-2222-2222-222222222222";
+        vm.LookupInput.AppendManualCommand.Execute(null);
+
+        Assert.Equal(["account", "contact"], vm.LookupInput.Records.Select(r => r.Entity).ToArray());
+        var built = Assert.IsType<OneOfRule>(vm.BuildRule());
+        Assert.Equal(OneOfPick.Cycle, built.Pick);
+        Assert.Equal("account", LookupRuleValue.TryParse(built.Values[0], CustomerColumn(), out var first, out _) ? first!.Entity : null);
+        Assert.Equal("contact", LookupRuleValue.TryParse(built.Values[1], CustomerColumn(), out var second, out _) ? second!.Entity : null);
+    }
+
+    [Fact]
+    public void Invalid_second_guid_adds_nothing_and_blocks_save()
+    {
+        var vm = new RuleEditorViewModel(BuildEntityWithLookups(), 3, 42, "lookup-test");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        vm.SelectedOp = "oneOf";
+        vm.LookupInput.GuidText = "11111111-1111-1111-1111-111111111111, not-a-guid";
+        vm.LookupInput.AppendManualCommand.Execute(null);
+
+        Assert.Empty(vm.LookupInput.Records);
+        Assert.Contains(vm.Messages, m => m.Text.Contains("GUID 2", StringComparison.Ordinal));
+        Assert.False(vm.CanSave);
+
+        vm.LookupInput.GuidText = "";
+        Assert.False(vm.CanSave);
+    }
+
+    [Fact]
+    public void Constant_oneOf_constant_preserves_selection_until_exactly_one()
+    {
+        var vm = new RuleEditorViewModel(BuildEntityWithLookups(), 3, 42, "lookup-test");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        vm.SelectedOp = "constant";
+        vm.LookupInput.GuidText = "11111111-1111-1111-1111-111111111111, 22222222-2222-2222-2222-222222222222";
+        vm.LookupInput.AppendManualCommand.Execute(null);
+        Assert.Equal(2, vm.LookupInput.Records.Count);
+        Assert.False(vm.CanSave);
+        Assert.Contains(vm.Messages, m => m.Text.Contains("exactly one", StringComparison.OrdinalIgnoreCase));
+
+        vm.SelectedOp = "oneOf";
+        Assert.Equal(2, vm.LookupInput.Records.Count);
+        Assert.True(vm.CanSave);
+        Assert.IsType<OneOfRule>(vm.BuildRule());
+
+        vm.SelectedOp = "constant";
+        Assert.Equal(2, vm.LookupInput.Records.Count);
+        Assert.False(vm.CanSave);
+        Assert.Null(vm.BuildRule());
+
+        vm.LookupInput.RemoveCommand.Execute(vm.LookupInput.Records[1]);
+        Assert.True(vm.CanSave);
+        Assert.IsType<ConstantRule>(vm.BuildRule());
+    }
+
+    [Fact]
+    public async Task Cancel_picker_CancelRule_and_table_switch_restore_saved_lookup_rule()
+    {
+        var original = new OneOfRule(
+        [
+            new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Acme").ToJson(),
+            new LookupRuleValue("account", Guid.Parse("33333333-3333-3333-3333-333333333333"), "Beta").ToJson(),
+        ], OneOfPick.Cycle);
+        var picker = new Mock<ILookupRecordPicker>();
+        picker
+            .Setup(p => p.PickAsync(
+                It.IsAny<LookupAttributeMetadata>(),
+                It.IsAny<IReadOnlyList<LookupRuleValue>>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<LookupRuleValue>?)null);
+        var (vm, _, _, _) = await LoadedLookupEditorAsync(
+            picker: picker.Object,
+            columns: new Dictionary<string, FieldRule> { ["parentaccountid"] = original });
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        Assert.Equal(2, vm.LookupInput.Records.Count);
+        vm.LookupInput.GuidText = "44444444-4444-4444-4444-444444444444";
+        await vm.PickLookupRecordsCommand.ExecuteAsync(null);
+        Assert.Equal(2, vm.LookupInput.Records.Count);
+        Assert.Equal("44444444-4444-4444-4444-444444444444", vm.LookupInput.GuidText);
+
+        vm.CancelRuleCommand.Execute(null);
+        Assert.Equal("", vm.LookupInput.GuidText);
+        var restored = Assert.IsType<OneOfRule>(vm.BuildRule());
+        Assert.Equal(original.Values.Select(v => v.GetRawText()), restored.Values.Select(v => v.GetRawText()));
+
+        vm.LookupInput.GuidText = "55555555-5555-5555-5555-555555555555";
+        vm.SelectedTable = vm.Tables.Single(t => t.LogicalName == "contact");
+        Assert.Equal("firstname", vm.SelectedColumn?.LogicalName);
+        Assert.Empty(vm.LookupInput.Records);
+        Assert.Empty(vm.LookupInput.Targets);
+        Assert.False(vm.IsLookupColumn);
+    }
+
+    [Fact]
+    public async Task Stale_picker_result_is_ignored_after_column_op_or_connection_change()
+    {
+        var saved = new ConstantRule(
+            new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Acme").ToJson());
+        var stale = new LookupRuleValue("account", Guid.Parse("99999999-9999-9999-9999-999999999999"), "Stale");
+        var picker = new Mock<ILookupRecordPicker>();
+        var pending = new TaskCompletionSource<IReadOnlyList<LookupRuleValue>?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        picker
+            .Setup(p => p.PickAsync(
+                It.IsAny<LookupAttributeMetadata>(),
+                It.IsAny<IReadOnlyList<LookupRuleValue>>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(pending.Task);
+        var connection = new Mock<IDataverseConnectionService>();
+        var (vm, _, _, _) = await LoadedLookupEditorAsync(
+            picker: picker.Object,
+            connection: connection.Object,
+            columns: new Dictionary<string, FieldRule> { ["parentaccountid"] = saved });
+        vm.Activate();
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        Assert.Equal("constant", vm.SelectedOp);
+
+        var pickTask = vm.PickLookupRecordsCommand.ExecuteAsync(null);
+        vm.SelectedOp = "oneOf";
+        pending.SetResult([stale, new LookupRuleValue("account", Guid.Parse("88888888-8888-8888-8888-888888888888"))]);
+        await pickTask;
+        Assert.Equal("11111111-1111-1111-1111-111111111111", vm.LookupInput.Records.Single().Id.ToString());
+
+        pending = new TaskCompletionSource<IReadOnlyList<LookupRuleValue>?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        picker
+            .Setup(p => p.PickAsync(
+                It.IsAny<LookupAttributeMetadata>(),
+                It.IsAny<IReadOnlyList<LookupRuleValue>>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(pending.Task);
+        vm.SelectedOp = "constant";
+        pickTask = vm.PickLookupRecordsCommand.ExecuteAsync(null);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentcustomerid");
+        pending.SetResult([stale]);
+        await pickTask;
+        Assert.Empty(vm.LookupInput.Records);
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        pending = new TaskCompletionSource<IReadOnlyList<LookupRuleValue>?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        picker
+            .Setup(p => p.PickAsync(
+                It.IsAny<LookupAttributeMetadata>(),
+                It.IsAny<IReadOnlyList<LookupRuleValue>>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(pending.Task);
+        pickTask = vm.PickLookupRecordsCommand.ExecuteAsync(null);
+        connection.Raise(c => c.ConnectionReset += null, connection.Object, EventArgs.Empty);
+        pending.SetResult([stale]);
+        await pickTask;
+        Assert.Equal("11111111-1111-1111-1111-111111111111", vm.LookupInput.Records.Single().Id.ToString());
+        Assert.False(vm.IsMetadataAvailable);
+        Assert.False(vm.CanSave);
+        Assert.Contains("Reconnect and retry", vm.MetadataError, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConnectionReset_ignores_ui_queued_picker_and_metadata_continuations()
+    {
+        var savedId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var saved = new ConstantRule(new LookupRuleValue("account", savedId, "Acme").ToJson());
+        var stale = new LookupRuleValue("account", Guid.Parse("99999999-9999-9999-9999-999999999999"), "Stale");
+        var picker = new Mock<ILookupRecordPicker>();
+        var pickPending = new TaskCompletionSource<IReadOnlyList<LookupRuleValue>?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        picker
+            .Setup(p => p.PickAsync(
+                It.IsAny<LookupAttributeMetadata>(),
+                It.IsAny<IReadOnlyList<LookupRuleValue>>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(pickPending.Task);
+
+        var liveMeta = BuildEntityWithLookups();
+        var staleColumn = new StringAttributeMetadata
+        {
+            LogicalName = "stale_column",
+            IsValidForCreate = true,
+            MaxLength = 20,
+        };
+        var staleMeta = BuildEntityWithLookups();
+        typeof(EntityMetadata).GetProperty(nameof(EntityMetadata.Attributes))!
+            .SetValue(staleMeta, staleMeta.Attributes.Append(staleColumn).ToArray());
+
+        var metadataPending = new TaskCompletionSource<IReadOnlyList<EntityMetadata>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var metadataCalls = 0;
+        var metadata = new Mock<IMetadataProvider>();
+        metadata
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                metadataCalls++;
+                return metadataCalls == 1
+                    ? Task.FromResult<IReadOnlyList<EntityMetadata>>([liveMeta])
+                    : metadataPending.Task;
+            });
+
+        var connection = new Mock<IDataverseConnectionService>();
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(2, "working-set", null, 42,
+                [new ProfileTable("account", 10, new Dictionary<string, FieldRule> { ["parentaccountid"] = saved })]),
+            TableName = "account",
+        };
+        var vm = new RuleEditorViewModel(
+            metadata.Object,
+            new Mock<IProfileService>().Object,
+            new Mock<IAppNavigator>().Object,
+            request,
+            picker: picker.Object,
+            connection: connection.Object);
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+
+        var sc = new QueueSynchronizationContext();
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(sc);
+        try
+        {
+            vm.Activate();
+            vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+
+            var pickTask = vm.PickLookupRecordsCommand.ExecuteAsync(null);
+            pickPending.SetResult([stale]);
+            await WaitForQueuedAsync(sc, 1, TestContext.Current.CancellationToken);
+
+            var retryTask = vm.RetryMetadataCommand.ExecuteAsync(null);
+            metadataPending.SetResult([staleMeta]);
+            await WaitForQueuedAsync(sc, 2, TestContext.Current.CancellationToken);
+
+            connection.Raise(c => c.ConnectionReset += null, connection.Object, EventArgs.Empty);
+            sc.Drain();
+            await pickTask;
+            await retryTask;
+
+            Assert.Equal(savedId, vm.LookupInput.Records.Single().Id);
+            Assert.DoesNotContain(vm.SettableColumns, c => c.LogicalName == "stale_column");
+            Assert.False(vm.IsMetadataAvailable);
+            Assert.Contains("Reconnect and retry", vm.MetadataError, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            vm.Deactivate();
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
+    [Fact]
+    public async Task Missing_profile_or_not_ready_connection_then_Retry_reloads_retained_profile()
+    {
+        var metadata = new Mock<IMetadataProvider>();
+        var missingRequest = new RulesNavigationRequest();
+        var missing = new RuleEditorViewModel(
+            metadata.Object,
+            new Mock<IProfileService>().Object,
+            new Mock<IAppNavigator>().Object,
+            missingRequest);
+        missing.Activate();
+        await missing.LoadForProfileAsync(TestContext.Current.CancellationToken);
+        Assert.False(missing.IsMetadataAvailable);
+        Assert.False(string.IsNullOrWhiteSpace(missing.MetadataError));
+        Assert.False(missing.RetryMetadataCommand.CanExecute(null));
+
+        var saved = new List<Profile>();
+        var calls = 0;
+        metadata
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                if (calls == 1)
+                    return Task.FromException<IReadOnlyList<EntityMetadata>>(
+                        new InvalidOperationException("No connection profile configured."));
+                return Task.FromResult<IReadOnlyList<EntityMetadata>>([BuildEntityWithLookups()]);
+            });
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(2, "working-set", null, 42,
+                [new ProfileTable("account", 10, null)]),
+            TableName = "account",
+            OnSaved = p => saved.Add(p),
+        };
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<string>());
+        var vm = new RuleEditorViewModel(
+            metadata.Object,
+            profiles.Object,
+            new Mock<IAppNavigator>().Object,
+            request);
+        vm.Activate();
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+        Assert.False(vm.IsMetadataAvailable);
+        Assert.Contains("No connection profile configured.", vm.MetadataError);
+        Assert.True(vm.RetryMetadataCommand.CanExecute(null));
+
+        await vm.RetryMetadataCommand.ExecuteAsync(null);
+        Assert.True(vm.IsMetadataAvailable);
+        Assert.True(string.IsNullOrWhiteSpace(vm.MetadataError));
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        vm.SelectedOp = "lookupRandom";
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+        Assert.Single(saved);
+        Assert.IsType<LookupRandomRule>(saved[0].Tables[0].Columns!["parentaccountid"]);
+    }
+
+    [Fact]
+    public async Task LookupRandom_editor_preview_is_explanatory_without_evaluate()
+    {
+        var vm = new RuleEditorViewModel(BuildEntityWithLookups(), 10, 42, "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentaccountid");
+        vm.SelectedOp = "lookupRandom";
+
+        Assert.True(vm.CanSave);
+        Assert.IsType<LookupRandomRule>(vm.BuildRule());
+        await Task.Delay(250, TestContext.Current.CancellationToken);
+        Assert.Equal(vm.LookupRandomExplanation, Assert.Single(vm.PreviewValues));
+        Assert.Contains("1,000", vm.PreviewValues[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("11111111", vm.PreviewValues[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Owner_rule_is_rejected_by_core_not_only_hidden_in_ui()
+    {
+        var meta = BuildEntity();
+        var owner = meta.Attributes.Single(a => a.LogicalName == "ownerid");
+        var rule = new ConstantRule(new LookupRuleValue("systemuser", Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).ToJson());
+        var result = RuleValidator.Validate(rule, owner, new RuleValidationContext("account", 10, "r1"));
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Messages, m => m.Severity == RuleMessageSeverity.Error);
+        Assert.DoesNotContain("constant", result.Messages[0].Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Customer_oneof_reopens_with_mixed_identity_order_and_pick_mode()
+    {
+        var attr = new LookupAttributeMetadata
+        {
+            LogicalName = "parentcustomerid", IsValidForCreate = true, Targets = ["account", "contact"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(attr, AttributeTypeCode.Customer);
+        var meta = BuildEntity();
+        typeof(EntityMetadata).GetProperty(nameof(EntityMetadata.Attributes))!
+            .SetValue(meta, meta.Attributes.Append(attr).ToArray());
+        var vm = new RuleEditorViewModel(meta, 3, 42, "lookup-test");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "parentcustomerid");
+        var original = new OneOfRule(new[]
+        {
+            new LookupRuleValue("account", Guid.Parse("11111111-1111-1111-1111-111111111111"), "Acme").ToJson(),
+            new LookupRuleValue("contact", Guid.Parse("22222222-2222-2222-2222-222222222222"), "Alex").ToJson(),
+        }, OneOfPick.Cycle);
+        vm.ApplyExistingRule(original);
+        Assert.Equal("oneOf", vm.SelectedOp);
+        var reopened = Assert.IsType<OneOfRule>(vm.BuildRule());
+        Assert.Equal(OneOfPick.Cycle, reopened.Pick);
+        Assert.Equal(original.Values.Select(v => v.GetRawText()), reopened.Values.Select(v => v.GetRawText()));
+    }
+
+    private static LookupAttributeMetadata CustomerColumn()
+    {
+        var attr = new LookupAttributeMetadata
+        {
+            LogicalName = "parentcustomerid",
+            IsValidForCreate = true,
+            Targets = ["account", "contact"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(attr, AttributeTypeCode.Customer);
+        return attr;
+    }
+
+    private static LookupAttributeMetadata AccountLookupColumn()
+    {
+        var attr = new LookupAttributeMetadata
+        {
+            LogicalName = "parentaccountid",
+            IsValidForCreate = true,
+            Targets = ["account"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(attr, AttributeTypeCode.Lookup);
+        return attr;
+    }
+
+    private static EntityMetadata BuildEntityWithLookups()
+    {
+        var meta = BuildEntity();
+        typeof(EntityMetadata).GetProperty(nameof(EntityMetadata.Attributes))!
+            .SetValue(meta, meta.Attributes.Concat([CustomerColumn(), AccountLookupColumn()]).ToArray());
+        return meta;
+    }
+
+    private static async Task<(RuleEditorViewModel Vm, Mock<IAppNavigator> Navigator, Mock<IProfileService> Profiles, List<Profile> Saved)>
+        LoadedLookupEditorAsync(
+            ILookupRecordPicker? picker = null,
+            IDataverseConnectionService? connection = null,
+            Dictionary<string, FieldRule>? columns = null)
+    {
+        var navigator = new Mock<IAppNavigator>();
+        var saved = new List<Profile>();
+        var firstname = new StringAttributeMetadata { LogicalName = "firstname", IsValidForCreate = true, MaxLength = 50 };
+        var contact = new EntityMetadata { LogicalName = "contact" };
+        contact.GetType().GetProperty("Attributes")!.SetValue(contact, new AttributeMetadata[] { firstname });
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(2, "working-set", null, 42,
+            [
+                new ProfileTable("account", 10, columns),
+                new ProfileTable("contact", 10, null),
+            ]),
+            TableName = "account",
+            OnSaved = p => saved.Add(p),
+        };
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([BuildEntityWithLookups(), contact]);
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<string>());
+        var vm = new RuleEditorViewModel(
+            metadata.Object,
+            profiles.Object,
+            navigator.Object,
+            request,
+            picker: picker,
+            connection: connection);
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+        return (vm, navigator, profiles, saved);
+    }
+
+    private static async Task WaitForQueuedAsync(QueueSynchronizationContext sc, int minCount, CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(2);
+        while (sc.Count < minCount)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException($"UI context queued {sc.Count}, expected at least {minCount}.");
+            await Task.Delay(10, ct);
+        }
+    }
+
+    private sealed class QueueSynchronizationContext : SynchronizationContext
+    {
+        private readonly List<(SendOrPostCallback Callback, object? State)> _queue = [];
+
+        public int Count
+        {
+            get
+            {
+                lock (_queue)
+                    return _queue.Count;
+            }
+        }
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            lock (_queue)
+                _queue.Add((d, state));
+        }
+
+        public override void Send(SendOrPostCallback d, object? state) => d(state);
+
+        public void Drain()
+        {
+            while (true)
+            {
+                SendOrPostCallback callback;
+                object? state;
+                lock (_queue)
+                {
+                    if (_queue.Count == 0)
+                        return;
+                    (callback, state) = _queue[0];
+                    _queue.RemoveAt(0);
+                }
+
+                callback(state);
+            }
+        }
     }
 
     private static RuleEditorViewModel EditorForExtra(params AttributeMetadata[] extra)

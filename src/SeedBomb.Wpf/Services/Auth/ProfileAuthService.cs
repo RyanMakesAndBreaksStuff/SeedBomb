@@ -280,17 +280,20 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private async Task<AuthResult> SignInAppOnlyAsync(
         ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
+        string? clientSecret = profile.ClientSecret;
         if (profile.AuthType == AuthType.Certificate)
         {
             if (string.IsNullOrWhiteSpace(profile.CertificateThumbprint))
                 return new AuthResult(false, null, "Certificate thumbprint is not configured for this profile.");
         }
-        else if (string.IsNullOrWhiteSpace(profile.ClientSecret))
+        else
         {
-            return new AuthResult(false, null, "Client Secret is not configured for this profile.");
+            clientSecret ??= await _profiles.GetSecretAsync(profile.Id, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(clientSecret))
+                return new AuthResult(false, null, "Client Secret is not configured for this profile.");
         }
 
-        var cca = await GetOrCreateCca(profile, commitSession).ConfigureAwait(false);
+        var cca = await GetOrCreateCca(profile, commitSession, clientSecret).ConfigureAwait(false);
         var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
         try
@@ -321,11 +324,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// a SHA-256 hash of the secret or certificate thumbprint currently in use. Hashing keeps
     /// the raw secret out of the cache key/comparison state.
     /// </summary>
-    private static string ComputeCcaFingerprint(ConnectionProfile profile)
+    private static string ComputeCcaFingerprint(ConnectionProfile profile, string? clientSecret)
     {
         var credential = profile.AuthType == AuthType.Certificate
             ? profile.CertificateThumbprint
-            : profile.ClientSecret;
+            : clientSecret;
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(credential ?? string.Empty));
         return $"{profile.AuthType}:{Convert.ToHexString(hash)}";
     }
@@ -349,13 +352,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
         else
         {
-            var authority = string.IsNullOrWhiteSpace(profile.TenantId)
-                ? "https://login.microsoftonline.com/common"
-                : $"https://login.microsoftonline.com/{profile.TenantId}";
-
             newPca = PublicClientApplicationBuilder
                 .Create(profile.ClientId)
-                .WithAuthority(authority)
+                .WithAuthority(ResolveCloud(profile), ResolveTenant(profile))
                 .WithDefaultRedirectUri()
                 .Build();
 
@@ -369,9 +368,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         return newPca;
     }
 
-    internal async Task<IConfidentialClientApplication> GetOrCreateCca(ConnectionProfile profile, bool commitSession)
+    internal async Task<IConfidentialClientApplication> GetOrCreateCca(
+        ConnectionProfile profile, bool commitSession, string? clientSecret = null)
     {
-        var fingerprint = ComputeCcaFingerprint(profile);
+        clientSecret ??= profile.ClientSecret;
+        var fingerprint = ComputeCcaFingerprint(profile, clientSecret);
 
         if (commitSession
             && _clients.TryGetValue(profile.Id, out var existing)
@@ -388,17 +389,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
         else
         {
-            var authority = string.IsNullOrWhiteSpace(profile.TenantId)
-                ? "https://login.microsoftonline.com/common"
-                : $"https://login.microsoftonline.com/{profile.TenantId}";
-
             var ccaBuilder = ConfidentialClientApplicationBuilder
                 .Create(profile.ClientId)
-                .WithAuthority(authority);
+                .WithAuthority(ResolveCloud(profile), ResolveTenant(profile));
 
             ccaBuilder = profile.AuthType == AuthType.Certificate
                 ? ccaBuilder.WithCertificate(CertificateLoader.Load(profile.CertificateThumbprint!))
-                : ccaBuilder.WithClientSecret(profile.ClientSecret!);
+                : ccaBuilder.WithClientSecret(clientSecret!);
 
             newCca = ccaBuilder.Build();
 
@@ -411,6 +408,32 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         return newCca;
     }
+
+    /// <summary>
+    /// Maps a profile's Dataverse host suffix onto its Entra cloud. Public cloud is the
+    /// fallback for anything unrecognised, matching the previous hardcoded behaviour.
+    /// </summary>
+    /// <param name="profile">Profile whose <see cref="ConnectionProfile.EnvironmentUrl"/> selects the cloud.</param>
+    internal static AzureCloudInstance ResolveCloud(ConnectionProfile profile)
+    {
+        if (!Uri.TryCreate(profile.EnvironmentUrl, UriKind.Absolute, out var uri))
+            return AzureCloudInstance.AzurePublic;
+
+        return uri.Host switch
+        {
+            var h when h.EndsWith(".crm.microsoftdynamics.us", StringComparison.OrdinalIgnoreCase)
+                    || h.EndsWith(".crm.appsplatform.us", StringComparison.OrdinalIgnoreCase)
+                    || h.EndsWith(".crm.microsoftdynamics.de", StringComparison.OrdinalIgnoreCase)
+                => AzureCloudInstance.AzureUsGovernment,
+            var h when h.EndsWith(".crm.dynamics.cn", StringComparison.OrdinalIgnoreCase)
+                => AzureCloudInstance.AzureChina,
+            _ => AzureCloudInstance.AzurePublic,
+        };
+    }
+
+    /// <summary>Tenant segment for the authority: the profile's tenant, or "common" when blank.</summary>
+    private static string ResolveTenant(ConnectionProfile profile) =>
+        string.IsNullOrWhiteSpace(profile.TenantId) ? "common" : profile.TenantId;
 
     private static void ValidateProfile(ConnectionProfile profile)
     {

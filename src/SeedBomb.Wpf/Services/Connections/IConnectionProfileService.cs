@@ -21,6 +21,14 @@ public interface IConnectionProfileService
     /// </summary>
     Task<ConnectionProfile?> GetLastUsedAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Decrypts and returns the client secret for one profile, or <see langword="null"/> when the
+    /// profile has none. The only source of a plaintext secret — list projections never carry one.
+    /// </summary>
+    /// <param name="id">Profile to read.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<string?> GetSecretAsync(Guid id, CancellationToken ct = default);
+
     /// <summary>Records <paramref name="id"/> as the most-recently-used profile.</summary>
     Task SetLastUsedAsync(Guid id, CancellationToken ct = default);
 }

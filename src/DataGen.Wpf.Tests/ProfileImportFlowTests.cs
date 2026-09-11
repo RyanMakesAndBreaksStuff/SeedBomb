@@ -358,4 +358,146 @@ public sealed class ProfileImportFlowTests : IDisposable
             vm.SelectedEntities.Select(e => e.LogicalName).ToArray());
         Assert.Equal(777, overrides.GetCounts()["account"]);
     }
+
+    [Fact]
+    public async Task Import_preserves_lookup_identity_name_order_cycle_and_optional_name()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = NewService(out _);
+        var json = """
+            {
+              "profileVersion": 2,
+              "name": "lookup-roundtrip",
+              "tables": [
+                {
+                  "table": "account",
+                  "count": 10,
+                  "columns": {
+                    "parentcustomerid": {
+                      "op": "oneOf",
+                      "pick": "cycle",
+                      "values": [
+                        { "entity": "account", "id": "11111111-1111-1111-1111-111111111111", "name": "Acme" },
+                        { "entity": "contact", "id": "22222222-2222-2222-2222-222222222222" }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+            """;
+        var path = await WriteSourceAsync(json);
+        var (profile, error) = await svc.ImportAsync(path, ct);
+        Assert.Null(error);
+        var oneOf = Assert.IsType<OneOfRule>(profile!.Tables[0].Columns!["parentcustomerid"]);
+        Assert.Equal(OneOfPick.Cycle, oneOf.Pick);
+        Assert.Equal(2, oneOf.Values.Count);
+        Assert.Equal("Acme", oneOf.Values[0].GetProperty("name").GetString());
+        Assert.False(oneOf.Values[1].TryGetProperty("name", out _));
+        Assert.Equal("account", oneOf.Values[0].GetProperty("entity").GetString());
+        Assert.Equal("contact", oneOf.Values[1].GetProperty("entity").GetString());
+
+        var exportDir = Path.Combine(Path.GetTempPath(), "dg-profile-export", Guid.NewGuid().ToString("N"));
+        _tempDirs.Add(exportDir);
+        Directory.CreateDirectory(exportDir);
+        var exportPath = Path.Combine(exportDir, "exported.profile.json");
+        await svc.ExportAsync(profile.Name, exportPath, ct);
+        var svc2 = NewService(out _);
+        var (reimported, reimportError) = await svc2.ImportAsync(exportPath, ct);
+        Assert.Null(reimportError);
+        var again = Assert.IsType<OneOfRule>(reimported!.Tables[0].Columns!["parentcustomerid"]);
+        Assert.Equal(OneOfPick.Cycle, again.Pick);
+        Assert.Equal("account", again.Values[0].GetProperty("entity").GetString());
+        Assert.Equal("11111111-1111-1111-1111-111111111111", again.Values[0].GetProperty("id").GetString());
+        Assert.Equal("Acme", again.Values[0].GetProperty("name").GetString());
+        Assert.Equal("contact", again.Values[1].GetProperty("entity").GetString());
+        Assert.Equal("22222222-2222-2222-2222-222222222222", again.Values[1].GetProperty("id").GetString());
+        Assert.False(again.Values[1].TryGetProperty("name", out _));
+    }
+
+    [Fact]
+    public async Task Import_unknown_op_is_rejected()
+    {
+        var svc = NewService(out _);
+        var path = await WriteSourceAsync("""
+            {
+              "profileVersion": 2,
+              "name": "bad-op",
+              "tables": [
+                {
+                  "table": "account",
+                  "count": 1,
+                  "columns": {
+                    "parentaccountid": { "op": "oneOfPicker", "values": [] }
+                  }
+                }
+              ]
+            }
+            """);
+        var (profile, error) = await svc.ImportAsync(path, TestContext.Current.CancellationToken);
+        Assert.Null(profile);
+        Assert.NotNull(error);
+        Assert.StartsWith("not a valid profile:", error);
+    }
+
+    [Fact]
+    public async Task Import_lookupRandom_is_accepted_on_current_binary()
+    {
+        var svc = NewService(out _);
+        var path = await WriteSourceAsync("""
+            {
+              "profileVersion": 2,
+              "name": "lookup-random",
+              "tables": [
+                {
+                  "table": "account",
+                  "count": 1,
+                  "columns": {
+                    "parentaccountid": { "op": "lookupRandom" }
+                  }
+                }
+              ]
+            }
+            """);
+        var (profile, error) = await svc.ImportAsync(path, TestContext.Current.CancellationToken);
+        Assert.Null(error);
+        Assert.IsType<LookupRandomRule>(profile!.Tables[0].Columns!["parentaccountid"]);
+    }
+
+    [Fact]
+    public void Owner_hand_edited_into_profile_is_rejected_by_preflight()
+    {
+        var owner = new LookupAttributeMetadata
+        {
+            LogicalName = "ownerid",
+            IsValidForCreate = true,
+            Targets = ["systemuser"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(owner, AttributeTypeCode.Owner);
+        var meta = BuildAccountMetadata();
+        meta.GetType().GetProperty("Attributes")!
+            .SetValue(meta, meta.Attributes.Append(owner).ToArray());
+        var profile = new Profile(
+            Profile.CurrentProfileVersion,
+            "owner-edit",
+            null,
+            42,
+            [
+                new ProfileTable("account", 10, new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["ownerid"] = new ConstantRule(
+                        new LookupRuleValue("systemuser", Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")).ToJson()),
+                }),
+            ]);
+
+        var report = ProfileImport.ValidateAgainstMetadata(
+            profile,
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = meta },
+            runId: "run-test");
+
+        Assert.Equal(0, report.AppliedRuleCount);
+        Assert.Contains(report.NotImported, n =>
+            n.Contains("ownerid", StringComparison.OrdinalIgnoreCase));
+    }
 }

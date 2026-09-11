@@ -1,5 +1,6 @@
 using DataGen.Core.Contracts;
 using Moq;
+using Seedbomb.Services.Connections;
 using Seedbomb.Services.Generation;
 using Seedbomb.ViewModels;
 using Xunit;
@@ -140,10 +141,11 @@ public sealed class RunViewModelTests
             Errors = [new BatchError("account", 2, "request throttled", -2147220956)],
         }, seed: 7, environmentHost: "contoso-dev", config: config);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => vm.RetrySelectedCommand.ExecuteAsync(null));
+        // Retry swallows cancellation and reports via ReportRunFailure — the bound command must not throw.
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
 
         Assert.Equal(1, prompted);
+        Assert.False(vm.IsRunning);
         gen.Verify(g => g.GenerateAsync(
             It.IsAny<GenerationConfig>(),
             It.IsAny<IProgress<ProgressUpdate>>(),
@@ -170,5 +172,143 @@ public sealed class RunViewModelTests
         vm.StartRun("contoso-dev", seed: 2, plannedTotal: 10, tables: ["account"]);
 
         Assert.Empty(vm.RecentActivity);
+    }
+
+    [Fact]
+    public async Task RetrySelected_WhenGenerationThrows_ReportsAndDoesNotPropagate()
+    {
+        var gen = new Mock<IWpfGenerationService>();
+        gen.SetupSequence(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(),
+                It.IsAny<IProgress<ProgressUpdate>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "request throttled", -2147220956)],
+            })
+            .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
+
+        var vm = new RunViewModel(generation: gen.Object);
+        await vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            },
+            "contoso-dev", ["account"], 1, TestContext.Current.CancellationToken);
+
+        // Must not throw: the summary page's primary button is bound straight to this command.
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsRunning);
+    }
+
+    [Fact]
+    public void ExportRejectedCsv_WritesToOverrideDirectory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dg-rejected", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var vm = new RunViewModel { ExportDirectoryOverride = root };
+            vm.ApplyResult(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "Duplicate key on emailaddress1", null)],
+            }, seed: 1, environmentHost: "contoso-dev");
+
+            vm.ExportRejectedCsvCommand.Execute(null);
+
+            var written = Assert.Single(Directory.GetFiles(root, "seedbomb-rejected-*.csv"));
+            Assert.Contains("Duplicate key on emailaddress1", File.ReadAllText(written), StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void ExportRejectedCsv_WhenDirectoryIsUnusable_DoesNotThrow()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dg-rejected", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var blocker = Path.Combine(root, "blocked");
+        File.WriteAllText(blocker, "");
+        try
+        {
+            var vm = new RunViewModel { ExportDirectoryOverride = blocker };
+            vm.ExportRejectedCsvCommand.Execute(null);   // must not throw
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void ApplyResult_SetsLastRunSucceeded_FromRejectionCount()
+    {
+        var clean = new RunViewModel();
+        clean.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [],
+        }, seed: 1, environmentHost: "contoso-dev");
+        Assert.True(clean.LastRunSucceeded);
+
+        var rejected = new RunViewModel();
+        rejected.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [new BatchError("account", 0, "Duplicate key on emailaddress1", null)],
+        }, seed: 1, environmentHost: "contoso-dev");
+        Assert.False(rejected.LastRunSucceeded);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithBlankHost_ResolvesTheConnectedEnvironmentHost()
+    {
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(),
+                It.IsAny<IProgress<ProgressUpdate>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [],
+            });
+
+        var connections = new Mock<IConnectionProfileService>();
+        connections.Setup(c => c.GetLastUsedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConnectionProfile { EnvironmentUrl = "https://contoso-uat.crm.dynamics.com" });
+
+        var vm = new RunViewModel(generation: gen.Object, connections: connections.Object);
+        await vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            },
+            environmentHost: "", ["account"], 1, TestContext.Current.CancellationToken);
+
+        Assert.Contains("contoso-uat.crm.dynamics.com", vm.RunDescription, StringComparison.Ordinal);
+        Assert.DoesNotContain("written to Dataverse", vm.RunDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StartRun_DoesNotPublishARejectedMetricTile()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 10, ["account"]);
+
+        Assert.Equal(3, vm.Metrics.Count);
+        Assert.DoesNotContain(vm.Metrics, m => m.Label == "Rejected");
     }
 }

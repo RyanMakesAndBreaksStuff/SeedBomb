@@ -4,7 +4,7 @@
 
     Every binding is an existing ConnectionManagerViewModel member: Profiles, SelectedProfile,
     EditingProfile, IsEditing, IsTesting, TestResult, TestSucceeded, IsSwitchingConnection,
-    SwitchError, HasSwitchError + the commands. DrawerCloseRequested is simply unused here.
+    SwitchError, HasSwitchError + the commands.
 -->
 <Page x:Class="Seedbomb.Views.Pages.ConnectionsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -196,7 +196,7 @@
                                             PlaceholderText="contoso-dev"
                                             FontFamily="{DynamicResource DG.Font.Mono}"
                                             Height="{DynamicResource DG.Size.Control}"
-                                            TextChanged="OnProfileFieldChanged" VerticalAlignment="Center" SelectionOpacity="0.5" VerticalContentAlignment="Center"/>
+                                            VerticalAlignment="Center" SelectionOpacity="0.5" VerticalContentAlignment="Center"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,0,0,14">
@@ -204,8 +204,7 @@
                                 <ui:TextBox Text="{Binding EditingProfile.EnvironmentUrl, UpdateSourceTrigger=PropertyChanged}"
                                             PlaceholderText="https://contoso-dev.crm.dynamics.com"
                                             FontFamily="{DynamicResource DG.Font.Mono}"
-                                            Height="{DynamicResource DG.Size.Control}"
-                                            TextChanged="OnProfileFieldChanged"/>
+                                            Height="{DynamicResource DG.Size.Control}"/>
                                 <TextBlock Style="{DynamicResource DG.Tertiary}"
                                            Foreground="{DynamicResource DG.Error}"
                                            Text="{Binding EnvironmentUrlError}"
@@ -218,8 +217,7 @@
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Application (client) ID"/>
                                 <ui:TextBox Text="{Binding EditingProfile.ClientId, UpdateSourceTrigger=PropertyChanged}"
                                             FontFamily="{DynamicResource DG.Font.Mono}"
-                                            Height="{DynamicResource DG.Size.Control}"
-                                            TextChanged="OnProfileFieldChanged"/>
+                                            Height="{DynamicResource DG.Size.Control}"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
                                     <TextBlock Style="{DynamicResource DG.Tertiary}"
                                                Text="Blank uses Microsoft's public client for Power Platform."/>
@@ -240,8 +238,7 @@
                             <StackPanel Margin="0,0,0,14">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Auth type"/>
                                 <ComboBox SelectedItem="{Binding EditingProfile.AuthType}"
-                                          ItemsSource="{Binding Source={x:Static conn:AuthTypeValues.All}}"
-                                          SelectionChanged="OnAuthTypeChanged"/>
+                                          ItemsSource="{Binding Source={x:Static conn:AuthTypeValues.All}}"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,0,0,14"
@@ -273,8 +270,7 @@
                                 <TextBlock Text="Certificate thumbprint" Style="{DynamicResource DG.GroupLabel}"/>
                                 <ui:TextBox Text="{Binding EditingProfile.CertificateThumbprint, UpdateSourceTrigger=PropertyChanged}"
                                             FontFamily="{DynamicResource DG.Font.Mono}"
-                                            Height="{DynamicResource DG.Size.Control}"
-                                            TextChanged="OnProfileFieldChanged"/>
+                                            Height="{DynamicResource DG.Size.Control}"/>
                                 <TextBlock Style="{DynamicResource DG.Secondary}"
                                            TextWrapping="Wrap"
                                            Margin="0,7,0,0"

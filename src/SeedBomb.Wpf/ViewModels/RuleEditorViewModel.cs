@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Text.Json;
 using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Exceptions;
 using DataGen.Core.Generators;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
@@ -13,85 +13,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
+using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
+using Seedbomb.ViewModels.Controls;
 using Seedbomb.Views.Pages;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
 
 namespace Seedbomb.ViewModels;
-
-/// <summary>One row in the column picker — settable or platform-owned-with-reason (§3.2).</summary>
-/// <param name="LogicalName">Attribute logical name.</param>
-/// <param name="DisplayName">User-facing label.</param>
-/// <param name="TypeLabel">Friendly type name shown in the picker row.</param>
-/// <param name="IsSelectable">True = eligible rule target.</param>
-/// <param name="DisabledReason">Copy shown when <paramref name="IsSelectable"/> is false; null when selectable.</param>
-public sealed record PickerColumn(string LogicalName, string DisplayName, string TypeLabel,
-    bool IsSelectable, string? DisabledReason)
-{
-    /// <summary>Handoff alias for <see cref="DisplayName"/>.</summary>
-    public string Name => DisplayName;
-
-    /// <summary>Handoff alias for <see cref="TypeLabel"/>.</summary>
-    public string TypeDetail => TypeLabel;
-
-    /// <summary>Mapped / Unmapped / Required / Disabled. XAML maps to DG.* — no Brush.</summary>
-    public string StateKey { get; init; } = "Unmapped";
-
-    /// <summary>CollectionView group: Mapped, Unmapped · required, or Unmapped.</summary>
-    public string GroupName { get; init; } = "Unmapped";
-
-    /// <summary>Group display rank — Mapped, Required, Unmapped, Disabled, in that order regardless of metadata order.</summary>
-    public int GroupOrder { get; init; }
-}
-
-/// <summary>One selectable operation chip in the rule editor (Mock F2 op cards).</summary>
-/// <param name="Op">Wire op id (<c>constant</c>, <c>oneOf</c>, …).</param>
-/// <param name="Title">Short label shown on the card.</param>
-/// <param name="Hint">One-line description under the title.</param>
-public sealed record OpOption(string Op, string Title, string Hint);
-
-/// <summary>Chip for Mapped / Required / All column filters.</summary>
-/// <param name="Key">Mapped, Required, or All.</param>
-/// <param name="Label">Chip label including count.</param>
-/// <param name="Count">Columns in this chip.</param>
-public sealed record ColumnFilterMode(string Key, string Label, int Count);
-
-/// <summary>One table in the Rules header switcher.</summary>
-/// <param name="LogicalName">Table logical name.</param>
-/// <param name="DisplayName">Label shown in the combo (logical name until metadata loads).</param>
-public sealed record RuleTableOption(string LogicalName, string DisplayName);
-
-/// <summary>One preview sample row. <see cref="ValueKind"/> is Blank or Value — no brush.</summary>
-/// <param name="DisplayValue">Rendered sample, or <c>— blank —</c>.</param>
-/// <param name="ValueKind">Blank or Value. XAML maps to DG.* — no Brush.</param>
-public sealed record PreviewRow(string DisplayValue, string ValueKind);
-
-/// <summary>Insertable pattern token chip.</summary>
-/// <param name="Name">Token text appended to the template, e.g. <c>{seq}</c>.</param>
-public sealed record TokenChip(string Name);
-
-/// <summary>One checkable option for a Choice/Two-Options <c>oneOf</c> rule.</summary>
-public sealed partial class OptionChoice : ObservableObject
-{
-    /// <summary>The option set value.</summary>
-    public int Value { get; }
-
-    /// <summary>The option's display label.</summary>
-    public string Label { get; }
-
-    [ObservableProperty]
-    private bool _isChecked;
-
-    /// <summary>Initialises the option.</summary>
-    public OptionChoice(int value, string label)
-    {
-        Value = value;
-        Label = label;
-    }
-}
 
 /// <summary>
 /// ViewModel for the rule editor dialog — the one place settable vs. platform-owned columns
@@ -110,38 +41,41 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private static readonly string[] NoOps = [];
 
     private readonly Dictionary<string, AttributeMetadata> _byName;
-    private readonly List<PickerColumn> _allSettable;
-    private readonly List<PickerColumn> _allExcluded;
-    // Settable + excluded, in metadata order — the one list ColumnsView wraps, so excluded
-    // (platform-owned) columns stay visible-but-disabled instead of silently disappearing (S3).
-    private readonly List<PickerColumn> _allColumns = [];
-    private readonly Dictionary<string, EntityMetadata> _entities = new(StringComparer.OrdinalIgnoreCase);
-    private readonly IMetadataProvider? _metadata;
+    private readonly RuleColumnCatalog _catalog = new();
+    private readonly RuleMetadataLoader? _loader;
     private readonly IProfileService? _profiles;
     private readonly IAppNavigator? _navigator;
     private readonly RulesNavigationRequest? _request;
     private readonly IContentDialogService? _dialogs;
     private readonly ISnackbarService? _snackbar;
     private readonly ILogger<RuleEditorViewModel>? _logger;
+    private readonly ILookupRecordPicker? _picker;
+    private readonly RulePreviewController _preview = new();
 
     private string _table;
     private int _recordCount;
     private int _seed;
     private string _runId;
-    private string _filterKey = "All";
-    private int _previewSalt;
     private bool _suppressTableChange;
     private Profile? _profile;
     private Action<Profile>? _onSaved;
     private Type? _returnPage;
 
     private IReadOnlyList<RuleMessage> _messages = [];
-    private IReadOnlyList<string> _previewValues = [];
     private FieldRule? _effectiveRule;
-    private bool _suppressBogusCascade;
-    private int _previewGeneration;
-    private CancellationTokenSource? _previewCts;
+    private bool _suppressDraftLoad;
+    private string? _lookupDraftError;
+    private int _editorGeneration;
+    private CancellationTokenSource? _pageCts;
+    private CancellationTokenSource? _pickerCts;
+    private SynchronizationContext? _uiContext;
     private HashSet<string> _errorProperties = [];
+
+    /// <summary>Lookup identity editor state for the selected column.</summary>
+    public LookupRuleInputViewModel LookupInput { get; }
+
+    /// <summary>Bogus catalog editor state for the selected column.</summary>
+    public BogusRuleInputViewModel BogusInput { get; }
 
     /// <summary>Initialises the editor from full live entity metadata (Task 9 supplies this via <c>IMetadataProvider</c>).</summary>
     /// <param name="meta">Full entity metadata — editor never derives columns from <c>EntitySummary</c> or creates a provider.</param>
@@ -149,22 +83,15 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <param name="seed">Generation seed — feeds the deterministic preview substream.</param>
     /// <param name="runId">Run id — feeds <c>{runId}</c> pattern expansion and its worst-case length.</param>
     public RuleEditorViewModel(EntityMetadata meta, int recordCount, int seed, string runId)
+        : this(recordCount, seed, runId)
     {
         ArgumentNullException.ThrowIfNull(meta);
         ArgumentNullException.ThrowIfNull(runId);
-
-        _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
-        _allSettable = [];
-        _allExcluded = [];
-        _table = string.Empty;
-        _recordCount = recordCount;
-        _seed = seed;
-        _runId = runId;
         ResetFromMetadata(meta);
+        IsMetadataAvailable = true;
     }
 
-    /// <summary>DI constructor for the Rules page. Call <see cref="LoadForProfileAsync"/> on navigate.</summary>
-    [ActivatorUtilitiesConstructor]
+    /// <summary>Test/page constructor. Call <see cref="LoadForProfileAsync"/> on navigate.</summary>
     public RuleEditorViewModel(
         IMetadataProvider metadata,
         IProfileService profiles,
@@ -172,22 +99,51 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         RulesNavigationRequest request,
         IContentDialogService? dialogs = null,
         ISnackbarService? snackbar = null,
-        ILogger<RuleEditorViewModel>? logger = null)
+        ILogger<RuleEditorViewModel>? logger = null,
+        ILookupRecordPicker? picker = null,
+        IDataverseConnectionService? connection = null)
+        : this(
+            new RuleMetadataLoader(metadata, connection),
+            profiles,
+            navigator,
+            request,
+            new RuleEditorServices(dialogs, snackbar, logger, picker))
     {
-        _metadata = metadata;
+    }
+
+    /// <summary>DI constructor for the Rules page. Call <see cref="LoadForProfileAsync"/> on navigate.</summary>
+    [ActivatorUtilitiesConstructor]
+    public RuleEditorViewModel(
+        RuleMetadataLoader metadata,
+        IProfileService profiles,
+        IAppNavigator navigator,
+        RulesNavigationRequest request,
+        RuleEditorServices services)
+        : this(10, 42, "rules-preview")
+    {
+        _loader = metadata;
         _profiles = profiles;
         _navigator = navigator;
         _request = request;
-        _dialogs = dialogs;
-        _snackbar = snackbar;
-        _logger = logger;
+        _dialogs = services.Dialogs;
+        _snackbar = services.Snackbar;
+        _logger = services.Logger;
+        _picker = services.Picker;
+    }
+
+    private RuleEditorViewModel(int recordCount, int seed, string runId)
+    {
         _byName = new Dictionary<string, AttributeMetadata>(StringComparer.OrdinalIgnoreCase);
-        _allSettable = [];
-        _allExcluded = [];
         _table = string.Empty;
-        _recordCount = 10;
-        _seed = 42;
-        _runId = "rules-preview";
+        _recordCount = recordCount;
+        _seed = seed;
+        _runId = runId;
+        LookupInput = new LookupRuleInputViewModel();
+        LookupInput.Changed += OnLookupInputChanged;
+        BogusInput = new BogusRuleInputViewModel();
+        BogusInput.Changed += OnBogusInputChanged;
+        BogusInput.PropertyChanged += OnBogusInputPropertyChanged;
+        _preview.Changed += OnPreviewChanged;
     }
 
     // ── Handoff aliases (lock 22) ────────────────────────────────────────────
@@ -198,9 +154,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         get => SearchText;
         set => SearchText = value;
     }
-
-    /// <summary>Handoff alias for <see cref="AvailableOps"/>.</summary>
-    public IReadOnlyList<string> AvailableOperations => AvailableOps;
 
     /// <summary>Handoff alias for <see cref="SelectedOp"/>.</summary>
     public string SelectedOperation
@@ -219,6 +172,42 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <summary>True when the selected op is <c>pattern</c> — shows the template block.</summary>
     public bool IsTemplateOperation => SelectedOp == "pattern";
 
+    /// <summary>True when the selected column is a lookup or customer attribute.</summary>
+    public bool IsLookupColumn =>
+        SelectedColumn is not null
+        && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
+        && attr is LookupAttributeMetadata;
+
+    /// <summary>True when constant/one-of identity editing is shown for a lookup column.</summary>
+    public bool IsLookupValueOperation =>
+        IsLookupColumn && SelectedOp is "constant" or "oneOf";
+
+    /// <summary>True when the lookup-random explanation is shown.</summary>
+    public bool IsLookupRandomOperation =>
+        IsLookupColumn && SelectedOp == "lookupRandom";
+
+    /// <summary>Run-time-only copy for lookupRandom preview. Interpolates the shared candidate bound.</summary>
+    public string LookupRandomExplanation =>
+        $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts.";
+
+    /// <summary>True when a metadata load failed and the page should show reconnect/retry guidance.</summary>
+    public bool HasMetadataError => !string.IsNullOrWhiteSpace(MetadataError);
+
+    /// <summary>True when live table metadata is loaded and save/picker may run.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _isMetadataAvailable;
+
+    /// <summary>True while table metadata is being fetched.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _isMetadataLoading;
+
+    /// <summary>Persistent reconnect/retry copy after a metadata or connection failure.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMetadataError))]
+    private string? _metadataError;
+
     // ── Page-scoped surface ──────────────────────────────────────────────────
 
     [ObservableProperty]
@@ -235,52 +224,27 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public ObservableCollection<RuleTableOption> Tables { get; } = [];
 
     /// <summary>Mapped / Required / All chips.</summary>
-    public ObservableCollection<ColumnFilterMode> ColumnFilterModes { get; } = [];
+    public ObservableCollection<ColumnFilterMode> ColumnFilterModes => _catalog.FilterModes;
 
     /// <summary>Live preview rows mapped from <see cref="PreviewValues"/>.</summary>
-    public ObservableCollection<PreviewRow> PreviewRows { get; } = [];
+    public ObservableCollection<PreviewRow> PreviewRows => _preview.Rows;
 
     /// <summary>Insertable pattern tokens.</summary>
     public ObservableCollection<TokenChip> AvailableTokens { get; } = [new("{seq}"), new("{runId}"), new("{n}")];
-
-    /// <summary>Collision strategies. Bind-only — Core has no FieldRule member (lock 16).</summary>
-    public IReadOnlyList<string> CollisionStrategies { get; } = ["Keep first"];
-
-    /// <summary>Case transforms. Bind-only — Core has no FieldRule member (lock 16).</summary>
-    public IReadOnlyList<string> CaseTransforms { get; } = ["None"];
-
-    [ObservableProperty]
-    private string _selectedCollisionStrategy = "Keep first";
-
-    [ObservableProperty]
-    private string _selectedCaseTransform = "None";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(BlankRateLabel))]
-    private bool _allowBlanks;
-
-    /// <summary>Derived AllowBlanks copy. Bind-only — no Core effect (lock 16).</summary>
-    public string BlankRateLabel => AllowBlanks ? "Leave blank for some rows" : "Never leave blank";
-
-    [ObservableProperty]
-    private bool _hasDependencyNote;
-
-    [ObservableProperty]
-    private string _dependencyNote = "";
 
     /// <summary>Preview pane footer — sampled from the table's planned row count.</summary>
     public string PreviewFooterLabel => $"Sampled from {_recordCount:N0} rows";
 
     /// <summary>Grouped view. Null after the metadata ctor — tests must not touch it.</summary>
-    public ICollectionView? ColumnsView { get; private set; }
+    public ICollectionView? ColumnsView => _catalog.ColumnsView;
 
     // ── Picker ────────────────────────────────────────────────────────────────
 
     /// <summary>Eligible rule targets (RuleEligibility.Classify == Settable), filtered by <see cref="SearchText"/>.</summary>
-    public IReadOnlyList<PickerColumn> SettableColumns => Filter(_allSettable);
+    public IReadOnlyList<PickerColumn> SettableColumns => _catalog.Settable(SearchText);
 
     /// <summary>Platform-owned columns, grouped and disabled with their reason; stays findable while excluded (S3).</summary>
-    public IReadOnlyList<PickerColumn> ExcludedColumns => Filter(_allExcluded);
+    public IReadOnlyList<PickerColumn> ExcludedColumns => _catalog.Excluded(SearchText);
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -313,29 +277,45 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// </summary>
     private void LoadDraftForColumn(PickerColumn? column)
     {
-        Options.Clear();
-        if (column is not null && _byName.TryGetValue(column.LogicalName, out var attr) && attr is EnumAttributeMetadata em)
+        CancelPicker();
+        _suppressDraftLoad = true;
+        try
         {
-            foreach (var opt in em.OptionSet?.Options ?? [])
+            Options.Clear();
+            AttributeMetadata? attr = null;
+            if (column is not null)
+                _byName.TryGetValue(column.LogicalName, out attr);
+
+            LookupInput.Configure(attr as LookupAttributeMetadata);
+            Pick = OneOfPick.Random;
+
+            if (attr is EnumAttributeMetadata em)
             {
-                if (opt.Value is int v)
+                foreach (var opt in em.OptionSet?.Options ?? [])
                 {
-                    var choice = new OptionChoice(v, opt.Label?.UserLocalizedLabel?.Label ?? v.ToString());
-                    choice.PropertyChanged += (_, _) => Revalidate();
-                    Options.Add(choice);
+                    if (opt.Value is int v)
+                    {
+                        var choice = new OptionChoice(v, opt.Label?.UserLocalizedLabel?.Label ?? v.ToString());
+                        choice.PropertyChanged += (_, _) => Revalidate();
+                        Options.Add(choice);
+                    }
                 }
             }
-        }
 
-        OnPropertyChanged(nameof(AvailableOps));
-        OnPropertyChanged(nameof(AvailableOpOptions));
-        OnPropertyChanged(nameof(AvailableOperations));
-        SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
-        if (column is not null
-            && TryGetProfileColumns(out var cols)
-            && cols.TryGetValue(column.LogicalName, out var existing))
+            OnPropertyChanged(nameof(AvailableOps));
+            OnPropertyChanged(nameof(AvailableOpOptions));
+            NotifyLookupPresentation();
+            SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
+            if (column is not null
+                && TryGetProfileColumns(out var cols)
+                && cols.TryGetValue(column.LogicalName, out var existing))
+            {
+                ApplyExistingRule(existing);
+            }
+        }
+        finally
         {
-            ApplyExistingRule(existing);
+            _suppressDraftLoad = false;
         }
 
         Revalidate();
@@ -363,27 +343,43 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     partial void OnSelectedOpChanged(string value)
     {
+        CancelPicker();
         OnPropertyChanged(nameof(SelectedOperation));
         OnPropertyChanged(nameof(IsTemplateOperation));
+        NotifyLookupPresentation();
+        if (_suppressDraftLoad)
+            return;
         if (value == "bogus")
-            RefreshBogusCatalogLists();
-        else if (!_suppressBogusCascade)
-            ClearBogusEditor();
+            BogusInput.RefreshCatalog(TryTargetKind(out var kind) ? kind : null);
+        else if (!BogusInput.IsSuppressing)
+            BogusInput.ClearEditor();
         Revalidate();
     }
 
-    [ObservableProperty] private IReadOnlyList<string> _bogusApis = [];
-    [ObservableProperty] private string? _selectedBogusApi;
-    [ObservableProperty] private IReadOnlyList<BogusEndpointOption> _bogusEndpoints = [];
-    [ObservableProperty] private string? _selectedBogusEndpoint;
-    [ObservableProperty] private bool _bogusHasNumericArgs;
-    [ObservableProperty] private bool _bogusHasLengthArg;
-    [ObservableProperty] private bool _bogusHasDateArgs;
-    [ObservableProperty] private string _bogusMinNumber = "";
-    [ObservableProperty] private string _bogusMaxNumber = "";
-    [ObservableProperty] private string _bogusLengthText = "";
-    [ObservableProperty] private DateTime? _bogusMinDate;
-    [ObservableProperty] private DateTime? _bogusMaxDate;
+    /// <summary>Bogus API names compatible with the selected column.</summary>
+    public IReadOnlyList<string> BogusApis { get => BogusInput.BogusApis; set => BogusInput.BogusApis = value; }
+    /// <summary>Selected Bogus API id, or null.</summary>
+    public string? SelectedBogusApi { get => BogusInput.SelectedBogusApi; set => BogusInput.SelectedBogusApi = value; }
+    /// <summary>Endpoints of <see cref="SelectedBogusApi"/> compatible with the selected column.</summary>
+    public IReadOnlyList<BogusEndpointOption> BogusEndpoints { get => BogusInput.BogusEndpoints; set => BogusInput.BogusEndpoints = value; }
+    /// <summary>Selected Bogus endpoint id (<c>API.endpoint</c>), or null.</summary>
+    public string? SelectedBogusEndpoint { get => BogusInput.SelectedBogusEndpoint; set => BogusInput.SelectedBogusEndpoint = value; }
+    /// <summary>True when the selected endpoint takes a numeric min/max.</summary>
+    public bool BogusHasNumericArgs { get => BogusInput.BogusHasNumericArgs; set => BogusInput.BogusHasNumericArgs = value; }
+    /// <summary>True when the selected endpoint takes a length argument.</summary>
+    public bool BogusHasLengthArg { get => BogusInput.BogusHasLengthArg; set => BogusInput.BogusHasLengthArg = value; }
+    /// <summary>True when the selected endpoint takes a date min/max.</summary>
+    public bool BogusHasDateArgs { get => BogusInput.BogusHasDateArgs; set => BogusInput.BogusHasDateArgs = value; }
+    /// <summary>Authored numeric minimum, or empty.</summary>
+    public string BogusMinNumber { get => BogusInput.BogusMinNumber; set => BogusInput.BogusMinNumber = value; }
+    /// <summary>Authored numeric maximum, or empty.</summary>
+    public string BogusMaxNumber { get => BogusInput.BogusMaxNumber; set => BogusInput.BogusMaxNumber = value; }
+    /// <summary>Authored length text, or empty.</summary>
+    public string BogusLengthText { get => BogusInput.BogusLengthText; set => BogusInput.BogusLengthText = value; }
+    /// <summary>Authored date minimum, or null.</summary>
+    public DateTime? BogusMinDate { get => BogusInput.BogusMinDate; set => BogusInput.BogusMinDate = value; }
+    /// <summary>Authored date maximum, or null.</summary>
+    public DateTime? BogusMaxDate { get => BogusInput.BogusMaxDate; set => BogusInput.BogusMaxDate = value; }
 
     /// <inheritdoc />
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
@@ -401,36 +397,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             .Select(m => m.Text)
             .ToList();
     }
-
-    partial void OnSelectedBogusApiChanged(string? value)
-    {
-        BogusEndpoints = value is null || !TryTargetKind(out var kind)
-            ? []
-            : BogusCatalogQuery.EndpointsFor(value, kind);
-        if (_suppressBogusCascade)
-            return;
-        SelectedBogusEndpoint = null;
-        ClearAllBogusArguments();
-        Revalidate();
-        NotifyCanSaveChanged();
-    }
-
-    partial void OnSelectedBogusEndpointChanged(string? value)
-    {
-        if (_suppressBogusCascade)
-            return;
-        ApplyArgumentVisibility(value);
-        if (value is null)
-            ClearAllBogusArguments();
-        Revalidate();
-        NotifyCanSaveChanged();
-    }
-
-    partial void OnBogusMinNumberChanged(string value) => Revalidate();
-    partial void OnBogusMaxNumberChanged(string value) => Revalidate();
-    partial void OnBogusLengthTextChanged(string value) => Revalidate();
-    partial void OnBogusMinDateChanged(DateTime? value) => Revalidate();
-    partial void OnBogusMaxDateChanged(DateTime? value) => Revalidate();
 
     [ObservableProperty]
     private string _constantText = string.Empty;
@@ -482,10 +448,14 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public bool InfoBarIsError => _messages.Any(m => m.Severity == RuleMessageSeverity.Error);
 
     /// <summary><see cref="RuleValueGenerator"/> output for rows 0..2 of the current effective rule.</summary>
-    public IReadOnlyList<string> PreviewValues => _previewValues;
+    public IReadOnlyList<string> PreviewValues => _preview.Values;
 
     /// <summary>True when a draft rule built and validated with no Error-severity message.</summary>
-    public bool CanSave => _effectiveRule is not null && !_messages.Any(m => m.Severity == RuleMessageSeverity.Error);
+    public bool CanSave =>
+        IsMetadataAvailable
+        && !IsMetadataLoading
+        && _effectiveRule is not null
+        && !_messages.Any(m => m.Severity == RuleMessageSeverity.Error);
 
     /// <summary>Returns the last-validated effective rule (clamped range, etc.), or null if nothing valid is drafted.</summary>
     public FieldRule? BuildRule() => _effectiveRule;
@@ -497,7 +467,52 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public void ApplyExistingRule(FieldRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
+        if (SelectedColumn is not null
+            && _byName.TryGetValue(SelectedColumn.LogicalName, out var lookupAttr)
+            && lookupAttr is LookupAttributeMetadata)
+        {
+            ApplyLookupRule(rule);
+            return;
+        }
 
+        ApplyScalarRule(rule);
+    }
+
+    private void ApplyLookupRule(FieldRule rule)
+    {
+        var previousSuppress = _suppressDraftLoad;
+        _suppressDraftLoad = true;
+        try
+        {
+            LookupInput.Restore(rule);
+            switch (rule)
+            {
+                case ConstantRule:
+                    SelectedOp = "constant";
+                    break;
+                case OneOfRule o:
+                    SelectedOp = "oneOf";
+                    Pick = o.Pick;
+                    break;
+                case NullRule:
+                    SelectedOp = "null";
+                    break;
+                case LookupRandomRule:
+                    SelectedOp = "lookupRandom";
+                    break;
+            }
+        }
+        finally
+        {
+            _suppressDraftLoad = previousSuppress;
+        }
+
+        if (!previousSuppress)
+            Revalidate();
+    }
+
+    private void ApplyScalarRule(FieldRule rule)
+    {
         switch (rule)
         {
             case ConstantRule c:
@@ -533,29 +548,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     }
 
     /// <summary>True when <paramref name="column"/> passes the active search + chip filter.</summary>
-    public bool MatchesColumnFilter(PickerColumn column)
-    {
-        ArgumentNullException.ThrowIfNull(column);
-
-        if (!string.IsNullOrWhiteSpace(SearchText)
-            && !column.LogicalName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-            && !column.DisplayName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return _filterKey switch
-        {
-            // Disabled (platform-owned) columns never belong to Required/Mapped — they're
-            // never actionable, so they'd only mislead the checklist those chips exist for.
-            "Required" => column.IsSelectable && IsRequired(column),
-            // Metadata ctor has no profile: keep settable columns visible so required-unmapped
-            // (and the rest of the picker) stay testable without a ColumnsView.
-            "Mapped" => column.IsSelectable && (IsMapped(column) || IsRequired(column) || _profile is null),
-            "Disabled" => !column.IsSelectable,
-            _ => true,
-        };
-    }
+    public bool MatchesColumnFilter(PickerColumn column) =>
+        _catalog.Matches(column, SearchText, IsRequired(column), IsMapped(column), _profile is not null);
 
     /// <summary>
     /// Reads <see cref="RulesNavigationRequest"/>, then loads tables + metadata.
@@ -572,35 +566,44 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         if (profile is null)
         {
-            _profile = null;
-            _onSaved = null;
-            ProfileName = "No profile selected";
-            _suppressTableChange = true;
-            try
-            {
-                Tables.Clear();
-                SelectedTable = null;
-            }
-            finally
-            {
-                _suppressTableChange = false;
-            }
-
-            SelectedColumn = null;
-            _allSettable.Clear();
-            _allExcluded.Clear();
-            _allColumns.Clear();
-            OnPropertyChanged(nameof(SettableColumns));
-            OnPropertyChanged(nameof(ExcludedColumns));
-            ColumnFilterModes.Clear();
-            ColumnsView = null;
-            OnPropertyChanged(nameof(ColumnsView));
-            NotifyCanSaveChanged();
+            ApplyMissingProfile();
             return;
         }
 
         ct.ThrowIfCancellationRequested();
+        ApplyProfileHeader(profile, tableName);
+        await ReloadMetadataAsync(ct);
+    }
 
+    private void ApplyMissingProfile()
+    {
+        _profile = null;
+        _onSaved = null;
+        ProfileName = "No profile selected";
+        _suppressTableChange = true;
+        try
+        {
+            Tables.Clear();
+            SelectedTable = null;
+        }
+        finally
+        {
+            _suppressTableChange = false;
+        }
+
+        SelectedColumn = null;
+        _catalog.Clear();
+        OnPropertyChanged(nameof(SettableColumns));
+        OnPropertyChanged(nameof(ExcludedColumns));
+        OnPropertyChanged(nameof(ColumnsView));
+        IsMetadataAvailable = false;
+        MetadataError = "No profile is loaded. Open a profile, then retry.";
+        NotifyCanSaveChanged();
+        RetryMetadataCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplyProfileHeader(Profile profile, string? tableName)
+    {
         _profile = profile;
         ProfileName = string.IsNullOrWhiteSpace(profile.Name) ? "Untitled" : profile.Name;
         if (profile.Seed is int seed)
@@ -622,86 +625,126 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             _suppressTableChange = false;
         }
 
-        if (SelectedTable is null || _metadata is null)
+        if (SelectedTable is not null)
+            ApplyTableCounts(SelectedTable.LogicalName);
+    }
+
+    private bool CanRetryMetadata() =>
+        _profile is not null && _loader is not null && !IsMetadataLoading;
+
+    /// <summary>Retries metadata load using the retained profile, save callback, and selected table.</summary>
+    [RelayCommand(CanExecute = nameof(CanRetryMetadata))]
+    private Task RetryMetadataAsync(CancellationToken ct) => ReloadMetadataAsync(ct);
+
+    private async Task ReloadMetadataAsync(CancellationToken ct)
+    {
+        if (_profile is null || _loader is null)
         {
-            NotifyCanSaveChanged();
+            SetMetadataUnavailable("No profile is loaded. Open a profile, then retry.");
             return;
         }
 
-        ApplyTableCounts(SelectedTable.LogicalName);
+        if (SelectedTable is null)
+        {
+            SetMetadataUnavailable("No table is selected. Choose a table, then retry.");
+            return;
+        }
 
-        var names = Tables.Select(t => t.LogicalName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        IReadOnlyList<EntityMetadata> list;
+        BeginMetadataLoad();
+        var result = await _loader.FetchAsync(
+            Tables.Select(t => t.LogicalName).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            _pageCts?.Token ?? CancellationToken.None,
+            ct);
         try
         {
-            list = await _metadata.GetEntitiesAsync(names, ct);
+            if (!_loader.IsCurrent(result.Generation) || result.IsCanceled)
+                return;
+            ApplyFetchResult(result);
         }
-        catch (SchemaException ex)
+        finally
         {
-            _logger?.LogError(ex, "Failed to load table metadata for the Rules page");
-            _snackbar?.Show("Couldn't load table metadata", ex.Message,
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(5));
+            if (_loader.IsCurrent(result.Generation))
+                FinishMetadataLoad();
+        }
+    }
+
+    private void BeginMetadataLoad()
+    {
+        IsMetadataLoading = true;
+        MetadataError = null;
+        NotifyReadyCommands();
+    }
+
+    private void FinishMetadataLoad()
+    {
+        IsMetadataLoading = false;
+        NotifyReadyCommands();
+    }
+
+    private void SetMetadataUnavailable(string message)
+    {
+        IsMetadataAvailable = false;
+        IsMetadataLoading = false;
+        MetadataError = message;
+        NotifyReadyCommands();
+    }
+
+    private void ApplyFetchResult(MetadataFetchResult result)
+    {
+        if (result.Exception is not null)
+        {
+            FailMetadata(result.Error ?? result.Exception.Message, result.Exception);
+            return;
+        }
+
+        if (_loader is null || SelectedTable is null || !_loader.TryGet(SelectedTable.LogicalName, out var meta))
+        {
+            IsMetadataAvailable = false;
+            MetadataError = "Table metadata was not returned. Reconnect and retry.";
             NotifyCanSaveChanged();
             return;
         }
 
-        _entities.Clear();
-        foreach (var entity in list)
-        {
-            if (entity.LogicalName is not null)
-                _entities[entity.LogicalName] = entity;
-        }
+        ApplyLoadedMetadata(meta);
+    }
 
-        if (!_entities.TryGetValue(SelectedTable.LogicalName, out var meta))
-        {
-            NotifyCanSaveChanged();
-            return;
-        }
-
+    private void ApplyLoadedMetadata(EntityMetadata meta)
+    {
+        var selectedName = SelectedColumn?.LogicalName;
         ResetFromMetadata(meta);
-
-        ColumnsView = CollectionViewSource.GetDefaultView(_allColumns);
-        ColumnsView.Filter = o => o is PickerColumn c && MatchesColumnFilter(c);
-        if (ColumnsView is CollectionView view)
-        {
-            using (view.DeferRefresh())
-            {
-                view.SortDescriptions.Clear();
-                view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
-                view.GroupDescriptions.Clear();
-                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
-            }
-        }
-
+        _catalog.BindView(MatchesColumnFilter);
         OnPropertyChanged(nameof(ColumnsView));
+        IsMetadataAvailable = true;
+        MetadataError = null;
+        if (selectedName is not null)
+            SelectedColumn = _catalog.Find(selectedName);
+
+        NotifyReadyCommands();
+    }
+
+    private void NotifyReadyCommands()
+    {
         NotifyCanSaveChanged();
+        RetryMetadataCommand.NotifyCanExecuteChanged();
+        PickLookupRecordsCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedTableChanged(RuleTableOption? value)
     {
+        CancelPicker();
         if (_suppressTableChange || value is null)
             return;
 
         ApplyTableCounts(value.LogicalName);
-        if (!_entities.TryGetValue(value.LogicalName, out var meta))
+        if (_loader is null || !_loader.TryGet(value.LogicalName, out var meta))
             return;
 
         SelectedColumn = null;
         ResetFromMetadata(meta);
-        if (ColumnsView is CollectionView grouped)
-        {
-            using (grouped.DeferRefresh())
-            {
-                grouped.SortDescriptions.Clear();
-                grouped.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
-                grouped.GroupDescriptions.Clear();
-                grouped.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
-            }
-        }
-
+        _catalog.ApplyGrouping();
         ColumnsView?.Refresh();
         OnPropertyChanged(nameof(PreviewFooterLabel));
-        SelectedColumn = _allSettable.FirstOrDefault();
+        SelectedColumn = _catalog.FirstSettable;
     }
 
     [RelayCommand]
@@ -710,18 +753,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (mode is null || string.IsNullOrWhiteSpace(mode.Key))
             return;
 
-        _filterKey = mode.Key;
-        if (ColumnsView is CollectionView view)
-        {
-            using (view.DeferRefresh())
-            {
-                view.SortDescriptions.Clear();
-                view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
-                view.GroupDescriptions.Clear();
-                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
-            }
-        }
-
+        _catalog.SetFilterKey(mode.Key);
+        _catalog.ApplyGrouping();
         ColumnsView?.Refresh();
     }
 
@@ -736,7 +769,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     [RelayCommand]
     private void RerollPreview()
     {
-        _previewSalt++;
+        _preview.Reroll();
         Revalidate();
     }
 
@@ -777,23 +810,20 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _profile = _profile with { Tables = tables };
 
         // Generate working-set snapshots are not in the store — callback only, no disk write.
-        var names = await _profiles.ListAsync(ct);
-        if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
-            await _profiles.SaveAsync(_profile, ct);
-
-        _onSaved?.Invoke(_profile);
-
-        if (_entities.TryGetValue(_table, out var meta))
+        try
         {
-            // ResetFromMetadata rebuilds every PickerColumn record; re-point SelectedColumn at its
-            // fresh instance by name or the ListBox loses its highlight when the mapped state flips.
-            var name = SelectedColumn.LogicalName;
-            ResetFromMetadata(meta);
-            ColumnsView?.Refresh();
-            SelectedColumn = _allColumns.FirstOrDefault(c =>
-                string.Equals(c.LogicalName, name, StringComparison.OrdinalIgnoreCase)) ?? SelectedColumn;
+            var names = await _profiles.ListAsync(ct);
+            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+                await _profiles.SaveAsync(_profile, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FailProfileStore("save", ex);
+            return false;
         }
 
+        _onSaved?.Invoke(_profile);
+        RefreshMappedColumn();
         return true;
     }
 
@@ -853,20 +883,32 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         tables[idx] = tables[idx] with { Columns = cols };
         _profile = _profile with { Tables = tables };
 
-        var names = await _profiles.ListAsync(ct);
-        if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
-            await _profiles.SaveAsync(_profile, ct);
+        try
+        {
+            var names = await _profiles.ListAsync(ct);
+            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+                await _profiles.SaveAsync(_profile, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FailProfileStore("delete", ex);
+            return;
+        }
 
         _onSaved?.Invoke(_profile);
+        RefreshMappedColumn();
+    }
 
-        if (_entities.TryGetValue(_table, out var meta))
-        {
-            var name = SelectedColumn.LogicalName;
-            ResetFromMetadata(meta);
-            ColumnsView?.Refresh();
-            SelectedColumn = _allColumns.FirstOrDefault(c =>
-                string.Equals(c.LogicalName, name, StringComparison.OrdinalIgnoreCase)) ?? SelectedColumn;
-        }
+    private void RefreshMappedColumn()
+    {
+        // ResetFromMetadata rebuilds every PickerColumn record; re-point SelectedColumn at its
+        // fresh instance by name or the ListBox loses its highlight when the mapped state flips.
+        if (_loader is null || SelectedColumn is null || !_loader.TryGet(_table, out var meta))
+            return;
+        var name = SelectedColumn.LogicalName;
+        ResetFromMetadata(meta);
+        ColumnsView?.Refresh();
+        SelectedColumn = _catalog.Find(name) ?? SelectedColumn;
     }
 
     private void ApplyOneOfValues(IReadOnlyList<JsonElement> values)
@@ -908,6 +950,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         "sequence" => new("sequence", "sequence", "start + step per row"),
         "null" => new("null", "null", "leave unset (platform default)"),
         "bogus" => new("bogus", "bogus", "generated by Bogus"),
+        "lookupRandom" => new(
+            "lookupRandom",
+            "random (existing records)",
+            $"up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target"),
         _ => new(op, op, string.Empty),
     };
 
@@ -935,7 +981,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
                 var draft = TryBuildDraft(attr, SelectedOp);
                 if (draft is null)
                 {
-                    messages.Add(new RuleMessage(RuleMessageSeverity.Error, "Enter a value for this rule."));
+                    messages.Add(new RuleMessage(
+                        RuleMessageSeverity.Error,
+                        _lookupDraftError ?? "Enter a value for this rule."));
                 }
                 else
                 {
@@ -959,33 +1007,24 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         SchedulePreview();
     }
 
-    private void RebuildPreviewRows()
+    private FieldRule? TryBuildDraft(AttributeMetadata attr, string op)
     {
-        PreviewRows.Clear();
-        foreach (var value in _previewValues)
+        if (attr is LookupAttributeMetadata)
+            return LookupInput.Build(op, Pick, out _lookupDraftError);
+
+        _lookupDraftError = null;
+        return op switch
         {
-            if (IsBlankPreview(value))
-                PreviewRows.Add(new PreviewRow("— blank —", "Blank"));
-            else
-                PreviewRows.Add(new PreviewRow(value, "Value"));
-        }
+            "constant" => TryConstantValue(attr, ConstantText, out var v) ? new ConstantRule(v) : null,
+            "oneOf" => TryOneOf(attr),
+            "range" => TryRange(attr),
+            "pattern" => string.IsNullOrEmpty(Template) ? null : new PatternRule(Template),
+            "sequence" => TrySequence(),
+            "null" => new NullRule(),
+            "bogus" => BogusInput.TryBuild(),
+            _ => null,
+        };
     }
-
-    private static bool IsBlankPreview(string value) =>
-        string.IsNullOrWhiteSpace(value)
-        || value is "(null)" or "(omitted)";
-
-    private FieldRule? TryBuildDraft(AttributeMetadata attr, string op) => op switch
-    {
-        "constant" => TryConstantValue(attr, ConstantText, out var v) ? new ConstantRule(v) : null,
-        "oneOf" => TryOneOf(attr),
-        "range" => TryRange(attr),
-        "pattern" => string.IsNullOrEmpty(Template) ? null : new PatternRule(Template),
-        "sequence" => TrySequence(),
-        "null" => new NullRule(),
-        "bogus" => TryBuildBogus(),
-        _ => null,
-    };
 
     private FieldRule? TryOneOf(AttributeMetadata attr)
     {
@@ -1047,95 +1086,15 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         }
     }
 
-    private static string FormatPreview(object? value)
-    {
-        if (value is null) return "(null)";
-        if (ReferenceEquals(value, RuleValueGenerator.Omit)) return "(omitted)";
-        return value switch
-        {
-            OptionSetValue osv => osv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            Money m => m.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty,
-        };
-    }
-
     // ── Picker copy (§3.2) ───────────────────────────────────────────────────
 
     private void ResetFromMetadata(EntityMetadata meta)
     {
         _table = meta.LogicalName ?? string.Empty;
-        var attrs = meta.Attributes ?? [];
-        _byName.Clear();
-        foreach (var attr in attrs.Where(a => a.LogicalName is not null))
-            _byName[attr.LogicalName!] = attr;
-
-        var altKeyAttrs = (meta.Keys ?? [])
-            .SelectMany(k => k.KeyAttributes ?? [])
-            .ToHashSet(StringComparer.Ordinal);
-
-        _allSettable.Clear();
-        _allExcluded.Clear();
-        _allColumns.Clear();
-        foreach (var attr in attrs)
-        {
-            var column = BuildPickerColumn(attr, altKeyAttrs);
-            (column.IsSelectable ? _allSettable : _allExcluded).Add(column);
-            _allColumns.Add(column);
-        }
-
-        RebuildFilterChips();
+        _catalog.Reset(meta, _byName, IsMappedName, IsRequired);
         OnPropertyChanged(nameof(SettableColumns));
         OnPropertyChanged(nameof(ExcludedColumns));
         OnPropertyChanged(nameof(PreviewFooterLabel));
-    }
-
-    private PickerColumn BuildPickerColumn(AttributeMetadata attr, ISet<string> altKeyAttrs)
-    {
-        var name = attr.LogicalName ?? string.Empty;
-        var display = attr.DisplayName?.UserLocalizedLabel?.Label ?? name;
-        var eligibility = RuleEligibility.Classify(attr);
-
-        var selectable = eligibility.IsSettable && !altKeyAttrs.Contains(name);
-        var disabledReason = eligibility.IsSettable && altKeyAttrs.Contains(name)
-            ? "Alternate key — rejected before generation begins."
-            : ReasonText(eligibility.Reason);
-
-        var required = IsRequiredLevel(attr);
-        var mapped = selectable && IsMappedName(name);
-        var (stateKey, groupName, groupOrder) = ResolveState(selectable, mapped, required);
-
-        return new PickerColumn(name, display, TypeLabelFor(attr), selectable, disabledReason)
-        {
-            StateKey = stateKey,
-            GroupName = groupName,
-            GroupOrder = groupOrder,
-        };
-    }
-
-    private static (string StateKey, string GroupName, int GroupOrder) ResolveState(bool selectable, bool mapped, bool required)
-    {
-        if (!selectable)
-            return ("Disabled", "Disabled", 3);
-        if (mapped)
-            return ("Mapped", "Mapped", 0);
-        if (required)
-            return ("Required", "Unmapped · required", 1);
-        return ("Unmapped", "Unmapped", 2);
-    }
-
-    private void RebuildFilterChips()
-    {
-        var mapped = _allSettable.Count(c => c.GroupName == "Mapped");
-        var required = _allSettable.Count(IsRequired);
-        var disabled = _allExcluded.Count;
-        // "All" now includes the Disabled group shown alongside them in ColumnsView (S3).
-        var all = _allColumns.Count;
-        ColumnFilterModes.Clear();
-        ColumnFilterModes.Add(new ColumnFilterMode("Mapped", $"Mapped ({mapped})", mapped));
-        ColumnFilterModes.Add(new ColumnFilterMode("Required", $"Required ({required})", required));
-        ColumnFilterModes.Add(new ColumnFilterMode("Disabled", $"Disabled ({disabled})", disabled));
-        ColumnFilterModes.Add(new ColumnFilterMode("All", $"All ({all})", all));
     }
 
     private void ApplyTableCounts(string tableName)
@@ -1148,10 +1107,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     }
 
     private bool IsRequired(PickerColumn column) =>
-        _byName.TryGetValue(column.LogicalName, out var attr) && IsRequiredLevel(attr);
-
-    private static bool IsRequiredLevel(AttributeMetadata attr) =>
-        attr.RequiredLevel?.Value is AttributeRequiredLevel.SystemRequired
+        _byName.TryGetValue(column.LogicalName, out var attr)
+        && attr.RequiredLevel?.Value is AttributeRequiredLevel.SystemRequired
             or AttributeRequiredLevel.ApplicationRequired;
 
     private bool IsMapped(PickerColumn column) => IsMappedName(column.LogicalName);
@@ -1170,48 +1127,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         return true;
     }
 
-    // Reason copy sourced verbatim from the XML doc comments on EligibilityReason
-    // (src/DataGen.Core/Rules/RuleEligibility.cs) — the authoritative §3.2 wording.
-    private static string? ReasonText(EligibilityReason reason) => reason switch
-    {
-        EligibilityReason.Settable => null,
-        EligibilityReason.PlatformKey => "Primary key — assigned by the platform.",
-        EligibilityReason.AutoNumber => "Auto-numbered by platform.",
-        EligibilityReason.Calculated => "Platform computes this value.",
-        EligibilityReason.BaseCurrency => "Derived from exchange rate.",
-        EligibilityReason.StateCode => "Platform-owned state — set Status (reason) instead.",
-        EligibilityReason.BpfBookkeeping => "Platform-owned state — set Status (reason) instead.",
-        EligibilityReason.BinaryUpload => "File/image — needs the upload API.",
-        EligibilityReason.Lookup => "Lookup — out of scope in v1.",
-        EligibilityReason.PolymorphicType => "Owner/Customer type — determined by its paired lookup value.",
-        EligibilityReason.NotCreatable => "Not valid for create.",
-        EligibilityReason.MultiSelectV2 => "MultiSelect — rule editing planned for v2.",
-        _ => reason.ToString(),
-    };
-
-    private static string TypeLabelFor(AttributeMetadata attr) => attr switch
-    {
-        StringAttributeMetadata => "Text",
-        MemoAttributeMetadata => "Memo",
-        IntegerAttributeMetadata => "Whole Number",
-        BigIntAttributeMetadata => "Big Integer",
-        DecimalAttributeMetadata => "Decimal",
-        DoubleAttributeMetadata => "Floating Point",
-        MoneyAttributeMetadata => "Money",
-        DateTimeAttributeMetadata => "Date/Time",
-        BooleanAttributeMetadata => "Two Options",
-        MultiSelectPicklistAttributeMetadata => "MultiSelect Choice",
-        StatusAttributeMetadata => "Status (reason)",
-        StateAttributeMetadata => "Status",
-        EnumAttributeMetadata => "Choice",
-        LookupAttributeMetadata => "Lookup",
-        UniqueIdentifierAttributeMetadata => "Unique Identifier",
-        ImageAttributeMetadata or FileAttributeMetadata => "File/Image",
-        _ => "Other",
-    };
-
     private static IReadOnlyList<string> OpsFor(AttributeMetadata attr)
     {
+        if (attr is LookupAttributeMetadata)
+            return RuleEligibility.Classify(attr).IsSettable
+                ? ["constant", "oneOf", "lookupRandom", "null"]
+                : NoOps;
+
         var ops = attr switch
         {
             StringAttributeMetadata or MemoAttributeMetadata => TextOps,
@@ -1228,21 +1150,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (TryMapKind(attr, out var kind) && BogusCatalogQuery.HasAny(kind))
             return [.. ops, "bogus"];
         return ops;
-    }
-
-    private void RefreshBogusCatalogLists()
-    {
-        if (!TryTargetKind(out var kind))
-        {
-            BogusApis = [];
-            BogusEndpoints = [];
-            return;
-        }
-
-        BogusApis = BogusCatalogQuery.ApisFor(kind);
-        BogusEndpoints = SelectedBogusApi is null
-            ? []
-            : BogusCatalogQuery.EndpointsFor(SelectedBogusApi, kind);
     }
 
     private bool TryTargetKind(out DataverseValueKind kind)
@@ -1292,225 +1199,44 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     private void RestoreBogus(BogusRule rule)
     {
-        _suppressBogusCascade = true;
+        var previous = _suppressDraftLoad;
+        _suppressDraftLoad = true;
         try
         {
             SelectedOp = "bogus";
-            RefreshBogusCatalogLists();
-            SelectedBogusApi = rule.Api;
-            if (TryTargetKind(out var kind))
-                BogusEndpoints = BogusCatalogQuery.EndpointsFor(rule.Api, kind);
-            SelectedBogusEndpoint = $"{rule.Api}.{rule.Endpoint}";
-            ApplyArgumentVisibility(SelectedBogusEndpoint);
-            RestoreBogusArguments(rule);
+            BogusInput.Restore(rule, TryTargetKind(out var kind) ? kind : null);
         }
         finally
         {
-            _suppressBogusCascade = false;
+            _suppressDraftLoad = previous;
         }
 
         Revalidate();
     }
 
-    private void RestoreBogusArguments(BogusRule rule)
+    private void OnBogusInputChanged(object? sender, EventArgs e)
     {
-        ClearAllBogusArguments();
-        if (rule.Args.TryGetValue("min", out var min))
-        {
-            if (BogusHasDateArgs && DateOnly.TryParse(min.GetString(), out var minDate))
-                BogusMinDate = minDate.ToDateTime(TimeOnly.MinValue);
-            else
-                BogusMinNumber = JsonElementToEditorText(min);
-        }
-
-        if (rule.Args.TryGetValue("max", out var max))
-        {
-            if (BogusHasDateArgs && DateOnly.TryParse(max.GetString(), out var maxDate))
-                BogusMaxDate = maxDate.ToDateTime(TimeOnly.MinValue);
-            else
-                BogusMaxNumber = JsonElementToEditorText(max);
-        }
-
-        if (rule.Args.TryGetValue("length", out var length))
-            BogusLengthText = JsonElementToEditorText(length);
+        if (!_suppressDraftLoad)
+            Revalidate();
     }
 
-    private FieldRule? TryBuildBogus()
+    private void OnBogusInputPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (string.IsNullOrEmpty(SelectedBogusApi) || string.IsNullOrEmpty(SelectedBogusEndpoint))
-            return null;
-
-        var dot = SelectedBogusEndpoint.LastIndexOf('.');
-        var endpoint = dot >= 0 ? SelectedBogusEndpoint[(dot + 1)..] : SelectedBogusEndpoint;
-        Dictionary<string, JsonElement>? args = null;
-        if (BogusHasNumericArgs)
-        {
-            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-            if (!string.IsNullOrWhiteSpace(BogusMinNumber)
-                && TryParseJsonNumber(BogusMinNumber, out var min))
-                args["min"] = min;
-            if (!string.IsNullOrWhiteSpace(BogusMaxNumber)
-                && TryParseJsonNumber(BogusMaxNumber, out var max))
-                args["max"] = max;
-            if (args.Count == 0)
-                args = null;
-        }
-        else if (BogusHasLengthArg && !string.IsNullOrWhiteSpace(BogusLengthText)
-                 && TryParseJsonNumber(BogusLengthText, out var length))
-        {
-            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal) { ["length"] = length };
-        }
-        else if (BogusHasDateArgs && BogusMinDate is { } minDate && BogusMaxDate is { } maxDate)
-        {
-            args = new Dictionary<string, JsonElement>(StringComparer.Ordinal)
-            {
-                ["min"] = JsonSerializer.SerializeToElement(DateOnly.FromDateTime(minDate).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
-                ["max"] = JsonSerializer.SerializeToElement(DateOnly.FromDateTime(maxDate).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
-            };
-        }
-
-        return new BogusRule(SelectedBogusApi, endpoint, 1, args);
-    }
-
-    private static bool TryParseJsonNumber(string text, out JsonElement element)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(text);
-            if (doc.RootElement.ValueKind == JsonValueKind.Number)
-            {
-                element = doc.RootElement.Clone();
-                return true;
-            }
-        }
-        catch (JsonException)
-        {
-            // Malformed text is handed to the validator via a string element.
-        }
-
-        element = JsonSerializer.SerializeToElement(text);
-        return true;
-    }
-
-    private void ApplyArgumentVisibility(string? endpointId)
-    {
-        var kind = BogusUiArgumentKind.None;
-        if (SelectedBogusApi is not null && endpointId is not null)
-        {
-            var dot = endpointId.LastIndexOf('.');
-            var endpoint = dot >= 0 ? endpointId[(dot + 1)..] : endpointId;
-            kind = BogusCatalogQuery.ArgumentKind(SelectedBogusApi, endpoint);
-        }
-
-        BogusHasNumericArgs = kind == BogusUiArgumentKind.NumericRange;
-        BogusHasLengthArg = kind == BogusUiArgumentKind.Length;
-        BogusHasDateArgs = kind == BogusUiArgumentKind.DateRange;
-    }
-
-    private void ClearBogusEditor()
-    {
-        _suppressBogusCascade = true;
-        try
-        {
-            SelectedBogusApi = null;
-            SelectedBogusEndpoint = null;
-            BogusApis = [];
-            BogusEndpoints = [];
-            ClearAllBogusArguments();
-            ApplyArgumentVisibility(null);
-        }
-        finally
-        {
-            _suppressBogusCascade = false;
-        }
-    }
-
-    private void ClearAllBogusArguments()
-    {
-        BogusMinNumber = "";
-        BogusMaxNumber = "";
-        BogusLengthText = "";
-        BogusMinDate = null;
-        BogusMaxDate = null;
+        if (!string.IsNullOrEmpty(e.PropertyName))
+            OnPropertyChanged(e.PropertyName);
     }
 
     private void SchedulePreview()
     {
-        var generation = Interlocked.Increment(ref _previewGeneration);
-        var effective = _effectiveRule;
-        var column = SelectedColumn;
-        if (effective is null
-            || column is null
-            || !_byName.TryGetValue(column.LogicalName, out var attr))
-        {
-            if (generation == _previewGeneration)
-                PublishPreview([]);
-            return;
-        }
-
-        _previewCts?.Cancel();
-        _previewCts?.Dispose();
-        _previewCts = new CancellationTokenSource();
-        var ct = _previewCts.Token;
-        var seed = _seed + _previewSalt;
-        var table = _table;
-        var runId = _runId;
-        var count = _recordCount;
-        _ = RunPreviewAsync(generation, effective, attr, seed, table, runId, count, ct);
+        AttributeMetadata? attr = null;
+        if (SelectedColumn is not null)
+            _byName.TryGetValue(SelectedColumn.LogicalName, out attr);
+        _preview.Schedule(
+            _effectiveRule, attr, _seed, _table, _runId, _recordCount, LookupRandomExplanation);
     }
 
-    private async Task RunPreviewAsync(
-        int generation,
-        FieldRule effective,
-        AttributeMetadata attr,
-        int seed,
-        string table,
-        string runId,
-        int recordCount,
-        CancellationToken ct)
-    {
-        try
-        {
-            await Task.Delay(150, ct);
-            if (generation != _previewGeneration)
-                return;
-
-            var preview = new List<string>(3);
-            var eval = new RuleEvaluationContext(table, seed, DeterministicFaker.DefaultLocale, runId, recordCount);
-            if (effective is BogusRule bogus)
-            {
-                var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
-                using var session = new BogusEvaluatorSession(eval.Locale);
-                for (var row = 0; row < 3; row++)
-                    preview.Add(FormatPreview(session.Evaluate(prepared, attr, eval, row)));
-            }
-            else
-            {
-                for (var row = 0; row < 3; row++)
-                    preview.Add(FormatPreview(RuleValueGenerator.Evaluate(effective, attr, seed, table, row, runId)));
-            }
-
-            if (generation != _previewGeneration)
-                return;
-            PublishPreview(preview);
-        }
-        catch (OperationCanceledException)
-        {
-            // superseded edit
-        }
-        catch (InvalidOperationException)
-        {
-            if (generation == _previewGeneration)
-                PublishPreview([]);
-        }
-    }
-
-    private void PublishPreview(IReadOnlyList<string> preview)
-    {
-        _previewValues = preview;
-        RebuildPreviewRows();
+    private void OnPreviewChanged(object? sender, EventArgs e) =>
         OnPropertyChanged(nameof(PreviewValues));
-    }
 
     private void PublishErrors()
     {
@@ -1543,10 +1269,165 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _ => nameof(SelectedOp),
     };
 
-    private IReadOnlyList<PickerColumn> Filter(List<PickerColumn> source) =>
-        string.IsNullOrWhiteSpace(SearchText)
-            ? source
-            : source.Where(c => c.LogicalName.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-                              || c.DisplayName.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+    /// <summary>Starts page lifetime: captures the UI context and listens for connection resets.</summary>
+    public void Activate()
+    {
+        _uiContext = SynchronizationContext.Current;
+        _pageCts?.Cancel();
+        _pageCts?.Dispose();
+        _pageCts = new CancellationTokenSource();
+        _loader?.SubscribeReset(OnConnectionReset);
+    }
+
+    /// <summary>Ends page lifetime and cancels picker, preview, and metadata work.</summary>
+    public void Deactivate()
+    {
+        _loader?.UnsubscribeReset(OnConnectionReset);
+        Interlocked.Increment(ref _editorGeneration);
+        _preview.Cancel();
+        _loader?.Cancel();
+        _pageCts?.Cancel();
+        _pickerCts?.Cancel();
+    }
+
+    private bool CanPickLookupRecords() =>
+        _picker is not null
+        && IsMetadataAvailable
+        && !IsMetadataLoading
+        && IsLookupValueOperation
+        && SelectedColumn is not null;
+
+    /// <summary>Opens the lookup record picker and replaces selection only after Add on the current column.</summary>
+    [RelayCommand(CanExecute = nameof(CanPickLookupRecords))]
+    private async Task PickLookupRecordsAsync(CancellationToken ct)
+    {
+        if (_picker is null
+            || SelectedColumn is null
+            || !_byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
+            || attr is not LookupAttributeMetadata lookup)
+            return;
+
+        var table = _table;
+        var column = SelectedColumn.LogicalName;
+        var op = SelectedOp;
+        var single = SelectedOp == "constant";
+
+        CancelPicker();
+        var generation = _editorGeneration;
+        _pickerCts = CancellationTokenSource.CreateLinkedTokenSource(_pageCts?.Token ?? CancellationToken.None, ct);
+        var token = _pickerCts.Token;
+
+        IReadOnlyList<LookupRuleValue>? result;
+        try
+        {
+            result = await _picker.PickAsync(lookup, LookupInput.Records.ToArray(), single, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (IsStalePickerResult(result, token, generation, table, column, op) || result is null)
+            return;
+        AcceptPickerSelection(column, result);
+    }
+
+    private bool IsStalePickerResult(
+        IReadOnlyList<LookupRuleValue>? result,
+        CancellationToken token,
+        int generation,
+        string table,
+        string column,
+        string op) =>
+        result is null
+        || token.IsCancellationRequested
+        || generation != _editorGeneration
+        || !string.Equals(table, _table, StringComparison.OrdinalIgnoreCase)
+        || SelectedColumn is null
+        || !string.Equals(column, SelectedColumn.LogicalName, StringComparison.OrdinalIgnoreCase)
+        || SelectedOp != op;
+
+    private void AcceptPickerSelection(string column, IReadOnlyList<LookupRuleValue> result)
+    {
+        if (!_byName.TryGetValue(column, out var currentAttr) || currentAttr is not LookupAttributeMetadata currentLookup)
+            return;
+
+        var accepted = new List<LookupRuleValue>(result.Count);
+        foreach (var value in result)
+        {
+            if (!LookupRuleValue.TryParse(value.ToJson(), currentLookup, out var parsed, out _) || parsed is null)
+                return;
+            accepted.Add(parsed);
+        }
+
+        LookupInput.ReplaceSelection(accepted);
+    }
+
+    private void OnLookupInputChanged(object? sender, EventArgs e)
+    {
+        if (!_suppressDraftLoad)
+            Revalidate();
+    }
+
+    private void NotifyLookupPresentation()
+    {
+        OnPropertyChanged(nameof(IsLookupColumn));
+        OnPropertyChanged(nameof(IsLookupValueOperation));
+        OnPropertyChanged(nameof(IsLookupRandomOperation));
+        PickLookupRecordsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void CancelPicker()
+    {
+        Interlocked.Increment(ref _editorGeneration);
+        _pickerCts?.Cancel();
+        _pickerCts?.Dispose();
+        _pickerCts = null;
+    }
+
+    private void OnConnectionReset(object? sender, EventArgs e)
+    {
+        InvalidateInFlightWork();
+        if (_uiContext is not null)
+            _uiContext.Post(_ => ApplyConnectionResetUi(), null);
+        else
+            ApplyConnectionResetUi();
+    }
+
+    private void InvalidateInFlightWork()
+    {
+        Interlocked.Increment(ref _editorGeneration);
+        _preview.Cancel();
+        _loader?.Cancel();
+        _pickerCts?.Cancel();
+    }
+
+    private void ApplyConnectionResetUi()
+    {
+        _loader?.ClearEntities();
+        IsMetadataAvailable = false;
+        IsMetadataLoading = false;
+        MetadataError = "Connection changed. Reconnect and retry to reload table metadata.";
+        _preview.Clear();
+        NotifyReadyCommands();
+    }
+
+    private void FailMetadata(string message, Exception ex)
+    {
+        RuleMetadataLoader.LogFailure(_logger, _snackbar, ex, message);
+        IsMetadataAvailable = false;
+        MetadataError = string.IsNullOrWhiteSpace(message)
+            ? "Couldn't load table metadata. Reconnect and retry."
+            : $"{message} Reconnect and retry.";
+        NotifyReadyCommands();
+    }
+
+    /// <summary>Routes a profile-store failure to the same banner + snackbar surface as <see cref="FailMetadata"/>.</summary>
+    private void FailProfileStore(string action, Exception ex)
+    {
+        _logger?.LogError(ex, "Failed to {Action} the rule profile", action);
+        _snackbar?.Show($"Couldn't {action} the rule", ex.Message,
+            ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
+        MetadataError = ex.Message;
+    }
 }
