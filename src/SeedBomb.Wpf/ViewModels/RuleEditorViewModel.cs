@@ -91,8 +91,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         IsMetadataAvailable = true;
     }
 
-    /// <summary>Test/page constructor. Call <see cref="LoadForProfileAsync"/> on navigate.</summary>
-    public RuleEditorViewModel(
+    /// <summary>Test convenience — wraps individual services into the DI types.</summary>
+    internal RuleEditorViewModel(
         IMetadataProvider metadata,
         IProfileService profiles,
         IAppNavigator navigator,
@@ -211,7 +211,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     // ── Page-scoped surface ──────────────────────────────────────────────────
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsWorkingSet))]
     private string _profileName = "Untitled";
+
+    /// <summary>True when the loaded profile is the in-memory working set, not a stored profile.</summary>
+    public bool IsWorkingSet => string.Equals(ProfileName, "working-set", StringComparison.Ordinal);
 
     /// <summary>Breadcrumb root. Generate when opened from the wizard; Profiles otherwise.</summary>
     public string BreadcrumbRootLabel =>
@@ -784,6 +788,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private void NotifyCanSaveChanged()
     {
         SaveProfileCommand.NotifyCanExecuteChanged();
+        SaveProfileAsCommand.NotifyCanExecuteChanged();
         SaveRuleCommand.NotifyCanExecuteChanged();
     }
 
@@ -834,8 +839,81 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     [RelayCommand(CanExecute = nameof(CanSaveProfile))]
     private async Task SaveProfileAsync(CancellationToken ct)
     {
+        // "working-set" isn't a stored profile — route to Save As so it always gets a real name.
+        if (IsWorkingSet)
+        {
+            await SaveProfileAsAsync(ct);
+            return;
+        }
+
         if (!await CommitSelectedColumnRuleAsync(ct))
             return;
+
+        if (_returnPage is not null)
+            _navigator?.Navigate(_returnPage);
+    }
+
+    /// <summary>Test seam for <see cref="AskProfileNameAsync"/> — bypasses the real dialog.</summary>
+    internal Func<string, Task<string?>>? PromptProfileName { get; set; }
+
+    private async Task<string?> AskProfileNameAsync(string suggested)
+    {
+        if (PromptProfileName is not null)
+            return await PromptProfileName(suggested);
+        if (_dialogs is null)
+            return null;
+
+        var box = new System.Windows.Controls.TextBox { Text = suggested };
+        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
+        {
+            Title = "Profile name",
+            Content = box,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+        });
+        return result == ContentDialogResult.Primary ? box.Text : null;
+    }
+
+    /// <summary>Prompts for a name and saves the current draft as a new profile, leaving the
+    /// original (if any) untouched.</summary>
+    [RelayCommand(CanExecute = nameof(CanSaveProfile))]
+    private async Task SaveProfileAsAsync(CancellationToken ct)
+    {
+        if (_profiles is null || _profile is null)
+            return;
+
+        var name = await AskProfileNameAsync(IsWorkingSet ? "" : ProfileName);
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        var tables = _profile.Tables.ToList();
+        var rule = BuildRule();
+        if (rule is not null && SelectedColumn is not null)
+        {
+            var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
+            if (idx >= 0)
+            {
+                var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+                cols[SelectedColumn.LogicalName] = rule;
+                tables[idx] = tables[idx] with { Columns = cols };
+            }
+        }
+
+        var newProfile = _profile with { Name = name, Tables = tables };
+        try
+        {
+            await _profiles.SaveAsync(newProfile, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FailProfileStore("save", ex);
+            return;
+        }
+
+        _profile = newProfile;
+        ProfileName = newProfile.Name;
+        _onSaved?.Invoke(newProfile);
+        RefreshMappedColumn();
 
         if (_returnPage is not null)
             _navigator?.Navigate(_returnPage);

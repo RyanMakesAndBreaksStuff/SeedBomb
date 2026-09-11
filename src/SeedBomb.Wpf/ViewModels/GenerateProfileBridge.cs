@@ -98,7 +98,10 @@ internal sealed class GenerateProfileBridge
         if (_rulesRequest is null)
             return false;
 
-        _rulesRequest.Profile = BuildProfileSnapshot("working-set");
+        _rulesRequest.Profile = BuildProfileSnapshot(
+            string.Equals(_owner.ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
+                ? "working-set"
+                : _owner.ActiveProfileName);
         _rulesRequest.TableName = _owner.SelectedEntities.FirstOrDefault()?.LogicalName;
         _rulesRequest.OnSaved = ApplySavedRulesProfile;
         _rulesRequest.ReturnPage = typeof(GeneratePage);
