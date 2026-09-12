@@ -140,11 +140,11 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
     }
 
     [Fact]
-    public void IsActiveAliasesIsLastUsed()
+    public void IsLastUsed_RoundTrips()
     {
         var profile = new ConnectionProfile { IsLastUsed = true };
-        Assert.True(profile.IsActive);
-        profile.IsActive = false;
+        Assert.True(profile.IsLastUsed);
+        profile.IsLastUsed = false;
         Assert.False(profile.IsLastUsed);
     }
 

@@ -71,17 +71,13 @@ public class GraphBuilder(ILogger<GraphBuilder> logger)
 
                     if (string.Equals(target, entityLogicalName, StringComparison.OrdinalIgnoreCase))
                     {
-                        // Self-referential — NOT a cycle
-                        graph.AddSelfReference(entityLogicalName);
-                        _logger.LogDebug("Self-reference detected: {Entity}.{Field}",
-                            entityLogicalName, lookup.LogicalName);
+                        // Self-referential — NOT a cycle, and not a graph edge.
+                        continue;
                     }
-                    else
-                    {
-                        graph.AddEdge(entityLogicalName, target);
-                        _logger.LogDebug("Edge added: {Source}.{Field} → {Target}",
-                            entityLogicalName, lookup.LogicalName, target);
-                    }
+
+                    graph.AddEdge(entityLogicalName, target);
+                    _logger.LogDebug("Edge added: {Source}.{Field} → {Target}",
+                        entityLogicalName, lookup.LogicalName, target);
                 }
             }
 
@@ -109,13 +105,11 @@ public class GraphBuilder(ILogger<GraphBuilder> logger)
         {
             var nodeCount = graph.Nodes.Count;
             var edgeCount = graph.Edges.Values.Sum(e => e.Count);
-            var selfRefCount = graph.SelfReferences.Count;
 
             _logger.LogInformation(
-                "Dependency graph built: {NodeCount} nodes, {EdgeCount} edges, {SelfRefCount} self-references",
+                "Dependency graph built: {NodeCount} nodes, {EdgeCount} edges",
                 nodeCount,
-                edgeCount,
-                selfRefCount);
+                edgeCount);
         }
 
         return graph;

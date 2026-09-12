@@ -10,7 +10,6 @@ public class DependencyGraph
 {
     private readonly Dictionary<string, HashSet<string>> _edges = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<DeferredLookup>> _deferredEdges = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _selfReferences = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<ManyToManyRelationship>> _relationships = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _nodes = new(StringComparer.OrdinalIgnoreCase);
 
@@ -31,12 +30,6 @@ public class DependencyGraph
             kvp => kvp.Key,
             kvp => (IReadOnlyList<DeferredLookup>)kvp.Value.AsReadOnly(),
             StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// Gets entities that reference themselves (e.g., parentaccountid on Account).
-    /// These are NOT cycles and are handled via hierarchical generation.
-    /// </summary>
-    public IReadOnlySet<string> SelfReferences => _selfReferences;
 
     /// <summary>
     /// Gets many-to-many relationships keyed by entity logical name.
@@ -96,15 +89,6 @@ public class DependencyGraph
         }
         deferred.Add(deferredLookup);
         _deferredEdgesCache = null;
-    }
-
-    /// <summary>
-    /// Marks an entity as self-referencing.
-    /// </summary>
-    /// <param name="entityLogicalName">The entity logical name.</param>
-    public void AddSelfReference(string entityLogicalName)
-    {
-        _selfReferences.Add(entityLogicalName);
     }
 
     /// <summary>

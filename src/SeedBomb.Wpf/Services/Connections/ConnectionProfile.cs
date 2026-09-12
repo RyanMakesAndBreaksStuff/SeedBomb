@@ -85,13 +85,6 @@ public sealed class ConnectionProfile : INotifyPropertyChanged
 
     /// <summary>Not persisted. Set by the VM to mark the currently active (last-used) profile.</summary>
     public bool IsLastUsed { get; set; }
-
-    /// <summary>Handoff alias for <see cref="IsLastUsed"/>.</summary>
-    public bool IsActive
-    {
-        get => IsLastUsed;
-        set => IsLastUsed = value;
-    }
 }
 
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>
@@ -100,14 +93,4 @@ public static class AuthTypeValues
     /// <summary>All authentication type options (Connections page editor).</summary>
     public static readonly AuthType[] All =
         [AuthType.OAuth, AuthType.ClientSecret, AuthType.Certificate];
-
-    /// <summary>Drawer quick-create is OAuth-only; app-only auth goes through ConnectionsPage.</summary>
-    public static readonly AuthType[] OAuthOnly = [AuthType.OAuth];
-}
-
-/// <summary>Provides all <see cref="EnvironmentType"/> values for binding to ComboBox.</summary>
-public static class EnvironmentTypeValues
-{
-    /// <summary>All environment type options.</summary>
-    public static readonly EnvironmentType[] All = [EnvironmentType.Development, EnvironmentType.Test, EnvironmentType.UAT, EnvironmentType.Production];
 }

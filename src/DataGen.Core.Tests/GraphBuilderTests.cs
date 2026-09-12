@@ -100,7 +100,7 @@ public class GraphBuilderTests
     }
 
     [Fact]
-    public void Build_SelfReferenceLookup_MarkedAsSelfReference()
+    public void Build_SelfTargetingLookup_NotAddedAsEdge()
     {
         var entities = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
         {
@@ -108,7 +108,6 @@ public class GraphBuilderTests
         };
         var graph = _builder.Build(entities);
 
-        Assert.Contains("account", graph.SelfReferences);
         Assert.Empty(graph.Edges["account"]);
     }
 

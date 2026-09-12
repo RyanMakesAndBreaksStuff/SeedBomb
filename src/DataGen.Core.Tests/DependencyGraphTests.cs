@@ -50,14 +50,6 @@ public class DependencyGraphTests
     }
 
     [Fact]
-    public void AddSelfReference_MarksEntity()
-    {
-        var graph = new DependencyGraph();
-        graph.AddSelfReference("account");
-        Assert.Contains("account", graph.SelfReferences);
-    }
-
-    [Fact]
     public void AddRelationship_AppearsOnBothEntities()
     {
         var graph = new DependencyGraph();

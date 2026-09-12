@@ -32,7 +32,7 @@
                                    Text="{Binding SelectedColumn.LogicalName}"
                                    TextTrimming="CharacterEllipsis"/>
                         <TextBlock Style="{DynamicResource DG.Mono}"
-                                   Text="{Binding SelectedColumn.TypeDetail}"
+                                   Text="{Binding SelectedColumn.TypeLabel}"
                                    Margin="0,3,0,0"/>
                         <TextBlock Style="{DynamicResource DG.Secondary}"
                                    Text="Choose how SeedBomb fills this column for every generated row."
