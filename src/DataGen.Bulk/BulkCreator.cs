@@ -336,17 +336,14 @@ public class BulkCreator : IBulkCreator
         }
 
         var batches = entities.Chunk(config.BatchSize).ToArray();
-        var useCreateMultiple = await _messageChecker
-            .IsCreateMultipleAvailableAsync(entityName, ct).ConfigureAwait(false);
 
         return await SubmitEntityBatchesAsync(
-            entityName, batches, useCreateMultiple, recordCount, config, effectiveDop, progress, ct).ConfigureAwait(false);
+            entityName, batches, recordCount, config, effectiveDop, progress, ct).ConfigureAwait(false);
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitEntityBatchesAsync(
         string entityName,
         Entity[][] batches,
-        bool useCreateMultiple,
         int recordCount,
         GenerationConfig config,
         int effectiveDop,
@@ -380,7 +377,7 @@ public class BulkCreator : IBulkCreator
                 try
                 {
                     (batchIds, batchErrors) = await SubmitBatchAsync(
-                        entityName, batch, useCreateMultiple, config.MaxRetries, innerCt).ConfigureAwait(false);
+                        entityName, batch, config.MaxRetries, innerCt).ConfigureAwait(false);
                 }
                 catch (DataGenerationException ex)
                 {
@@ -420,11 +417,13 @@ public class BulkCreator : IBulkCreator
     private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitBatchAsync(
         string entityName,
         Entity[] batch,
-        bool useCreateMultiple,
         int maxRetries,
         CancellationToken ct)
     {
-        if (useCreateMultiple)
+        // No availability pre-check: the sdkmessagefilter probe returned false positives, so the
+        // runtime rejection below is the authority. ShouldAttemptCreateMultiple only consults the
+        // in-memory cache so a rejected entity skips straight to ExecuteMultiple on later batches.
+        if (_messageChecker.ShouldAttemptCreateMultiple(entityName))
         {
             try
             {

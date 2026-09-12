@@ -3,6 +3,7 @@ using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.ServiceModel;
 
 namespace DataGen.Bulk.Tests;
 
@@ -13,7 +14,8 @@ public class BulkCreatorTests
     {
         var serviceMock = new Mock<IOrganizationServiceAsync2>();
 
-        // MessageAvailabilityChecker: default to ExecuteMultiple fallback (returns empty EntityCollection)
+        // RetrieveMultipleAsync serves only the UpdateMultiple probe (DeferredLookupBackfill);
+        // CreateMultiple availability is no longer probed.
         serviceMock
             .Setup(s => s.RetrieveMultipleAsync(It.IsAny<QueryBase>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EntityCollection());
@@ -236,6 +238,14 @@ public class BulkCreatorTests
             .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
             {
+                if (req is CreateMultipleRequest)
+                {
+                    // Runtime rejection (as for OOB tables like account): BulkCreator must catch
+                    // this, mark the entity, and fall back to ExecuteMultiple.
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) });
+                }
+
                 if (req is ExecuteMultipleRequest emr)
                 {
                     var responses = new ExecuteMultipleResponseItemCollection();

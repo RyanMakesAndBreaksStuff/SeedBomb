@@ -7,8 +7,8 @@ using System.Collections.Concurrent;
 namespace DataGen.Bulk;
 
 /// <summary>
-/// Checks and caches whether the CreateMultiple SDK message is available for a given entity.
-/// CreateMultiple is not supported for all out-of-the-box tables (e.g. Account, Contact).
+/// Checks and caches whether the UpdateMultiple SDK message is available for a given entity,
+/// and tracks which entities have rejected <c>CreateMultiple</c> at runtime.
 /// </summary>
 public class MessageAvailabilityChecker
 {
@@ -36,29 +36,15 @@ public class MessageAvailabilityChecker
         _cache[(entityLogicalName, "CreateMultiple")] = false;
 
     /// <summary>
-    /// Determines whether the <c>CreateMultiple</c> message is supported for the given entity.
-    /// Result is cached for the lifetime of this instance.
+    /// Determines whether <c>CreateMultiple</c> should still be attempted for the given entity.
+    /// Starts optimistic — the <c>sdkmessagefilter</c> probe this replaces returned false positives,
+    /// so the runtime rejection caught by <see cref="BulkCreator"/> (which calls
+    /// <see cref="MarkUnsupported"/>) is the only authority. In-memory only; no Dataverse round-trip.
     /// </summary>
     /// <param name="entityLogicalName">The entity logical name to check.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>True if CreateMultiple is supported; false if ExecuteMultiple fallback should be used.</returns>
-    public async Task<bool> IsCreateMultipleAvailableAsync(string entityLogicalName, CancellationToken ct = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(entityLogicalName);
-
-        var cacheKey = (entityLogicalName, "CreateMultiple");
-        if (_cache.TryGetValue(cacheKey, out var cached))
-        {
-            _logger.LogDebug("Cache hit for CreateMultiple availability: {Entity} = {Available}", entityLogicalName, cached);
-            return cached;
-        }
-
-        var available = await QueryMessageSupportAsync(entityLogicalName, "CreateMultiple", ct).ConfigureAwait(false);
-        _cache[cacheKey] = available;
-
-        _logger.LogInformation("CreateMultiple availability for {Entity}: {Available}", entityLogicalName, available);
-        return available;
-    }
+    /// <returns>True until the entity has rejected <c>CreateMultiple</c> at runtime.</returns>
+    public bool ShouldAttemptCreateMultiple(string entityLogicalName) =>
+        !_cache.TryGetValue((entityLogicalName, "CreateMultiple"), out var cached) || cached;
 
     /// <summary>
     /// Determines whether the <c>UpdateMultiple</c> message is supported for the given entity.
@@ -104,22 +90,14 @@ public class MessageAvailabilityChecker
             messageLink.LinkCriteria.AddCondition("name", ConditionOperator.Equal, messageName);
 
             var result = await _service.RetrieveMultipleAsync(query, ct).ConfigureAwait(false);
-
-            if (result.Entities.Count > 0 && result.Entities[0].Contains("primaryobjecttypecode"))
-            {
-                var rawOtc = result.Entities[0]["primaryobjecttypecode"];
-                _logger.LogDebug("sdkmessagefilter.primaryobjecttypecode raw for {Entity}: {RawValue} ({Type})",
-                    entityLogicalName, rawOtc, rawOtc?.GetType().Name ?? "null");
-            }
-
             return result.Entities.Count > 0;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // If we can't query, default to safe fallback (ExecuteMultiple works everywhere)
             _logger.LogWarning(ex,
-                "Failed to query CreateMultiple support for {Entity}; defaulting to ExecuteMultiple fallback.",
-                entityLogicalName);
+                "Failed to query {Message} support for {Entity}; defaulting to ExecuteMultiple fallback.",
+                messageName, entityLogicalName);
             return false;
         }
     }
