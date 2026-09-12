@@ -397,45 +397,23 @@ internal static class BogusCatalog
 public static class BogusCatalogQuery
 {
     /// <summary>Ordered distinct API IDs that have at least one endpoint compatible with <paramref name="target"/>.</summary>
-    public static IReadOnlyList<string> ApisFor(DataverseValueKind target)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var apis = new List<string>();
-        foreach (var d in BogusCatalog.All)
-        {
-            if (!BogusCatalog.Fits(d, target) || !seen.Add(d.Id.Api))
-                continue;
-            apis.Add(d.Id.Api);
-        }
-
-        return apis;
-    }
+    public static IReadOnlyList<string> ApisFor(DataverseValueKind target) =>
+        BogusCatalog.All
+            .Where(d => BogusCatalog.Fits(d, target))
+            .Select(d => d.Id.Api)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
 
     /// <summary>UI-ordered endpoints of <paramref name="api"/> that can produce <paramref name="target"/>.</summary>
-    public static IReadOnlyList<BogusEndpointOption> EndpointsFor(string api, DataverseValueKind target)
-    {
-        var options = new List<BogusEndpointOption>();
-        foreach (var d in BogusCatalog.All)
-        {
-            if (!string.Equals(d.Id.Api, api, StringComparison.Ordinal) || !BogusCatalog.Fits(d, target))
-                continue;
-            options.Add(new BogusEndpointOption(d.Id.ToString(), d.Id.Endpoint));
-        }
-
-        return options;
-    }
+    public static IReadOnlyList<BogusEndpointOption> EndpointsFor(string api, DataverseValueKind target) =>
+        BogusCatalog.All
+            .Where(d => string.Equals(d.Id.Api, api, StringComparison.Ordinal) && BogusCatalog.Fits(d, target))
+            .Select(d => new BogusEndpointOption(d.Id.ToString(), d.Id.Endpoint))
+            .ToList();
 
     /// <summary>True when any retained endpoint can produce <paramref name="target"/>.</summary>
-    public static bool HasAny(DataverseValueKind target)
-    {
-        foreach (var d in BogusCatalog.All)
-        {
-            if (BogusCatalog.Fits(d, target))
-                return true;
-        }
-
-        return false;
-    }
+    public static bool HasAny(DataverseValueKind target) =>
+        BogusCatalog.All.Any(d => BogusCatalog.Fits(d, target));
 
     /// <summary>True when the endpoint is retained and its risk class is not <c>None</c>.</summary>
     public static bool IsRisky(string api, string endpoint) =>

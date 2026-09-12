@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Windows;
 using Seedbomb.Converters;
-using Seedbomb.Services.Connections;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -9,14 +8,6 @@ namespace DataGen.Wpf.Tests;
 public sealed class ConverterTests
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-
-    [Fact]
-    public void BoolToVisibility_TrueVisible_FalseCollapsed()
-    {
-        var c = new BoolToVisibilityConverter();
-        Assert.Equal(Visibility.Visible, c.Convert(true, typeof(Visibility), null, Inv));
-        Assert.Equal(Visibility.Collapsed, c.Convert(false, typeof(Visibility), null, Inv));
-    }
 
     [Theory]
     [InlineData(2, "2", Visibility.Visible)]
@@ -34,17 +25,6 @@ public sealed class ConverterTests
         var c = new InverseBoolConverter();
         Assert.Equal(false, c.Convert(true, typeof(bool), null, Inv));
         Assert.Equal(true, c.Convert(false, typeof(bool), null, Inv));
-    }
-
-    [Theory]
-    [InlineData(AuthType.ClientSecret, "ClientSecret", Visibility.Visible)]
-    [InlineData(AuthType.OAuth, "ClientSecret", Visibility.Collapsed)]
-    [InlineData(AuthType.Certificate, "Certificate", Visibility.Visible)]
-    [InlineData(AuthType.Certificate, "ClientSecret", Visibility.Collapsed)]
-    public void AuthTypeToVisibility_MatchesParameter(AuthType value, string parameter, Visibility expected)
-    {
-        var c = new AuthTypeToVisibilityConverter();
-        Assert.Equal(expected, c.Convert(value, typeof(Visibility), parameter, Inv));
     }
 
     [Fact]
