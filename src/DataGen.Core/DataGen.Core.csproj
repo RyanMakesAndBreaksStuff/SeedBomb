@@ -3,7 +3,6 @@
     <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" />
     <PackageReference Include="Bogus" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
-    <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

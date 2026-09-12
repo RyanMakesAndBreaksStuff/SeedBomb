@@ -42,7 +42,7 @@ public sealed class SplashScreenAssetTests
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DataGen.sln")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SeedBomb.sln")))
             directory = directory.Parent;
         Assert.NotNull(directory);
         return File.ReadAllText(Path.Combine(directory.FullName, relativePath));
