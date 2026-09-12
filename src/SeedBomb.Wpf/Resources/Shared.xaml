@@ -13,9 +13,6 @@
     <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
     <converters:EqualityToBoolConverter x:Key="EqualityToBoolConverter" />
     <converters:AuthTypeToVisibilityConverter x:Key="AuthTypeToVisibility" />
-    <converters:TestResultStyleConverter x:Key="TestResultStyleConverter" />
-    <converters:TestResultGlyphConverter x:Key="TestResultGlyphConverter" />
-    <converters:TestResultBrushConverter x:Key="TestResultBrushConverter" />
     <converters:IdEqualsToVisibilityConverter x:Key="IdEqualsToVisibilityConverter" />
 
     <!-- ==================================================================

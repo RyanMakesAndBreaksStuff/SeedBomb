@@ -31,8 +31,23 @@
             style + glyph via the same slot. "Nothing was rolled back" is load-bearing copy —
             it is the first question every user asks.
         -->
-        <Border Grid.Row="1" Margin="0,20,0,0"
-                Style="{Binding LastRunSucceeded, Converter={StaticResource TestResultStyleConverter}}">
+        <Border Grid.Row="1" Margin="0,20,0,0">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="{DynamicResource DG.AccentSoft}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentSoftBorder}"/>
+                    <Setter Property="BorderThickness" Value="3,1,1,1"/>
+                    <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Panel}"/>
+                    <Setter Property="Padding" Value="14,12"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding LastRunSucceeded}" Value="False">
+                            <Setter Property="Background" Value="{DynamicResource DG.WarningSoft}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource DG.WarningBorder}"/>
+                            <Setter Property="Padding" Value="16,14"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>

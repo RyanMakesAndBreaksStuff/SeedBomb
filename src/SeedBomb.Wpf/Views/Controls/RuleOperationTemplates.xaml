@@ -2,8 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
-                    xmlns:rules="clr-namespace:DataGen.Core.Rules;assembly=DataGen.Core"
-                    xmlns:controls="clr-namespace:Seedbomb.Views.Controls">
+                    xmlns:rules="clr-namespace:DataGen.Core.Rules;assembly=DataGen.Core">
 
     <ObjectDataProvider x:Key="OneOfPickValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
         <ObjectDataProvider.MethodParameters>
@@ -297,14 +296,4 @@
             </Grid>
         </StackPanel>
     </DataTemplate>
-
-    <controls:RuleOperationTemplateSelector x:Key="RuleOperationTemplateSelector"
-                                            ConstantTemplate="{StaticResource ConstantOpTemplate}"
-                                            RangeTemplate="{StaticResource RangeOpTemplate}"
-                                            SequenceTemplate="{StaticResource SequenceOpTemplate}"
-                                            PatternTemplate="{StaticResource PatternOpTemplate}"
-                                            OneOfTemplate="{StaticResource OneOfOpTemplate}"
-                                            BogusTemplate="{StaticResource BogusOpTemplate}"
-                                            LookupRandomTemplate="{StaticResource LookupRandomOpTemplate}"
-                                            EmptyTemplate="{StaticResource EmptyOpTemplate}"/>
 </ResourceDictionary>
