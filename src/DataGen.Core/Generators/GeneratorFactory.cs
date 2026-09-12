@@ -1,7 +1,6 @@
 using Bogus;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
-using System.Collections.Concurrent;
 
 namespace DataGen.Core.Generators;
 
@@ -11,9 +10,20 @@ namespace DataGen.Core.Generators;
 /// </summary>
 public class GeneratorFactory
 {
-    private readonly Dictionary<Type, IFieldGenerator> _generators = new();
-    private readonly ConcurrentDictionary<Type, bool> _typeMatchCache = new();
     private readonly ILogger<GeneratorFactory> _logger;
+    private readonly StringFieldGenerator _string = new();
+    private readonly MoneyFieldGenerator _money = new();
+    private readonly PicklistFieldGenerator _picklist = new();
+    private readonly LookupFieldGenerator _lookup = new();
+    private readonly DateTimeFieldGenerator _dateTime = new();
+    private readonly MultiSelectPicklistFieldGenerator _multiSelectPicklist = new();
+    private readonly BooleanFieldGenerator _boolean = new();
+    private readonly IntegerFieldGenerator _integer = new();
+    private readonly DecimalFieldGenerator _decimal = new();
+    private readonly DoubleFieldGenerator _double = new();
+    private readonly MemoFieldGenerator _memo = new();
+    private readonly UniqueIdentifierFieldGenerator _uniqueIdentifier = new();
+    private readonly BigIntFieldGenerator _bigInt = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GeneratorFactory"/> class
@@ -23,31 +33,6 @@ public class GeneratorFactory
     public GeneratorFactory(ILogger<GeneratorFactory> logger)
     {
         _logger = logger;
-
-        RegisterGenerator<StringAttributeMetadata>(new StringFieldGenerator());
-        RegisterGenerator<MoneyAttributeMetadata>(new MoneyFieldGenerator());
-        RegisterGenerator<PicklistAttributeMetadata>(new PicklistFieldGenerator());
-        RegisterGenerator<LookupAttributeMetadata>(new LookupFieldGenerator());
-        RegisterGenerator<DateTimeAttributeMetadata>(new DateTimeFieldGenerator());
-        RegisterGenerator<MultiSelectPicklistAttributeMetadata>(new MultiSelectPicklistFieldGenerator());
-        RegisterGenerator<BooleanAttributeMetadata>(new BooleanFieldGenerator());
-        RegisterGenerator<IntegerAttributeMetadata>(new IntegerFieldGenerator());
-        RegisterGenerator<DecimalAttributeMetadata>(new DecimalFieldGenerator());
-        RegisterGenerator<DoubleAttributeMetadata>(new DoubleFieldGenerator());
-        RegisterGenerator<MemoAttributeMetadata>(new MemoFieldGenerator());
-        RegisterGenerator<UniqueIdentifierAttributeMetadata>(new UniqueIdentifierFieldGenerator());
-        RegisterGenerator<BigIntAttributeMetadata>(new BigIntFieldGenerator());
-    }
-
-    /// <summary>
-    /// Registers a field generator for a specific attribute metadata type.
-    /// </summary>
-    /// <typeparam name="TMetadata">The attribute metadata type to handle.</typeparam>
-    /// <param name="generator">The generator instance.</param>
-    public void RegisterGenerator<TMetadata>(IFieldGenerator generator) where TMetadata : AttributeMetadata
-    {
-        ArgumentNullException.ThrowIfNull(generator);
-        _generators[typeof(TMetadata)] = generator;
     }
 
     /// <summary>
@@ -63,32 +48,36 @@ public class GeneratorFactory
         ArgumentNullException.ThrowIfNull(faker);
         ArgumentNullException.ThrowIfNull(pool);
 
-        var type = attr.GetType();
-        if (_typeMatchCache.TryGetValue(type, out var hasMatch) && !hasMatch)
+        // Subtypes (MemoAttributeMetadata : StringAttributeMetadata,
+        // MultiSelectPicklistAttributeMetadata : PicklistAttributeMetadata) are matched
+        // before their base types — pattern order below is significant.
+        IFieldGenerator? generator = attr switch
+        {
+            MemoAttributeMetadata => _memo,
+            StringAttributeMetadata => _string,
+            MoneyAttributeMetadata => _money,
+            MultiSelectPicklistAttributeMetadata => _multiSelectPicklist,
+            PicklistAttributeMetadata => _picklist,
+            LookupAttributeMetadata => _lookup,
+            DateTimeAttributeMetadata => _dateTime,
+            BooleanAttributeMetadata => _boolean,
+            IntegerAttributeMetadata => _integer,
+            DecimalAttributeMetadata => _decimal,
+            DoubleAttributeMetadata => _double,
+            UniqueIdentifierAttributeMetadata => _uniqueIdentifier,
+            BigIntAttributeMetadata => _bigInt,
+            _ => null
+        };
+
+        if (generator is null)
         {
             _logger.LogDebug("No generator registered for {AttributeType}, skipping {FieldName}",
-                type.Name, attr.LogicalName);
+                attr.GetType().Name, attr.LogicalName);
             return null;
         }
 
-        // Walk inheritance chain to handle SDK subtype metadata (e.g. CustomerAttributeMetadata → LookupAttributeMetadata)
-        var current = type;
-        while (current != null && current != typeof(object))
-        {
-            if (_generators.TryGetValue(current, out var generator))
-            {
-                _logger.LogDebug("Generating value for {FieldName} using {GeneratorType} (matched via {MatchedType})",
-                    attr.LogicalName, generator.GetType().Name, current.Name);
-                _typeMatchCache[type] = true;
-                return generator.Generate(attr, faker, pool);
-            }
-            current = current.BaseType;
-        }
-
-        if (_typeMatchCache.TryAdd(type, false))
-            _logger.LogWarning("No generator registered for {AttributeType}, skipping {FieldName}", type.Name, attr.LogicalName);
-        else
-            _logger.LogDebug("No generator registered for {AttributeType}, skipping {FieldName}", type.Name, attr.LogicalName);
-        return null;
+        _logger.LogDebug("Generating value for {FieldName} using {GeneratorType}",
+            attr.LogicalName, generator.GetType().Name);
+        return generator.Generate(attr, faker, pool);
     }
 }

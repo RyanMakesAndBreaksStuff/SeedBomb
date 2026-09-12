@@ -68,20 +68,4 @@ public class GeneratorFactoryTests
         var attr = new StringAttributeMetadata { LogicalName = "name" };
         Assert.Throws<ArgumentNullException>(() => _factory.Generate(attr, _faker, null!));
     }
-
-    [Fact]
-    public void RegisterGenerator_OverrideExisting_UsesNewGenerator()
-    {
-        var factory = new GeneratorFactory(NullLogger<GeneratorFactory>.Instance);
-        var mockGenerator = new Mock<IFieldGenerator>();
-        mockGenerator.Setup(g => g.Generate(It.IsAny<AttributeMetadata>(), It.IsAny<Faker>(), It.IsAny<DataverseRecordPool>()))
-            .Returns("custom_value");
-
-        factory.RegisterGenerator<StringAttributeMetadata>(mockGenerator.Object);
-
-        var attr = new StringAttributeMetadata { LogicalName = "name" };
-        var result = factory.Generate(attr, _faker, _pool);
-
-        Assert.Equal("custom_value", result);
-    }
 }
