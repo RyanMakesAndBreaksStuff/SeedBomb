@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DataGen.Bulk;
 using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
 using Microsoft.Extensions.Logging;
@@ -14,16 +15,16 @@ public sealed class WpfGenerationService : IWpfGenerationService
     private static readonly TimeSpan ProgressGate = TimeSpan.FromMilliseconds(100);
 
     private readonly IDataverseConnectionService _conn;
-    private readonly IGenerationPipeline _generationPipeline;
+    private readonly GenerationPipeline _generationPipeline;
     private readonly ILogger<WpfGenerationService> _logger;
 
     /// <summary>Initialises the service.</summary>
     /// <param name="conn">Dataverse connection service.</param>
-    /// <param name="generationPipeline">Bulk/Core orchestration boundary.</param>
+    /// <param name="generationPipeline">Bulk/Core orchestration pipeline.</param>
     /// <param name="logger">Logger.</param>
     public WpfGenerationService(
         IDataverseConnectionService conn,
-        IGenerationPipeline generationPipeline,
+        GenerationPipeline generationPipeline,
         ILogger<WpfGenerationService> logger)
     {
         _conn = conn;
