@@ -374,13 +374,13 @@ public sealed class RuleEditorViewModelTests
     // Per-rule Save/Cancel/Delete (RulesPage Preview pane + config-panel "More" menu).
     private static async Task<(RuleEditorViewModel Vm, Mock<IAppNavigator> Navigator, Mock<IProfileService> Profiles, List<Profile> Saved)>
         LoadedEditorAsync(IReadOnlyList<string>? existingProfileNames = null, Type? returnPage = null,
-            Dictionary<string, FieldRule>? nameColumnRule = null)
+            Dictionary<string, FieldRule>? nameColumnRule = null, string profileName = "working-set")
     {
         var navigator = new Mock<IAppNavigator>();
         var saved = new List<Profile>();
         var request = new RulesNavigationRequest
         {
-            Profile = new Profile(1, "working-set", null, 42,
+            Profile = new Profile(1, profileName, null, 42,
                 [new ProfileTable("account", 10, nameColumnRule)]),
             TableName = "account",
             ReturnPage = returnPage,
@@ -430,7 +430,9 @@ public sealed class RuleEditorViewModelTests
     [Fact]
     public async Task SaveProfileCommand_still_navigates_after_commit()
     {
-        var (vm, navigator, _, saved) = await LoadedEditorAsync(returnPage: typeof(GeneratePage));
+        var (vm, navigator, _, saved) = await LoadedEditorAsync(
+            returnPage: typeof(GeneratePage), existingProfileNames: ["g2"], profileName: "g2");
+        // Not a working-set snapshot, so it saves back to its own name without prompting.
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
         vm.SelectedOp = "constant";
         vm.ConstantText = "fixed";
@@ -438,8 +440,42 @@ public sealed class RuleEditorViewModelTests
         await vm.SaveProfileCommand.ExecuteAsync(null);
 
         Assert.Single(saved);
+        Assert.Equal("g2", saved[0].Name);
         Assert.True(saved[0].Tables.Single(t => t.Table == "account").Columns!.ContainsKey("name"));
         navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveProfileCommand_on_working_set_prompts_for_name_and_saves_as_new_profile()
+    {
+        var (vm, navigator, _, saved) = await LoadedEditorAsync(returnPage: typeof(GeneratePage));
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+        vm.PromptProfileName = _ => Task.FromResult<string?>("new-profile");
+
+        await vm.SaveProfileCommand.ExecuteAsync(null);
+
+        Assert.Single(saved);
+        Assert.Equal("new-profile", saved[0].Name);
+        Assert.True(saved[0].Tables.Single(t => t.Table == "account").Columns!.ContainsKey("name"));
+        Assert.Equal("new-profile", vm.ProfileName);
+        navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveProfileAsCommand_cancelled_prompt_does_not_save_or_navigate()
+    {
+        var (vm, navigator, _, saved) = await LoadedEditorAsync(returnPage: typeof(GeneratePage));
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+        vm.PromptProfileName = _ => Task.FromResult<string?>(null);
+
+        await vm.SaveProfileAsCommand.ExecuteAsync(null);
+
+        Assert.Empty(saved);
+        navigator.Verify(n => n.Navigate(It.IsAny<Type>()), Times.Never);
     }
 
     [Fact]

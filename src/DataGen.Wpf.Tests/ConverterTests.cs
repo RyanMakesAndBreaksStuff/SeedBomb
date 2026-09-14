@@ -10,14 +10,6 @@ public sealed class ConverterTests
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-    [Fact]
-    public void BoolToVisibility_TrueVisible_FalseCollapsed()
-    {
-        var c = new BoolToVisibilityConverter();
-        Assert.Equal(Visibility.Visible, c.Convert(true, typeof(Visibility), null, Inv));
-        Assert.Equal(Visibility.Collapsed, c.Convert(false, typeof(Visibility), null, Inv));
-    }
-
     [Theory]
     [InlineData(2, "2", Visibility.Visible)]
     [InlineData(2, "3", Visibility.Collapsed)]

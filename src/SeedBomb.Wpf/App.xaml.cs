@@ -176,7 +176,7 @@ public partial class App : Application
         sc.AddTransient<Func<LookupRecordPickerViewModel>>(sp =>
             () => sp.GetRequiredService<LookupRecordPickerViewModel>());
         sc.AddTransient<ILookupRecordPicker, LookupRecordPickerService>();
-        sc.AddSingleton<IGenerationPipeline, GenerationPipeline>();
+        sc.AddSingleton<GenerationPipeline>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
         sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();
         sc.AddSingleton<IProfileService, JsonProfileService>();

@@ -1,5 +1,4 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Seedbomb.Services.Connections;
 
@@ -31,67 +30,45 @@ public enum EnvironmentType
 /// Represents a saved Dataverse connection configuration.
 /// Secrets are plaintext in memory; encrypted on disk via <see cref="JsonConnectionProfileService"/>.
 /// </summary>
-public sealed class ConnectionProfile : INotifyPropertyChanged
+public sealed partial class ConnectionProfile : ObservableObject
 {
-    private string _name = string.Empty;
-    private string _environmentUrl = string.Empty;
-    private EnvironmentType _environmentType;
-    private AuthType _authType = AuthType.OAuth;
-    private string _clientId = string.Empty;
-    private string _tenantId = string.Empty;
-    private string? _clientSecret;
-    private string? _certificateThumbprint;
-
-    /// <inheritdoc />
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     /// <summary>Unique identifier for this profile.</summary>
-    public Guid   Id              { get; init; }  = Guid.NewGuid();
+    public Guid Id { get; init; } = Guid.NewGuid();
 
     /// <summary>Display name shown in the connection picker.</summary>
-    public string Name { get => _name; set => Set(ref _name, value); }
+    [ObservableProperty]
+    private string _name = string.Empty;
 
     /// <summary>Dataverse environment URL, e.g. https://org.crm.dynamics.com.</summary>
-    public string EnvironmentUrl { get => _environmentUrl; set => Set(ref _environmentUrl, value); }
+    [ObservableProperty]
+    private string _environmentUrl = string.Empty;
 
     /// <summary>Environment tier classification.</summary>
-    public EnvironmentType EnvironmentType { get => _environmentType; set => Set(ref _environmentType, value); }
+    [ObservableProperty]
+    private EnvironmentType _environmentType;
 
     /// <summary>Authentication method used for this connection.</summary>
-    public AuthType AuthType { get => _authType; set => Set(ref _authType, value); }
+    [ObservableProperty]
+    private AuthType _authType = AuthType.OAuth;
 
     /// <summary>Azure AD application (client) ID. Used by all auth types.</summary>
-    public string ClientId { get => _clientId; set => Set(ref _clientId, value); }
+    [ObservableProperty]
+    private string _clientId = string.Empty;
 
     /// <summary>Azure AD tenant ID. Used by all auth types.</summary>
-    public string TenantId { get => _tenantId; set => Set(ref _tenantId, value); }
+    [ObservableProperty]
+    private string _tenantId = string.Empty;
 
     /// <summary>Client secret (plaintext). Used by <see cref="AuthType.ClientSecret"/> only.</summary>
-    public string? ClientSecret { get => _clientSecret; set => Set(ref _clientSecret, value); }
+    [ObservableProperty]
+    private string? _clientSecret;
 
     /// <summary>Certificate thumbprint in CurrentUser\My. Used by <see cref="AuthType.Certificate"/> only.</summary>
-    public string? CertificateThumbprint
-    {
-        get => _certificateThumbprint;
-        set => Set(ref _certificateThumbprint, value);
-    }
-
-    private void Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return;
-        field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
+    [ObservableProperty]
+    private string? _certificateThumbprint;
 
     /// <summary>Not persisted. Set by the VM to mark the currently active (last-used) profile.</summary>
     public bool IsLastUsed { get; set; }
-
-    /// <summary>Handoff alias for <see cref="IsLastUsed"/>.</summary>
-    public bool IsActive
-    {
-        get => IsLastUsed;
-        set => IsLastUsed = value;
-    }
 }
 
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>
@@ -100,14 +77,4 @@ public static class AuthTypeValues
     /// <summary>All authentication type options (Connections page editor).</summary>
     public static readonly AuthType[] All =
         [AuthType.OAuth, AuthType.ClientSecret, AuthType.Certificate];
-
-    /// <summary>Drawer quick-create is OAuth-only; app-only auth goes through ConnectionsPage.</summary>
-    public static readonly AuthType[] OAuthOnly = [AuthType.OAuth];
-}
-
-/// <summary>Provides all <see cref="EnvironmentType"/> values for binding to ComboBox.</summary>
-public static class EnvironmentTypeValues
-{
-    /// <summary>All environment type options.</summary>
-    public static readonly EnvironmentType[] All = [EnvironmentType.Development, EnvironmentType.Test, EnvironmentType.UAT, EnvironmentType.Production];
 }

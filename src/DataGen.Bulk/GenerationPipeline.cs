@@ -16,13 +16,22 @@ namespace DataGen.Bulk;
 /// <remarks>Initializes a new instance of the <see cref="GenerationPipeline"/> class.</remarks>
 /// <param name="metadata">Metadata provider reused across runs.</param>
 /// <param name="loggerFactory">Logger factory used for pipeline components.</param>
-public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactory loggerFactory) : IGenerationPipeline
+public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactory loggerFactory)
 {
     private readonly IMetadataProvider _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
     private readonly ILoggerFactory _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
     private readonly ILogger<GenerationPipeline> _logger = loggerFactory.CreateLogger<GenerationPipeline>();
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Executes a full generation run for the selected entities: loads metadata, builds and
+    /// topologically sorts the dependency graph, then bulk-creates records with deferred
+    /// lookup backfill.
+    /// </summary>
+    /// <param name="config">Generation configuration.</param>
+    /// <param name="service">Dataverse organization service used for write operations.</param>
+    /// <param name="progress">Optional progress reporter.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The completed generation result.</returns>
     public async Task<GenerationResult> GenerateAsync(
         GenerationConfig config,
         IOrganizationServiceAsync2 service,

@@ -361,17 +361,17 @@ public class DeferredLookupBackfillTests
     }
 
     [Fact]
-    public async Task BackfillLookupsAsync_ThrottleOnFirstAttempt_RetriesAndSucceeds()
+    public async Task BackfillLookupsAsync_TransientTimeoutOnFirstAttempt_RetriesAndSucceeds()
     {
         int callCount = 0;
-        var throttleFault = new FaultException<OrganizationServiceFault>(
-            new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Throttled" }, "Throttled");
 
         var mock = new Mock<IOrganizationServiceAsync2>();
         mock.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
-                if (Interlocked.Increment(ref callCount) == 1) throw throttleFault;
+                // Timeout is the transient fault ThrottlePolicy still retries; throttle faults
+                // are ServiceClient's job and are terminal by the time they surface here.
+                if (Interlocked.Increment(ref callCount) == 1) throw new TimeoutException("socket timeout");
                 return Task.FromResult<OrganizationResponse>(new ExecuteMultipleResponse
                 {
                     Results = new ParameterCollection

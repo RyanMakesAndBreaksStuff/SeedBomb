@@ -31,53 +31,47 @@ public class EdgeCaseValidator
         ArgumentNullException.ThrowIfNull(attr);
         ArgumentNullException.ThrowIfNull(entity);
 
-        var result = new FieldValidationResult { FieldLogicalName = attr.LogicalName ?? "unknown" };
+        var name = attr.LogicalName ?? "unknown";
 
         // 1. Calculated/Rollup/Formula — server-computed, skip
         if (attr is { SourceType: > 0 })
         {
-            result.Skip("Calculated/rollup/formula fields are auto-computed");
             _logger.LogDebug("Skipping {Field}: calculated/rollup/formula", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "Calculated/rollup/formula fields are auto-computed");
         }
 
         // 2. Auto-number — server-generated, skip
         if (attr is StringAttributeMetadata { AutoNumberFormat.Length: > 0 })
         {
-            result.Skip("Auto-number fields are server-generated");
             _logger.LogDebug("Skipping {Field}: auto-number", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "Auto-number fields are server-generated");
         }
 
         // 3. Base currency (*_base fields) — auto-calculated from exchange rates, skip
         if (attr.LogicalName?.EndsWith("_base", StringComparison.Ordinal) == true)
         {
-            result.Skip("Base currency fields are auto-calculated from exchange rates");
             _logger.LogDebug("Skipping {Field}: base currency", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "Base currency fields are auto-calculated from exchange rates");
         }
 
         // 4. File/Image columns — require chunked upload API, skip
         if (attr is ImageAttributeMetadata or FileAttributeMetadata)
         {
-            result.Skip("File/Image fields require dedicated upload API");
             _logger.LogDebug("Skipping {Field}: file/image column", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "File/Image fields require dedicated upload API");
         }
 
         // 5. Status/State — special handling (statecode should never be set on create)
         if (string.Equals(attr.LogicalName, "statecode", StringComparison.OrdinalIgnoreCase))
         {
-            result.Skip("statecode defaults to Active on create and should not be set");
             _logger.LogDebug("Skipping {Field}: statecode", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "statecode defaults to Active on create and should not be set");
         }
 
         if (string.Equals(attr.LogicalName, "statuscode", StringComparison.OrdinalIgnoreCase))
         {
-            result.Skip("statuscode must match statecode; Dataverse sets default on create");
             _logger.LogDebug("Skipping {Field}: statuscode", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "statuscode must match statecode; Dataverse sets default on create");
         }
 
         // 6. Picklist with no valid options — fail
@@ -85,71 +79,56 @@ public class EdgeCaseValidator
         {
             if (psMeta.OptionSet?.Options?.Count is null or 0)
             {
-                result.Fail("Picklist has no valid options");
                 _logger.LogDebug("Failed {Field}: picklist with no options", attr.LogicalName);
+                return new FieldValidationResult(name, FieldAction.Fail, "Picklist has no valid options");
             }
-            else
-            {
-                result.OK();
-            }
-            return result;
+            return new FieldValidationResult(name, FieldAction.Generate);
         }
 
         // 7. Multi-select option sets — special handling
         if (attr is MultiSelectPicklistAttributeMetadata msMeta)
         {
-            if (msMeta.OptionSet?.Options?.Count is null or 0)
-            {
-                result.Fail("Multi-select picklist has no valid options");
-            }
-            else
-            {
-                result.RequireSpecialHandling("MultiSelect");
-            }
-            return result;
+            return msMeta.OptionSet?.Options?.Count is null or 0
+                ? new FieldValidationResult(name, FieldAction.Fail, "Multi-select picklist has no valid options")
+                : new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "MultiSelect");
         }
 
         // 8. Currency fields — transactioncurrencyid is silently required for Money fields
         if (attr is MoneyAttributeMetadata)
         {
-            result.RequireSpecialHandling("CurrencyValidation");
             _logger.LogDebug("Special handling for {Field}: currency field", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "CurrencyValidation");
         }
 
         // 9. DateTime behavior — affects how values are stored and displayed
         if (attr is DateTimeAttributeMetadata dtMeta)
         {
             var behavior = dtMeta.DateTimeBehavior?.Value ?? "Unknown";
-            result.RequireSpecialHandling($"DateTime_{behavior}");
             _logger.LogDebug("Special handling for {Field}: datetime behavior {Behavior}", attr.LogicalName, behavior);
-            return result;
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: $"DateTime_{behavior}");
         }
 
         // 10. Alternate keys — need uniqueness guarantees
         if (entity.Keys?.Any(k => k.KeyAttributes?.Contains(attr.LogicalName) == true) == true)
         {
-            result.RequireSpecialHandling("AlternateKeyUniqueness");
             _logger.LogDebug("Special handling for {Field}: part of alternate key", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "AlternateKeyUniqueness");
         }
 
         // 11. Rich text fields — require HTML formatting
         if (attr is MemoAttributeMetadata memoMeta &&
             string.Equals(memoMeta.FormatName?.Value, "RichText", StringComparison.OrdinalIgnoreCase))
         {
-            result.RequireSpecialHandling("RichText");
             _logger.LogDebug("Special handling for {Field}: rich text memo", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "RichText");
         }
 
         // 12. UTC offset integers — Format metadata may be null but Dataverse validates against timezonedefinition; skip
         if (attr is IntegerAttributeMetadata &&
             attr.LogicalName?.EndsWith("utcoffset", StringComparison.OrdinalIgnoreCase) == true)
         {
-            result.Skip("UTC offset fields require valid timezone definition codes; optional address field");
             _logger.LogDebug("Skipping {Field}: utcoffset requires timezone definition lookup", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.Skip, "UTC offset fields require valid timezone definition codes; optional address field");
         }
 
         // 13. Owner-type lookups — ownerid is polymorphic (systemuser + team) but Dataverse
@@ -158,21 +137,18 @@ public class EdgeCaseValidator
         if (attr is LookupAttributeMetadata lookupMeta &&
             string.Equals(lookupMeta.LogicalName, "ownerid", StringComparison.OrdinalIgnoreCase))
         {
-            result.RequireSpecialHandling("OwnerLookup");
             _logger.LogDebug("Special handling for {Field}: owner lookup", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "OwnerLookup");
         }
 
         // 14. Polymorphic lookups — multiple possible target entities
         if (attr is LookupAttributeMetadata { Targets.Length: > 1 })
         {
-            result.RequireSpecialHandling("PolymorphicLookup");
             _logger.LogDebug("Special handling for {Field}: polymorphic lookup", attr.LogicalName);
-            return result;
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "PolymorphicLookup");
         }
 
         // Default: field is OK for normal generation
-        result.OK();
-        return result;
+        return new FieldValidationResult(name, FieldAction.Generate);
     }
 }

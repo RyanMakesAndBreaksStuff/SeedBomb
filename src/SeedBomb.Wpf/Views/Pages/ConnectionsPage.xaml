@@ -278,20 +278,43 @@
                             </StackPanel>
 
                             <!-- Test result. Success and failure share the slot; only the style differs. -->
-                            <Border Style="{Binding TestSucceeded,
-                                            Converter={StaticResource TestResultStyleConverter}}"
-                                    Visibility="{Binding TestResult,
+                            <Border Visibility="{Binding TestResult,
                                                  Converter={StaticResource NullToVisibilityConverter}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{DynamicResource DG.AccentSoft}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentSoftBorder}"/>
+                                        <Setter Property="BorderThickness" Value="3,1,1,1"/>
+                                        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Panel}"/>
+                                        <Setter Property="Padding" Value="14,12"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding TestSucceeded}" Value="False">
+                                                <Setter Property="Background" Value="{DynamicResource DG.WarningSoft}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource DG.WarningBorder}"/>
+                                                <Setter Property="Padding" Value="16,14"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <ui:SymbolIcon Grid.Column="0" FontSize="{DynamicResource DG.Type.Icon}" VerticalAlignment="Top"
-                                                   Symbol="{Binding TestSucceeded,
-                                                            Converter={StaticResource TestResultGlyphConverter}}"
-                                                   Foreground="{Binding TestSucceeded,
-                                                                Converter={StaticResource TestResultBrushConverter}}"/>
+                                    <ui:SymbolIcon Grid.Column="0" FontSize="{DynamicResource DG.Type.Icon}" VerticalAlignment="Top">
+                                        <ui:SymbolIcon.Style>
+                                            <Style TargetType="ui:SymbolIcon">
+                                                <Setter Property="Symbol" Value="CheckmarkCircle24"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding TestSucceeded}" Value="False">
+                                                        <Setter Property="Symbol" Value="Warning24"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Warning}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:SymbolIcon.Style>
+                                    </ui:SymbolIcon>
                                     <TextBlock Grid.Column="1" Style="{DynamicResource DG.Secondary}"
                                                Foreground="{DynamicResource DG.TextBody}"
                                                Text="{Binding TestResult}"

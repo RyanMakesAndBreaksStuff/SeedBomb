@@ -52,10 +52,16 @@
                       DisplayMemberPath="DisplayName"
                       AutomationProperties.Name="Table"/>
 
-            <Button Grid.Column="2" Style="{DynamicResource DG.PrimaryButton}"
-                    VerticalAlignment="Bottom"
-                    Command="{Binding SaveProfileCommand}"
-                    Content="Save profile"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                <Button Style="{DynamicResource DG.Button}"
+                        Margin="0,0,8,0"
+                        Command="{Binding SaveProfileCommand}"
+                        Content="Save profile"
+                        Visibility="{Binding IsWorkingSet, Converter={StaticResource InverseBoolToVisible}}"/>
+                <Button Style="{DynamicResource DG.PrimaryButton}"
+                        Command="{Binding SaveProfileAsCommand}"
+                        Content="Save profile as"/>
+            </StackPanel>
         </Grid>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,12">

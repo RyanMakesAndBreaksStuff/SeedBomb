@@ -11,6 +11,9 @@ using System.Windows.Threading;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Xrm.Sdk.Metadata;
+using Moq;
+using Seedbomb.Services.Auth;
+using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
@@ -21,6 +24,8 @@ using Wpf.Ui.Appearance;
 using ContentDialog = Wpf.Ui.Controls.ContentDialog;
 using ContentDialogButton = Wpf.Ui.Controls.ContentDialogButton;
 using ContentDialogHost = Wpf.Ui.Controls.ContentDialogHost;
+using SymbolIcon = Wpf.Ui.Controls.SymbolIcon;
+using SymbolRegular = Wpf.Ui.Controls.SymbolRegular;
 using Wpf.Ui.Markup;
 using Xunit;
 using Xunit.Sdk;
@@ -154,6 +159,61 @@ public sealed class RulesPageStaTests : IDisposable
         Flush();
         Assert.Equal("lookupRandom", combo.SelectedValue);
         Assert.Equal("lookupRandom", vm.SelectedOp);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void OperationPane_SwapsTemplateForEveryOperationKind()
+    {
+        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var content = FindVisualChildren<ContentControl>(page)
+            .Single(c => ReferenceEquals(c.Content, vm));
+
+        var templates = new HashSet<DataTemplate>();
+        foreach (var op in new[] { "constant", "range", "sequence", "pattern", "oneOf", "bogus", "lookupRandom" })
+        {
+            vm.SelectedOp = op;
+            Flush();
+            Assert.NotNull(content.ContentTemplate);
+            templates.Add(content.ContentTemplate);
+        }
+
+        Assert.Equal(7, templates.Count);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void ConnectionsTestResultBanner_SwapsBrushGlyphAndVisibility()
+    {
+        var (page, vm) = LoadConnectionsPageOnSta();
+
+        // Untested state: no TestResult → banner collapsed.
+        var marker = "banner-sta-" + Guid.NewGuid().ToString("N");
+        vm.TestResult = marker;
+        Flush();
+        var text = FindVisualChildren<TextBlock>(page).Single(t => t.Text == marker);
+        var banner = FindAncestor<Border>(text);
+        var glyph = FindVisualChildren<SymbolIcon>(banner).Single();
+
+        // Failed test → warning variant.
+        Assert.Equal(Visibility.Visible, banner.Visibility);
+        Assert.Equal(ExpectedColor("DG.WarningSoft"), ((SolidColorBrush)banner.Background).Color);
+        Assert.Equal(ExpectedColor("DG.WarningBorder"), ((SolidColorBrush)banner.BorderBrush).Color);
+        Assert.Equal(SymbolRegular.Warning24, glyph.Symbol);
+        Assert.Equal(ExpectedColor("DG.Warning"), ((SolidColorBrush)glyph.Foreground).Color);
+
+        // Successful test → accent/success variant.
+        vm.TestSucceeded = true;
+        Flush();
+        Assert.Equal(ExpectedColor("DG.AccentSoft"), ((SolidColorBrush)banner.Background).Color);
+        Assert.Equal(ExpectedColor("DG.AccentSoftBorder"), ((SolidColorBrush)banner.BorderBrush).Color);
+        Assert.Equal(SymbolRegular.CheckmarkCircle24, glyph.Symbol);
+        Assert.Equal(ExpectedColor("DG.Success"), ((SolidColorBrush)glyph.Foreground).Color);
+
+        // Cleared result → untested state collapses the banner again.
+        vm.TestResult = null;
+        Flush();
+        Assert.Equal(Visibility.Collapsed, banner.Visibility);
         Assert.Empty(CapturedBindingErrors);
     }
 
@@ -385,6 +445,21 @@ public sealed class RulesPageStaTests : IDisposable
         }
     }
 
+    private static T FindAncestor<T>(DependencyObject node) where T : DependencyObject
+    {
+        for (var current = VisualTreeHelper.GetParent(node); current is not null;
+             current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is T match)
+                return match;
+        }
+
+        throw new InvalidOperationException($"No {typeof(T).Name} ancestor of {node.GetType().Name}.");
+    }
+
+    private static Color ExpectedColor(string resourceKey) =>
+        Assert.IsType<SolidColorBrush>(Application.Current.TryFindResource(resourceKey)).Color;
+
     private static int CountGeneratedContainers(ItemsControl items)
     {
         var generated = 0;
@@ -439,6 +514,34 @@ public sealed class RulesPageStaTests : IDisposable
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == column.LogicalName);
 
         var page = new RulesPage(vm);
+        var window = new Window
+        {
+            Content = page,
+            Width = 1280,
+            Height = 800,
+            ShowInTaskbar = false,
+            ShowActivated = false,
+            WindowStyle = WindowStyle.ToolWindow,
+        };
+        _windows.Add(window);
+        window.Show();
+        page.UpdateLayout();
+        window.UpdateLayout();
+        Flush();
+        return (page, vm);
+    }
+
+    private (ConnectionsPage page, ConnectionManagerViewModel vm) LoadConnectionsPageOnSta()
+    {
+        EnsureApplication();
+        StartBindingTrace();
+        CapturedBindingErrors.Clear();
+
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(),
+            Mock.Of<IAuthService>(),
+            Mock.Of<IDataverseConnectionService>());
+        var page = new ConnectionsPage(vm);
         var window = new Window
         {
             Content = page,

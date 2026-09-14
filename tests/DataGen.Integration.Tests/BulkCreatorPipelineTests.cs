@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.ServiceModel;
 using DataGen.Core.Rules;
 
 namespace DataGen.Integration.Tests;
@@ -41,7 +42,7 @@ public class BulkCreatorPipelineTests
     {
         var mock = new Mock<IOrganizationServiceAsync2>();
 
-        // sdkmessagefilter query → indicates CreateMultiple support
+        // sdkmessagefilter query → serves the UpdateMultiple probe (DeferredLookupBackfill)
         var sdkFilterResult = new EntityCollection(
             supportsCreateMultiple ? [new Entity("sdkmessagefilter")] : []);
 
@@ -49,6 +50,24 @@ public class BulkCreatorPipelineTests
                 It.IsAny<Microsoft.Xrm.Sdk.Query.QueryBase>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(sdkFilterResult);
+
+        // CreateMultiple is attempted first; when the environment rejects it (OOB tables),
+        // the runtime fault drives the ExecuteMultiple fallback.
+        mock.Setup(s => s.ExecuteAsync(
+                It.Is<CreateMultipleRequest>(_ => true),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
+            {
+                if (!supportsCreateMultiple)
+                {
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) });
+                }
+
+                var cmr = (CreateMultipleRequest)req;
+                var ids = cmr.Targets.Entities.Select(_ => Guid.NewGuid()).ToArray();
+                return new CreateMultipleResponse { Results = { ["Ids"] = ids } };
+            });
 
         // ExecuteAsync for ExecuteMultiple
         mock.Setup(s => s.ExecuteAsync(
@@ -141,6 +160,13 @@ public class BulkCreatorPipelineTests
                 It.IsAny<Microsoft.Xrm.Sdk.Query.QueryBase>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new EntityCollection([]));
+
+        // CreateMultiple is rejected → batches flow through ExecuteMultiple
+        serviceMock.Setup(s => s.ExecuteAsync(
+                It.Is<CreateMultipleRequest>(_ => true),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) }));
 
         // Track which entity is being created by inspecting the request
         serviceMock.Setup(s => s.ExecuteAsync(
@@ -283,6 +309,12 @@ public class BulkCreatorPipelineTests
             .Setup(s => s.ExecuteAsync(It.Is<ExecuteMultipleRequest>(_ => true), It.IsAny<CancellationToken>()))
             .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
             {
+                if (req is CreateMultipleRequest)
+                {
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) });
+                }
+
                 var emr = (ExecuteMultipleRequest)req;
                 var responses = new ExecuteMultipleResponseItemCollection();
                 for (var i = 0; i < emr.Requests.Count; i++)
@@ -359,6 +391,13 @@ public class BulkCreatorPipelineTests
         service.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((OrganizationRequest request, CancellationToken _) =>
             {
+                if (request is CreateMultipleRequest)
+                {
+                    // Force the ExecuteMultiple transport for this variant
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) });
+                }
+
                 if (request is not ExecuteMultipleRequest batch) return new OrganizationResponse();
                 var responses = new ExecuteMultipleResponseItemCollection();
                 for (var i = 0; i < batch.Requests.Count; i++)
@@ -552,13 +591,19 @@ public class BulkCreatorPipelineTests
         var firstWrite = ops.IndexOf("write");
         Assert.True(ops.IndexOf("query:account") < firstWrite);
         Assert.DoesNotContain(ops.Skip(firstWrite), o => o == "query:account");
-        var createdSources = requests.OfType<CreateRequest>()
-            .Where(r => r.Target.LogicalName is "sourcea" or "sourceb")
-            .ToArray();
-        Assert.Equal(4, createdSources.Length);
-        Assert.All(createdSources, r =>
+        // Writes may flow through CreateMultiple or the ExecuteMultiple fallback; gather both.
+        IEnumerable<Entity> SourceRows(OrganizationRequest r) => r switch
         {
-            var reference = Assert.IsType<EntityReference>(r.Target["accountid"]);
+            CreateMultipleRequest cm => cm.Targets.Entities,
+            CreateRequest cr => [cr.Target],
+            _ => [],
+        };
+        var createdSourceEntities = requests.SelectMany(SourceRows)
+            .Where(e => e.LogicalName is "sourcea" or "sourceb").ToArray();
+        Assert.Equal(4, createdSourceEntities.Length);
+        Assert.All(createdSourceEntities, e =>
+        {
+            var reference = Assert.IsType<EntityReference>(e["accountid"]);
             Assert.Equal("account", reference.LogicalName);
             Assert.Equal(existingAccountId, reference.Id);
         });

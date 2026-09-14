@@ -2,6 +2,5 @@
   <ItemGroup>
     <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
     <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" />
-    <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
 </Project>

@@ -8,16 +8,12 @@ using System.ServiceModel;
 namespace DataGen.Bulk;
 
 /// <summary>
-/// Executes Dataverse API calls with automatic retry on transient throttle and timeout faults.
-/// Uses exponential backoff with jitter.
+/// Executes Dataverse API calls with automatic retry on transient timeout and network faults.
+/// Service-protection (throttle) faults are not retried here — <c>ServiceClient</c> already
+/// pauses and resends those itself before a fault ever surfaces. Uses exponential backoff with jitter.
 /// </summary>
 public class ThrottlePolicy
 {
-    // Dataverse service protection limit error codes
-    private const int ErrorCodeNumberOfRequests = -2147015902;
-    private const int ErrorCodeTimeLimitExceeded = -2147015903;
-    private const int ErrorCodeConcurrentRequests = -2147015898;
-
     private static readonly TimeSpan BaseDelay = TimeSpan.FromSeconds(2);
     private readonly ILogger<ThrottlePolicy> _logger;
 
@@ -31,7 +27,7 @@ public class ThrottlePolicy
     }
 
     /// <summary>
-    /// Executes an operation with retry on throttle and timeout faults.
+    /// Executes an operation with retry on transient timeout and network faults.
     /// </summary>
     /// <typeparam name="T">The return type of the operation.</typeparam>
     /// <param name="operation">The async operation to execute.</param>
@@ -60,18 +56,9 @@ public class ThrottlePolicy
             {
                 throw;
             }
-            catch (FaultException<OrganizationServiceFault> ex) when (IsThrottleFault(ex) && attempt < maxRetries)
-            {
-                // Retryable throttle fault on a non-final attempt — back off and retry
-                var delay = ComputeDelay(attempt, ex);
-                _logger.LogWarning(
-                    "Dataverse throttle fault for {Entity} (error {Code}) on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
-                    entityName, ex.Detail?.ErrorCode, attempt + 1, maxRetries, delay.TotalMilliseconds);
-                await Task.Delay(delay, ct).ConfigureAwait(false);
-            }
             catch (TimeoutException) when (attempt < maxRetries)
             {
-                var delay = ComputeDelay(attempt, null);
+                var delay = ComputeDelay(attempt);
                 _logger.LogWarning(
                     "Timeout for {Entity} on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
                     entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
@@ -79,17 +66,18 @@ public class ThrottlePolicy
             }
             catch (HttpRequestException) when (attempt < maxRetries)
             {
-                var delay = ComputeDelay(attempt, null);
+                var delay = ComputeDelay(attempt);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
             catch (IOException) when (attempt < maxRetries)
             {
-                var delay = ComputeDelay(attempt, null);
+                var delay = ComputeDelay(attempt);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
             catch (FaultException<OrganizationServiceFault> ex)
             {
-                // Non-throttle fault OR throttle fault on the final attempt — give up
+                // ServiceClient already pauses and resends on service-protection limits, so any
+                // fault that still surfaces is terminal — wrap it, don't retry it.
                 throw new DataGenerationException(
                     $"Batch creation failed for '{entityName}' on attempt {attempt + 1}: {ex.Detail?.Message ?? ex.Message}",
                     ex);
@@ -107,38 +95,11 @@ public class ThrottlePolicy
             $"Batch creation for '{entityName}' exhausted {maxRetries} retries with no result.");
     }
 
-    private static bool IsThrottleFault(FaultException<OrganizationServiceFault> ex)
-    {
-        if (ex.Detail is null) return false;
-        return ex.Detail.ErrorCode is
-            ErrorCodeNumberOfRequests or
-            ErrorCodeTimeLimitExceeded or
-            ErrorCodeConcurrentRequests;
-    }
-
-    private static TimeSpan ComputeDelay(int attempt, FaultException<OrganizationServiceFault>? ex)
+    private static TimeSpan ComputeDelay(int attempt)
     {
         var exponential = BaseDelay * Math.Pow(2, attempt);
         exponential = TimeSpan.FromSeconds(Math.Min(60, exponential.TotalSeconds));
         var jitter = TimeSpan.FromMilliseconds((Random.Shared.NextDouble() * 4000) - 2000);
-
-        if (ex?.Detail?.ErrorDetails?.TryGetValue("Retry-After", out var retryAfterObj) == true)
-        {
-            TimeSpan retryAfter;
-            if (retryAfterObj is TimeSpan ts)
-                retryAfter = ts;
-            else if (retryAfterObj is int seconds)
-                retryAfter = TimeSpan.FromSeconds(seconds);
-            else if (int.TryParse(retryAfterObj?.ToString(), out var s))
-                retryAfter = TimeSpan.FromSeconds(s);
-            else
-                retryAfter = TimeSpan.Zero;
-
-            // Retry-After and exponential are floors. Jitter may add wait, never subtract below either.
-            var floor = TimeSpan.FromTicks(Math.Max(exponential.Ticks, retryAfter.Ticks));
-            return floor + TimeSpan.FromMilliseconds(Math.Max(0, jitter.TotalMilliseconds));
-        }
-
         return exponential + jitter;
     }
 }

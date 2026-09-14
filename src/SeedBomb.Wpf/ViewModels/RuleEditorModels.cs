@@ -14,12 +14,6 @@ namespace Seedbomb.ViewModels;
 public sealed record PickerColumn(string LogicalName, string DisplayName, string TypeLabel,
     bool IsSelectable, string? DisabledReason)
 {
-    /// <summary>Handoff alias for <see cref="DisplayName"/>.</summary>
-    public string Name => DisplayName;
-
-    /// <summary>Handoff alias for <see cref="TypeLabel"/>.</summary>
-    public string TypeDetail => TypeLabel;
-
     /// <summary>Mapped / Unmapped / Required / Disabled. XAML maps to DG.* — no Brush.</summary>
     public string StateKey { get; init; } = "Unmapped";
 

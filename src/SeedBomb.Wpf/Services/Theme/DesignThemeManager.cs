@@ -281,7 +281,6 @@ public static class DesignThemeManager
 
             Success: successC,
             SuccessSoft: FromRgb(successTint),
-            SuccessBorder: WithAlpha(borderAlpha, successC),
             Warning: warnC,
             WarningSoft: FromRgb(warningTint),
             WarningBorder: WithAlpha(borderAlpha, warnC),
@@ -292,7 +291,6 @@ public static class DesignThemeManager
             // Neither sheet ships an info hue — both draw the info banner in accent tint.
             Info: accentC,
             InfoSoft: tintC,
-            InfoBorder: tintStrokeC,
 
             Energy: FromRgb(energyFill),
             Series1: FromRgb(s1), Series2: FromRgb(s2), Series3: FromRgb(s3),
@@ -409,7 +407,6 @@ public static class DesignThemeManager
         Color SelectionIndicator,
         Color Success,
         Color SuccessSoft,
-        Color SuccessBorder,
         Color Warning,
         Color WarningSoft,
         Color WarningBorder,
@@ -419,7 +416,6 @@ public static class DesignThemeManager
         Color ErrorBorder,
         Color Info,
         Color InfoSoft,
-        Color InfoBorder,
         Color Energy,
         Color Series1,
         Color Series2,

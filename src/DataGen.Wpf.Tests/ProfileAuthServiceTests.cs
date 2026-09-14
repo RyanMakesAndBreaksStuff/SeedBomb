@@ -56,14 +56,6 @@ public sealed class ProfileAuthServiceTests
             AuthTypeValues.All);
     }
 
-    [Fact]
-    public void AuthTypeValuesOAuthOnlyIsDrawerQuickCreateList()
-    {
-        Assert.Equal([AuthType.OAuth], AuthTypeValues.OAuthOnly);
-        Assert.DoesNotContain(AuthType.ClientSecret, AuthTypeValues.OAuthOnly);
-        Assert.DoesNotContain(AuthType.Certificate, AuthTypeValues.OAuthOnly);
-    }
-
     // Vacuous on empty cache: ProfileAuthService has no public seed for _clients.
     // Asserting HasNoCachedClients after a real sign-in is manual verification only.
     [Fact]

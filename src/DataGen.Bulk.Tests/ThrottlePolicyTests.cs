@@ -20,44 +20,6 @@ public class ThrottlePolicyTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_FailsOnceWithThrottleFault_RetriesAndSucceeds()
-    {
-        int callCount = 0;
-        var throttleFault = new FaultException<OrganizationServiceFault>(
-            new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Too many requests" },
-            "Throttled");
-
-        var result = await _policy.ExecuteAsync(
-            () =>
-            {
-                callCount++;
-                if (callCount == 1) throw throttleFault;
-                return Task.FromResult("success");
-            },
-            "account",
-            maxRetries: 3,
-            CancellationToken.None);
-
-        Assert.Equal("success", result);
-        Assert.Equal(2, callCount);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_ExceedsMaxRetries_ThrowsDataGenerationException()
-    {
-        var throttleFault = new FaultException<OrganizationServiceFault>(
-            new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Too many requests" },
-            "Throttled");
-
-        await Assert.ThrowsAsync<DataGenerationException>(() =>
-            _policy.ExecuteAsync<string>(
-                () => throw throttleFault,
-                "account",
-                maxRetries: 1,
-                CancellationToken.None));
-    }
-
-    [Fact]
     public async Task ExecuteAsync_NonThrottleFault_RethrowsAfterMaxRetries()
     {
         // A non-throttle fault (e.g. validation error) should NOT be retried
@@ -74,6 +36,51 @@ public class ThrottlePolicyTests
                 CancellationToken.None));
 
         Assert.Contains("account", ex.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThrottleFault_IsNotRetriedByPolicy()
+    {
+        // ServiceClient already pauses and resends on service-protection codes before a fault
+        // ever surfaces, so if one still reaches the policy it is terminal: wrap immediately.
+        var throttleFault = new FaultException<OrganizationServiceFault>(
+            new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Too many requests" },
+            "Throttled");
+
+        var callCount = 0;
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            _policy.ExecuteAsync<int>(
+                () =>
+                {
+                    callCount++;
+                    throw throttleFault;
+                },
+                "account",
+                maxRetries: 3,
+                CancellationToken.None));
+
+        Assert.Equal(1, callCount);
+        Assert.Same(throttleFault, ex.InnerException);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TimeoutFault_RetriesAndSucceeds()
+    {
+        var callCount = 0;
+
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1) throw new TimeoutException("socket timeout");
+                return Task.FromResult("success");
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
     }
 
     [Fact]
@@ -120,45 +127,5 @@ public class ThrottlePolicyTests
                 results.Add(result);
             });
         Assert.Equal(40, results.Count);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_HonorsRetryAfterHeader_WhenPresent()
-    {
-        // Arrange — fault with Retry-After: 4 seconds.
-        // BaseDelay=2s, attempt=0 → exponential=2s; 4s > 2s so Retry-After wins.
-        // Without the fix, max delay would be ~3s (2s + 1s jitter); with it, floor is 4s.
-        var fault = new OrganizationServiceFault
-        {
-            ErrorCode = -2147015902, // NumberOfRequests throttle code
-            Message = "Too many requests"
-        };
-        fault.ErrorDetails["Retry-After"] = 4; // 4 seconds — exceeds exponential floor
-
-        var faultException = new FaultException<OrganizationServiceFault>(
-            fault,
-            new FaultReason("Too many requests"));
-
-        var callCount = 0;
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-        var result = await _policy.ExecuteAsync<int>(
-            () =>
-            {
-                callCount++;
-                if (callCount == 1) throw faultException;
-                return Task.FromResult(42);
-            },
-            "account",
-            maxRetries: 2,
-            CancellationToken.None);
-
-        sw.Stop();
-
-        Assert.Equal(42, result);
-        Assert.Equal(2, callCount);
-        // Retry-After=4s means delay >= 4s; assert >= 3500ms to allow for timer resolution
-        Assert.True(sw.Elapsed.TotalMilliseconds >= 3500,
-            $"Expected >= 3500ms delay (Retry-After=4s), got {sw.Elapsed.TotalMilliseconds}ms");
     }
 }
