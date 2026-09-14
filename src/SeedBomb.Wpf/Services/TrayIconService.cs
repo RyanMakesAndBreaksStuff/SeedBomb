@@ -13,8 +13,8 @@ namespace Seedbomb.Services;
 /// </summary>
 public sealed class TrayIconService : IDisposable
 {
-    private const string ColoredIconUri = "pack://application:,,,/Resources/SB_logo.ico";
-    private const string DarkBackgroundIconUri = "pack://application:,,,/Resources/SB_logo_darkbg.ico";
+    private const string LightBackgroundIconUri = "pack://application:,,,/Resources/logo.ico";
+    private const string DarkBackgroundIconUri = "pack://application:,,,/Resources/logo-dark.ico";
     private const string PersonalizeKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     private readonly TaskbarIcon _trayIcon;
@@ -104,7 +104,7 @@ public sealed class TrayIconService : IDisposable
     }
 
     private static BitmapImage LoadIconSource() =>
-        new(new Uri(IsWindowsDarkMode() ? DarkBackgroundIconUri : ColoredIconUri));
+        new(new Uri(IsWindowsDarkMode() ? DarkBackgroundIconUri : LightBackgroundIconUri));
 
     private static bool IsWindowsDarkMode()
     {

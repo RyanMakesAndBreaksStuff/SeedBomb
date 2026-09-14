@@ -17,6 +17,7 @@ using Seedbomb.Services.Settings;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Theme;
 using Seedbomb.Services.Diagnostics;
+using Seedbomb.Resources;
 using System.Windows;
 using Wpf.Ui;
 using Wpf.Ui.Appearance;
@@ -36,8 +37,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        SplashWindow? splash = null;
         try
         {
+            splash = new SplashWindow();
+            splash.Show();
+            splash.SetStatus("Starting services...");
+
 #if DEBUG
             // Host.CreateApplicationBuilder defaults to Production when DOTNET_ENVIRONMENT is unset.
             Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Development");
@@ -47,12 +53,9 @@ public partial class App : Application
             _host = builder.Build();
             await _host.StartAsync();
 
-            // Resolving (not just registering) creates the singleton now; its Dispose() runs
-            // automatically when the host's ServiceProvider is disposed in OnExit.
-            _host.Services.GetRequiredService<TrayIconService>();
-
             // Apply saved theme before showing MainWindow so it renders correctly
             // from the first frame.
+            splash.SetStatus("Applying your theme...");
             var settings = _host.Services.GetRequiredService<ISettingsService>();
             var savedSettings = await settings.LoadAsync();
             DesignThemeManager.Apply(savedSettings.DarkTheme, savedSettings.PaletteId);
@@ -61,6 +64,7 @@ public partial class App : Application
             // Pass nint.Zero to suppress any interactive popup — silent-only path.
             // MSAL may emit first-chance RPC/COM exceptions (0x6BA/0x71A) against WAM; those
             // are handled inside SignInAsync and must not crash startup.
+            splash.SetStatus("Restoring your session...");
             var auth = _host.Services.GetRequiredService<IAuthService>();
             AuthResult result;
             try
@@ -76,12 +80,19 @@ public partial class App : Application
 
             // Always show MainWindow — its "Sign in to continue" overlay covers a failed
             // silent attempt, and the first-run overlay already covers zero profiles.
+            splash.SetStatus("Preparing your workspace...");
             await ShowMainWindow(result.DisplayName ?? string.Empty, result.Succeeded);
+            // Resolving (not just registering) creates the singleton now; its Dispose() runs
+            // automatically when the host's ServiceProvider is disposed in OnExit.
+            _host.Services.GetRequiredService<TrayIconService>();
+            splash.SetStatus("Ready");
+            splash.SetProgress(1.0);
         }
         catch (Exception ex)
         {
+            splash?.Close();
             CrashLog.Write(ex);
-            MessageBox.Show($"Startup failed: {ex}", "DataGen",
+            MessageBox.Show($"Startup failed: {ex}", "SeedBomb",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
@@ -125,8 +136,8 @@ public partial class App : Application
         vm.NeedsSignIn = profile is not null && !signedIn;
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-        mainWindow.Show();
         Current.MainWindow = mainWindow;
+        mainWindow.Show();
     }
 
     /// <inheritdoc />

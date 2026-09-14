@@ -1,0 +1,129 @@
+<Window x:Class="Seedbomb.Resources.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Seed Bomb for Microsoft Dataverse"
+        Width="800" Height="480"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        Topmost="True">
+
+    <!-- ================================================================
+         Seed Bomb splash — WPF port of concept 07 (Indigo Dark · halo +
+         ring loader), 800 x 480. Layer order is the contract: backdrop,
+         frame, halo/ticks, loader ring, pips, bomb — and ALL type last
+         (the three arc Paths + corner tags), so text is always the top
+         level, no exceptions. Arc type is real vector geometry built in
+         SplashWindow.xaml.cs (per-glyph FormattedText -> Geometry).
+         ================================================================ -->
+    <Window.Resources>
+        <RadialGradientBrush x:Key="PageGlow" Center="0.5,0" GradientOrigin="0.5,0" RadiusX="0.62" RadiusY="0.62">
+            <GradientStop Color="#1E2340" Offset="0"/>
+            <GradientStop Color="#171A21" Offset="1"/>
+        </RadialGradientBrush>
+        <RadialGradientBrush x:Key="BombGlow" Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+            <GradientStop Color="#297F8CF8" Offset="0"/>
+            <GradientStop Color="#007F8CF8" Offset="1"/>
+        </RadialGradientBrush>
+        <LinearGradientBrush x:Key="TitleGrad" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#D6DBFF" Offset="0"/>
+            <GradientStop Color="#7F8CF8" Offset="1"/>
+        </LinearGradientBrush>
+    </Window.Resources>
+
+    <Grid x:Name="Root" Width="800" Height="480" Opacity="0" RenderTransformOrigin="0.5,0.5">
+        <Grid.RenderTransform>
+            <ScaleTransform x:Name="RootScale" ScaleX="0.96" ScaleY="0.96"/>
+        </Grid.RenderTransform>
+
+        <Canvas Width="800" Height="480">
+
+            <!-- 1 · backdrop + frame -->
+            <Rectangle Canvas.Left="0" Canvas.Top="0" Width="800" Height="480" Fill="{StaticResource PageGlow}"/>
+            <Rectangle Canvas.Left="14" Canvas.Top="14" Width="772" Height="452" Stroke="#2B303C" StrokeThickness="1"/>
+
+            <!-- 2 · halo orbit line + crosshair ticks (0/180/225/315 deg) -->
+            <Ellipse Canvas.Left="256" Canvas.Top="94" Width="288" Height="288" Stroke="#2B303C" StrokeThickness="1"/>
+            <Line Canvas.Left="0" Canvas.Top="0" X1="538"   Y1="238"   X2="550"   Y2="238"   Stroke="#3A4050" StrokeThickness="1.5"/>
+            <Line Canvas.Left="0" Canvas.Top="0" X1="262"   Y1="238"   X2="250"   Y2="238"   Stroke="#3A4050" StrokeThickness="1.5"/>
+            <Line Canvas.Left="0" Canvas.Top="0" X1="497.58" Y1="140.42" X2="506.07" Y2="131.93" Stroke="#3A4050" StrokeThickness="1.5"/>
+            <Line Canvas.Left="0" Canvas.Top="0" X1="302.42" Y1="140.42" X2="293.93" Y2="131.93" Stroke="#3A4050" StrokeThickness="1.5"/>
+
+            <!-- 3 · seal ring track + circling loader arc (C2 style).
+                 The arc is ALWAYS indeterminate ambiance: constant rhythm from
+                 Loaded to fade, never reflecting loading % and never reacting
+                 to completion. SetProgress() only drives the lifecycle: at 1.0
+                 DoneBadge parks at 12 o'clock and the window closes no earlier
+                 than the 3 s minimum-visible mark. -->
+            <Ellipse Canvas.Left="204" Canvas.Top="42" Width="392" Height="392" Stroke="#3A4050" StrokeThickness="1.5"/>
+            <Canvas x:Name="LoaderSpin" Width="800" Height="480">
+                <Canvas.RenderTransform>
+                    <RotateTransform x:Name="LoaderRot" Angle="0" CenterX="400" CenterY="238"/>
+                </Canvas.RenderTransform>
+                <Path Stroke="#7F8CF8" StrokeThickness="9" Opacity="0.22" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Data="M 382.92 42.75 A 196 196 0 0 1 580.42 161.42">
+                    <Path.Effect><BlurEffect Radius="4"/></Path.Effect>
+                </Path>
+                <Path Stroke="#7F8CF8" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Data="M 382.92 42.75 A 196 196 0 0 1 580.42 161.42"/>
+            </Canvas>
+            <Grid x:Name="DoneBadge" Width="18" Height="18" Canvas.Left="391" Canvas.Top="33" Visibility="Collapsed">
+                <Ellipse Width="18" Height="18" Fill="#5BD08D"/>
+                <TextBlock Text="✓" FontFamily="Segoe UI" FontWeight="Bold" FontSize="11" Foreground="#0B0D14"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
+            </Grid>
+
+            <!-- 4 · energy pips at 3 / 9 o'clock -->
+            <Ellipse Canvas.Left="200.5" Canvas.Top="234.5" Width="7" Height="7" Fill="#FF9351"/>
+            <Ellipse Canvas.Left="592.5" Canvas.Top="234.5" Width="7" Height="7" Fill="#FF9351"/>
+
+            <!-- 5 · bomb (soft periwinkle glow, then shadowed image) -->
+            <Ellipse Canvas.Left="250" Canvas.Top="88" Width="300" Height="300" Fill="{StaticResource BombGlow}"/>
+            <Image Canvas.Left="261.3" Canvas.Top="120.5" Width="277.4" Height="235"
+                   Source="pack://application:,,,/Resources/logo-dark.png"
+                   RenderOptions.BitmapScalingMode="HighQuality">
+                <Image.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="36" ShadowDepth="18" Opacity="0.6"/>
+                </Image.Effect>
+            </Image>
+
+            <!-- 6 · TYPE — added last, always the foreground layer.
+                 Data (arc geometry) is built in code-behind; fills here. -->
+            <Path x:Name="SloganArc" Fill="#A9AFC1"/>
+            <Path x:Name="SubArc"    Fill="#838A9E"/>
+            <Path x:Name="TitleArc"  Fill="{StaticResource TitleGrad}"/>
+            <TextBlock x:Name="StatusText" Canvas.Left="0" Canvas.Top="396" Width="800" TextAlignment="Center"
+                       FontFamily="Consolas" FontSize="10" Foreground="#838A9E"/>
+
+            <!-- 7 · corner tags -->
+            <TextBlock Canvas.Left="32" Canvas.Top="446" Text="TOKENS / DARK"
+                       FontFamily="Consolas" FontWeight="Bold" FontSize="9" Foreground="#5C6377"/>
+            <TextBlock Canvas.Left="736" Canvas.Top="446" Text="V1.0.0"
+                       FontFamily="Consolas" FontWeight="Bold" FontSize="9" Foreground="#5C6377"/>
+        </Canvas>
+    </Grid>
+
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Root" Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.45"/>
+                    <DoubleAnimation Storyboard.TargetName="RootScale" Storyboard.TargetProperty="ScaleX"
+                                     From="0.96" To="1" Duration="0:0:0.55">
+                        <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="RootScale" Storyboard.TargetProperty="ScaleY"
+                                     From="0.96" To="1" Duration="0:0:0.55">
+                        <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <!-- loader spin is started/stopped from code-behind so it can
+                         be halted cleanly when SetProgress(1.0) arrives -->
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+</Window>

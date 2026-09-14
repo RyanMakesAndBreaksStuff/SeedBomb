@@ -13,7 +13,8 @@
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica"
                  WindowCornerPreference="Round"
-                 WindowStartupLocation="CenterScreen">
+                 WindowStartupLocation="CenterScreen"
+                 Icon="pack://application:,,,/Resources/logo.ico">
 
     <ui:FluentWindow.Resources>
         <!-- Dimmed, not disabled: IsEnabled still gates on HasConnection alone (zero profiles).
@@ -53,7 +54,7 @@
                      Title="SeedBomb — Mock data explosion"
                      ShowMaximize="True" ShowMinimize="True" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/Resources/SB_logo.ico" Width="16" Height="16"/>
+                <ui:ImageIcon Source="pack://application:,,,/Resources/logo.ico" Width="16" Height="16"/>
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
