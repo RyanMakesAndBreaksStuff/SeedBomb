@@ -9,7 +9,7 @@ namespace Seedbomb.Services.History;
 /// <param name="TotalRecords">Total number of records created.</param>
 /// <param name="Duration">Elapsed time for the run.</param>
 /// <param name="Succeeded">Whether the run completed without fatal errors.</param>
-/// <param name="ErrorCount">Number of batch errors encountered.</param>
+/// <param name="ErrorCount">Rows rejected during the run. Records written before 15 Sep 2026 hold a batch count instead.</param>
 public record RunRecord(
     Guid Id,
     DateTimeOffset Timestamp,

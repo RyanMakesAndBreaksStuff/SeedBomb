@@ -336,7 +336,7 @@ public sealed partial class RunViewModel : ObservableObject
         }
 
         var written = result.TotalRecords;
-        var rejected = result.Errors.Count;
+        var rejected = result.Errors.Sum(e => e.RowCount);
         var planned = _plannedTotal > 0 ? _plannedTotal : written;
         var pct = planned > 0 ? Math.Clamp(100.0 * written / planned, 0, 100) : 100;
         OverallPercent = pct;
@@ -646,7 +646,7 @@ public sealed partial class RunViewModel : ObservableObject
         LastRunSucceeded = !hasRejects;
         OutcomeGlyph = hasRejects ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24;
         OutcomeHeadline = hasRejects
-            ? $"Completed with {rejected:N0} rejected rows"
+            ? $"Completed with {rejected:N0} rejected {(rejected == 1 ? "row" : "rows")}"
             : "Completed";
         OutcomeDetail = $"Wrote {written:N0} rows. Nothing was rolled back.";
 
@@ -673,7 +673,7 @@ public sealed partial class RunViewModel : ObservableObject
             CauseText = message,
             CauseHint = hint,
             TableName = grouping.Key.EntityLogicalName,
-            RowCount = grouping.Count(),
+            RowCount = grouping.Sum(e => e.RowCount),
             IsRetryable = retryable,
             DispositionLabel = retryable ? "Retryable" : "Needs a fix",
             DispositionKey = retryable ? "Retryable" : "FixFirst",
