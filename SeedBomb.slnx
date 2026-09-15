@@ -1,25 +1,15 @@
 <Solution>
-  <Folder Name="/assets/">
-    <File Path="../Art Assets/aurora_rift.png" />
-    <File Path="../Art Assets/nova_burst.png" />
-  </Folder>
-  <Folder Name="/docs/">
-    <File Path="Docs/DATAGEN_IMPLEMENTATION_PLAN.md" />
-    <File Path="Docs/DATAGEN_MANIFEST.md" />
-    <File Path="Docs/Technology Stack Audit for Dataverse Synthetic Data with Blazor Server_ 2025 Compatibility and Migration Analysis.pdf" />
-    <File Path="Docs/WhitePaper — algorithms.md" />
-  </Folder>
   <Folder Name="/src/">
-    <Project Path="src/DataGen.Core/DataGen.Core.csproj" />
     <Project Path="src/DataGen.Bulk/DataGen.Bulk.csproj" />
+    <Project Path="src/DataGen.Core/DataGen.Core.csproj" />
     <Project Path="src/DataGen.Web/DataGen.Web.csproj" />
     <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="src/DataGen.Bulk.Tests/DataGen.Bulk.Tests.csproj" />
     <Project Path="src/DataGen.Core.Tests/DataGen.Core.Tests.csproj" />
-    <Project Path="src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj" />
     <Project Path="src/DataGen.Web.Tests/DataGen.Web.Tests.csproj" />
+    <Project Path="src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj" />
     <Project Path="tests/DataGen.Integration.Tests/DataGen.Integration.Tests.csproj" />
   </Folder>
 </Solution>
