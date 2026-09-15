@@ -1,12 +1,13 @@
 using System.IO;
 using System.Text.Json;
 using DataGen.Core.Rules;
+using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.Profiles;
 
 /// <summary>
 /// JSON-backed <see cref="IProfileService"/>. Profiles live under
-/// <c>%LOCALAPPDATA%\DataGen\profiles\*.profile.json</c> (§3.6); the fixed draft slot is
+/// <c>%LOCALAPPDATA%\SeedBomb\profiles\*.profile.json</c> (§3.6); the fixed draft slot is
 /// <c>draft.profile.json</c>. Thread-safe via <see cref="SemaphoreSlim"/>
 /// (<see cref="Services.Settings.JsonSettingsService"/> convention); serialization uses
 /// <see cref="FieldRule.JsonOptions"/> (<c>JsonSerializerDefaults.Web</c> +
@@ -19,9 +20,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     private const string FileSuffix = ".profile.json";
     private const int MaxProfileBytes = 1024 * 1024; // §08: read at most 1 MiB per file.
 
-    private static readonly string DefaultRoot = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DataGen", "profiles");
+    private static readonly string DefaultRoot = Path.Combine(AppPaths.Root, "profiles");
 
     // Property names never allowed anywhere in a profile document (D2 — no secrets by schema).
     // Scanned against JSON *property names* only, during the raw walk below — never against

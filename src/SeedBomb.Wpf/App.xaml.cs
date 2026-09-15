@@ -6,6 +6,7 @@ using Seedbomb.ViewModels.Controls;
 using Seedbomb.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Seedbomb.Services;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
@@ -50,6 +51,7 @@ public partial class App : Application
 #endif
             var builder = Host.CreateApplicationBuilder();
             ConfigureServices(builder.Services);
+            builder.Logging.AddProvider(new FileLoggerProvider());
             _host = builder.Build();
             await _host.StartAsync();
 

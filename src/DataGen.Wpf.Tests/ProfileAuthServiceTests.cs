@@ -2,6 +2,7 @@ using Microsoft.Identity.Client;
 using Moq;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
+using Seedbomb.Services.Diagnostics;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;
@@ -18,24 +19,18 @@ public sealed class ProfileAuthServiceTests
     }
 
     [Fact]
-    public void CreateUserCachePropertiesUsesDataGenLocalAppData()
+    public void CreateUserCachePropertiesUsesSeedBombLocalAppData()
     {
         var props = ProfileAuthService.CreateUserCacheProperties();
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DataGen");
-        Assert.Equal(dir, props.CacheDirectory);
+        Assert.Equal(AppPaths.Root, props.CacheDirectory);
         Assert.Equal("msal_user_cache.bin", props.CacheFileName);
     }
 
     [Fact]
-    public void CreateAppCachePropertiesUsesDataGenLocalAppData()
+    public void CreateAppCachePropertiesUsesSeedBombLocalAppData()
     {
         var props = ProfileAuthService.CreateAppCacheProperties();
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DataGen");
-        Assert.Equal(dir, props.CacheDirectory);
+        Assert.Equal(AppPaths.Root, props.CacheDirectory);
         Assert.Equal("msal_app_cache.bin", props.CacheFileName);
     }
 

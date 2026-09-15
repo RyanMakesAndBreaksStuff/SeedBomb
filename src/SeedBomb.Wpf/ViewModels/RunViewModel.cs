@@ -6,10 +6,12 @@ using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
+using DataGen.Core.Exceptions;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Seedbomb.Services.Connections;
+using Seedbomb.Services.Diagnostics;
 using Seedbomb.Services.Export;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
@@ -129,6 +131,9 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>False when the last run produced rejected rows. Drives the outcome banner style.</summary>
     [ObservableProperty] private bool _lastRunSucceeded = true;
+
+    /// <summary>Text shown in the last failure toast. Empty until a run fails.</summary>
+    [ObservableProperty] private string _lastFailureMessage = "";
 
     /// <summary>Outcome glyph. Enum, not a Brush.</summary>
     [ObservableProperty] private SymbolRegular _outcomeGlyph = SymbolRegular.CheckmarkCircle24;
@@ -422,12 +427,22 @@ public sealed partial class RunViewModel : ObservableObject
                     ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
                 break;
             default:
-                _snackbar?.Show("Error", "Generation failed — see logs for details",
-                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
                 _logger?.LogError(ex, "Generation failed");
+                LastFailureMessage = DescribeFailure(ex);
+                _snackbar?.Show("Error", LastFailureMessage,
+                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(10));
                 break;
         }
     }
+
+    /// <summary>
+    /// A <see cref="DataGenerationException"/> message is written for the user and names the fix,
+    /// so it is shown verbatim. Anything else is a defect and points at the log file.
+    /// </summary>
+    /// <param name="ex">The failure to describe.</param>
+    private static string DescribeFailure(Exception ex) => ex is DataGenerationException
+        ? ex.Message
+        : $"Generation failed: {ex.Message} — full details in {AppPaths.Logs}";
 
     private async Task<bool> ConfirmRiskyBogusAsync()
     {

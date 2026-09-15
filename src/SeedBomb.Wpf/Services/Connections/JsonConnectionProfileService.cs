@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.Connections;
 
@@ -25,11 +26,9 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
     private readonly SemaphoreSlim _lock = new(1, 1);
     private StoreDto? _cache;
 
-    /// <summary>Stores profiles under <c>%LOCALAPPDATA%\DataGen\connections.json</c>.</summary>
+    /// <summary>Stores profiles under <c>%LOCALAPPDATA%\SeedBomb\connections.json</c>.</summary>
     public JsonConnectionProfileService()
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DataGen"))
+        : this(AppPaths.Root)
     {
     }
 
