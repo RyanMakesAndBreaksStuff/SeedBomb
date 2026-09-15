@@ -799,8 +799,21 @@ public class RuledGenerationTests
             Assert.Equal(reference, large[name]);
     }
 
+    // BuildSut's default ExecuteAsync answers CreateMultipleRequest with a bare OrganizationResponse,
+    // so BulkCreator gets no ids back and the pool stays empty. Answer the message here, and capture
+    // the targets that returning non-null skips past in BuildSut.
+    private static Func<OrganizationRequest, CancellationToken, OrganizationResponse?> CreateMultipleWithIds(
+        List<Entity> writes) => (req, _) =>
+    {
+        if (req is not CreateMultipleRequest cmr) return null;
+        writes.AddRange(cmr.Targets.Entities);
+        var response = new CreateMultipleResponse();
+        response.Results["Ids"] = cmr.Targets.Entities.Select(_ => Guid.NewGuid()).ToArray();
+        return response;
+    };
+
     [Fact]
-    public async Task Random_lookup_empty_or_faulted_later_target_makes_zero_writes()
+    public async Task Random_lookup_empty_target_created_in_this_run_uses_run_records()
     {
         var accountName = NameAttr();
         var contactLookup = LookupAttr("parentaccountid", "account");
@@ -818,23 +831,84 @@ public class RuledGenerationTests
             FieldRules = new() { ["contact"] = new() { ["parentaccountid"] = new LookupRandomRule() } },
         };
 
-        var (emptySut, emptyCaptured) = BuildSut();
-        var emptyError = await Assert.ThrowsAsync<DataGenerationException>(() =>
-            emptySut.CreateAsync(config, meta, graph));
-        Assert.Contains("contact.parentaccountid", emptyError.Message);
-        Assert.Empty(emptyCaptured);
+        var writes = new List<Entity>();
+        var (sut, _) = BuildSut(onExecute: CreateMultipleWithIds(writes));
+        var result = await sut.CreateAsync(config, meta, graph);
 
-        var (faultSut, faultCaptured) = BuildSut(onQuery: (q, _) =>
+        Assert.Empty(result.Errors);
+        var accountIds = result.CreatedRecords["account"].ToHashSet();
+        Assert.Equal(3, accountIds.Count);
+        var contacts = writes.Where(e => e.LogicalName == "contact").ToList();
+        Assert.Equal(2, contacts.Count);
+        Assert.All(contacts, e =>
         {
-            if (string.Equals(q.EntityName, "account", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("permission denied");
-            return new EntityCollection();
+            var eref = Assert.IsType<EntityReference>(e["parentaccountid"]);
+            Assert.Equal("account", eref.LogicalName);
+            Assert.Contains(eref.Id, accountIds);
         });
-        var faultError = await Assert.ThrowsAsync<DataGenerationException>(() =>
-            faultSut.CreateAsync(config, meta, graph));
-        Assert.Contains("contact.parentaccountid", faultError.Message);
-        Assert.Contains("account", faultError.Message);
-        Assert.Empty(faultCaptured);
+    }
+
+    [Fact]
+    public async Task Random_lookup_empty_target_outside_this_run_still_throws()
+    {
+        var contactLookup = LookupAttr("parentaccountid", "account");
+        var meta = new Dictionary<string, EntityMetadata>
+        {
+            ["account"] = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid"),
+            ["contact"] = WithPrimaryId(BuildNamedMeta("contact", contactLookup), "contactid"),
+        };
+        var graph = new DependencyGraph();
+        graph.AddNode("contact");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["contact"],
+            RecordCounts = new() { ["contact"] = 2 },
+            FieldRules = new() { ["contact"] = new() { ["parentaccountid"] = new LookupRandomRule() } },
+        };
+
+        var (sut, captured) = BuildSut();
+        var error = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            sut.CreateAsync(config, meta, graph));
+        Assert.Contains("No readable existing candidates", error.Message, StringComparison.Ordinal);
+        Assert.Contains("contact.parentaccountid", error.Message, StringComparison.Ordinal);
+        Assert.Empty(captured);
+    }
+
+    [Fact]
+    public async Task Random_lookup_faulted_target_makes_zero_writes()
+    {
+        var accountName = NameAttr();
+        var contactLookup = LookupAttr("parentaccountid", "account");
+        var meta = new Dictionary<string, EntityMetadata>
+        {
+            ["account"] = WithPrimaryId(BuildNamedMeta("account", accountName), "accountid"),
+            ["contact"] = WithPrimaryId(BuildNamedMeta("contact", contactLookup), "contactid"),
+        };
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new() { ["account"] = 3, ["contact"] = 2 },
+            FieldRules = new() { ["contact"] = new() { ["parentaccountid"] = new LookupRandomRule() } },
+        };
+
+        var writes = new List<Entity>();
+        var (sut, _) = BuildSut(
+            onQuery: (q, _) =>
+            {
+                if (string.Equals(q.EntityName, "account", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("permission denied");
+                return new EntityCollection();
+            },
+            onExecute: CreateMultipleWithIds(writes));
+
+        // A read fault is a real problem even when the target is also created in this run.
+        var error = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            sut.CreateAsync(config, meta, graph));
+        Assert.Contains("contact.parentaccountid", error.Message, StringComparison.Ordinal);
+        Assert.Contains("account", error.Message, StringComparison.Ordinal);
+        Assert.Empty(writes);
     }
 
     [Fact]

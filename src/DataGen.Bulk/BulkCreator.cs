@@ -76,14 +76,17 @@ public class BulkCreator : IBulkCreator
 
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
-            var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata,
+            // Sort first: PreparedLookupRun needs the creation order to know which lookup targets
+            // this run creates before their source table.
+            var sortedEntities = _topologicalSort.Sort(graph);
+
+            var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
                 _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
 
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
             await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
 
-            var sortedEntities = _topologicalSort.Sort(graph);
             var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
             var allErrors = new List<BatchError>();
             var runStart = DateTimeOffset.UtcNow;
@@ -276,7 +279,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
@@ -288,7 +291,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -299,7 +302,7 @@ public class BulkCreator : IBulkCreator
             {
                 if (attr.LogicalName is null || !tableRules.TryGetValue(attr.LogicalName, out var rule))
                     continue;
-                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -384,7 +387,7 @@ public class BulkCreator : IBulkCreator
                     _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
-                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message, 0)];
+                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message, 0, batch.Length)];
                 }
 
                 idBags[batchIndex] = batchIds;
@@ -783,11 +786,12 @@ public class BulkCreator : IBulkCreator
         int rowIndex,
         PreparedBogusRun? preparedRun,
         PreparedLookupRun lookupRun,
+        DataverseRecordPool pool,
         BogusEvaluatorSession session)
     {
         if (rule is LookupRandomRule)
             return RuleValueGenerator.EvaluateLookupRandom(
-                lookupRun.Get(context.Table, attr.LogicalName!), context.Seed,
+                lookupRun.Get(context.Table, attr.LogicalName!, pool), context.Seed,
                 context.Table, attr.LogicalName!, rowIndex);
 
         if (rule is not BogusRule bogus)
