@@ -565,6 +565,65 @@ public sealed class RulesPageStaTests : IDisposable
         Flush();
     }
 
+    [StaFact]
+    public void LookupValueBlock_EveryControl_UsesADgStyle()
+    {
+        var (page, vm) = LoadRulesPageOnSta(CustomerLookupColumn());
+        vm.SelectedOp = "constant";
+        Flush();
+
+        var pane = FindVisualChild<RuleOperationPane>(page)!;
+        var block = FindVisualChildren<StackPanel>(pane).Single(sp => sp.Name == "LookupValueBlock");
+        var app = Application.Current!.Resources;
+
+        AssertStyledBy(FindVisualChildren<ComboBox>(block), app["DG.ComboBox"], "ComboBox");
+        AssertStyledBy(FindVisualChildren<TextBox>(block), app["DG.TextBox"], "TextBox");
+        AssertStyledBy(FindVisualChildren<ListBox>(block), app["DG.ListBox"], "ListBox");
+        foreach (var text in FindVisualChildren<TextBlock>(block))
+        {
+            if (text.TemplatedParent is not null) continue;
+            Assert.True(ResolvesToADgStyle(text.Style, app),
+                $"TextBlock '{text.Text}' has no DG.* style.");
+        }
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    private static void AssertStyledBy<T>(IEnumerable<T> controls, object expected, string label)
+        where T : FrameworkElement
+    {
+        foreach (var control in controls)
+        {
+            var style = control.Style;
+            Assert.True(ReferenceEquals(style, expected) || ReferenceEquals(style?.BasedOn, expected),
+                $"{label} is not styled by the DG design system.");
+        }
+    }
+
+    private static bool ResolvesToADgStyle(Style? style, ResourceDictionary app)
+    {
+        for (var current = style; current is not null; current = current.BasedOn)
+            foreach (var key in new[] { "DG.Body", "DG.Secondary", "DG.Tertiary", "DG.GroupLabel", "DG.Mono", "DG.Cell" })
+                if (ReferenceEquals(current, app[key]))
+                    return true;
+        return false;
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject root) where T : DependencyObject
+        => FindVisualChildren<T>(root).FirstOrDefault();
+
+    private static LookupAttributeMetadata CustomerLookupColumn()
+    {
+        var attr = new LookupAttributeMetadata
+        {
+            LogicalName = "parentcustomerid",
+            IsValidForCreate = true,
+            Targets = ["account", "contact"],
+        };
+        typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
+            .SetValue(attr, AttributeTypeCode.Customer);
+        return attr;
+    }
+
     private static StringAttributeMetadata StringColumn() =>
         new() { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
 

@@ -173,7 +173,8 @@
 
     <DataTemplate x:Key="LookupRandomOpTemplate">
         <StackPanel Margin="0,0,0,16">
-            <TextBlock Text="{Binding LookupRandomExplanation}" TextWrapping="Wrap"/>
+            <TextBlock Style="{DynamicResource DG.Secondary}"
+                       Text="{Binding LookupRandomExplanation}" TextWrapping="Wrap"/>
         </StackPanel>
     </DataTemplate>
 

@@ -722,6 +722,16 @@
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
+    <!-- Flat list surface for picked lookup records; rows use DG.Cell text. -->
+    <Style x:Key="DG.ListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    </Style>
+
     <!-- 3px selection stripe on the leading edge of a selected nav/list item. -->
     <Style x:Key="DG.SelectionStripe" TargetType="Border">
         <Setter Property="Width" Value="{DynamicResource DG.Size.SelectionStripe}"/>
