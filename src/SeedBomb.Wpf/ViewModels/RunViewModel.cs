@@ -268,14 +268,22 @@ public sealed partial class RunViewModel : ObservableObject
         Metrics.Add(new RunValueRow("Throughput", "0/min", "Normal"));
     }
 
-    /// <summary>Projects a pipeline snapshot onto the sheet.</summary>
-    private void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
+    /// <summary>Projects a pipeline snapshot onto the sheet. Internal so progress tests can drive it.</summary>
+    /// <param name="u">One pipeline snapshot.</param>
+    /// <param name="plannedTables">Tables queued for this run.</param>
+    /// <param name="plannedTotal">Rows planned across every table.</param>
+    internal void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
     {
         ArgumentNullException.ThrowIfNull(u);
         ArgumentNullException.ThrowIfNull(plannedTables);
 
         if (!string.IsNullOrEmpty(u.EntityName))
         {
+            // Batches run in parallel and Progress<T> does not preserve post order, so a snapshot
+            // can arrive carrying a lower cumulative count than one already applied. Drop it whole:
+            // the ring, the row, the metrics and the activity line must never run backwards.
+            if (u.RecordsCreated < _tableWritten.GetValueOrDefault(u.EntityName))
+                return;
             _tableWritten[u.EntityName] = u.RecordsCreated;
             UpdateTableRow(u);
         }
@@ -295,7 +303,9 @@ public sealed partial class RunViewModel : ObservableObject
 
         RefreshMetrics(u, written, plannedTotal);
         var entity = string.IsNullOrEmpty(u.EntityName) ? "" : $"  {u.EntityName}";
-        AppendActivity($"{u.Phase}{entity}  {u.RecordsCreated:N0}/{u.TotalRecords:N0}");
+        AppendActivity(u.TotalRecords > 0
+            ? $"{u.Phase}{entity}  {u.RecordsCreated:N0}/{u.TotalRecords:N0}"
+            : $"{u.Phase}{entity}");
     }
 
     /// <summary>Projects a finished <see cref="GenerationResult"/> onto the summary. Keeps <paramref name="config"/> for retry.</summary>
@@ -312,6 +322,18 @@ public sealed partial class RunViewModel : ObservableObject
 
         IsRunning = false;
         IsIndeterminate = false;
+
+        // The last per-table snapshot can be throttled away or arrive out of order; the result is
+        // the authoritative written count, so rows settle here rather than at whatever the UI saw.
+        foreach (var (table, ids) in result.CreatedRecords)
+        {
+            _tableWritten[table] = ids.Count;
+            var plannedForTable = _lastConfig?.RecordCounts is { } counts
+                && counts.TryGetValue(table, out var want) ? want : ids.Count;
+            UpdateTableRow(
+                new ProgressUpdate("Generating", table, ids.Count, plannedForTable, 0, 0, 0, result.Elapsed),
+                final: true);
+        }
 
         var written = result.TotalRecords;
         var rejected = result.Errors.Count;
@@ -718,10 +740,10 @@ public sealed partial class RunViewModel : ObservableObject
         RetrySelectedCommand.NotifyCanExecuteChanged();
     }
 
-    private void UpdateTableRow(ProgressUpdate u)
+    private void UpdateTableRow(ProgressUpdate u, bool final = false)
     {
-        var pct = u.TotalRecords > 0 ? 100.0 * u.RecordsCreated / u.TotalRecords : 0;
-        var done = u.TotalRecords > 0 && u.RecordsCreated >= u.TotalRecords;
+        var pct = u.TotalRecords > 0 ? Math.Clamp(100.0 * u.RecordsCreated / u.TotalRecords, 0, 100) : 0;
+        var done = final || (u.TotalRecords > 0 && u.RecordsCreated >= u.TotalRecords);
         var row = new RunTableProgressRow(
             u.EntityName,
             pct,
