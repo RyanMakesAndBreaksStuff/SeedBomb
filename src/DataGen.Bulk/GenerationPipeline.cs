@@ -85,7 +85,7 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
         var bulkProgress = progress is null ? null : new Progress<BulkCreationProgress>(p =>
             progress.Report(new GenerationPipelineProgress
             {
-                Phase = "Generating",
+                Phase = p.Phase,
                 EntityLogicalName = p.EntityLogicalName,
                 RecordsCreated = p.RecordsCreated,
                 TotalRecords = p.TotalRecords,

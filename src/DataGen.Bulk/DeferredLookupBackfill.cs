@@ -1,3 +1,4 @@
+using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
@@ -44,6 +45,10 @@ public class DeferredLookupBackfill(
     /// Optional predicate identifying lookup columns that supply their own value or omission
     /// and must not be overwritten during backfill. Arguments are source table and column logical names.
     /// </param>
+    /// <param name="progress">
+    /// Optional progress reporter. Each deferred-edge source entity emits one "Linking" snapshot so the
+    /// UI can show that the run is still working after record creation finishes.
+    /// </param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> BackfillLookupsAsync(
         DependencyGraph graph,
@@ -52,7 +57,8 @@ public class DeferredLookupBackfill(
         int seed = 42,
         int maxRetries = 3,
         CancellationToken ct = default,
-        Func<string, string, bool>? isExplicitLookup = null)
+        Func<string, string, bool>? isExplicitLookup = null,
+        IProgress<BulkCreationProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(pool);
@@ -72,8 +78,24 @@ public class DeferredLookupBackfill(
 
         var rng = new Random(seed);
 
+        // One unit of work is one source entity. Report at the top of the loop body so every
+        // iteration emits a snapshot, including the ones that skip via continue below.
+        var totalUnits = graph.DeferredEdges.Count;
+        var unit = 0;
+
         foreach (var (sourceEntity, deferredLookups) in graph.DeferredEdges)
         {
+            unit++;
+            progress?.Report(new BulkCreationProgress
+            {
+                Phase = "Linking",
+                EntityLogicalName = sourceEntity,
+                BatchIndex = unit,
+                TotalBatches = totalUnits,
+                RecordsCreated = unit,
+                TotalRecords = totalUnits,
+            });
+
             var sourceIds = pool.Get(sourceEntity);
             if (sourceIds.Count == 0)
             {
@@ -135,6 +157,10 @@ public class DeferredLookupBackfill(
     /// <param name="seed">RNG seed for deterministic association selection. Should match the generation seed.</param>
     /// <param name="maxRetries">Maximum number of retry attempts for throttle faults.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="progress">
+    /// Optional progress reporter. Each distinct relationship emits one "Linking" snapshot so the
+    /// UI can show that the run is still working after record creation finishes.
+    /// </param>
     /// <returns>Any batch errors encountered.</returns>
     public async Task<IReadOnlyList<BatchError>> AssociateManyToManyAsync(
         DependencyGraph graph,
@@ -142,7 +168,8 @@ public class DeferredLookupBackfill(
         int batchSize,
         int seed = 42,
         int maxRetries = 3,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IProgress<BulkCreationProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(pool);
@@ -153,6 +180,15 @@ public class DeferredLookupBackfill(
         _logger.LogInformation("Starting N:N association pass.");
         var rng = new Random(seed);
 
+        // One unit of work is one distinct relationship; total is cheap to precompute because
+        // relationships appear under both entities and must be de-duplicated the same way.
+        var totalUnits = graph.Relationships
+            .SelectMany(kv => kv.Value)
+            .Select(r => r.SchemaName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var unit = 0;
+
         foreach (var (entityName, relationships) in graph.Relationships)
         {
             foreach (var rel in relationships)
@@ -160,6 +196,17 @@ public class DeferredLookupBackfill(
                 // Process each relationship only once (it appears under both entities)
                 if (!processedRelationships.Add(rel.SchemaName))
                     continue;
+
+                unit++;
+                progress?.Report(new BulkCreationProgress
+                {
+                    Phase = "Linking",
+                    EntityLogicalName = rel.Entity1LogicalName,
+                    BatchIndex = unit,
+                    TotalBatches = totalUnits,
+                    RecordsCreated = unit,
+                    TotalRecords = totalUnits,
+                });
 
                 var entity1Ids = pool.Get(rel.Entity1LogicalName);
                 var entity2Ids = pool.Get(rel.Entity2LogicalName);

@@ -59,6 +59,8 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
     private readonly Dictionary<string, int> _tableWritten = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Diagnostics.Stopwatch _runClock = new();
+    private System.Windows.Threading.DispatcherTimer? _clockTimer;
 
     private GenerationConfig? _lastConfig;
     private CancellationTokenSource? _runCts;
@@ -121,6 +123,15 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>True before the first batch completes.</summary>
     [ObservableProperty] private bool _isIndeterminate;
+
+    /// <summary>True while the pipeline is backfilling lookups and N:N links after record creation.</summary>
+    [ObservableProperty] private bool _isLinking;
+
+    /// <summary>0–100 progress of the link phase. Drives the secondary bar.</summary>
+    [ObservableProperty] private double _linkPercent;
+
+    /// <summary>Human label for the link phase, e.g. "3 / 7 tables linked".</summary>
+    [ObservableProperty] private string _linkLabel = "";
 
     /// <summary>0–100 overall progress for the ring.</summary>
     [ObservableProperty] private double _overallPercent;
@@ -238,6 +249,8 @@ public sealed partial class RunViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+            _runClock.Stop();
+            _clockTimer?.Stop();
             // Hold the completed sheet up until manual Close when the user asked to keep it open.
             IsSheetVisible = KeepWindowOpen;
             _runCts?.Dispose();
@@ -261,8 +274,13 @@ public sealed partial class RunViewModel : ObservableObject
         RecentActivity.Clear();
 
         IsRunning = true;
+        _runClock.Restart();
+        StartClock();
         IsSheetVisible = true;
         IsIndeterminate = true;
+        IsLinking = false;
+        LinkPercent = 0;
+        LinkLabel = "";
         StatusHeadline = "Generating…";
         OverallPercent = 0;
         OverallPercentLabel = "0";
@@ -287,6 +305,26 @@ public sealed partial class RunViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(u);
         ArgumentNullException.ThrowIfNull(plannedTables);
+
+        // A link snapshot is not a record-creation snapshot: it must not touch _tableWritten, the
+        // per-table rows or the ring, which would read as corrupted progress. The secondary bar carries it.
+        if (string.Equals(u.Phase, "Linking", StringComparison.Ordinal))
+        {
+            IsLinking = true;
+            IsIndeterminate = u.TotalRecords == 0;
+            LinkPercent = u.TotalRecords > 0
+                ? Math.Clamp(100.0 * u.RecordsCreated / u.TotalRecords, 0, 100)
+                : 0;
+            LinkLabel = u.TotalRecords > 0
+                ? $"{u.RecordsCreated:N0} / {u.TotalRecords:N0} linked"
+                : "Preparing links…";
+            if (!string.Equals(StatusHeadline, "Cancelling…", StringComparison.Ordinal))
+                StatusHeadline = "Linking records…";
+            AppendActivity(string.IsNullOrEmpty(u.EntityName)
+                ? "Linking records"
+                : $"Linking  {u.EntityName}  {u.RecordsCreated:N0}/{u.TotalRecords:N0}");
+            return;
+        }
 
         if (!string.IsNullOrEmpty(u.EntityName))
         {
@@ -324,6 +362,9 @@ public sealed partial class RunViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(result);
 
+        _runClock.Stop();
+        _clockTimer?.Stop();
+
         if (config is not null)
             _lastConfig = config with { AllowRiskyBogusValues = false };
         _environmentHost = environmentHost;
@@ -333,6 +374,7 @@ public sealed partial class RunViewModel : ObservableObject
 
         IsRunning = false;
         IsIndeterminate = false;
+        IsLinking = false;
 
         // The last per-table snapshot can be throttled away or arrive out of order; the result is
         // the authoritative written count, so rows settle here rather than at whatever the UI saw.
@@ -775,6 +817,32 @@ public sealed partial class RunViewModel : ObservableObject
         Tables.Add(row);
     }
 
+    private void StartClock()
+    {
+        _clockTimer ??= new System.Windows.Threading.DispatcherTimer(
+            System.Windows.Threading.DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        _clockTimer.Tick -= OnClockTick;
+        _clockTimer.Tick += OnClockTick;
+        _clockTimer.Start();
+    }
+
+    // The pipeline stops reporting during the link phases, so elapsed must come from a local
+    // clock — sourcing it from ProgressUpdate.Elapsed froze the timer and read as "finished".
+    private void OnClockTick(object? sender, EventArgs e)
+    {
+        if (!IsRunning)
+        {
+            _clockTimer?.Stop();
+            return;
+        }
+
+        if (Metrics.Count > 0)
+            Metrics[0] = new RunValueRow("Elapsed", FormatDuration(_runClock.Elapsed), "Normal");
+    }
+
     private void RefreshMetrics(ProgressUpdate u, int written, int plannedTotal)
     {
         var remaining = "—";
@@ -786,7 +854,7 @@ public sealed partial class RunViewModel : ObservableObject
         }
 
         Metrics.Clear();
-        Metrics.Add(new RunValueRow("Elapsed", FormatDuration(u.Elapsed), "Normal"));
+        Metrics.Add(new RunValueRow("Elapsed", FormatDuration(_runClock.Elapsed), "Normal"));
         Metrics.Add(new RunValueRow("Remaining", remaining, remainingKind));
         Metrics.Add(new RunValueRow("Throughput", $"{u.RecordsPerMinute:N0}/min", "Normal"));
     }

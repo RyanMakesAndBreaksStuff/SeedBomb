@@ -148,16 +148,30 @@ public class BulkCreator : IBulkCreator
                 }
             }
 
+            // Opening Linking snapshot: switches the UI to the link phase even when there is
+            // nothing to link, so a run never looks "finished" before phases 2 and 3 have run.
+            progress?.Report(new BulkCreationProgress
+            {
+                Phase = "Linking",
+                EntityLogicalName = string.Empty,
+                BatchIndex = 0,
+                TotalBatches = 0,
+                RecordsCreated = 0,
+                TotalRecords = 0,
+            });
+
             // Phase 2: backfill deferred lookups
             _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
             var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
                 graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
-                isExplicitLookup: (table, column) => LookupRulePolicy.IsExplicit(config.FieldRules, table, column)).ConfigureAwait(false);
+                isExplicitLookup: (table, column) => LookupRulePolicy.IsExplicit(config.FieldRules, table, column),
+                progress: progress).ConfigureAwait(false);
             allErrors.AddRange(backfillErrors);
 
             // Phase 3: N:N associations
             var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
-                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
+                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
+                progress: progress).ConfigureAwait(false);
             allErrors.AddRange(associateErrors);
 
             var elapsed = DateTimeOffset.UtcNow - runStart;
