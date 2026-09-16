@@ -97,6 +97,12 @@ public sealed class GenerationService
             var lastProgressAt = TimeSpan.Zero;
             var bulkProgress = new Progress<BulkCreationProgress>(p =>
             {
+                // The Web UI has no link-phase concept: Linking snapshots carry link-unit counts
+                // that would render as regressing record progress after the 100% of record creation.
+                // Skip them so the relay keeps its pre-link-phase behavior.
+                if (string.Equals(p.Phase, "Linking", StringComparison.Ordinal))
+                    return;
+
                 var now = sw.Elapsed;
                 var isTerminal = p.BatchIndex == p.TotalBatches;
                 if (!isTerminal && (now - lastProgressAt) < progressRelayWindow)
