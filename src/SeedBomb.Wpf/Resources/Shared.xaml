@@ -126,7 +126,7 @@
     <sys:Double x:Key="DG.Size.ControlSmall">30</sys:Double>
     <sys:Double x:Key="DG.Size.Chip">24</sys:Double>
     <sys:Double x:Key="DG.Size.ListPane">330</sys:Double>   <!-- 3a profile list -->
-    <sys:Double x:Key="DG.Size.ColumnPane">256</sys:Double> <!-- 3b column list -->
+    <sys:Double x:Key="DG.Size.ColumnPane">312</sys:Double> <!-- 3b column list -->
     <sys:Double x:Key="DG.Size.PreviewPane">236</sys:Double><!-- 3b preview -->
     <sys:Double x:Key="DG.Size.AsidePane">320</sys:Double>  <!-- 2a wizard aside -->
     <sys:Double x:Key="DG.Size.SheetWidth">600</sys:Double> <!-- 3c run sheet -->
