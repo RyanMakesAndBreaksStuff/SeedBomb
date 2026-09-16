@@ -121,10 +121,8 @@ public sealed class ProfilesPageHandoffTests
     {
         var generate = MakeGenerateViewModel(out var metadataMock);
         metadataMock
-            .Setup(m => m.GetEntitiesAsync(
-                It.Is<string[]>(names => names.SequenceEqual(new[] { "account" })),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[new EntityMetadata { LogicalName = "account" }]);
+            .Setup(m => m.GetEntityAsync("account", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityMetadata { LogicalName = "account" });
 
         // Simulates ProfilesPage's cold-start prefetch: metadata is ensured for the profile's
         // tables BEFORE ProfilesViewModel.PresentImport (via LoadCommand) ever runs — no
@@ -159,14 +157,14 @@ public sealed class ProfilesPageHandoffTests
     {
         var generate = MakeGenerateViewModel(out var metadataMock);
         metadataMock
-            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[new EntityMetadata { LogicalName = "account" }]);
+            .Setup(m => m.GetEntityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityMetadata { LogicalName = "account" });
 
         await generate.EnsureMetadataAsync(["account"], TestContext.Current.CancellationToken);
         await generate.EnsureMetadataAsync(["account"], TestContext.Current.CancellationToken);
 
         metadataMock.Verify(
-            m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()),
+            m => m.GetEntityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
         Assert.True(generate.EntityMetadataMap.ContainsKey("account"));
     }
@@ -176,12 +174,30 @@ public sealed class ProfilesPageHandoffTests
     {
         var generate = MakeGenerateViewModel(out var metadataMock);
         metadataMock
-            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .Setup(m => m.GetEntityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("org unreachable"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => generate.EnsureMetadataAsync(["account"], TestContext.Current.CancellationToken));
 
         Assert.Empty(generate.EntityMetadataMap);
+    }
+
+    [Fact]
+    public async Task EnsureMetadataAsync_PartialFailure_KeepsResolvedTablesAndSkipsMissing()
+    {
+        var generate = MakeGenerateViewModel(out var metadataMock);
+        metadataMock
+            .Setup(m => m.GetEntityAsync("account", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityMetadata { LogicalName = "account" });
+        metadataMock
+            .Setup(m => m.GetEntityAsync("bogus_table", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("table not found in environment"));
+
+        await generate.EnsureMetadataAsync(
+            ["account", "bogus_table"], TestContext.Current.CancellationToken);
+
+        Assert.True(generate.EntityMetadataMap.ContainsKey("account"));
+        Assert.False(generate.EntityMetadataMap.ContainsKey("bogus_table"));
     }
 }

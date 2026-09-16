@@ -704,8 +704,9 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// fetching only the ones not already cached and merging them in — additive, never removes
     /// or replaces entries <see cref="GoToRulesAsync"/> (or a prior call) already fetched. Lets a
     /// profiles-first flow (Profiles → Generate…) validate against real metadata without requiring
-    /// a prior visit to the Rules step. Provider failures propagate to the caller rather than
-    /// being swallowed into an empty map.
+    /// a prior visit to the Rules step. Tables unavailable in this environment are skipped, so
+    /// per-table import validation can report them; only when every requested fetch fails does
+    /// the failure propagate to the caller rather than resolve to an empty map.
     /// </summary>
     /// <param name="logicalNames">Table logical names to ensure metadata for.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -720,11 +721,35 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         if (missing.Length == 0)
             return;
 
-        var list = await _metadataProvider.GetEntitiesAsync(missing, ct);
-        foreach (var m in list.Where(m => m.LogicalName is not null))
-            _entityMetadata[m.LogicalName!] = m;
+        var results = await Task.WhenAll(missing.Select(n => FetchOrFailAsync(n, ct)));
+
+        var failures = results.Where(r => r.Meta is null).ToArray();
+        if (failures.Length == missing.Length)
+            throw failures[0].Error!;
+
+        foreach (var r in results.Where(r => r.Meta is not null))
+            _entityMetadata[r.Meta!.LogicalName ?? r.Name] = r.Meta;
+
+        if (failures.Length > 0)
+        {
+            _logger.LogWarning("Table(s) not available in this environment: {Tables}",
+                string.Join(", ", failures.Select(f => f.Name)));
+        }
 
         OnPropertyChanged(nameof(EntityMetadataMap));
+    }
+
+    private async Task<(string Name, Microsoft.Xrm.Sdk.Metadata.EntityMetadata? Meta, Exception? Error)> FetchOrFailAsync(
+        string name, CancellationToken ct)
+    {
+        try
+        {
+            return (name, await _metadataProvider.GetEntityAsync(name, ct), null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return (name, null, ex);
+        }
     }
 
     private bool CanGoToReview() => IsRulesLoaded && !IsRunning;
