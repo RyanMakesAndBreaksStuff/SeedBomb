@@ -33,6 +33,30 @@ public sealed class HistoryViewModelTests
     }
 
     [Fact]
+    public async Task SearchText_MatchesEnvironment()
+    {
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new RunRecord(Guid.NewGuid(), new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero),
+                ["Account"], 10, TimeSpan.FromMinutes(1), true, 0,
+                Environment: "contoso.crm.dynamics.com"),
+            new RunRecord(Guid.NewGuid(), new DateTimeOffset(2026, 9, 15, 8, 0, 0, TimeSpan.Zero),
+                ["Contact"], 5, TimeSpan.FromMinutes(1), true, 0,
+                Environment: "fabrikam.crm.dynamics.com"),
+        ]);
+
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        vm.SearchText = "contoso";
+
+        Assert.Single(vm.DayGroups);
+        Assert.Single(vm.DayGroups[0].Runs);
+        Assert.Equal("contoso.crm.dynamics.com", vm.DayGroups[0].Runs[0].Environment);
+    }
+
+    [Fact]
     public async Task LoadAsync_ShowsDangerSnackbar_WhenHistoryServiceFails()
     {
         var history = new Mock<IRunHistoryService>();

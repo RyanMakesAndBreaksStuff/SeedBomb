@@ -154,7 +154,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
 
             var lines = new List<string>
             {
-                "Timestamp,Entities,TotalRecords,Duration,Status,Errors"
+                "Timestamp,Entities,TotalRecords,Duration,Status,Errors,Environment,User,Profile"
             };
 
             foreach (var run in Runs)
@@ -168,7 +168,10 @@ public sealed partial class HistoryViewModel : ViewModelBase
                     EscapeCsv(run.TotalRecords.ToString()),
                     EscapeCsv(duration),
                     EscapeCsv(status),
-                    EscapeCsv(run.ErrorCount.ToString())));
+                    EscapeCsv(run.ErrorCount.ToString()),
+                    EscapeCsv(run.Environment),
+                    EscapeCsv(run.User),
+                    EscapeCsv(run.Profile)));
             }
 
             await System.IO.File.WriteAllLinesAsync(path, lines);
@@ -205,8 +208,11 @@ public sealed partial class HistoryViewModel : ViewModelBase
         IEnumerable<RunRecord> source = Runs;
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
-            source = Runs.Where(r => r.EntityNames.Any(n =>
-                n.Contains(SearchText, StringComparison.OrdinalIgnoreCase)));
+            source = Runs.Where(r =>
+                r.EntityNames.Any(n => n.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+                || r.Environment.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                || r.User.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                || r.Profile.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
         }
 
         var groups = source

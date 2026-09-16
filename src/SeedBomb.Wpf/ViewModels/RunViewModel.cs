@@ -10,6 +10,7 @@ using DataGen.Core.Exceptions;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
+using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Diagnostics;
 using Seedbomb.Services.Export;
@@ -53,6 +54,7 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
     private readonly IConnectionProfileService? _connections;
+    private readonly IAuthService? _auth;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
@@ -80,6 +82,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
     /// <param name="connections">Resolves the connected environment host. Null leaves it unknown.</param>
+    /// <param name="auth">Signed-in user for history rows. Null leaves it blank.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
@@ -87,7 +90,8 @@ public sealed partial class RunViewModel : ObservableObject
         IAppNavigator? navigator = null,
         ISnackbarService? snackbar = null,
         ILogger<RunViewModel>? logger = null,
-        IConnectionProfileService? connections = null)
+        IConnectionProfileService? connections = null,
+        IAuthService? auth = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
@@ -96,10 +100,17 @@ public sealed partial class RunViewModel : ObservableObject
         _snackbar = snackbar;
         _logger = logger;
         _connections = connections;
+        _auth = auth;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
+
+    /// <summary>Host of the environment the last run targeted, e.g. <c>contoso.crm.dynamics.com</c>.</summary>
+    public string EnvironmentLabel => _environmentHost;
+
+    /// <summary>Signed-in user for the last run, or "" when unknown.</summary>
+    public string UserLabel => _auth?.CurrentUserDisplayName ?? "";
 
     /// <summary>True while generation is in flight. Drives the ring, headline, and Cancel/Close swap.</summary>
     [ObservableProperty] private bool _isRunning;

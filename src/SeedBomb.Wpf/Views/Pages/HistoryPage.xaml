@@ -66,17 +66,23 @@
                     <Border Grid.Row="0" Style="{DynamicResource DG.TableHeader}">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="72" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="88" />
-                                <ColumnDefinition Width="72" />
-                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="72" />   <!-- Time -->
+                                <ColumnDefinition Width="*" MinWidth="160" />  <!-- Tables -->
+                                <ColumnDefinition Width="160" />  <!-- Environment -->
+                                <ColumnDefinition Width="150" />  <!-- User -->
+                                <ColumnDefinition Width="130" />  <!-- Profile -->
+                                <ColumnDefinition Width="88" />   <!-- Records -->
+                                <ColumnDefinition Width="72" />   <!-- Duration -->
+                                <ColumnDefinition Width="80" />   <!-- Status -->
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Style="{DynamicResource DG.TableHeaderText}" Text="Time" />
                             <TextBlock Grid.Column="1" Style="{DynamicResource DG.TableHeaderText}" Text="Tables" />
-                            <TextBlock Grid.Column="2" Style="{DynamicResource DG.TableHeaderText}" Text="Records" />
-                            <TextBlock Grid.Column="3" Style="{DynamicResource DG.TableHeaderText}" Text="Duration" />
-                            <TextBlock Grid.Column="4" Style="{DynamicResource DG.TableHeaderText}" Text="Status" />
+                            <TextBlock Grid.Column="2" Style="{DynamicResource DG.TableHeaderText}" Text="Environment" />
+                            <TextBlock Grid.Column="3" Style="{DynamicResource DG.TableHeaderText}" Text="User" />
+                            <TextBlock Grid.Column="4" Style="{DynamicResource DG.TableHeaderText}" Text="Profile" />
+                            <TextBlock Grid.Column="5" Style="{DynamicResource DG.TableHeaderText}" Text="Records" />
+                            <TextBlock Grid.Column="6" Style="{DynamicResource DG.TableHeaderText}" Text="Duration" />
+                            <TextBlock Grid.Column="7" Style="{DynamicResource DG.TableHeaderText}" Text="Status" />
                         </Grid>
                     </Border>
 
@@ -105,11 +111,14 @@
                                     </Border.InputBindings>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="72" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="88" />
-                                            <ColumnDefinition Width="72" />
-                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="72" />   <!-- Time -->
+                                            <ColumnDefinition Width="*" MinWidth="160" />  <!-- Tables -->
+                                            <ColumnDefinition Width="160" />  <!-- Environment -->
+                                            <ColumnDefinition Width="150" />  <!-- User -->
+                                            <ColumnDefinition Width="130" />  <!-- Profile -->
+                                            <ColumnDefinition Width="88" />   <!-- Records -->
+                                            <ColumnDefinition Width="72" />   <!-- Duration -->
+                                            <ColumnDefinition Width="80" />   <!-- Status -->
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
                                                    Style="{DynamicResource DG.Cell}"
@@ -130,11 +139,29 @@
                                         </ItemsControl>
                                         <TextBlock Grid.Column="2"
                                                    Style="{DynamicResource DG.Cell}"
-                                                   Text="{Binding TotalRecords, StringFormat=N0}" />
+                                                   Text="{Binding Environment}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Environment}"
+                                                   Margin="0,0,8,0" />
                                         <TextBlock Grid.Column="3"
                                                    Style="{DynamicResource DG.Cell}"
+                                                   Text="{Binding User}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding User}"
+                                                   Margin="0,0,8,0" />
+                                        <TextBlock Grid.Column="4"
+                                                   Style="{DynamicResource DG.Cell}"
+                                                   Text="{Binding Profile}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Profile}"
+                                                   Margin="0,0,8,0" />
+                                        <TextBlock Grid.Column="5"
+                                                   Style="{DynamicResource DG.Cell}"
+                                                   Text="{Binding TotalRecords, StringFormat=N0}" />
+                                        <TextBlock Grid.Column="6"
+                                                   Style="{DynamicResource DG.Cell}"
                                                    Text="{Binding Duration, StringFormat={}{0:mm\\:ss}}" />
-                                        <TextBlock Grid.Column="4">
+                                        <TextBlock Grid.Column="7">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Cell}">
                                                     <Setter Property="Text" Value="Failed" />
