@@ -40,7 +40,7 @@ namespace Seedbomb.Resources
 
         // arc radii + type sizes, identical to render_concepts.py concept 07
         private const double Cx = 400.0, Cy = 238.0;
-        private const double RTitle = 172.0, RSub = 152.0, RSlogan = 124.0;
+        private const double RTitle = 172.0, RSub = 152.0, RSlogan = 134.0;
 
         private DateTime _shownAt;
         private double _progress = -1.0;
@@ -53,13 +53,13 @@ namespace Seedbomb.Resources
 
             TitleArc.Data = BuildArcGeometry("SEED BOMB",
                 new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
-                25, 3, RTitle, top: true);
+                25, 4.5, RTitle, top: true);
             SubArc.Data = BuildArcGeometry("FOR MICROSOFT DATAVERSE",
                 new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
                 10, 3, RSub, top: true);
             SloganArc.Data = BuildArcGeometry("Mock Data That Goes Boom! Before You Do",
                 new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
-                13, 0.5, RSlogan, top: false);
+                12, 1.8, RSlogan, top: false);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
