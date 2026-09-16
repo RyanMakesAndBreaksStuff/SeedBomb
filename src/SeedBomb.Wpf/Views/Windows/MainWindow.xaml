@@ -11,7 +11,7 @@
                  Width="1380" Height="900" MinWidth="960" MinHeight="560"
                  Background="{DynamicResource DG.Bg}"
                  ExtendsContentIntoTitleBar="True"
-                 WindowBackdropType="Mica"
+                 WindowBackdropType="None"
                  WindowCornerPreference="Round"
                  WindowStartupLocation="CenterScreen"
                  Icon="pack://application:,,,/Resources/logo.ico">
