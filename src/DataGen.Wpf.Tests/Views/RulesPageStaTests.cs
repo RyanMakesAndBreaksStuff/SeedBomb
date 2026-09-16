@@ -227,7 +227,7 @@ public sealed class RulesPageStaTests : IDisposable
             [selected], single: true, CancellationToken.None);
         var picker = LoadPicker(vm);
 
-        var search = FindButtons(picker).Single(b => Equals(b.Content, "Search / Retry"));
+        var search = FindButtons(picker).Single(b => Equals(b.Content, "Search"));
         var addHighlighted = FindButtons(picker).Single(b => Equals(b.Content, "Select highlighted record"));
         var next = FindButtons(picker).Single(b => Equals(b.Content, "Next page"));
         var remove = FindButtons(picker).Single(b => Equals(b.Content, "Remove"));
