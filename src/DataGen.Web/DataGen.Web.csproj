@@ -9,6 +9,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="appsettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="appsettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
     <ProjectReference Include="../DataGen.Bulk/DataGen.Bulk.csproj" />
   </ItemGroup>

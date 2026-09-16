@@ -50,9 +50,11 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
         progress?.Report(new GenerationPipelineProgress { Phase = "Resolving dependencies" });
         var graphBuilder = new GraphBuilder(lf.CreateLogger<GraphBuilder>());
         var cycleDetector = new CycleDetector(lf.CreateLogger<CycleDetector>());
-        bool IsExplicitLookup(string table, string column) =>
-            LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
-        var graph = graphBuilder.Build(metaDict, IsExplicitLookup);
+        // Backfill ownership (LookupRulePolicy.IsExplicit, used in BulkCreator) is a different
+        // question: lookupRandom owns its written value but still depends on its in-run targets.
+        bool SuppliesValueWithoutDependency(string table, string column) =>
+            LookupRulePolicy.SuppliesValueWithoutDependency(config.FieldRules, table, column);
+        var graph = graphBuilder.Build(metaDict, SuppliesValueWithoutDependency);
         var cycles = cycleDetector.FindStronglyConnectedComponents(graph);
         if (cycles.Count > 0)
         {
@@ -60,7 +62,7 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
             {
                 _logger.LogWarning("Breaking {Count} dependency cycle(s)", cycles.Count);
             }
-            cycleDetector.BreakCycles(graph, cycles, metaDict, IsExplicitLookup);
+            cycleDetector.BreakCycles(graph, cycles, metaDict, SuppliesValueWithoutDependency);
         }
 
         progress?.Report(new GenerationPipelineProgress { Phase = "Generating records" });
@@ -83,7 +85,7 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
         var bulkProgress = progress is null ? null : new Progress<BulkCreationProgress>(p =>
             progress.Report(new GenerationPipelineProgress
             {
-                Phase = "Generating",
+                Phase = p.Phase,
                 EntityLogicalName = p.EntityLogicalName,
                 RecordsCreated = p.RecordsCreated,
                 TotalRecords = p.TotalRecords,

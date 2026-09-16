@@ -128,4 +128,46 @@ public class ThrottlePolicyTests
             });
         Assert.Equal(40, results.Count);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_Http429_RetriesAndSucceeds()
+    {
+        // ServiceClient surfaces a bare HTTP 429 as ProtocolException, not a service-protection
+        // fault, so the policy owns the resend. A 429 is rejected before processing: no duplicates.
+        var callCount = 0;
+
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new ProtocolException("The remote server returned an unexpected response: (429)  .");
+                return Task.FromResult("success");
+            },
+            "contact",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NonThrottleProtocolFault_IsNotRetried()
+    {
+        var callCount = 0;
+
+        await Assert.ThrowsAsync<DataGenerationException>(() =>
+            _policy.ExecuteAsync<int>(
+                () =>
+                {
+                    callCount++;
+                    throw new ProtocolException("The remote server returned an unexpected response: (502)  .");
+                },
+                "contact",
+                maxRetries: 3,
+                CancellationToken.None));
+
+        Assert.Equal(1, callCount);
+    }
 }

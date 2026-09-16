@@ -268,9 +268,10 @@ public class BulkCreatorPipelineTests
             new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["new_widget"] = meta },
             graph, progress, CancellationToken.None);
 
-        // 6 records / batch of 2 = 3 batches → 3 progress reports
+        // 6 records / batch of 2 = 3 batches → 3 progress reports. The link phases (and their
+        // opening entity-less snapshot) are also reported now; they are not batch reports.
         Assert.True(progressReports.Count >= 3, $"Expected at least 3 progress reports for 3 batches, got {progressReports.Count}");
-        Assert.All(progressReports, p => Assert.Equal("new_widget", p.EntityLogicalName));
+        Assert.All(progressReports.Where(p => p.Phase == "Generating"), p => Assert.Equal("new_widget", p.EntityLogicalName));
     }
 
     [Fact]

@@ -6,10 +6,13 @@ using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
+using DataGen.Core.Exceptions;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
+using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
+using Seedbomb.Services.Diagnostics;
 using Seedbomb.Services.Export;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
@@ -51,10 +54,13 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
     private readonly IConnectionProfileService? _connections;
+    private readonly IAuthService? _auth;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
     private readonly Dictionary<string, int> _tableWritten = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Diagnostics.Stopwatch _runClock = new();
+    private System.Windows.Threading.DispatcherTimer? _clockTimer;
 
     private GenerationConfig? _lastConfig;
     private CancellationTokenSource? _runCts;
@@ -78,6 +84,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
     /// <param name="connections">Resolves the connected environment host. Null leaves it unknown.</param>
+    /// <param name="auth">Signed-in user for history rows. Null leaves it blank.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
@@ -85,7 +92,8 @@ public sealed partial class RunViewModel : ObservableObject
         IAppNavigator? navigator = null,
         ISnackbarService? snackbar = null,
         ILogger<RunViewModel>? logger = null,
-        IConnectionProfileService? connections = null)
+        IConnectionProfileService? connections = null,
+        IAuthService? auth = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
@@ -94,10 +102,17 @@ public sealed partial class RunViewModel : ObservableObject
         _snackbar = snackbar;
         _logger = logger;
         _connections = connections;
+        _auth = auth;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
+
+    /// <summary>Host of the environment the last run targeted, e.g. <c>contoso.crm.dynamics.com</c>.</summary>
+    public string EnvironmentLabel => _environmentHost;
+
+    /// <summary>Signed-in user for the last run, or "" when unknown.</summary>
+    public string UserLabel => _auth?.CurrentUserDisplayName ?? "";
 
     /// <summary>True while generation is in flight. Drives the ring, headline, and Cancel/Close swap.</summary>
     [ObservableProperty] private bool _isRunning;
@@ -108,6 +123,15 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>True before the first batch completes.</summary>
     [ObservableProperty] private bool _isIndeterminate;
+
+    /// <summary>True while the pipeline is backfilling lookups and N:N links after record creation.</summary>
+    [ObservableProperty] private bool _isLinking;
+
+    /// <summary>0–100 progress of the link phase. Drives the secondary bar.</summary>
+    [ObservableProperty] private double _linkPercent;
+
+    /// <summary>Human label for the link phase, e.g. "3 / 7 tables linked".</summary>
+    [ObservableProperty] private string _linkLabel = "";
 
     /// <summary>0–100 overall progress for the ring.</summary>
     [ObservableProperty] private double _overallPercent;
@@ -129,6 +153,9 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>False when the last run produced rejected rows. Drives the outcome banner style.</summary>
     [ObservableProperty] private bool _lastRunSucceeded = true;
+
+    /// <summary>Text shown in the last failure toast. Empty until a run fails.</summary>
+    [ObservableProperty] private string _lastFailureMessage = "";
 
     /// <summary>Outcome glyph. Enum, not a Brush.</summary>
     [ObservableProperty] private SymbolRegular _outcomeGlyph = SymbolRegular.CheckmarkCircle24;
@@ -222,6 +249,8 @@ public sealed partial class RunViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+            _runClock.Stop();
+            _clockTimer?.Stop();
             // Hold the completed sheet up until manual Close when the user asked to keep it open.
             IsSheetVisible = KeepWindowOpen;
             _runCts?.Dispose();
@@ -245,8 +274,13 @@ public sealed partial class RunViewModel : ObservableObject
         RecentActivity.Clear();
 
         IsRunning = true;
+        _runClock.Restart();
+        StartClock();
         IsSheetVisible = true;
         IsIndeterminate = true;
+        IsLinking = false;
+        LinkPercent = 0;
+        LinkLabel = "";
         StatusHeadline = "Generating…";
         OverallPercent = 0;
         OverallPercentLabel = "0";
@@ -263,14 +297,42 @@ public sealed partial class RunViewModel : ObservableObject
         Metrics.Add(new RunValueRow("Throughput", "0/min", "Normal"));
     }
 
-    /// <summary>Projects a pipeline snapshot onto the sheet.</summary>
-    private void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
+    /// <summary>Projects a pipeline snapshot onto the sheet. Internal so progress tests can drive it.</summary>
+    /// <param name="u">One pipeline snapshot.</param>
+    /// <param name="plannedTables">Tables queued for this run.</param>
+    /// <param name="plannedTotal">Rows planned across every table.</param>
+    internal void AcceptProgress(ProgressUpdate u, IReadOnlyList<string> plannedTables, int plannedTotal)
     {
         ArgumentNullException.ThrowIfNull(u);
         ArgumentNullException.ThrowIfNull(plannedTables);
 
+        // A link snapshot is not a record-creation snapshot: it must not touch _tableWritten, the
+        // per-table rows or the ring, which would read as corrupted progress. The secondary bar carries it.
+        if (string.Equals(u.Phase, "Linking", StringComparison.Ordinal))
+        {
+            IsLinking = true;
+            IsIndeterminate = u.TotalRecords == 0;
+            LinkPercent = u.TotalRecords > 0
+                ? Math.Clamp(100.0 * u.RecordsCreated / u.TotalRecords, 0, 100)
+                : 0;
+            LinkLabel = u.TotalRecords > 0
+                ? $"{u.RecordsCreated:N0} / {u.TotalRecords:N0} linked"
+                : "Preparing links…";
+            if (!string.Equals(StatusHeadline, "Cancelling…", StringComparison.Ordinal))
+                StatusHeadline = "Linking records…";
+            AppendActivity(string.IsNullOrEmpty(u.EntityName)
+                ? "Linking records"
+                : $"Linking  {u.EntityName}  {u.RecordsCreated:N0}/{u.TotalRecords:N0}");
+            return;
+        }
+
         if (!string.IsNullOrEmpty(u.EntityName))
         {
+            // Batches run in parallel and Progress<T> does not preserve post order, so a snapshot
+            // can arrive carrying a lower cumulative count than one already applied. Drop it whole:
+            // the ring, the row, the metrics and the activity line must never run backwards.
+            if (u.RecordsCreated < _tableWritten.GetValueOrDefault(u.EntityName))
+                return;
             _tableWritten[u.EntityName] = u.RecordsCreated;
             UpdateTableRow(u);
         }
@@ -290,13 +352,18 @@ public sealed partial class RunViewModel : ObservableObject
 
         RefreshMetrics(u, written, plannedTotal);
         var entity = string.IsNullOrEmpty(u.EntityName) ? "" : $"  {u.EntityName}";
-        AppendActivity($"{u.Phase}{entity}  {u.RecordsCreated:N0}/{u.TotalRecords:N0}");
+        AppendActivity(u.TotalRecords > 0
+            ? $"{u.Phase}{entity}  {u.RecordsCreated:N0}/{u.TotalRecords:N0}"
+            : $"{u.Phase}{entity}");
     }
 
     /// <summary>Projects a finished <see cref="GenerationResult"/> onto the summary. Keeps <paramref name="config"/> for retry.</summary>
     public void ApplyResult(GenerationResult result, int seed, string environmentHost, GenerationConfig? config = null)
     {
         ArgumentNullException.ThrowIfNull(result);
+
+        _runClock.Stop();
+        _clockTimer?.Stop();
 
         if (config is not null)
             _lastConfig = config with { AllowRiskyBogusValues = false };
@@ -307,9 +374,22 @@ public sealed partial class RunViewModel : ObservableObject
 
         IsRunning = false;
         IsIndeterminate = false;
+        IsLinking = false;
+
+        // The last per-table snapshot can be throttled away or arrive out of order; the result is
+        // the authoritative written count, so rows settle here rather than at whatever the UI saw.
+        foreach (var (table, ids) in result.CreatedRecords)
+        {
+            _tableWritten[table] = ids.Count;
+            var plannedForTable = _lastConfig?.RecordCounts is { } counts
+                && counts.TryGetValue(table, out var want) ? want : ids.Count;
+            UpdateTableRow(
+                new ProgressUpdate("Generating", table, ids.Count, plannedForTable, 0, 0, 0, result.Elapsed),
+                final: true);
+        }
 
         var written = result.TotalRecords;
-        var rejected = result.Errors.Count;
+        var rejected = result.Errors.Sum(e => e.RowCount);
         var planned = _plannedTotal > 0 ? _plannedTotal : written;
         var pct = planned > 0 ? Math.Clamp(100.0 * written / planned, 0, 100) : 100;
         OverallPercent = pct;
@@ -422,12 +502,22 @@ public sealed partial class RunViewModel : ObservableObject
                     ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
                 break;
             default:
-                _snackbar?.Show("Error", "Generation failed — see logs for details",
-                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
                 _logger?.LogError(ex, "Generation failed");
+                LastFailureMessage = DescribeFailure(ex);
+                _snackbar?.Show("Error", LastFailureMessage,
+                    ControlAppearance.Danger, null, TimeSpan.FromSeconds(10));
                 break;
         }
     }
+
+    /// <summary>
+    /// A <see cref="DataGenerationException"/> message is written for the user and names the fix,
+    /// so it is shown verbatim. Anything else is a defect and points at the log file.
+    /// </summary>
+    /// <param name="ex">The failure to describe.</param>
+    private static string DescribeFailure(Exception ex) => ex is DataGenerationException
+        ? ex.Message
+        : $"Generation failed: {ex.Message} — full details in {AppPaths.Logs}";
 
     private async Task<bool> ConfirmRiskyBogusAsync()
     {
@@ -609,7 +699,7 @@ public sealed partial class RunViewModel : ObservableObject
         LastRunSucceeded = !hasRejects;
         OutcomeGlyph = hasRejects ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24;
         OutcomeHeadline = hasRejects
-            ? $"Completed with {rejected:N0} rejected rows"
+            ? $"Completed with {rejected:N0} rejected {(rejected == 1 ? "row" : "rows")}"
             : "Completed";
         OutcomeDetail = $"Wrote {written:N0} rows. Nothing was rolled back.";
 
@@ -636,7 +726,7 @@ public sealed partial class RunViewModel : ObservableObject
             CauseText = message,
             CauseHint = hint,
             TableName = grouping.Key.EntityLogicalName,
-            RowCount = grouping.Count(),
+            RowCount = grouping.Sum(e => e.RowCount),
             IsRetryable = retryable,
             DispositionLabel = retryable ? "Retryable" : "Needs a fix",
             DispositionKey = retryable ? "Retryable" : "FixFirst",
@@ -703,10 +793,10 @@ public sealed partial class RunViewModel : ObservableObject
         RetrySelectedCommand.NotifyCanExecuteChanged();
     }
 
-    private void UpdateTableRow(ProgressUpdate u)
+    private void UpdateTableRow(ProgressUpdate u, bool final = false)
     {
-        var pct = u.TotalRecords > 0 ? 100.0 * u.RecordsCreated / u.TotalRecords : 0;
-        var done = u.TotalRecords > 0 && u.RecordsCreated >= u.TotalRecords;
+        var pct = u.TotalRecords > 0 ? Math.Clamp(100.0 * u.RecordsCreated / u.TotalRecords, 0, 100) : 0;
+        var done = final || (u.TotalRecords > 0 && u.RecordsCreated >= u.TotalRecords);
         var row = new RunTableProgressRow(
             u.EntityName,
             pct,
@@ -727,6 +817,32 @@ public sealed partial class RunViewModel : ObservableObject
         Tables.Add(row);
     }
 
+    private void StartClock()
+    {
+        _clockTimer ??= new System.Windows.Threading.DispatcherTimer(
+            System.Windows.Threading.DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        _clockTimer.Tick -= OnClockTick;
+        _clockTimer.Tick += OnClockTick;
+        _clockTimer.Start();
+    }
+
+    // The pipeline stops reporting during the link phases, so elapsed must come from a local
+    // clock — sourcing it from ProgressUpdate.Elapsed froze the timer and read as "finished".
+    private void OnClockTick(object? sender, EventArgs e)
+    {
+        if (!IsRunning)
+        {
+            _clockTimer?.Stop();
+            return;
+        }
+
+        if (Metrics.Count > 0)
+            Metrics[0] = new RunValueRow("Elapsed", FormatDuration(_runClock.Elapsed), "Normal");
+    }
+
     private void RefreshMetrics(ProgressUpdate u, int written, int plannedTotal)
     {
         var remaining = "—";
@@ -738,7 +854,7 @@ public sealed partial class RunViewModel : ObservableObject
         }
 
         Metrics.Clear();
-        Metrics.Add(new RunValueRow("Elapsed", FormatDuration(u.Elapsed), "Normal"));
+        Metrics.Add(new RunValueRow("Elapsed", FormatDuration(_runClock.Elapsed), "Normal"));
         Metrics.Add(new RunValueRow("Remaining", remaining, remainingKind));
         Metrics.Add(new RunValueRow("Throughput", $"{u.RecordsPerMinute:N0}/min", "Normal"));
     }

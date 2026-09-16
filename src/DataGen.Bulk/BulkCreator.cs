@@ -76,14 +76,17 @@ public class BulkCreator : IBulkCreator
 
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
-            var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata,
+            // Sort first: PreparedLookupRun needs the creation order to know which lookup targets
+            // this run creates before their source table.
+            var sortedEntities = _topologicalSort.Sort(graph);
+
+            var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
                 _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
 
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
             await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
 
-            var sortedEntities = _topologicalSort.Sort(graph);
             var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
             var allErrors = new List<BatchError>();
             var runStart = DateTimeOffset.UtcNow;
@@ -145,16 +148,30 @@ public class BulkCreator : IBulkCreator
                 }
             }
 
+            // Opening Linking snapshot: switches the UI to the link phase even when there is
+            // nothing to link, so a run never looks "finished" before phases 2 and 3 have run.
+            progress?.Report(new BulkCreationProgress
+            {
+                Phase = "Linking",
+                EntityLogicalName = string.Empty,
+                BatchIndex = 0,
+                TotalBatches = 0,
+                RecordsCreated = 0,
+                TotalRecords = 0,
+            });
+
             // Phase 2: backfill deferred lookups
             _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
             var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
                 graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
-                isExplicitLookup: (table, column) => LookupRulePolicy.IsExplicit(config.FieldRules, table, column)).ConfigureAwait(false);
+                isExplicitLookup: (table, column) => LookupRulePolicy.IsExplicit(config.FieldRules, table, column),
+                progress: progress).ConfigureAwait(false);
             allErrors.AddRange(backfillErrors);
 
             // Phase 3: N:N associations
             var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
-                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct).ConfigureAwait(false);
+                graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
+                progress: progress).ConfigureAwait(false);
             allErrors.AddRange(associateErrors);
 
             var elapsed = DateTimeOffset.UtcNow - runStart;
@@ -276,7 +293,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
@@ -288,7 +305,7 @@ public class BulkCreator : IBulkCreator
             {
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
-                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                    value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -299,7 +316,7 @@ public class BulkCreator : IBulkCreator
             {
                 if (attr.LogicalName is null || !tableRules.TryGetValue(attr.LogicalName, out var rule))
                     continue;
-                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, bogusSession);
+                var value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
@@ -384,7 +401,7 @@ public class BulkCreator : IBulkCreator
                     _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
-                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message, 0)];
+                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message, 0, batch.Length)];
                 }
 
                 idBags[batchIndex] = batchIds;
@@ -783,11 +800,12 @@ public class BulkCreator : IBulkCreator
         int rowIndex,
         PreparedBogusRun? preparedRun,
         PreparedLookupRun lookupRun,
+        DataverseRecordPool pool,
         BogusEvaluatorSession session)
     {
         if (rule is LookupRandomRule)
             return RuleValueGenerator.EvaluateLookupRandom(
-                lookupRun.Get(context.Table, attr.LogicalName!), context.Seed,
+                lookupRun.Get(context.Table, attr.LogicalName!, pool), context.Seed,
                 context.Table, attr.LogicalName!, rowIndex);
 
         if (rule is not BogusRule bogus)

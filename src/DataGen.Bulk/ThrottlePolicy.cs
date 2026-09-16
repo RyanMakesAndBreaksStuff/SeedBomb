@@ -10,7 +10,9 @@ namespace DataGen.Bulk;
 /// <summary>
 /// Executes Dataverse API calls with automatic retry on transient timeout and network faults.
 /// Service-protection (throttle) faults are not retried here — <c>ServiceClient</c> already
-/// pauses and resends those itself before a fault ever surfaces. Uses exponential backoff with jitter.
+/// pauses and resends those itself before a fault ever surfaces. A bare HTTP 429 is the exception:
+/// it reaches us as a <see cref="ProtocolException"/> that <c>ServiceClient</c> did not handle, so
+/// this policy resends it. Uses exponential backoff with jitter.
 /// </summary>
 public class ThrottlePolicy
 {
@@ -74,6 +76,14 @@ public class ThrottlePolicy
                 var delay = ComputeDelay(attempt);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
+            catch (ProtocolException ex) when (attempt < maxRetries && IsRateLimited(ex))
+            {
+                var delay = ComputeDelay(attempt);
+                _logger.LogWarning(
+                    "HTTP 429 for {Entity} on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
+                    entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+            }
             catch (FaultException<OrganizationServiceFault> ex)
             {
                 // ServiceClient already pauses and resends on service-protection limits, so any
@@ -94,6 +104,11 @@ public class ThrottlePolicy
         throw new DataGenerationException(
             $"Batch creation for '{entityName}' exhausted {maxRetries} retries with no result.");
     }
+
+    // ponytail: matches ServiceClient's own message text. A structured status code never reaches
+    // us — ThrowIfResponseIsEmpty formats the code into the message and drops the response.
+    private static bool IsRateLimited(ProtocolException ex) =>
+        ex.Message.Contains("(429)", StringComparison.Ordinal);
 
     private static TimeSpan ComputeDelay(int attempt)
     {

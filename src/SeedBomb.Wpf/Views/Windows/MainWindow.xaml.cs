@@ -86,6 +86,7 @@ public partial class MainWindow : FluentWindow
         };
         _authService.SignedOut += OnSignedOut;
         Loaded += OnWindowLoaded;
+        SourceInitialized += OnSourceInitialized;
         Closed += OnWindowClosed;
 
         // Same shared ConnectionManagerViewModel instance ConnectionsPage's identical
@@ -116,6 +117,26 @@ public partial class MainWindow : FluentWindow
             // SignInErrorBanner/SignInErrorText via the explicit-source bindings at :100-107.
             _connectionManagerViewModel.SwitchError = ex.Message;
         }
+    }
+
+    // The XAML asks for 1380x900 DIPs, which does not fit a 1366x768 display or a 1920x1080 one
+    // at 125%+ scaling. WindowStartupLocation="CenterScreen" then centres an oversized window and
+    // pushes the title bar off the top and the nav footer off the bottom. Clamp to the work area
+    // and re-centre inside it. Startup only: the user's own resizing and maximizing are untouched.
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        SourceInitialized -= OnSourceInitialized;
+
+        var work = SystemParameters.WorkArea;
+        var width = Math.Min(Width, work.Width);
+        var height = Math.Min(Height, work.Height);
+
+        // MinWidth/MinHeight win over the clamp in WPF, so a work area smaller than the minimum
+        // still overflows — nothing sensible to do there beyond keeping the minimum small.
+        Width = width;
+        Height = height;
+        Left = work.Left + Math.Max(0, (work.Width - width) / 2);
+        Top = work.Top + Math.Max(0, (work.Height - height) / 2);
     }
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)

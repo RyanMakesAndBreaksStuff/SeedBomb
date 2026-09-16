@@ -210,6 +210,26 @@
                     </Border>
                 </Grid>
 
+                <!-- ── Link phase ────────────────────────────────────────
+                     Record creation finishing is not the run finishing: deferred lookups and
+                     N:N links run afterwards. Without this the ring sat at 100% and the sheet
+                     read as done while the pipeline was still writing. -->
+                <StackPanel Grid.Row="3" Margin="26,14,26,0"
+                            Visibility="{Binding IsLinking, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{DynamicResource DG.GroupLabel}"
+                                   Margin="0" Text="Linking records" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Style="{DynamicResource DG.Mono}"
+                                   Text="{Binding LinkLabel}" VerticalAlignment="Center"/>
+                    </Grid>
+                    <ProgressBar Style="{DynamicResource DG.ProgressBar}"
+                                 Value="{Binding LinkPercent}" Maximum="100"/>
+                </StackPanel>
+
                 <!-- ── Command bar ───────────────────────────────────── -->
                 <Border Grid.Row="4"
                         Background="{DynamicResource DG.Surface2}"

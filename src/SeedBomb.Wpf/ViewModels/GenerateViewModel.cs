@@ -849,7 +849,10 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 result.TotalRecords,
                 result.Elapsed,
                 result.Errors.Count == 0,
-                result.Errors.Count));
+                result.Errors.Sum(e => e.RowCount),
+                Run.EnvironmentLabel,
+                Run.UserLabel,
+                ActiveProfileName));
             ReportOutcome(result);
             if (!Run.KeepWindowOpen)
                 _navigator?.Navigate(typeof(RunSummaryPage));

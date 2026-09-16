@@ -126,7 +126,7 @@
     <sys:Double x:Key="DG.Size.ControlSmall">30</sys:Double>
     <sys:Double x:Key="DG.Size.Chip">24</sys:Double>
     <sys:Double x:Key="DG.Size.ListPane">330</sys:Double>   <!-- 3a profile list -->
-    <sys:Double x:Key="DG.Size.ColumnPane">256</sys:Double> <!-- 3b column list -->
+    <sys:Double x:Key="DG.Size.ColumnPane">312</sys:Double> <!-- 3b column list -->
     <sys:Double x:Key="DG.Size.PreviewPane">236</sys:Double><!-- 3b preview -->
     <sys:Double x:Key="DG.Size.AsidePane">320</sys:Double>  <!-- 2a wizard aside -->
     <sys:Double x:Key="DG.Size.SheetWidth">600</sys:Double> <!-- 3c run sheet -->
@@ -720,6 +720,16 @@
         <Setter Property="Background" Value="{DynamicResource DG.TrackFill}"/>
         <Setter Property="Foreground" Value="{DynamicResource DG.RunSweep}"/>
         <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <!-- Flat list surface for picked lookup records; rows use DG.Cell text. -->
+    <Style x:Key="DG.ListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
     </Style>
 
     <!-- 3px selection stripe on the leading edge of a selected nav/list item. -->

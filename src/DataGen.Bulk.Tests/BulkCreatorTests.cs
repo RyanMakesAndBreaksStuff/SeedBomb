@@ -353,4 +353,37 @@ public class BulkCreatorTests
 
         Assert.True(result.Elapsed >= TimeSpan.Zero);
     }
+
+    [Fact]
+    public async Task CreateAsync_WholeBatchFails_ReportsEveryLostRow()
+    {
+        // CreateMultiple is transactional: one rejected request loses the whole batch.
+        var (sut, serviceMock) = BuildSut();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ProtocolException("The remote server returned an unexpected response: (429)  ."));
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(0, result.TotalRecords);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(10, error.RowCount);
+    }
 }

@@ -311,4 +311,84 @@ public sealed class RunViewModelTests
         Assert.Equal(3, vm.Metrics.Count);
         Assert.DoesNotContain(vm.Metrics, m => m.Label == "Rejected");
     }
+
+    [Fact]
+    public void AcceptProgress_OutOfOrderSnapshots_NeverMoveProgressBackwards()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+
+        vm.AcceptProgress(Update("account", created: 80, total: 100), ["account"], 100);
+        // A slower batch's snapshot lands after a faster one's: it carries a lower cumulative count.
+        vm.AcceptProgress(Update("account", created: 40, total: 100), ["account"], 100);
+
+        Assert.Equal(80, vm.OverallPercent);
+        Assert.Equal("80", vm.OverallPercentLabel);
+        Assert.Equal(80, Assert.Single(vm.Tables).Percent);
+    }
+
+    [Fact]
+    public void ApplyResult_SettlesEveryTableRow_EvenWhenTheLastSnapshotWasDropped()
+    {
+        var vm = new RunViewModel();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 100 },
+            Seed = 1,
+        };
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+        vm.AcceptProgress(Update("account", created: 80, total: 100), ["account"], 100);
+
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [.. Enumerable.Range(0, 100).Select(_ => Guid.NewGuid())],
+            },
+            Elapsed = TimeSpan.FromSeconds(5),
+            Errors = [],
+        }, seed: 1, environmentHost: "contoso-dev", config: config);
+
+        var row = Assert.Single(vm.Tables);
+        Assert.Equal("Done", row.StateKey);
+        Assert.Equal("100 / 100", row.ProgressLabel);
+        Assert.Equal(100, row.Percent);
+        Assert.Equal(100, vm.OverallPercent);
+    }
+
+    [Fact]
+    public void AcceptProgress_PhaseOnlySnapshot_LogsNoZeroOfZeroCounts()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+
+        vm.AcceptProgress(Update("", created: 0, total: 0, phase: "Resolving dependencies"), ["account"], 100);
+
+        Assert.Equal("Resolving dependencies", Assert.Single(vm.RecentActivity).Line);
+    }
+
+    private static ProgressUpdate Update(
+        string entity, int created, int total, string phase = "Generating") =>
+        new(phase, entity, created, total, BatchesCompleted: 1, TotalBatches: 4,
+            RecordsPerMinute: 0, Elapsed: TimeSpan.FromSeconds(1));
+
+    [Fact]
+    public void ApplyResult_RejectionCounts_AreRowsNotBatches()
+    {
+        var vm = new RunViewModel();
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [Guid.NewGuid()],
+            },
+            Elapsed = TimeSpan.FromMinutes(1),
+            Errors = [new BatchError("account", 15, "request throttled", -2147220956, 500)],
+        }, seed: 42, environmentHost: "contoso-dev");
+
+        Assert.Equal("500", Assert.Single(vm.SummaryStats, s => s.Label == "Rejected").Value);
+        Assert.Equal(500, Assert.Single(vm.RejectionGroups).RowCount);
+        Assert.Contains("500 rejected rows", vm.OutcomeHeadline, StringComparison.Ordinal);
+    }
 }

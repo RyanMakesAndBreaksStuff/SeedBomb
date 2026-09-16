@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
 using Seedbomb.Services.Connections;
+using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.Auth;
 
@@ -65,9 +66,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     internal static StorageCreationProperties CreateUserCacheProperties()
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DataGen");
+        var dir = AppPaths.Root;
         return new StorageCreationPropertiesBuilder("msal_user_cache.bin", dir).Build();
     }
 
@@ -76,9 +75,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     // client type needs its own cache file.
     internal static StorageCreationProperties CreateAppCacheProperties()
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DataGen");
+        var dir = AppPaths.Root;
         return new StorageCreationPropertiesBuilder("msal_app_cache.bin", dir).Build();
     }
 

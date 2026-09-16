@@ -1,4 +1,5 @@
 using System.Reflection;
+using DataGen.Core.Rules;
 
 namespace DataGen.Core.Tests;
 
@@ -170,5 +171,44 @@ public class GraphBuilderTests
         ]);
         var withUnruledSibling = _builder.Build(entities, RuledOnly);
         Assert.Contains("account", withUnruledSibling.Edges["contact"]);
+    }
+
+    [Fact]
+    public void Build_LookupRandomColumn_StillCreatesEdge()
+    {
+        var entities = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = MakeEntity("contact", [MakeLookup("accountid", ["account"])]),
+            ["account"] = MakeEntity("account"),
+        };
+        var rules = new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = new() { ["accountid"] = new LookupRandomRule() },
+        };
+
+        var graph = _builder.Build(entities,
+            (t, c) => LookupRulePolicy.SuppliesValueWithoutDependency(rules, t, c));
+
+        // lookupRandom may draw from records this run creates, so account must still sort first.
+        Assert.Contains("account", graph.Edges["contact"]);
+    }
+
+    [Fact]
+    public void Build_ConstantLookupColumn_SuppressesTheEdge()
+    {
+        var entities = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = MakeEntity("contact", [MakeLookup("accountid", ["account"])]),
+            ["account"] = MakeEntity("account"),
+        };
+        var rules = new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["contact"] = new() { ["accountid"] = new NullRule() },
+        };
+
+        var graph = _builder.Build(entities,
+            (t, c) => LookupRulePolicy.SuppliesValueWithoutDependency(rules, t, c));
+
+        Assert.Empty(graph.Edges["contact"]);
     }
 }

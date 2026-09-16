@@ -1,17 +1,16 @@
 using System.IO;
 using System.Text.Json;
+using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.Settings;
 
 /// <summary>
-/// Loads and saves <see cref="AppSettings"/> to <c>%LOCALAPPDATA%\DataGen\settings.json</c>.
+/// Loads and saves <see cref="AppSettings"/> to <c>%LOCALAPPDATA%\SeedBomb\settings.json</c>.
 /// Thread-safe via <see cref="SemaphoreSlim"/>.
 /// </summary>
 public sealed class JsonSettingsService : ISettingsService, IDisposable
 {
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DataGen", "settings.json");
+    private static readonly string FilePath = Path.Combine(AppPaths.Root, "settings.json");
 
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web) { WriteIndented = true };

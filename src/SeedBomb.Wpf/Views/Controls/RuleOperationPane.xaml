@@ -67,41 +67,59 @@
                                   AutomationProperties.Name="Operation"/>
                     </StackPanel>
 
-                    <StackPanel Margin="0,0,0,16">
+                    <StackPanel x:Name="LookupValueBlock" Margin="0,0,0,16">
                         <StackPanel.Style><Style TargetType="StackPanel">
                             <Setter Property="Visibility" Value="Collapsed"/>
                             <Style.Triggers><DataTrigger Binding="{Binding IsLookupValueOperation}" Value="True">
                                 <Setter Property="Visibility" Value="Visible"/>
                             </DataTrigger></Style.Triggers>
                         </Style></StackPanel.Style>
-                        <TextBlock Text="Add record GUIDs or choose existing records" TextWrapping="Wrap"/>
+                        <TextBlock Style="{DynamicResource DG.GroupLabel}"
+                                   Text="Add record GUIDs or choose existing records"
+                                   TextWrapping="Wrap"/>
+                        <!-- BasedOn is required: a trigger-only Style discards the implicit
+                             DG.ComboBox template and falls back to WPF-UI chrome. -->
                         <ComboBox ItemsSource="{Binding LookupInput.Targets}"
-                                  SelectedItem="{Binding LookupInput.SelectedTarget, Mode=TwoWay}">
-                            <ComboBox.Style><Style TargetType="ComboBox"><Style.Triggers>
-                                <DataTrigger Binding="{Binding LookupInput.Targets.Count}" Value="1">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers></Style></ComboBox.Style>
+                                  SelectedItem="{Binding LookupInput.SelectedTarget, Mode=TwoWay}"
+                                  AutomationProperties.Name="Lookup target table"
+                                  Margin="0,0,0,8">
+                            <ComboBox.Style>
+                                <Style TargetType="ComboBox" BasedOn="{StaticResource DG.ComboBox}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LookupInput.Targets.Count}" Value="1">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ComboBox.Style>
                         </ComboBox>
-                        <TextBox Text="{Binding LookupInput.GuidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Style="{DynamicResource DG.TextBox}"
+                                 Text="{Binding LookupInput.GuidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  AutomationProperties.Name="Comma-separated record GUIDs"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}"/>
-                            <Button Content="Choose records…" Command="{Binding PickLookupRecordsCommand}" Margin="8,0,0,0"/>
-                            <Button Content="Clear selected" Command="{Binding LookupInput.ClearCommand}" Margin="8,0,0,0"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Style="{DynamicResource DG.Button}"
+                                    Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}"/>
+                            <Button Style="{DynamicResource DG.Button}"
+                                    Content="Choose records…" Command="{Binding PickLookupRecordsCommand}" Margin="8,0,0,0"/>
+                            <Button Style="{DynamicResource DG.Button}"
+                                    Content="Clear selected" Command="{Binding LookupInput.ClearCommand}" Margin="8,0,0,0"/>
                         </StackPanel>
-                        <ListBox ItemsSource="{Binding LookupInput.Records}" Height="120"
+                        <ListBox Style="{DynamicResource DG.ListBox}"
+                                 ItemsSource="{Binding LookupInput.Records}" Height="120" Margin="0,8,0,0"
                                  ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling">
                             <ListBox.ItemTemplate><DataTemplate><DockPanel>
-                                <Button DockPanel.Dock="Right" Content="Remove" CommandParameter="{Binding}"
+                                <Button DockPanel.Dock="Right" Style="{DynamicResource DG.LinkButton}"
+                                        Content="Remove" CommandParameter="{Binding}"
                                         Command="{Binding DataContext.LookupInput.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
-                                <TextBlock><Run Text="{Binding Name, Mode=OneWay}"/><Run Text=" · "/>
+                                <TextBlock Style="{DynamicResource DG.Cell}"><Run Text="{Binding Name, Mode=OneWay}"/><Run Text=" · "/>
                                     <Run Text="{Binding Entity, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Id, Mode=OneWay}"/>
                                 </TextBlock>
                             </DockPanel></DataTemplate></ListBox.ItemTemplate>
                         </ListBox>
-                        <TextBlock Text="Manual GUIDs are checked for format and target type, not existence." TextWrapping="Wrap"/>
+                        <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                   Text="Manual GUIDs are checked for format and target type, not existence."
+                                   TextWrapping="Wrap" Margin="0,6,0,0"/>
                     </StackPanel>
 
                     <ContentControl Content="{Binding}">

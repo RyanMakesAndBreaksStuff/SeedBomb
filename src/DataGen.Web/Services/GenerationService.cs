@@ -78,9 +78,9 @@ public sealed class GenerationService
 
             uiProgress?.Report(new ProgressUpdate("Resolving dependencies", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
 
-            bool IsExplicitLookup(string table, string column) =>
-                LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
-            var graph = _graphBuilder!.Build(metadataDict, IsExplicitLookup);
+            bool SuppliesValueWithoutDependency(string table, string column) =>
+                LookupRulePolicy.SuppliesValueWithoutDependency(config.FieldRules, table, column);
+            var graph = _graphBuilder!.Build(metadataDict, SuppliesValueWithoutDependency);
             var cycles = _cycleDetector!.FindStronglyConnectedComponents(graph);
             if (cycles.Count > 0)
             {
@@ -88,7 +88,7 @@ public sealed class GenerationService
                 {
                     _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
                 }
-                _cycleDetector.BreakCycles(graph, cycles, metadataDict, IsExplicitLookup);
+                _cycleDetector.BreakCycles(graph, cycles, metadataDict, SuppliesValueWithoutDependency);
             }
 
             uiProgress?.Report(new ProgressUpdate("Generating records", string.Empty, 0, 0, 0, 0, 0, TimeSpan.Zero));
@@ -97,6 +97,12 @@ public sealed class GenerationService
             var lastProgressAt = TimeSpan.Zero;
             var bulkProgress = new Progress<BulkCreationProgress>(p =>
             {
+                // The Web UI has no link-phase concept: Linking snapshots carry link-unit counts
+                // that would render as regressing record progress after the 100% of record creation.
+                // Skip them so the relay keeps its pre-link-phase behavior.
+                if (string.Equals(p.Phase, "Linking", StringComparison.Ordinal))
+                    return;
+
                 var now = sw.Elapsed;
                 var isTerminal = p.BatchIndex == p.TotalBatches;
                 if (!isTerminal && (now - lastProgressAt) < progressRelayWindow)
@@ -183,9 +189,9 @@ public sealed class GenerationService
             var metadataList = await metadata.GetEntitiesAsync(config.EntityLogicalNames, ct).ConfigureAwait(false);
             var metadataDict = metadataList.ToDictionary(e => e.LogicalName);
 
-            bool IsExplicitLookup(string table, string column) =>
-                LookupRulePolicy.IsExplicit(config.FieldRules, table, column);
-            var graph = graphBuilder.Build(metadataDict, IsExplicitLookup);
+            bool SuppliesValueWithoutDependency(string table, string column) =>
+                LookupRulePolicy.SuppliesValueWithoutDependency(config.FieldRules, table, column);
+            var graph = graphBuilder.Build(metadataDict, SuppliesValueWithoutDependency);
             var cycles = cycleDetector.FindStronglyConnectedComponents(graph);
             if (cycles.Count > 0)
             {
@@ -193,7 +199,7 @@ public sealed class GenerationService
                 {
                     _logger.LogWarning("Breaking {Count} dependency cycle(s) before generation", cycles.Count);
                 }
-                cycleDetector.BreakCycles(graph, cycles, metadataDict, IsExplicitLookup);
+                cycleDetector.BreakCycles(graph, cycles, metadataDict, SuppliesValueWithoutDependency);
             }
 
             var result = await bulkCreator.CreateAsync(config, metadataDict, graph, null, ct).ConfigureAwait(false);

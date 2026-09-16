@@ -1,17 +1,16 @@
 using System.IO;
 using System.Text.Json;
+using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.History;
 
 /// <summary>
-/// Persists run history to <c>%LOCALAPPDATA%\DataGen\history.json</c>.
+/// Persists run history to <c>%LOCALAPPDATA%\SeedBomb\history.json</c>.
 /// Thread-safe via <see cref="SemaphoreSlim"/>.
 /// </summary>
 public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
 {
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DataGen", "history.json");
+    private static readonly string FilePath = Path.Combine(AppPaths.Root, "history.json");
 
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web) { WriteIndented = true };

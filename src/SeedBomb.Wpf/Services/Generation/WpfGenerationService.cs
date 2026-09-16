@@ -48,7 +48,12 @@ public sealed class WpfGenerationService : IWpfGenerationService
             var pipelineProgress = new Progress<GenerationPipelineProgress>(p =>
             {
                 var now = sw.Elapsed;
-                var isTerminal = p.BatchIndex == p.TotalBatches && p.TotalBatches > 0;
+                // Batches complete out of order, so BatchIndex == TotalBatches is not the last
+                // snapshot for an entity. Gate on the count so the update that completes a table is
+                // never dropped by the throttle.
+                // ponytail: lastAt races across pool threads; the worst case is one extra or one
+                // skipped throttle tick, which the monotonic guard in AcceptProgress absorbs.
+                var isTerminal = p.TotalRecords > 0 && p.RecordsCreated >= p.TotalRecords;
                 var isPhaseOnly = string.IsNullOrEmpty(p.EntityLogicalName);
                 if (!isTerminal && !isPhaseOnly && now - lastAt < ProgressGate)
                     return;

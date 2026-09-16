@@ -13,14 +13,12 @@ public static class CrashLog
     /// <see langword="null"/> when the write failed.
     /// </summary>
     /// <param name="ex">Exception to record.</param>
-    /// <param name="directoryOverride">Test seam. Null uses %LOCALAPPDATA%\DataGen.</param>
+    /// <param name="directoryOverride">Test seam. Null uses %LOCALAPPDATA%\SeedBomb.</param>
     public static string? Write(Exception ex, string? directoryOverride = null)
     {
         try
         {
-            var directory = directoryOverride ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "DataGen");
+            var directory = directoryOverride ?? AppPaths.Root;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, FileName);
             File.WriteAllText(path, ex?.ToString() ?? string.Empty);

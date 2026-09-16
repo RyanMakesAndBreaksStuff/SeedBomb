@@ -7,4 +7,14 @@ namespace DataGen.Core.Contracts;
 /// <param name="BatchIndex">The index of the batch that failed.</param>
 /// <param name="ErrorMessage">The error message.</param>
 /// <param name="FaultCode">The optional Dataverse fault code.</param>
-public record BatchError(string EntityLogicalName, int BatchIndex, string ErrorMessage, int? FaultCode);
+/// <param name="RowCount">
+/// Rows this error lost. Per-row faults from an <c>ExecuteMultiple</c> response leave the default
+/// of 1; a whole batch that never landed supplies its length, because <c>CreateMultiple</c> is
+/// transactional and rejects every row in the request together.
+/// </param>
+public record BatchError(
+    string EntityLogicalName,
+    int BatchIndex,
+    string ErrorMessage,
+    int? FaultCode,
+    int RowCount = 1);

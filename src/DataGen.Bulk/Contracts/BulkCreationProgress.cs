@@ -39,4 +39,10 @@ public record BulkCreationProgress
     /// Gets an error message if the batch failed, or null on success.
     /// </summary>
     public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// Gets the phase this snapshot belongs to: "Generating" for record creation,
+    /// "Linking" for the deferred-lookup and N:N passes that follow it.
+    /// </summary>
+    public string Phase { get; init; } = "Generating";
 }
