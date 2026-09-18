@@ -16,6 +16,8 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:ConnectionManagerViewModel}"
       mc:Ignorable="d"
+      VerticalAlignment="Stretch"
+      ScrollViewer.CanContentScroll="False"
       Background="{DynamicResource DG.Surface1}">
 
     <Grid Margin="{DynamicResource DG.Pad.Page}">
@@ -62,16 +64,17 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" Margin="0,16,0,0">
+        <Grid x:Name="BodyGrid" Grid.Row="2" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
+                <!-- 330 matches DG.Size.ListPane. ColumnDefinition is not a FrameworkElement,
+                     so DynamicResource on MaxWidth is unreliable. -->
+                <ColumnDefinition Width="*" MinWidth="200" MaxWidth="330"/>
                 <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*" MinWidth="320"/>
+                <ColumnDefinition Width="2*" MinWidth="280"/>
             </Grid.ColumnDefinitions>
 
             <!-- ── Connection list ──────────────────────────────────── -->
-            <Border Grid.Column="0" Style="{DynamicResource DG.CardBorder}"
-                    Width="{DynamicResource DG.Size.ListPane}">
+            <Border Grid.Column="0" Style="{DynamicResource DG.CardBorder}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -184,11 +187,14 @@
                                        TextTrimming="CharacterEllipsis"/>
                             <TextBlock Style="{DynamicResource DG.Secondary}"
                                        Text="Sign-in happens in your browser. SeedBomb stores the environment URL and app registration details needed to connect."
-                                       Margin="0,4,0,0" LineHeight="18"/>
+                                       Margin="0,4,0,0" LineHeight="18" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16">
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="20,16">
                         <StackPanel IsEnabled="{Binding IsEditing}">
                             <StackPanel Margin="0,0,0,14">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Display name"/>
@@ -218,13 +224,14 @@
                                 <ui:TextBox Text="{Binding EditingProfile.ClientId, UpdateSourceTrigger=PropertyChanged}"
                                             FontFamily="{DynamicResource DG.Font.Mono}"
                                             Height="{DynamicResource DG.Size.Control}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                <WrapPanel Margin="0,7,0,0">
                                     <TextBlock Style="{DynamicResource DG.Tertiary}"
-                                               Text="Blank uses Microsoft's public client for Power Platform."/>
+                                               Text="Blank uses Microsoft's public client for Power Platform."
+                                               TextWrapping="Wrap"/>
                                     <Button Style="{DynamicResource DG.LinkButton}"
                                             Command="{Binding UseDefaultClientIdCommand}"
                                             Content="Use default" Margin="6,0,0,0"/>
-                                </StackPanel>
+                                </WrapPanel>
                             </StackPanel>
 
                             <StackPanel Margin="0,0,0,16">
@@ -324,13 +331,11 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}" Padding="20,12">
+                    <Border x:Name="EditorFooter" Grid.Row="2"
+                            Style="{DynamicResource DG.CardFooter}" Padding="20,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
@@ -339,39 +344,44 @@
                                     Command="{Binding DeleteProfileCommand}"
                                     CommandParameter="{Binding EditingProfile}"
                                     Content="Delete connection"
+                                    HorizontalAlignment="Left"
                                     VerticalAlignment="Center"/>
 
-                            <Button Grid.Column="2" Style="{DynamicResource DG.Button}"
-                                    Command="{Binding TestConnectionCommand}"
-                                    IsEnabled="{Binding IsTesting,
-                                                Converter={StaticResource InverseBoolConverter}}"
-                                    Margin="0,0,10,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:ProgressRing IsIndeterminate="True" Width="13" Height="13"
-                                                     Margin="0,0,7,0"
-                                                     Visibility="{Binding IsTesting,
-                                                                  Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    <TextBlock Text="Test connection"/>
-                                </StackPanel>
-                            </Button>
+                            <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
+                                <Button Style="{DynamicResource DG.Button}"
+                                        Command="{Binding TestConnectionCommand}"
+                                        IsEnabled="{Binding IsTesting,
+                                                    Converter={StaticResource InverseBoolConverter}}"
+                                        Margin="0,4,10,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:ProgressRing IsIndeterminate="True" Width="13" Height="13"
+                                                         Margin="0,0,7,0"
+                                                         Visibility="{Binding IsTesting,
+                                                                      Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <TextBlock Text="Test connection"/>
+                                    </StackPanel>
+                                </Button>
 
-                            <Button Grid.Column="3" Style="{DynamicResource DG.Button}"
-                                    Command="{Binding CancelEditCommand}"
-                                    Content="Cancel" Margin="0,0,10,0"/>
+                                <Button Style="{DynamicResource DG.Button}"
+                                        Command="{Binding CancelEditCommand}"
+                                        Content="Cancel" Margin="0,4,10,4"/>
 
-                            <!-- Save and Connect are mutually exclusive: Save while unsaved/dirty,
-                                 Connect once saved and clean — never both at once. -->
-                            <Button Grid.Column="4" Style="{DynamicResource DG.PrimaryButton}"
-                                    Command="{Binding SaveProfileCommand}"
-                                    Content="Save"
-                                    Visibility="{Binding ShowSaveButton,
-                                                 Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                <!-- Save and Connect are mutually exclusive: Save while unsaved/dirty,
+                                     Connect once saved and clean — never both at once. -->
+                                <Button Style="{DynamicResource DG.PrimaryButton}"
+                                        Command="{Binding SaveProfileCommand}"
+                                        Content="Save"
+                                        Margin="0,4,0,4"
+                                        Visibility="{Binding ShowSaveButton,
+                                                     Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                            <Button Grid.Column="4" Style="{DynamicResource DG.PrimaryButton}"
-                                    Command="{Binding ConnectCommand}"
-                                    Content="Connect"
-                                    Visibility="{Binding ShowConnectButton,
-                                                 Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                <Button Style="{DynamicResource DG.PrimaryButton}"
+                                        Command="{Binding ConnectCommand}"
+                                        Content="Connect"
+                                        Margin="0,4,0,4"
+                                        Visibility="{Binding ShowConnectButton,
+                                                     Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            </WrapPanel>
                         </Grid>
                     </Border>
                 </Grid>

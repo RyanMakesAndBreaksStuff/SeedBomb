@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using DataGen.Core.Contracts;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
@@ -33,8 +32,7 @@ public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
     // Logical Parent is NavigationViewContentPresenter; pin Height to its viewport.
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
-        if (Parent is FrameworkElement host)
-            SetBinding(HeightProperty, new Binding(nameof(ActualHeight)) { Source = host });
+        NavigationPageLayout.PinHeightToHost(this);
 
         // EntitySelectorCtrl usually resolves its ViewModel on its own Loaded before this page's
         // Loaded fires, but that ordering isn't guaranteed (and both this page and the VM are

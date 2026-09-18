@@ -38,9 +38,12 @@ namespace Seedbomb.Resources
         private const double FadeMs = 350.0;
         private const double SpinSeconds = 2.6;
 
-        // arc radii + type sizes, identical to render_concepts.py concept 07
+        // Arc radii are BASELINE radii from the bomb centre. The logo art's ink
+        // reaches r≈153 above the centre and r≈145 below it, and the seal ring
+        // sits at r=196, so all three bands live between those two limits: top
+        // type grows outward from its baseline, the slogan grows inward.
         private const double Cx = 400.0, Cy = 238.0;
-        private const double RTitle = 172.0, RSub = 152.0, RSlogan = 134.0;
+        private const double RTitle = 172.0, RSub = 157.0, RSlogan = 162.0;
 
         private DateTime _shownAt;
         private double _progress = -1.0;
@@ -175,6 +178,12 @@ namespace Seedbomb.Resources
             }
             total -= letterSpacing;
 
+            // BuildGeometry's origin is the layout box's TOP-LEFT, not the baseline;
+            // lifting every glyph by the baseline offset is what makes r the baseline
+            // radius, so type grows away from the bomb instead of over it.
+            double baseline = new FormattedText("X", CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight, typeface, emSize, Brushes.Black, 1.0).Baseline;
+
             double theta = -total / (2 * r);
             for (int i = 0; i < text.Length; i++)
             {
@@ -189,7 +198,7 @@ namespace Seedbomb.Resources
                 // on its advance width, rotate to the tangent, translate onto the arc
                 Geometry g = new FormattedText(text[i].ToString(), CultureInfo.InvariantCulture,
                         FlowDirection.LeftToRight, typeface, emSize, Brushes.Black, 1.0)
-                    .BuildGeometry(new Point(-widths[i] / 2, 0))
+                    .BuildGeometry(new Point(-widths[i] / 2, -baseline))
                     .Clone();
 
                 var m = new Matrix();

@@ -120,7 +120,7 @@
     <Thickness x:Key="DG.Pad.RowTall">10,9</Thickness>
 
     <!-- Structural widths/heights taken from the mocks. -->
-    <sys:Double x:Key="DG.Size.NavPane">260</sys:Double>
+    <sys:Double x:Key="DG.Size.NavPane">220</sys:Double>
     <sys:Double x:Key="DG.Size.TitleBar">40</sys:Double>
     <sys:Double x:Key="DG.Size.Control">32</sys:Double>
     <sys:Double x:Key="DG.Size.ControlSmall">30</sys:Double>
@@ -140,20 +140,20 @@
     <FontFamily x:Key="DG.Font.Display">Segoe UI Variable Display, Segoe UI</FontFamily>
     <FontFamily x:Key="DG.Font.Mono">Consolas, Cascadia Mono</FontFamily>
 
-    <sys:Double x:Key="DG.Type.PageTitle">26</sys:Double>
-    <sys:Double x:Key="DG.Type.Hero">21</sys:Double>
-    <sys:Double x:Key="DG.Type.Stat">19</sys:Double>
-    <sys:Double x:Key="DG.Type.SheetTitle">17</sys:Double>
-    <sys:Double x:Key="DG.Type.IconLg">16</sys:Double>
-    <sys:Double x:Key="DG.Type.CardTitle">15</sys:Double>
-    <sys:Double x:Key="DG.Type.Icon">14</sys:Double>
-    <sys:Double x:Key="DG.Type.Subtitle">13</sys:Double>
-    <sys:Double x:Key="DG.Type.Body">12.5</sys:Double>
+    <sys:Double x:Key="DG.Type.PageTitle">28</sys:Double>
+    <sys:Double x:Key="DG.Type.Hero">22</sys:Double>
+    <sys:Double x:Key="DG.Type.Stat">20</sys:Double>
+    <sys:Double x:Key="DG.Type.SheetTitle">19</sys:Double>
+    <sys:Double x:Key="DG.Type.IconLg">17</sys:Double>
+    <sys:Double x:Key="DG.Type.CardTitle">16</sys:Double>
+    <sys:Double x:Key="DG.Type.Icon">15</sys:Double>
+    <sys:Double x:Key="DG.Type.Subtitle">15</sys:Double>
+    <sys:Double x:Key="DG.Type.Body">13.5</sys:Double>
     <sys:Double x:Key="DG.Type.Caption">12</sys:Double>
-    <sys:Double x:Key="DG.Type.Small">11.5</sys:Double>
-    <sys:Double x:Key="DG.Type.Micro">11</sys:Double>
-    <sys:Double x:Key="DG.Type.Label">10.5</sys:Double>
-    <sys:Double x:Key="DG.Type.Tiny">10</sys:Double>
+    <sys:Double x:Key="DG.Type.Small">12.5</sys:Double>
+    <sys:Double x:Key="DG.Type.Micro">11.5</sys:Double>
+    <sys:Double x:Key="DG.Type.Label">11.0</sys:Double>
+    <sys:Double x:Key="DG.Type.Tiny">10.5</sys:Double>
 
     <Style x:Key="DG.PageTitle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Display}"/>

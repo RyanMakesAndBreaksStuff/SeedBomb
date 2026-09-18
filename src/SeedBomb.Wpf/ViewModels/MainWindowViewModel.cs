@@ -73,6 +73,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
+    [NotifyPropertyChangedFor(nameof(ConnectedOpacity))]
     private bool _hasConnection;
 
     /// <summary>
@@ -82,6 +83,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
+    [NotifyPropertyChangedFor(nameof(ConnectedOpacity))]
     private bool _needsSignIn;
 
     /// <summary>Gets whether the "Sign in to continue" overlay should be shown.</summary>
@@ -89,6 +91,12 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>Gets whether the app is actually connected right now (not just "a profile exists").</summary>
     public bool IsConnected => HasConnection && !NeedsSignIn;
+
+    /// <summary>
+    /// Full opacity when connected; dimmed (not disabled) when a profile exists
+    /// but nothing is actually signed in.
+    /// </summary>
+    public double ConnectedOpacity => IsConnected ? 1.0 : 0.55;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UserInitials))]

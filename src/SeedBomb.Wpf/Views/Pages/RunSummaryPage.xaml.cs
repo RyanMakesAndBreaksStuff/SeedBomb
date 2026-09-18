@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
@@ -16,5 +17,9 @@ public partial class RunSummaryPage : Page, INavigableView<RunViewModel>
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        Loaded += OnPageLoaded;
     }
+
+    private void OnPageLoaded(object sender, RoutedEventArgs e) =>
+        NavigationPageLayout.PinHeightToHost(this);
 }

@@ -28,6 +28,7 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
         _navigator = navigator;
         DataContext = viewModel;
         InitializeComponent();
+        Loaded += OnPageLoaded;
 
         viewModel.PickImportPath ??= PickImport;
         viewModel.PickExportPath ??= PickExport;
@@ -50,6 +51,9 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
         viewModel.ProfileApplied += OnProfileApplied;
         Unloaded += (_, _) => viewModel.ProfileApplied -= OnProfileApplied;
     }
+
+    private void OnPageLoaded(object sender, RoutedEventArgs e) =>
+        NavigationPageLayout.PinHeightToHost(this);
 
     private void OnProfileApplied(object? sender, Seedbomb.Services.Profiles.ProfileImportReport report)
     {

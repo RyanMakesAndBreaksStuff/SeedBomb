@@ -33,6 +33,7 @@ using Xunit.v3;
 
 namespace DataGen.Wpf.Tests.Views;
 
+[Collection("StaUi")]
 public sealed class RulesPageStaTests : IDisposable
 {
     private static readonly List<string> CapturedBindingErrors = [];

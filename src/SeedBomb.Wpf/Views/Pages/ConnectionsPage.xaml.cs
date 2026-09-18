@@ -20,6 +20,7 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        Loaded += OnPageLoaded;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
@@ -52,6 +53,9 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         ViewModel.ShowConnectedToast = false;
         return Task.CompletedTask;
     }
+
+    private void OnPageLoaded(object sender, RoutedEventArgs e) =>
+        NavigationPageLayout.PinHeightToHost(this);
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

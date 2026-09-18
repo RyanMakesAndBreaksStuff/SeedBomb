@@ -12,5 +12,9 @@ public partial class SettingsPage : Page
     {
         DataContext = viewModel;
         InitializeComponent();
+        Loaded += OnPageLoaded;
     }
+
+    private void OnPageLoaded(object sender, RoutedEventArgs e) =>
+        NavigationPageLayout.PinHeightToHost(this);
 }

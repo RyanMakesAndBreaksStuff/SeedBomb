@@ -8,6 +8,8 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:HistoryViewModel}"
       mc:Ignorable="d"
+      VerticalAlignment="Stretch"
+      ScrollViewer.CanContentScroll="False"
       Background="{DynamicResource DG.Surface1}">
 
     <Grid Margin="{DynamicResource DG.Pad.Page}">

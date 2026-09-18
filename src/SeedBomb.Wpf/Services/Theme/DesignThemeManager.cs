@@ -42,9 +42,9 @@ public static class DesignThemeManager
 
     private static ThemePaletteOption MakeOption(string id, string displayName)
     {
-        var variants = Palettes[id];
-        var light = new SolidColorBrush(variants.Light.Accent);
-        var dark = new SolidColorBrush(variants.Dark.Accent);
+        var (lightVariant, darkVariant) = Palettes[id];
+        var light = new SolidColorBrush(lightVariant.Accent);
+        var dark = new SolidColorBrush(darkVariant.Accent);
         light.Freeze();
         dark.Freeze();
         return new ThemePaletteOption(id, displayName, light, dark);
@@ -62,8 +62,8 @@ public static class DesignThemeManager
 
         ApplicationThemeManager.Apply(isDark ? ApplicationTheme.Dark : ApplicationTheme.Light);
 
-        var variants = Palettes[paletteId];
-        var p = isDark ? variants.Dark : variants.Light;
+        var (lightVariant, darkVariant) = Palettes[paletteId];
+        var p = isDark ? darkVariant : lightVariant;
 
         // --- Surfaces ---------------------------------------------------
         Set("DG.Bg", p.Bg);
@@ -297,8 +297,8 @@ public static class DesignThemeManager
             Series4: FromRgb(s4), Series5: FromRgb(s5));
     }
 
-    private static readonly IReadOnlyDictionary<string, (Palette Light, Palette Dark)> Palettes =
-        new Dictionary<string, (Palette Light, Palette Dark)>
+    private static readonly Dictionary<string, (Palette Light, Palette Dark)> Palettes =
+        new()
         {
             // Design of record. Charcoal-and-citron. Two hard rules from the sheet:
             // citron is a fill and never a font on a light surface, and citron never

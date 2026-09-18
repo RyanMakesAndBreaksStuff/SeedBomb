@@ -8,33 +8,13 @@
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:pages="clr-namespace:Seedbomb.Views.Pages"
                  Title="SeedBomb — Mock data explosion"
-                 Width="1380" Height="900" MinWidth="960" MinHeight="560"
+                 Width="1100" Height="800" MinWidth="960" MinHeight="560"
                  Background="{DynamicResource DG.Bg}"
                  ExtendsContentIntoTitleBar="True"
-                 WindowBackdropType="None"
+                 WindowBackdropType="Mica"
                  WindowCornerPreference="Round"
                  WindowStartupLocation="CenterScreen"
                  Icon="pack://application:,,,/Resources/logo.ico">
-
-    <ui:FluentWindow.Resources>
-        <!-- Dimmed, not disabled: IsEnabled still gates on HasConnection alone (zero profiles).
-             This is a purely visual cue that a profile exists but nothing is actually connected. -->
-        <Style x:Key="DG.NavItemConnected" TargetType="ui:NavigationViewItem"
-               BasedOn="{StaticResource {x:Type ui:NavigationViewItem}}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                    <Setter Property="Opacity" Value="0.55"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="DG.PaneFooterConnected" TargetType="Button" BasedOn="{StaticResource DG.LinkButton}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                    <Setter Property="Opacity" Value="0.55"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-    </ui:FluentWindow.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -63,7 +43,7 @@
             sits below the footer as PaneFooter content so it pins to the bottom of the pane.
         -->
         <ui:NavigationView x:Name="RootNavigation"
-                           Grid.Row="1"
+                           Grid.Row="1" Grid.Column="0"
                            OpenPaneLength="{DynamicResource DG.Size.NavPane}"
                            IsPaneToggleVisible="True"
                            IsBackButtonVisible="Collapsed"
@@ -72,10 +52,13 @@
                            Background="{DynamicResource DG.Surface1}" Grid.RowSpan="2" Grid.ColumnSpan="3">
 
             <ui:NavigationView.MenuItems>
+                <!-- Dimmed, not disabled: IsEnabled still gates on HasConnection alone (zero profiles).
+                     Do not set Style — a local Style replaces WPF-UI's implicit NavigationViewItem chrome,
+                     and that chrome is not a designer-visible resource to BasedOn. -->
                 <ui:NavigationViewItem Content="Generate"
                                        TargetPageType="{x:Type pages:GeneratePage}"
                                        IsEnabled="{Binding HasConnection}"
-                                       Style="{StaticResource DG.NavItemConnected}">
+                                       Opacity="{Binding ConnectedOpacity}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Flash24"/>
                     </ui:NavigationViewItem.Icon>
@@ -84,7 +67,7 @@
                 <ui:NavigationViewItem Content="Profiles"
                                        TargetPageType="{x:Type pages:ProfilesPage}"
                                        IsEnabled="{Binding HasConnection}"
-                                       Style="{StaticResource DG.NavItemConnected}">
+                                       Opacity="{Binding ConnectedOpacity}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Layer24"/>
                     </ui:NavigationViewItem.Icon>
@@ -93,7 +76,7 @@
                 <ui:NavigationViewItem Content="History"
                                        TargetPageType="{x:Type pages:HistoryPage}"
                                        IsEnabled="{Binding HasConnection}"
-                                       Style="{StaticResource DG.NavItemConnected}">
+                                       Opacity="{Binding ConnectedOpacity}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="History24"/>
                     </ui:NavigationViewItem.Icon>
@@ -122,7 +105,8 @@
 
             <!-- Account + environment. Click opens the connection manager. -->
             <ui:NavigationView.PaneFooter>
-                <Button Style="{StaticResource DG.PaneFooterConnected}"
+                <Button Style="{StaticResource DG.LinkButton}"
+                        Opacity="{Binding ConnectedOpacity}"
                         Command="{Binding OpenConnectionsCommand}"
                         HorizontalContentAlignment="Stretch"
                         Margin="8,8,8,4">
@@ -167,9 +151,9 @@
                               VerticalAlignment="Bottom" HorizontalAlignment="Center"
                               Margin="{DynamicResource DG.Pad.Page}" Grid.Column="2"/>
 
-        <ui:ContentDialogHost Grid.RowSpan="3" Grid.ColumnSpan="3" />
+        <ui:ContentDialogHost Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Grid.ColumnSpan="3" />
 
-        <Border x:Name="FirstRunOverlay" Grid.Row="1" Style="{DynamicResource DG.Scrim.Style}"
+        <Border x:Name="FirstRunOverlay" Grid.Row="1" Grid.Column="0" Style="{DynamicResource DG.Scrim.Style}"
                 Visibility="{Binding HasConnection, Converter={StaticResource InverseBoolToVisible}}" Grid.RowSpan="2" Grid.ColumnSpan="3">
             <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
@@ -186,7 +170,7 @@
         <!-- Shown when a connection profile exists but the startup silent sign-in failed
              (e.g. an OAuth token needing re-consent). App-only profiles never hit this —
              their silent sign-in needs no user/window and always succeeds at startup. -->
-        <Border x:Name="SignInOverlay" Grid.Row="1" Style="{DynamicResource DG.Scrim.Style}"
+        <Border x:Name="SignInOverlay" Grid.Row="1" Grid.Column="0" Style="{DynamicResource DG.Scrim.Style}"
                 Visibility="{Binding ShowSignInOverlay, Converter={StaticResource BoolToVisibilityConverter}}" Grid.RowSpan="2" Grid.ColumnSpan="3">
             <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">

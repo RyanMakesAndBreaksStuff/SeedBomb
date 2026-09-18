@@ -118,7 +118,7 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Margin="20,18,20,0">
+                        <StackPanel Grid.Row="0" Margin="2,10,10,0">
                             <TextBlock Style="{DynamicResource DG.CardTitle}" Text="Select tables"/>
                             <TextBlock Style="{DynamicResource DG.Secondary}"
                                        Text="Pick the tables to populate. Metadata is read live from this environment."
@@ -132,7 +132,7 @@
                                                         Margin="20,16,20,0"
                                                         SelectedEntitiesChanged="OnEntitiesChanged"/>
 
-                        <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}" Padding="20,11">
+                        <Border Grid.Row="2" Style="{DynamicResource DG.CardFooter}" Padding="5,5,5,5">
                             <TextBlock Style="{DynamicResource DG.Tertiary}"
                                        Text="{Binding ViewModel.FooterLabel, ElementName=EntitySelectorCtrl}"/>
                         </Border>
@@ -140,7 +140,7 @@
                 </Border>
 
                 <StackPanel Grid.Column="2" Width="{DynamicResource DG.Size.AsidePane}">
-                    <Border Style="{DynamicResource DG.CardBorder}" Padding="18,16" Margin="0,0,0,12">
+                    <Border Style="{DynamicResource DG.CardBorder}" Padding="5,5" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Selected"/>
                             <ItemsControl ItemsSource="{Binding SelectedTableRows}">

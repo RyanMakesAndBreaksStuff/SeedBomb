@@ -95,7 +95,7 @@
             <Path x:Name="SloganArc" Fill="#A9AFC1"/>
             <Path x:Name="SubArc"    Fill="#838A9E"/>
             <Path x:Name="TitleArc"  Fill="{StaticResource TitleGrad}"/>
-            <TextBlock x:Name="StatusText" Canvas.Left="0" Canvas.Top="396" Width="800" TextAlignment="Center"
+            <TextBlock x:Name="StatusText" Canvas.Left="0" Canvas.Top="408" Width="800" TextAlignment="Center"
                        FontFamily="Consolas" FontSize="10" Foreground="#838A9E"/>
 
             <!-- 7 · corner tags -->
