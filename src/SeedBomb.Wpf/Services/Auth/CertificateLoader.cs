@@ -43,7 +43,7 @@ public static class CertificateLoader
             using (candidate)
             {
                 if (clone is not null || !string.Equals(
-                    Normalize(candidate.Thumbprint), normalized, StringComparison.Ordinal))
+                        Normalize(candidate.Thumbprint), normalized, StringComparison.Ordinal))
                 {
                     continue;
                 }

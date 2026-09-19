@@ -42,9 +42,9 @@
                         <Style TargetType="Button" BasedOn="{StaticResource DG.Button}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding ShowCustomOnly}" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource DG.AccentChip}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentChipBorder}"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource DG.AccentText}"/>
+                                    <Setter Property="Background" Value="{DynamicResource DG.AccentChip}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentChipBorder}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource DG.AccentText}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

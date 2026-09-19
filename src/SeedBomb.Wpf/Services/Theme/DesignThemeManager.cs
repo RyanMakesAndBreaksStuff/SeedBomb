@@ -246,13 +246,11 @@ public static class DesignThemeManager
             Card: cardC,
             CardSunken: FromRgb(insetBg),
             CodeSurface: FromRgb(insetBg),
-
             Border: borderC,
             BorderStrong: FromRgb(strongStroke),
             // Row rules must read softer than card outlines; the sheets ship one stroke value.
             Divider: Blend(borderC, cardC, 0.55),
             Focus: FromRgb(focusStroke),
-
             ControlFill: FromRgb(controlFill),
             ControlBorder: FromRgb(controlStroke),
             ControlHover: FromRgb(controlFillHover),
@@ -260,14 +258,12 @@ public static class DesignThemeManager
             RowSelected: Over(hoverOverlay, cardC),
             TrackFill: FromRgb(progressTrack),
             Scrim: FromArgb(scrimBg),
-
             Text1: text1C,
             TextBody: Blend(text1C, text2C, 0.22),
             TextNav: Blend(text1C, text2C, 0.30),
             Text2: text2C,
             Text3: FromRgb(textTertiary),
             TextDisabled: FromRgb(textDisabled),
-
             Accent: accentC,
             AccentHover: FromRgb(accentFillHover),
             AccentPressed: FromRgb(accentFillPressed),
@@ -278,7 +274,6 @@ public static class DesignThemeManager
             AccentChip: Blend(tintC, accentC, isDark ? 0.24 : 0.14),
             AccentChipBorder: Blend(tintStrokeC, accentC, isDark ? 0.30 : 0.20),
             SelectionIndicator: FromRgb(selectionIndicator),
-
             Success: successC,
             SuccessSoft: FromRgb(successTint),
             Warning: warnC,
@@ -291,7 +286,6 @@ public static class DesignThemeManager
             // Neither sheet ships an info hue — both draw the info banner in accent tint.
             Info: accentC,
             InfoSoft: tintC,
-
             Energy: FromRgb(energyFill),
             Series1: FromRgb(s1), Series2: FromRgb(s2), Series3: FromRgb(s3),
             Series4: FromRgb(s4), Series5: FromRgb(s5));

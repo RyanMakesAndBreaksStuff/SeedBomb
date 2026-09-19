@@ -46,8 +46,13 @@ internal sealed class GenerateDraftAutosave
         _cts?.Cancel();
         if (_task is { } pending)
         {
-            try { await pending; }
-            catch (OperationCanceledException) { }
+            try
+            {
+                await pending;
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         _cts?.Dispose();

@@ -19,72 +19,72 @@
          1. Current tokens — the ONLY keys views bind to.
             Seeded dark; DesignThemeManager.Apply reassigns from C# palettes.
          ================================================================== -->
-    <SolidColorBrush x:Key="DG.Bg"            Color="#121110"/>
-    <SolidColorBrush x:Key="DG.TitleBar"      Color="#121110"/>
-    <SolidColorBrush x:Key="DG.Surface1"      Color="#191816"/>
-    <SolidColorBrush x:Key="DG.Surface2"      Color="#2A2825"/>
-    <SolidColorBrush x:Key="DG.Card"          Color="#201F1C"/>
-    <SolidColorBrush x:Key="DG.CardSunken"    Color="#0E0D0C"/>
-    <SolidColorBrush x:Key="DG.CodeSurface"   Color="#0E0D0C"/>
-    <SolidColorBrush x:Key="DG.Border"        Color="#2E2C28"/>
-    <SolidColorBrush x:Key="DG.BorderStrong"  Color="#57534A"/>
-    <SolidColorBrush x:Key="DG.Divider"       Color="#262421"/>
-    <SolidColorBrush x:Key="DG.Focus"         Color="#BADD52"/>
-    <SolidColorBrush x:Key="DG.ControlFill"   Color="#2A2825"/>
-    <SolidColorBrush x:Key="DG.ControlBorder" Color="#3D3A34"/>
-    <SolidColorBrush x:Key="DG.ControlHover"  Color="#35322D"/>
-    <SolidColorBrush x:Key="DG.ItemSelected"  Color="#2A2825"/>
-    <SolidColorBrush x:Key="DG.RowSelected"   Color="#31302D"/>
-    <SolidColorBrush x:Key="DG.TrackFill"     Color="#33302B"/>
-    <SolidColorBrush x:Key="DG.Scrim"         Color="#99000000"/>
+    <SolidColorBrush x:Key="DG.Bg" Color="#121110" />
+    <SolidColorBrush x:Key="DG.TitleBar" Color="#121110" />
+    <SolidColorBrush x:Key="DG.Surface1" Color="#191816" />
+    <SolidColorBrush x:Key="DG.Surface2" Color="#2A2825" />
+    <SolidColorBrush x:Key="DG.Card" Color="#201F1C" />
+    <SolidColorBrush x:Key="DG.CardSunken" Color="#0E0D0C" />
+    <SolidColorBrush x:Key="DG.CodeSurface" Color="#0E0D0C" />
+    <SolidColorBrush x:Key="DG.Border" Color="#2E2C28" />
+    <SolidColorBrush x:Key="DG.BorderStrong" Color="#57534A" />
+    <SolidColorBrush x:Key="DG.Divider" Color="#262421" />
+    <SolidColorBrush x:Key="DG.Focus" Color="#BADD52" />
+    <SolidColorBrush x:Key="DG.ControlFill" Color="#2A2825" />
+    <SolidColorBrush x:Key="DG.ControlBorder" Color="#3D3A34" />
+    <SolidColorBrush x:Key="DG.ControlHover" Color="#35322D" />
+    <SolidColorBrush x:Key="DG.ItemSelected" Color="#2A2825" />
+    <SolidColorBrush x:Key="DG.RowSelected" Color="#31302D" />
+    <SolidColorBrush x:Key="DG.TrackFill" Color="#33302B" />
+    <SolidColorBrush x:Key="DG.Scrim" Color="#99000000" />
 
-    <SolidColorBrush x:Key="DG.Text1"         Color="#F2F0EA"/>
-    <SolidColorBrush x:Key="DG.TextBody"      Color="#E4E1DA"/>
-    <SolidColorBrush x:Key="DG.TextNav"       Color="#DFDCD4"/>
-    <SolidColorBrush x:Key="DG.Text2"         Color="#B4AFA3"/>
-    <SolidColorBrush x:Key="DG.Text3"         Color="#8B857A"/>
-    <SolidColorBrush x:Key="DG.TextDisabled"  Color="#625D54"/>
+    <SolidColorBrush x:Key="DG.Text1" Color="#F2F0EA" />
+    <SolidColorBrush x:Key="DG.TextBody" Color="#E4E1DA" />
+    <SolidColorBrush x:Key="DG.TextNav" Color="#DFDCD4" />
+    <SolidColorBrush x:Key="DG.Text2" Color="#B4AFA3" />
+    <SolidColorBrush x:Key="DG.Text3" Color="#8B857A" />
+    <SolidColorBrush x:Key="DG.TextDisabled" Color="#625D54" />
 
-    <SolidColorBrush x:Key="DG.Accent"              Color="#BADD52"/>
-    <SolidColorBrush x:Key="DG.AccentHover"         Color="#C9E76F"/>
-    <SolidColorBrush x:Key="DG.AccentPressed"       Color="#A6C93F"/>
-    <SolidColorBrush x:Key="DG.OnAccent"            Color="#14130F"/>
-    <SolidColorBrush x:Key="DG.AccentText"          Color="#C2E060"/>
-    <SolidColorBrush x:Key="DG.AccentSoft"          Color="#24290F"/>
-    <SolidColorBrush x:Key="DG.AccentSoftBorder"    Color="#3E4A18"/>
-    <SolidColorBrush x:Key="DG.AccentChip"          Color="#48541F"/>
-    <SolidColorBrush x:Key="DG.AccentChipBorder"    Color="#637629"/>
-    <SolidColorBrush x:Key="DG.AccentLight"         Color="#C9E76F"/>
-    <SolidColorBrush x:Key="DG.SelectionIndicator"  Color="#BADD52"/>
+    <SolidColorBrush x:Key="DG.Accent" Color="#BADD52" />
+    <SolidColorBrush x:Key="DG.AccentHover" Color="#C9E76F" />
+    <SolidColorBrush x:Key="DG.AccentPressed" Color="#A6C93F" />
+    <SolidColorBrush x:Key="DG.OnAccent" Color="#14130F" />
+    <SolidColorBrush x:Key="DG.AccentText" Color="#C2E060" />
+    <SolidColorBrush x:Key="DG.AccentSoft" Color="#24290F" />
+    <SolidColorBrush x:Key="DG.AccentSoftBorder" Color="#3E4A18" />
+    <SolidColorBrush x:Key="DG.AccentChip" Color="#48541F" />
+    <SolidColorBrush x:Key="DG.AccentChipBorder" Color="#637629" />
+    <SolidColorBrush x:Key="DG.AccentLight" Color="#C9E76F" />
+    <SolidColorBrush x:Key="DG.SelectionIndicator" Color="#BADD52" />
 
-    <SolidColorBrush x:Key="DG.Success"       Color="#5BD08D"/>
-    <SolidColorBrush x:Key="DG.SuccessSoft"   Color="#14251C"/>
-    <SolidColorBrush x:Key="DG.Warning"       Color="#E8B04B"/>
-    <SolidColorBrush x:Key="DG.WarningSoft"   Color="#2C2313"/>
-    <SolidColorBrush x:Key="DG.WarningBorder" Color="#59E8B04B"/>
-    <SolidColorBrush x:Key="DG.WarningText"   Color="#F4DBAE"/>
-    <SolidColorBrush x:Key="DG.Error"         Color="#FF8E80"/>
-    <SolidColorBrush x:Key="DG.ErrorSoft"     Color="#2E1815"/>
-    <SolidColorBrush x:Key="DG.ErrorBorder"   Color="#63302A"/>
-    <SolidColorBrush x:Key="DG.Info"          Color="#BADD52"/>
-    <SolidColorBrush x:Key="DG.InfoSoft"      Color="#24290F"/>
+    <SolidColorBrush x:Key="DG.Success" Color="#5BD08D" />
+    <SolidColorBrush x:Key="DG.SuccessSoft" Color="#14251C" />
+    <SolidColorBrush x:Key="DG.Warning" Color="#E8B04B" />
+    <SolidColorBrush x:Key="DG.WarningSoft" Color="#2C2313" />
+    <SolidColorBrush x:Key="DG.WarningBorder" Color="#59E8B04B" />
+    <SolidColorBrush x:Key="DG.WarningText" Color="#F4DBAE" />
+    <SolidColorBrush x:Key="DG.Error" Color="#FF8E80" />
+    <SolidColorBrush x:Key="DG.ErrorSoft" Color="#2E1815" />
+    <SolidColorBrush x:Key="DG.ErrorBorder" Color="#63302A" />
+    <SolidColorBrush x:Key="DG.Info" Color="#BADD52" />
+    <SolidColorBrush x:Key="DG.InfoSoft" Color="#24290F" />
 
     <!-- Energy & series. Series brushes are published for future per-table charts. -->
-    <SolidColorBrush x:Key="DG.Energy"        Color="#9DCB1F"/>
-    <SolidColorBrush x:Key="DG.Series1"       Color="#D8D3C8"/>
-    <SolidColorBrush x:Key="DG.Series2"       Color="#BADD52"/>
-    <SolidColorBrush x:Key="DG.Series3"       Color="#E0965A"/>
-    <SolidColorBrush x:Key="DG.Series4"       Color="#6FB4D6"/>
-    <SolidColorBrush x:Key="DG.Series5"       Color="#D291C4"/>
+    <SolidColorBrush x:Key="DG.Energy" Color="#9DCB1F" />
+    <SolidColorBrush x:Key="DG.Series1" Color="#D8D3C8" />
+    <SolidColorBrush x:Key="DG.Series2" Color="#BADD52" />
+    <SolidColorBrush x:Key="DG.Series3" Color="#E0965A" />
+    <SolidColorBrush x:Key="DG.Series4" Color="#6FB4D6" />
+    <SolidColorBrush x:Key="DG.Series5" Color="#D291C4" />
 
     <!-- Signature run sweep: Accent → Energy. Rebuilt per palette in DesignThemeManager.Apply. -->
     <LinearGradientBrush x:Key="DG.RunSweep" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#BADD52" Offset="0"/>
-        <GradientStop Color="#9DCB1F" Offset="1"/>
+        <GradientStop Color="#BADD52" Offset="0" />
+        <GradientStop Color="#9DCB1F" Offset="1" />
     </LinearGradientBrush>
 
     <!-- Legacy key kept for existing references. -->
-    <SolidColorBrush x:Key="AccentBrush" Color="#BADD52"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#BADD52" />
 
     <!-- ==================================================================
          2. Geometry — radii, spacing scale, fixed pane widths
@@ -156,71 +156,71 @@
     <sys:Double x:Key="DG.Type.Tiny">10.5</sys:Double>
 
     <Style x:Key="DG.PageTitle" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Display}"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.PageTitle}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Display}" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.PageTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
     </Style>
     <Style x:Key="DG.PageSubtitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}"/>
-        <Setter Property="Margin" Value="0,4,0,0"/>
-        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}" />
+        <Setter Property="Margin" Value="0,4,0,0" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style x:Key="DG.CardTitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.CardTitle}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.CardTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
     </Style>
     <Style x:Key="DG.Body" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
     </Style>
     <Style x:Key="DG.Secondary" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}"/>
-        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style x:Key="DG.Tertiary" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Small}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Small}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}" />
     </Style>
     <!-- The all-caps group label used above every field group and table header. -->
     <Style x:Key="DG.GroupLabel" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
-        <Setter Property="Typography.Capitals" Value="AllSmallCaps"/>
-        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
+        <Setter Property="Typography.Capitals" Value="AllSmallCaps" />
+        <Setter Property="Margin" Value="0,0,0,8" />
     </Style>
     <Style x:Key="DG.Mono" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Mono}"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Small}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}"/>
-        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Mono}" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Small}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text2}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
     <!-- Numeric stat used in the run-summary tiles. -->
     <Style x:Key="DG.Stat" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Mono}"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Stat}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="Margin" Value="0,5,0,0"/>
+        <Setter Property="FontFamily" Value="{DynamicResource DG.Font.Mono}" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Stat}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="Margin" Value="0,5,0,0" />
     </Style>
     <!-- Every table/list cell: single line, ellipsis. Prevents the row-height blowout. -->
     <Style x:Key="DG.Cell" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
-        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-        <Setter Property="TextWrapping" Value="NoWrap"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <!-- ==================================================================
          4. Elevation
          ================================================================== -->
     <DropShadowEffect x:Key="DG.Shadow.Sheet" BlurRadius="70" ShadowDepth="24"
-                      Direction="270" Opacity="0.7" Color="#000000"/>
+                      Direction="270" Opacity="0.7" Color="#000000" />
 
     <!-- ==================================================================
          5. Control styles — the vocabulary used across all 1a screens
@@ -228,53 +228,53 @@
 
     <!-- Card surface. Every pane in every screen is one of these. -->
     <Style x:Key="DG.CardBorder" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource DG.Card}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Card}"/>
-        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Card}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Card}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
     </Style>
 
     <Style TargetType="{x:Type ui:Card}">
-        <Setter Property="Background" Value="{DynamicResource DG.Card}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Card}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Card}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Card}" />
     </Style>
 
     <Style TargetType="Page">
-        <Setter Property="Background" Value="{DynamicResource DG.Bg}"/>
-        <Setter Property="FontFamily" Value="{DynamicResource DG.Font}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Bg}" />
+        <Setter Property="FontFamily" Value="{DynamicResource DG.Font}" />
     </Style>
 
     <!-- Primary (accent) button — one per screen, maximum. -->
     <Style x:Key="DG.PrimaryButton" TargetType="Button">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="Padding" Value="14,0"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.OnAccent}"/>
-        <Setter Property="Background" Value="{DynamicResource DG.Accent}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.OnAccent}" />
+        <Setter Property="Background" Value="{DynamicResource DG.Accent}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Bd" Background="{TemplateBinding Background}"
                             CornerRadius="{DynamicResource DG.Radius.Control}"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.AccentHover}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.AccentHover}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.AccentPressed}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.AccentPressed}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlFill}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlFill}" />
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -289,15 +289,15 @@
         Debugger Immediate Window writes hitch the UI. No storyboards here.
     -->
     <Style x:Key="DG.CheckBox" TargetType="CheckBox">
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="MinWidth" Value="0"/>
-        <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="SnapsToDevicePixels" Value="True"/>
-        <Setter Property="OverridesDefaultStyle" Value="True"/>
-        <Setter Property="FocusVisualStyle" Value="{DynamicResource DefaultControlFocusVisualStyle}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource DefaultControlFocusVisualStyle}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
@@ -317,51 +317,51 @@
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource DG.OnAccent}"
-                                               Visibility="Collapsed"/>
+                                               Visibility="Collapsed" />
                             </Border>
                         </BulletDecorator.Bullet>
                         <ContentPresenter Margin="8,0,0,0"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                          RecognizesAccessKey="True"/>
+                                          RecognizesAccessKey="True" />
                     </BulletDecorator>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.Accent}"/>
-                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
-                            <Setter TargetName="Glyph" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.Accent}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
+                            <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.ControlHover}"/>
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.ControlHover}" />
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
-                                <Condition Property="IsChecked" Value="True"/>
-                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="True" />
+                                <Condition Property="IsMouseOver" Value="True" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.AccentHover}"/>
-                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource DG.AccentHover}"/>
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource DG.AccentHover}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource DG.AccentHover}" />
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
-                            <Setter TargetName="Box" Property="Opacity" Value="0.5"/>
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}" />
+                            <Setter TargetName="Box" Property="Opacity" Value="0.5" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
-    <Style TargetType="CheckBox" BasedOn="{StaticResource DG.CheckBox}"/>
+    <Style TargetType="CheckBox" BasedOn="{StaticResource DG.CheckBox}" />
 
     <!-- Standard button — everything else, including Back/Next. -->
     <Style x:Key="DG.Button" TargetType="Button">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="Padding" Value="12,0"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
-        <Setter Property="Background" Value="{DynamicResource DG.ControlFill}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
+        <Setter Property="Background" Value="{DynamicResource DG.ControlFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -370,14 +370,14 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{DynamicResource DG.Radius.Control}"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlHover}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlHover}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -387,14 +387,14 @@
 
     <!-- Pressed-state twin of DG.Button. Do not apply DG.Button to ToggleButton. -->
     <Style x:Key="DG.ToggleButton" TargetType="ToggleButton">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="Padding" Value="12,0"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
-        <Setter Property="Background" Value="{DynamicResource DG.ControlFill}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Body}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
+        <Setter Property="Background" Value="{DynamicResource DG.ControlFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
@@ -403,18 +403,18 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{DynamicResource DG.Radius.Control}"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlHover}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ControlHover}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -424,44 +424,44 @@
 
     <!-- Destructive button — Cancel run only. -->
     <Style x:Key="DG.DangerButton" TargetType="Button" BasedOn="{StaticResource DG.Button}">
-        <Setter Property="Background" Value="{DynamicResource DG.ErrorSoft}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ErrorBorder}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Error}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.ErrorSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ErrorBorder}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Error}" />
     </Style>
 
     <!-- Inline link ("add a rule", "View full log"). -->
     <Style x:Key="DG.LinkButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{DynamicResource DG.Accent}"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Small}"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.Accent}" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Small}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <ContentPresenter/>
+                    <ContentPresenter />
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Foreground" Value="{DynamicResource DG.AccentHover}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DG.AccentHover}" />
             </Trigger>
         </Style.Triggers>
     </Style>
 
     <!-- Text input / search field / combo face. -->
     <Style x:Key="DG.TextBox" TargetType="TextBox">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Control}"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="CaretBrush" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Control}" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -470,11 +470,11 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{DynamicResource DG.Radius.Control}">
                         <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Center"/>
+                                      VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -483,25 +483,25 @@
     </Style>
 
     <Style x:Key="DG.NumberBox" TargetType="ui:NumberBox">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="Padding" Value="11,0,36,0"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="CaretBrush" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="SpinButtonPlacementMode" Value="Compact"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="Padding" Value="11,0,36,0" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="SpinButtonPlacementMode" Value="Compact" />
     </Style>
 
     <Style x:Key="DG.ComboBoxItem" TargetType="ComboBoxItem">
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Padding" Value="11,6"/>
-        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="11,6" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
@@ -511,17 +511,17 @@
                             SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="Center"
-                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DG.ItemSelected}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -535,27 +535,27 @@
         Do not set ScrollViewer.CanContentScroll=False — that blocks item selection.
     -->
     <Style x:Key="DG.ComboBox" TargetType="ComboBox">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}"/>
-        <Setter Property="Padding" Value="11,0,28,0"/>
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
-        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        <Setter Property="SnapsToDevicePixels" Value="True"/>
-        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        <Setter Property="ItemContainerStyle" Value="{StaticResource DG.ComboBoxItem}"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="MinHeight" Value="{DynamicResource DG.Size.Control}" />
+        <Setter Property="Padding" Value="11,0,28,0" />
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Caption}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}" />
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ItemContainerStyle" Value="{StaticResource DG.ComboBoxItem}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="28"/>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="28" />
                         </Grid.ColumnDefinitions>
                         <ToggleButton x:Name="ToggleButton"
                                       Grid.ColumnSpan="2"
@@ -568,17 +568,17 @@
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                             <ToggleButton.Style>
                                 <Style TargetType="ToggleButton">
-                                    <Setter Property="OverridesDefaultStyle" Value="True"/>
-                                    <Setter Property="Focusable" Value="False"/>
-                                    <Setter Property="ClickMode" Value="Press"/>
-                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                                    <Setter Property="VerticalAlignment" Value="Stretch"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="OverridesDefaultStyle" Value="True" />
+                                    <Setter Property="Focusable" Value="False" />
+                                    <Setter Property="ClickMode" Value="Press" />
+                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                    <Setter Property="VerticalAlignment" Value="Stretch" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="ToggleButton">
-                                                <Border Background="Transparent"/>
+                                                <Border Background="Transparent" />
                                             </ControlTemplate>
                                         </Setter.Value>
                                     </Setter>
@@ -591,7 +591,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{DynamicResource DG.Radius.Control}"
-                                IsHitTestVisible="False"/>
+                                IsHitTestVisible="False" />
                         <ContentPresenter x:Name="ContentSite"
                                           Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -601,14 +601,14 @@
                                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                           ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                           IsHitTestVisible="False"
-                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                         <Path Grid.Column="1"
                               Data="M 0,0 L 4,4 L 8,0"
                               Stroke="{TemplateBinding Foreground}"
                               StrokeThickness="1.5"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
-                              IsHitTestVisible="False"/>
+                              IsHitTestVisible="False" />
                         <Popup x:Name="PART_Popup"
                                Grid.ColumnSpan="2"
                                Placement="Bottom"
@@ -624,165 +624,165 @@
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                 <ScrollViewer>
                                     <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
-                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
                                 </ScrollViewer>
                             </Border>
                         </Popup>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
                         </Trigger>
                         <Trigger Property="IsDropDownOpen" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource DG.TextDisabled}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
-    <Style TargetType="ComboBox" BasedOn="{StaticResource DG.ComboBox}"/>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource DG.ComboBox}" />
 
     <!-- Mono editor surface: template box, log block, preview rows. -->
     <Style x:Key="DG.CodeBox" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource DG.CodeSurface}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Control}"/>
-        <Setter Property="Padding" Value="12,11"/>
+        <Setter Property="Background" Value="{DynamicResource DG.CodeSurface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Control}" />
+        <Setter Property="Padding" Value="12,11" />
     </Style>
 
     <!-- Filter pill. Selected variant carries the accent tint. -->
     <Style x:Key="DG.Chip" TargetType="Border">
-        <Setter Property="Height" Value="{DynamicResource DG.Size.Chip}"/>
-        <Setter Property="Padding" Value="9,0"/>
-        <Setter Property="Background" Value="{DynamicResource DG.ItemSelected}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Pill}"/>
+        <Setter Property="Height" Value="{DynamicResource DG.Size.Chip}" />
+        <Setter Property="Padding" Value="9,0" />
+        <Setter Property="Background" Value="{DynamicResource DG.ItemSelected}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Pill}" />
     </Style>
     <!-- Solid accent fill, not the soft tint DG.Chip normally carries — this one is a status
          badge (currently connected), not a filter pill, and needs to read at a glance. -->
     <Style x:Key="DG.ChipSelected" TargetType="Border" BasedOn="{StaticResource DG.Chip}">
-        <Setter Property="Background" Value="{DynamicResource DG.Accent}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Accent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Accent}" />
     </Style>
 
     <!-- Info / warning banners. Left edge is the 3px accent stripe. -->
     <Style x:Key="DG.InfoBanner" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource DG.AccentSoft}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentSoftBorder}"/>
-        <Setter Property="BorderThickness" Value="3,1,1,1"/>
-        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Panel}"/>
-        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Background" Value="{DynamicResource DG.AccentSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.AccentSoftBorder}" />
+        <Setter Property="BorderThickness" Value="3,1,1,1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Panel}" />
+        <Setter Property="Padding" Value="14,12" />
     </Style>
     <Style x:Key="DG.WarningBanner" TargetType="Border" BasedOn="{StaticResource DG.InfoBanner}">
-        <Setter Property="Background" Value="{DynamicResource DG.WarningSoft}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.WarningBorder}"/>
-        <Setter Property="Padding" Value="16,14"/>
+        <Setter Property="Background" Value="{DynamicResource DG.WarningSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.WarningBorder}" />
+        <Setter Property="Padding" Value="16,14" />
     </Style>
 
     <!-- Table header row and body row separators. -->
     <Style x:Key="DG.TableHeader" TargetType="Border">
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
-        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Row}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Row}" />
     </Style>
     <Style x:Key="DG.TableRow" TargetType="Border">
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Divider}"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
-        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Row}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Divider}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Row}" />
     </Style>
     <!-- Two-line rows: cause + hint, run + outcome. Cannot compact to DG.Pad.Row. -->
     <Style x:Key="DG.TableRowTall" TargetType="Border" BasedOn="{StaticResource DG.TableRow}">
-        <Setter Property="Padding" Value="{DynamicResource DG.Pad.RowTall}"/>
+        <Setter Property="Padding" Value="{DynamicResource DG.Pad.RowTall}" />
     </Style>
     <Style x:Key="DG.TableHeaderText" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Label}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}"/>
-        <Setter Property="Typography.Capitals" Value="AllSmallCaps"/>
+        <Setter Property="FontSize" Value="{DynamicResource DG.Type.Label}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.Text3}" />
+        <Setter Property="Typography.Capitals" Value="AllSmallCaps" />
     </Style>
 
     <!-- Card footer strip (counts, seed, "edited 2 days ago"). -->
     <Style x:Key="DG.CardFooter" TargetType="Border">
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}"/>
-        <Setter Property="BorderThickness" Value="0,1,0,0"/>
-        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="16,10" />
     </Style>
 
     <!-- Progress bar: 4px, square track. -->
     <Style x:Key="DG.ProgressBar" TargetType="ProgressBar">
-        <Setter Property="Height" Value="4"/>
-        <Setter Property="Background" Value="{DynamicResource DG.TrackFill}"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.RunSweep}"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Background" Value="{DynamicResource DG.TrackFill}" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.RunSweep}" />
+        <Setter Property="BorderThickness" Value="0" />
     </Style>
 
     <!-- Flat list surface for picked lookup records; rows use DG.Cell text. -->
     <Style x:Key="DG.ListBox" TargetType="ListBox">
-        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}"/>
-        <Setter Property="Padding" Value="2"/>
-        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="Background" Value="{DynamicResource DG.CardSunken}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource DG.TextBody}" />
+        <Setter Property="Padding" Value="2" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
     </Style>
 
     <!-- 3px selection stripe on the leading edge of a selected nav/list item. -->
     <Style x:Key="DG.SelectionStripe" TargetType="Border">
-        <Setter Property="Width" Value="{DynamicResource DG.Size.SelectionStripe}"/>
-        <Setter Property="CornerRadius" Value="2"/>
-        <Setter Property="Background" Value="{DynamicResource DG.SelectionIndicator}"/>
-        <Setter Property="HorizontalAlignment" Value="Left"/>
-        <Setter Property="Margin" Value="0,9"/>
+        <Setter Property="Width" Value="{DynamicResource DG.Size.SelectionStripe}" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="Background" Value="{DynamicResource DG.SelectionIndicator}" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="Margin" Value="0,9" />
     </Style>
 
     <!-- Modal scrim behind the run sheet. -->
     <Style x:Key="DG.Scrim.Style" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource DG.Scrim}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Scrim}" />
     </Style>
     <Style x:Key="DG.Sheet" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource DG.Card}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.BorderStrong}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Sheet}"/>
-        <Setter Property="Effect" Value="{StaticResource DG.Shadow.Sheet}"/>
+        <Setter Property="Background" Value="{DynamicResource DG.Card}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DG.BorderStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Sheet}" />
+        <Setter Property="Effect" Value="{StaticResource DG.Shadow.Sheet}" />
     </Style>
 
     <!-- ==================================================================
          8. WPF-UI overrides — keeps library chrome on our palette
          ================================================================== -->
-    <SolidColorBrush x:Key="ApplicationBackgroundBrush"              Color="#121110"/>
-    <SolidColorBrush x:Key="LayerFillColorDefaultBrush"              Color="#191816"/>
-    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush"     Color="#201F1C"/>
-    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush"   Color="#0E0D0C"/>
-    <SolidColorBrush x:Key="ControlFillColorDefaultBrush"            Color="#2A2825"/>
-    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush"          Color="#3D3A34"/>
-    <SolidColorBrush x:Key="KeyboardFocusBorderColorBrush"           Color="#BADD52"/>
-    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush"          Color="#2E2C28"/>
-    <SolidColorBrush x:Key="NavigationViewContentBackground"         Color="#191816"/>
-    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush"    Color="#2E2C28"/>
-    <SolidColorBrush x:Key="TextFillColorPrimaryBrush"               Color="#F2F0EA"/>
-    <SolidColorBrush x:Key="TextFillColorSecondaryBrush"             Color="#B4AFA3"/>
-    <SolidColorBrush x:Key="TextFillColorTertiaryBrush"              Color="#8B857A"/>
-    <SolidColorBrush x:Key="TextFillColorDisabledBrush"              Color="#625D54"/>
-    <SolidColorBrush x:Key="AccentFillColorDefaultBrush"             Color="#BADD52"/>
-    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush"           Color="#C9E76F"/>
-    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush"            Color="#A6C93F"/>
-    <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush"         Color="#C2E060"/>
-    <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush"       Color="#14130F"/>
-    <SolidColorBrush x:Key="SystemAccentColorBrush"                  Color="#BADD52"/>
-    <SolidColorBrush x:Key="SystemAccentColorPrimaryBrush"           Color="#BADD52"/>
-    <SolidColorBrush x:Key="SystemAccentColor3Brush"                 Color="#48541F"/>
-    <SolidColorBrush x:Key="SystemFillColorSuccessBrush"             Color="#5BD08D"/>
-    <SolidColorBrush x:Key="SystemFillColorCautionBrush"             Color="#E8B04B"/>
-    <SolidColorBrush x:Key="SystemFillColorCriticalBrush"            Color="#FF8E80"/>
-    <SolidColorBrush x:Key="SystemFillColorSuccessBackgroundBrush"   Color="#14251C"/>
-    <SolidColorBrush x:Key="SystemFillColorCautionBackgroundBrush"   Color="#2C2313"/>
-    <SolidColorBrush x:Key="SystemFillColorCriticalBackgroundBrush"  Color="#2E1815"/>
+    <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="#121110" />
+    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#191816" />
+    <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#201F1C" />
+    <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#0E0D0C" />
+    <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#2A2825" />
+    <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#3D3A34" />
+    <SolidColorBrush x:Key="KeyboardFocusBorderColorBrush" Color="#BADD52" />
+    <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#2E2C28" />
+    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#191816" />
+    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#2E2C28" />
+    <SolidColorBrush x:Key="TextFillColorPrimaryBrush" Color="#F2F0EA" />
+    <SolidColorBrush x:Key="TextFillColorSecondaryBrush" Color="#B4AFA3" />
+    <SolidColorBrush x:Key="TextFillColorTertiaryBrush" Color="#8B857A" />
+    <SolidColorBrush x:Key="TextFillColorDisabledBrush" Color="#625D54" />
+    <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#BADD52" />
+    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#C9E76F" />
+    <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#A6C93F" />
+    <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#C2E060" />
+    <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#14130F" />
+    <SolidColorBrush x:Key="SystemAccentColorBrush" Color="#BADD52" />
+    <SolidColorBrush x:Key="SystemAccentColorPrimaryBrush" Color="#BADD52" />
+    <SolidColorBrush x:Key="SystemAccentColor3Brush" Color="#48541F" />
+    <SolidColorBrush x:Key="SystemFillColorSuccessBrush" Color="#5BD08D" />
+    <SolidColorBrush x:Key="SystemFillColorCautionBrush" Color="#E8B04B" />
+    <SolidColorBrush x:Key="SystemFillColorCriticalBrush" Color="#FF8E80" />
+    <SolidColorBrush x:Key="SystemFillColorSuccessBackgroundBrush" Color="#14251C" />
+    <SolidColorBrush x:Key="SystemFillColorCautionBackgroundBrush" Color="#2C2313" />
+    <SolidColorBrush x:Key="SystemFillColorCriticalBackgroundBrush" Color="#2E1815" />
 
 </ResourceDictionary>

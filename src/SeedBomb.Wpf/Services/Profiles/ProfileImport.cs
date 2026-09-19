@@ -104,7 +104,7 @@ public static class ProfileImport
                 if (!result.IsValid || result.EffectiveRule is null)
                 {
                     var detail = result.Messages.FirstOrDefault(m => m.Severity == RuleMessageSeverity.Error)?.Text
-                        ?? "rule rejected.";
+                                 ?? "rule rejected.";
                     notImported.Add($"{table.Table}.{column} — {detail}");
                     continue;
                 }

@@ -41,7 +41,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 return _cached;
 
             var profile = await _profileService.GetLastUsedAsync(ct).ConfigureAwait(false)
-                ?? throw new InvalidOperationException("No connection profile configured.");
+                          ?? throw new InvalidOperationException("No connection profile configured.");
             var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
             _cached = new ServiceClient(

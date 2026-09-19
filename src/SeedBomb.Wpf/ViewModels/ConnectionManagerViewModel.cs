@@ -44,6 +44,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<ConnectionProfile> _profiles = [];
     [ObservableProperty] private ConnectionProfile? _selectedProfile;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
@@ -51,16 +52,22 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     [NotifyPropertyChangedFor(nameof(EnvironmentUrlError))]
     private ConnectionProfile? _editingProfile;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     private bool _isEditing;
+
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private string? _testResult;
     [ObservableProperty] private bool _testSucceeded;
-    [ObservableProperty][NotifyCanExecuteChangedFor(nameof(SelectProfileCommand))] private bool _isSwitchingConnection;
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(HasSwitchError))] private string? _switchError;
+
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SelectProfileCommand))]
+    private bool _isSwitchingConnection;
+
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSwitchError))]
+    private string? _switchError;
 
     /// <summary>Not persisted. Id of the profile the app is actually connected to right now, if any.</summary>
     [ObservableProperty] private Guid? _connectedProfileId;

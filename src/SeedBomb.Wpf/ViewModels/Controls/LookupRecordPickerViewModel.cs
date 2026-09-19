@@ -36,36 +36,41 @@ public sealed partial class LookupRecordPickerViewModel : ObservableObject, IDis
 
     /// <summary>Current page; selection is stored separately.</summary>
     public ObservableCollection<LookupRecord> Results { get; } = [];
+
     /// <summary>Detached selected identities in authored order.</summary>
     public ObservableCollection<LookupRuleValue> Selected { get; } = [];
+
     /// <summary>Metadata-derived allowed targets.</summary>
     public ObservableCollection<string> Targets { get; } = [];
 
     [ObservableProperty] private string? _selectedTarget;
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private LookupRecord? _selectedResult;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanAccept))]
+
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanAccept))]
     private bool _isBusy;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError), nameof(CanAccept))]
+
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasError), nameof(CanAccept))]
     private string _errorMessage = "";
+
     [ObservableProperty] private string _status = "Search by name prefix or full GUID.";
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(NextPageCommand))]
+
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(NextPageCommand))]
     private bool _canReadNext;
 
     /// <summary>True when the current operation failed.</summary>
     public bool HasError => ErrorMessage.Length > 0;
+
     /// <summary>Whether the dialog may return its selected values.</summary>
     public bool CanAccept => !_disposed && !(_lifetime?.IsCancellationRequested ?? false) && !IsBusy && !HasError
-        && (_single ? Selected.Count == 1 : Selected.Count >= 2);
+                             && (_single ? Selected.Count == 1 : Selected.Count >= 2);
 
     /// <summary>Starts one dialog lifetime using copies of the supplied identities.</summary>
     public void Initialize(LookupAttributeMetadata attribute, IReadOnlyList<LookupRuleValue> initial,
         bool single, CancellationToken ownerToken)
     {
-        if (_lifetime is not null) throw new InvalidOperationException("A picker instance is used for one dialog only.");
+        if (_lifetime is not null)
+            throw new InvalidOperationException("A picker instance is used for one dialog only.");
         _attribute = attribute;
         _single = single;
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(ownerToken);
@@ -130,12 +135,15 @@ public sealed partial class LookupRecordPickerViewModel : ObservableObject, IDis
             _page = pageNumber;
             _cookie = page.PagingCookie;
             CanReadNext = page.MoreRecords && !string.IsNullOrWhiteSpace(_cookie);
-            Status = page.Records.Count == 0 ? "No records match. Change the search or target table."
+            Status = page.Records.Count == 0
+                ? "No records match. Change the search or target table."
                 : $"Page {_page}: {Results.Count} records" + (page.MoreRecords
                     ? CanReadNext ? " · More matches available" : " · More matches exist; refine the search to continue"
                     : " · End of results");
         }
-        catch (OperationCanceledException) when (own.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (own.IsCancellationRequested)
+        {
+        }
         catch (Exception ex)
         {
             if (_disposed || own.IsCancellationRequested || generation != _generation) return;
@@ -151,6 +159,7 @@ public sealed partial class LookupRecordPickerViewModel : ObservableObject, IDis
                 IsBusy = false;
                 NextPageCommand.NotifyCanExecuteChanged();
             }
+
             if (ReferenceEquals(_load, own)) _load = null;
             own.Dispose();
         }
@@ -162,7 +171,8 @@ public sealed partial class LookupRecordPickerViewModel : ObservableObject, IDis
         if (IsBusy || HasError || SelectedResult is not { } row || !Results.Contains(row)) return;
         if (!Targets.Contains(row.Value.Entity, StringComparer.OrdinalIgnoreCase) || row.Value.Id == Guid.Empty) return;
         if (_single) Selected.Clear();
-        if (!Selected.Any(v => v.Id == row.Value.Id && string.Equals(v.Entity, row.Value.Entity, StringComparison.OrdinalIgnoreCase)))
+        if (!Selected.Any(v =>
+                v.Id == row.Value.Id && string.Equals(v.Entity, row.Value.Entity, StringComparison.OrdinalIgnoreCase)))
             Selected.Add(row.Value with { });
     }
 

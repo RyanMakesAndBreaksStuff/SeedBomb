@@ -146,7 +146,7 @@ internal sealed class GenerateProfileBridge
     {
         var counts = _owner.FieldOverrides?.GetCounts() ?? new Dictionary<string, int>();
         var rules = _owner.FieldRules?.GetRules()
-            ?? new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
+                    ?? new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
 
         var tables = new List<ProfileTable>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -195,7 +195,8 @@ internal sealed class GenerateProfileBridge
 
         foreach (var table in tableNames)
         {
-            if (seen.Contains(table) || !_owner.LiveEntityMetadata.TryGetValue(table, out var meta) || meta.LogicalName is null)
+            if (seen.Contains(table) || !_owner.LiveEntityMetadata.TryGetValue(table, out var meta) ||
+                meta.LogicalName is null)
                 continue;
 
             merged.Add(new EntitySummary(

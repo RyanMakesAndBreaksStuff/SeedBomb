@@ -53,7 +53,7 @@ public sealed class ThirdPartyNoticeService(IEmbeddedResourceReader resources) :
     {
         ArgumentNullException.ThrowIfNull(component);
         return resources.ReadUtf8(component.LicenseResource)
-            ?? "License text is not available for this component.";
+               ?? "License text is not available for this component.";
     }
 
     /// <summary>Reads the DataGen/SeedBomb project license.</summary>
@@ -69,8 +69,8 @@ public sealed class ThirdPartyNoticeService(IEmbeddedResourceReader resources) :
         var url = row.ProjectUrl?.Trim();
         var resource = row.LicenseResource?.Trim();
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version)
-            || string.IsNullOrWhiteSpace(license) || string.IsNullOrWhiteSpace(url)
-            || string.IsNullOrWhiteSpace(resource))
+                                            || string.IsNullOrWhiteSpace(license) || string.IsNullOrWhiteSpace(url)
+                                            || string.IsNullOrWhiteSpace(resource))
         {
             errors.Add($"Skipped a component with missing required fields ({name ?? "unnamed"}).");
             return null;
@@ -121,7 +121,6 @@ public sealed class ThirdPartyNoticeService(IEmbeddedResourceReader resources) :
         public string? LicenseResource { get; set; }
         public bool Featured { get; set; }
         public string? Credit { get; set; }
-        [JsonPropertyName("featuredOrder")]
-        public int FeaturedOrder { get; set; }
+        [JsonPropertyName("featuredOrder")] public int FeaturedOrder { get; set; }
     }
 }

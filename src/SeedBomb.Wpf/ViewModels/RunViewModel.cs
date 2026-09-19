@@ -382,7 +382,9 @@ public sealed partial class RunViewModel : ObservableObject
         {
             _tableWritten[table] = ids.Count;
             var plannedForTable = _lastConfig?.RecordCounts is { } counts
-                && counts.TryGetValue(table, out var want) ? want : ids.Count;
+                                  && counts.TryGetValue(table, out var want)
+                ? want
+                : ids.Count;
             UpdateTableRow(
                 new ProgressUpdate("Generating", table, ids.Count, plannedForTable, 0, 0, 0, result.Elapsed),
                 final: true);
@@ -421,7 +423,8 @@ public sealed partial class RunViewModel : ObservableObject
         _plannedTotal = run.TotalRecords;
         _plannedTables = run.EntityNames;
 
-        RunMetaLine = $"Finished {run.Timestamp.LocalDateTime:d MMM yyyy, HH:mm} · {FormatDuration(run.Duration)} · historical";
+        RunMetaLine =
+            $"Finished {run.Timestamp.LocalDateTime:d MMM yyyy, HH:mm} · {FormatDuration(run.Duration)} · historical";
         ApplyOutcome(run.TotalRecords, run.ErrorCount, run.Duration, run.EntityNames.Length);
         ReplaceGroups([]);
         RefreshRetryChrome();
@@ -529,7 +532,8 @@ public sealed partial class RunViewModel : ObservableObject
         var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
         {
             Title = "Allow risky generated values",
-            Content = "This run includes Bogus endpoints that can produce routable, financial, or external values. Continue?",
+            Content =
+                "This run includes Bogus endpoints that can produce routable, financial, or external values. Continue?",
             PrimaryButtonText = "Allow",
             CloseButtonText = "Cancel",
         });
@@ -711,7 +715,8 @@ public sealed partial class RunViewModel : ObservableObject
         SummaryStats.Add(new RunValueRow("Throughput", $"{rpm:N0}/min", "Normal"));
     }
 
-    private static RejectionGroup BuildGroup(IGrouping<(string EntityLogicalName, string ErrorMessage), BatchError> grouping)
+    private static RejectionGroup BuildGroup(
+        IGrouping<(string EntityLogicalName, string ErrorMessage), BatchError> grouping)
     {
         var retryable = grouping.Any(RejectionClassifier.IsRetryable);
         var message = grouping.Key.ErrorMessage;

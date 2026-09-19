@@ -54,18 +54,22 @@ public sealed partial class BogusRuleInputViewModel : ObservableObject
     {
         if (!_suppressCascade) Changed?.Invoke(this, EventArgs.Empty);
     }
+
     partial void OnBogusMaxNumberChanged(string value)
     {
         if (!_suppressCascade) Changed?.Invoke(this, EventArgs.Empty);
     }
+
     partial void OnBogusLengthTextChanged(string value)
     {
         if (!_suppressCascade) Changed?.Invoke(this, EventArgs.Empty);
     }
+
     partial void OnBogusMinDateChanged(DateTime? value)
     {
         if (!_suppressCascade) Changed?.Invoke(this, EventArgs.Empty);
     }
+
     partial void OnBogusMaxDateChanged(DateTime? value)
     {
         if (!_suppressCascade) Changed?.Invoke(this, EventArgs.Empty);
@@ -145,7 +149,7 @@ public sealed partial class BogusRuleInputViewModel : ObservableObject
         if (BogusHasNumericArgs)
             return BuildNumericArgs();
         if (BogusHasLengthArg && !string.IsNullOrWhiteSpace(BogusLengthText)
-            && TryParseJsonNumber(BogusLengthText, out var length))
+                              && TryParseJsonNumber(BogusLengthText, out var length))
             return new Dictionary<string, JsonElement>(StringComparer.Ordinal) { ["length"] = length };
         if (BogusHasDateArgs && BogusMinDate is { } minDate && BogusMaxDate is { } maxDate)
             return BuildDateArgs(minDate, maxDate);
@@ -166,9 +170,11 @@ public sealed partial class BogusRuleInputViewModel : ObservableObject
         new(StringComparer.Ordinal)
         {
             ["min"] = JsonSerializer.SerializeToElement(
-                DateOnly.FromDateTime(minDate).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
+                DateOnly.FromDateTime(minDate)
+                    .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
             ["max"] = JsonSerializer.SerializeToElement(
-                DateOnly.FromDateTime(maxDate).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
+                DateOnly.FromDateTime(maxDate)
+                    .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)),
         };
 
     private void RestoreArguments(BogusRule rule)

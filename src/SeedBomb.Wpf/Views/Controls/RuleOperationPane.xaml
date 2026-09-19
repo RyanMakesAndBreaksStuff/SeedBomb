@@ -5,7 +5,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="RuleOperationTemplates.xaml"/>
+                <ResourceDictionary Source="RuleOperationTemplates.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -13,8 +13,8 @@
     <Border Style="{DynamicResource DG.CardBorder}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <!-- Stacked, not inline: the type line wrapped into the title at narrow widths. -->
@@ -22,20 +22,20 @@
                     BorderThickness="0,0,0,1" Padding="20,16">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0">
                         <TextBlock Style="{DynamicResource DG.CardTitle}"
                                    Text="{Binding SelectedColumn.LogicalName}"
-                                   TextTrimming="CharacterEllipsis"/>
+                                   TextTrimming="CharacterEllipsis" />
                         <TextBlock Style="{DynamicResource DG.Mono}"
                                    Text="{Binding SelectedColumn.TypeLabel}"
-                                   Margin="0,3,0,0"/>
+                                   Margin="0,3,0,0" />
                         <TextBlock Style="{DynamicResource DG.Secondary}"
                                    Text="Choose how SeedBomb fills this column for every generated row."
-                                   Margin="0,4,0,0"/>
+                                   Margin="0,4,0,0" />
                     </StackPanel>
 
                     <ui:Button Grid.Column="1" Style="{DynamicResource DG.Button}"
@@ -44,12 +44,12 @@
                                Padding="0" ToolTip="More"
                                VerticalAlignment="Top"
                                Click="OnMoreButtonClick">
-                        <ui:SymbolIcon Symbol="MoreHorizontal24" FontSize="{DynamicResource DG.Type.Icon}"/>
+                        <ui:SymbolIcon Symbol="MoreHorizontal24" FontSize="{DynamicResource DG.Type.Icon}" />
                         <!-- A ContextMenu only opens on right-click by default; OnMoreButtonClick
                              opens it on left-click instead, matching ProfilesPage. -->
                         <ui:Button.ContextMenu>
                             <ContextMenu Placement="Bottom">
-                                <MenuItem Header="Delete rule" Command="{Binding DeleteRuleCommand}"/>
+                                <MenuItem Header="Delete rule" Command="{Binding DeleteRuleCommand}" />
                             </ContextMenu>
                         </ui:Button.ContextMenu>
                     </ui:Button>
@@ -59,24 +59,28 @@
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16">
                 <StackPanel>
                     <StackPanel Margin="0,0,0,16">
-                        <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Operation"/>
+                        <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Operation" />
                         <ComboBox Style="{DynamicResource DG.ComboBox}"
                                   ItemsSource="{Binding AvailableOpOptions}"
                                   DisplayMemberPath="Title" SelectedValuePath="Op"
                                   SelectedValue="{Binding SelectedOp, Mode=TwoWay}"
-                                  AutomationProperties.Name="Operation"/>
+                                  AutomationProperties.Name="Operation" />
                     </StackPanel>
 
                     <StackPanel x:Name="LookupValueBlock" Margin="0,0,0,16">
-                        <StackPanel.Style><Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers><DataTrigger Binding="{Binding IsLookupValueOperation}" Value="True">
-                                <Setter Property="Visibility" Value="Visible"/>
-                            </DataTrigger></Style.Triggers>
-                        </Style></StackPanel.Style>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLookupValueOperation}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <TextBlock Style="{DynamicResource DG.GroupLabel}"
                                    Text="Add record GUIDs or choose existing records"
-                                   TextWrapping="Wrap"/>
+                                   TextWrapping="Wrap" />
                         <!-- BasedOn is required: a trigger-only Style discards the implicit
                              DG.ComboBox template and falls back to WPF-UI chrome. -->
                         <ComboBox ItemsSource="{Binding LookupInput.Targets}"
@@ -87,7 +91,7 @@
                                 <Style TargetType="ComboBox" BasedOn="{StaticResource DG.ComboBox}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding LookupInput.Targets.Count}" Value="1">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Visibility" Value="Collapsed" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -95,58 +99,67 @@
                         </ComboBox>
                         <TextBox Style="{DynamicResource DG.TextBox}"
                                  Text="{Binding LookupInput.GuidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 AutomationProperties.Name="Comma-separated record GUIDs"/>
+                                 AutomationProperties.Name="Comma-separated record GUIDs" />
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <Button Style="{DynamicResource DG.Button}"
-                                    Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}"/>
+                                    Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}" />
                             <Button Style="{DynamicResource DG.Button}"
-                                    Content="Choose records…" Command="{Binding PickLookupRecordsCommand}" Margin="8,0,0,0"/>
+                                    Content="Choose records…" Command="{Binding PickLookupRecordsCommand}"
+                                    Margin="8,0,0,0" />
                             <Button Style="{DynamicResource DG.Button}"
-                                    Content="Clear selected" Command="{Binding LookupInput.ClearCommand}" Margin="8,0,0,0"/>
+                                    Content="Clear selected" Command="{Binding LookupInput.ClearCommand}"
+                                    Margin="8,0,0,0" />
                         </StackPanel>
                         <ListBox Style="{DynamicResource DG.ListBox}"
                                  ItemsSource="{Binding LookupInput.Records}" Height="120" Margin="0,8,0,0"
                                  ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling">
-                            <ListBox.ItemTemplate><DataTemplate><DockPanel>
-                                <Button DockPanel.Dock="Right" Style="{DynamicResource DG.LinkButton}"
-                                        Content="Remove" CommandParameter="{Binding}"
-                                        Command="{Binding DataContext.LookupInput.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
-                                <TextBlock Style="{DynamicResource DG.Cell}"><Run Text="{Binding Name, Mode=OneWay}"/><Run Text=" · "/>
-                                    <Run Text="{Binding Entity, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Id, Mode=OneWay}"/>
-                                </TextBlock>
-                            </DockPanel></DataTemplate></ListBox.ItemTemplate>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Style="{DynamicResource DG.LinkButton}"
+                                                Content="Remove" CommandParameter="{Binding}"
+                                                Command="{Binding DataContext.LookupInput.RemoveCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" />
+                                        <TextBlock Style="{DynamicResource DG.Cell}">
+                                            <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" · " />
+                                            <Run Text="{Binding Entity, Mode=OneWay}" /><Run Text=" · " />
+                                            <Run Text="{Binding Id, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
                         </ListBox>
                         <TextBlock Style="{DynamicResource DG.Tertiary}"
                                    Text="Manual GUIDs are checked for format and target type, not existence."
-                                   TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                   TextWrapping="Wrap" Margin="0,6,0,0" />
                     </StackPanel>
 
                     <ContentControl Content="{Binding}">
                         <ContentControl.Style>
                             <Style TargetType="ContentControl">
-                                <Setter Property="ContentTemplate" Value="{StaticResource EmptyOpTemplate}"/>
+                                <Setter Property="ContentTemplate" Value="{StaticResource EmptyOpTemplate}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="constant">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource ConstantOpTemplate}"/>
+                                        <Setter Property="ContentTemplate" Value="{StaticResource ConstantOpTemplate}" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="range">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource RangeOpTemplate}"/>
+                                        <Setter Property="ContentTemplate" Value="{StaticResource RangeOpTemplate}" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="sequence">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource SequenceOpTemplate}"/>
+                                        <Setter Property="ContentTemplate" Value="{StaticResource SequenceOpTemplate}" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="pattern">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource PatternOpTemplate}"/>
+                                        <Setter Property="ContentTemplate" Value="{StaticResource PatternOpTemplate}" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="oneOf">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource OneOfOpTemplate}"/>
+                                        <Setter Property="ContentTemplate" Value="{StaticResource OneOfOpTemplate}" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="bogus">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource BogusOpTemplate}"/>
+                                        <Setter Property="ContentTemplate" Value="{StaticResource BogusOpTemplate}" />
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding SelectedOp}" Value="lookupRandom">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource LookupRandomOpTemplate}"/>
+                                        <Setter Property="ContentTemplate"
+                                                Value="{StaticResource LookupRandomOpTemplate}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -158,10 +171,10 @@
                                 Margin="0,0,0,16">
                         <ui:InfoBar.Style>
                             <Style TargetType="ui:InfoBar">
-                                <Setter Property="Severity" Value="Warning"/>
+                                <Setter Property="Severity" Value="Warning" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding InfoBarIsError}" Value="True">
-                                        <Setter Property="Severity" Value="Error"/>
+                                        <Setter Property="Severity" Value="Error" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

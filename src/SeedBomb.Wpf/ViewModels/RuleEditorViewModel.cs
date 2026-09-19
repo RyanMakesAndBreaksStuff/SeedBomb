@@ -31,7 +31,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 {
     // ── §3.1 Applies-to catalogs (Docs/field-rules-proto.html, table 3.1) ───────
     private static readonly string[] TextOps = ["constant", "oneOf", "pattern", "null"];
-    private static readonly string[] NumericOps = ["constant", "oneOf", "range", "sequence", "null"]; // Whole#/BigInt/Decimal/Money
+
+    private static readonly string[]
+        NumericOps = ["constant", "oneOf", "range", "sequence", "null"]; // Whole#/BigInt/Decimal/Money
+
     private static readonly string[] FloatOps = ["constant", "oneOf", "range", "null"]; // Float has no sequence row
     private static readonly string[] DateOps = ["constant", "oneOf", "null"];
     private static readonly string[] ChoiceOps = ["constant", "oneOf", "null"]; // Choice/Status(reason)/Two-Options
@@ -191,24 +194,20 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public bool HasMetadataError => !string.IsNullOrWhiteSpace(MetadataError);
 
     /// <summary>True when live table metadata is loaded and save/picker may run.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanSave))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanSave))]
     private bool _isMetadataAvailable;
 
     /// <summary>True while table metadata is being fetched.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanSave))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanSave))]
     private bool _isMetadataLoading;
 
     /// <summary>Persistent reconnect/retry copy after a metadata or connection failure.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasMetadataError))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasMetadataError))]
     private string? _metadataError;
 
     // ── Page-scoped surface ──────────────────────────────────────────────────
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsWorkingSet))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsWorkingSet))]
     private string _profileName = "Untitled";
 
     /// <summary>True when the loaded profile is the in-memory working set, not a stored profile.</summary>
@@ -218,8 +217,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     public string BreadcrumbRootLabel =>
         _returnPage == typeof(GeneratePage) ? "Generate" : "Profiles";
 
-    [ObservableProperty]
-    private RuleTableOption? _selectedTable;
+    [ObservableProperty] private RuleTableOption? _selectedTable;
 
     /// <summary>Tables in the current profile (header switcher).</summary>
     public ObservableCollection<RuleTableOption> Tables { get; } = [];
@@ -247,8 +245,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <summary>Platform-owned columns, grouped and disabled with their reason; stays findable while excluded (S3).</summary>
     public IReadOnlyList<PickerColumn> ExcludedColumns => _catalog.Excluded(SearchText);
 
-    [ObservableProperty]
-    private string _searchText = string.Empty;
+    [ObservableProperty] private string _searchText = string.Empty;
 
     partial void OnSearchTextChanged(string value)
     {
@@ -258,8 +255,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         ColumnsView?.Refresh();
     }
 
-    [ObservableProperty]
-    private PickerColumn? _selectedColumn;
+    [ObservableProperty] private PickerColumn? _selectedColumn;
 
     partial void OnSelectedColumnChanged(PickerColumn? value)
     {
@@ -339,8 +335,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     // ── Op selection + typed parameters ──────────────────────────────────────
 
-    [ObservableProperty]
-    private string _selectedOp = string.Empty;
+    [ObservableProperty] private string _selectedOp = string.Empty;
 
     partial void OnSelectedOpChanged(string value)
     {
@@ -358,29 +353,88 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     }
 
     /// <summary>Bogus API names compatible with the selected column.</summary>
-    public IReadOnlyList<string> BogusApis { get => BogusInput.BogusApis; set => BogusInput.BogusApis = value; }
+    public IReadOnlyList<string> BogusApis
+    {
+        get => BogusInput.BogusApis;
+        set => BogusInput.BogusApis = value;
+    }
+
     /// <summary>Selected Bogus API id, or null.</summary>
-    public string? SelectedBogusApi { get => BogusInput.SelectedBogusApi; set => BogusInput.SelectedBogusApi = value; }
+    public string? SelectedBogusApi
+    {
+        get => BogusInput.SelectedBogusApi;
+        set => BogusInput.SelectedBogusApi = value;
+    }
+
     /// <summary>Endpoints of <see cref="SelectedBogusApi"/> compatible with the selected column.</summary>
-    public IReadOnlyList<BogusEndpointOption> BogusEndpoints { get => BogusInput.BogusEndpoints; set => BogusInput.BogusEndpoints = value; }
+    public IReadOnlyList<BogusEndpointOption> BogusEndpoints
+    {
+        get => BogusInput.BogusEndpoints;
+        set => BogusInput.BogusEndpoints = value;
+    }
+
     /// <summary>Selected Bogus endpoint id (<c>API.endpoint</c>), or null.</summary>
-    public string? SelectedBogusEndpoint { get => BogusInput.SelectedBogusEndpoint; set => BogusInput.SelectedBogusEndpoint = value; }
+    public string? SelectedBogusEndpoint
+    {
+        get => BogusInput.SelectedBogusEndpoint;
+        set => BogusInput.SelectedBogusEndpoint = value;
+    }
+
     /// <summary>True when the selected endpoint takes a numeric min/max.</summary>
-    public bool BogusHasNumericArgs { get => BogusInput.BogusHasNumericArgs; set => BogusInput.BogusHasNumericArgs = value; }
+    public bool BogusHasNumericArgs
+    {
+        get => BogusInput.BogusHasNumericArgs;
+        set => BogusInput.BogusHasNumericArgs = value;
+    }
+
     /// <summary>True when the selected endpoint takes a length argument.</summary>
-    public bool BogusHasLengthArg { get => BogusInput.BogusHasLengthArg; set => BogusInput.BogusHasLengthArg = value; }
+    public bool BogusHasLengthArg
+    {
+        get => BogusInput.BogusHasLengthArg;
+        set => BogusInput.BogusHasLengthArg = value;
+    }
+
     /// <summary>True when the selected endpoint takes a date min/max.</summary>
-    public bool BogusHasDateArgs { get => BogusInput.BogusHasDateArgs; set => BogusInput.BogusHasDateArgs = value; }
+    public bool BogusHasDateArgs
+    {
+        get => BogusInput.BogusHasDateArgs;
+        set => BogusInput.BogusHasDateArgs = value;
+    }
+
     /// <summary>Authored numeric minimum, or empty.</summary>
-    public string BogusMinNumber { get => BogusInput.BogusMinNumber; set => BogusInput.BogusMinNumber = value; }
+    public string BogusMinNumber
+    {
+        get => BogusInput.BogusMinNumber;
+        set => BogusInput.BogusMinNumber = value;
+    }
+
     /// <summary>Authored numeric maximum, or empty.</summary>
-    public string BogusMaxNumber { get => BogusInput.BogusMaxNumber; set => BogusInput.BogusMaxNumber = value; }
+    public string BogusMaxNumber
+    {
+        get => BogusInput.BogusMaxNumber;
+        set => BogusInput.BogusMaxNumber = value;
+    }
+
     /// <summary>Authored length text, or empty.</summary>
-    public string BogusLengthText { get => BogusInput.BogusLengthText; set => BogusInput.BogusLengthText = value; }
+    public string BogusLengthText
+    {
+        get => BogusInput.BogusLengthText;
+        set => BogusInput.BogusLengthText = value;
+    }
+
     /// <summary>Authored date minimum, or null.</summary>
-    public DateTime? BogusMinDate { get => BogusInput.BogusMinDate; set => BogusInput.BogusMinDate = value; }
+    public DateTime? BogusMinDate
+    {
+        get => BogusInput.BogusMinDate;
+        set => BogusInput.BogusMinDate = value;
+    }
+
     /// <summary>Authored date maximum, or null.</summary>
-    public DateTime? BogusMaxDate { get => BogusInput.BogusMaxDate; set => BogusInput.BogusMaxDate = value; }
+    public DateTime? BogusMaxDate
+    {
+        get => BogusInput.BogusMaxDate;
+        set => BogusInput.BogusMaxDate = value;
+    }
 
     /// <inheritdoc />
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
@@ -399,39 +453,33 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             .ToList();
     }
 
-    [ObservableProperty]
-    private string _constantText = string.Empty;
+    [ObservableProperty] private string _constantText = string.Empty;
     partial void OnConstantTextChanged(string value) => Revalidate();
 
-    [ObservableProperty]
-    private string _template = string.Empty;
+    [ObservableProperty] private string _template = string.Empty;
+
     partial void OnTemplateChanged(string value)
     {
         OnPropertyChanged(nameof(TemplateExpression));
         Revalidate();
     }
 
-    [ObservableProperty]
-    private string _minText = string.Empty;
+    [ObservableProperty] private string _minText = string.Empty;
     partial void OnMinTextChanged(string value) => Revalidate();
 
-    [ObservableProperty]
-    private string _maxText = string.Empty;
+    [ObservableProperty] private string _maxText = string.Empty;
     partial void OnMaxTextChanged(string value) => Revalidate();
 
-    [ObservableProperty]
-    private string _startText = string.Empty;
+    [ObservableProperty] private string _startText = string.Empty;
     partial void OnStartTextChanged(string value) => Revalidate();
 
-    [ObservableProperty]
-    private string _stepText = string.Empty;
+    [ObservableProperty] private string _stepText = string.Empty;
     partial void OnStepTextChanged(string value) => Revalidate();
 
     /// <summary>Checkable option subset for Choice/Two-Options <c>oneOf</c> rule.</summary>
     public ObservableCollection<OptionChoice> Options { get; } = [];
 
-    [ObservableProperty]
-    private OneOfPick _pick = OneOfPick.Random;
+    [ObservableProperty] private OneOfPick _pick = OneOfPick.Random;
     partial void OnPickChanged(OneOfPick value) => Revalidate();
 
     // ── Live validation + preview (RuleValidator / RuleValueGenerator — Wave 1) ─
@@ -618,8 +666,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
                 Tables.Add(new RuleTableOption(table.Table, table.Table));
 
             SelectedTable = Tables.FirstOrDefault(t =>
-                    string.Equals(t.LogicalName, tableName, StringComparison.OrdinalIgnoreCase))
-                ?? Tables.FirstOrDefault();
+                                string.Equals(t.LogicalName, tableName, StringComparison.OrdinalIgnoreCase))
+                            ?? Tables.FirstOrDefault();
         }
         finally
         {
@@ -1107,7 +1155,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (attr is EnumAttributeMetadata or BooleanAttributeMetadata)
         {
             values = Options.Where(o => o.IsChecked)
-                .Select(o => JsonDocument.Parse(o.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)).RootElement)
+                .Select(o =>
+                    JsonDocument.Parse(o.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)).RootElement)
                 .ToList();
         }
         else
@@ -1116,11 +1165,13 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             // comma-separated list — a dedicated multi-value editor is out of scope for this task.
             if (string.IsNullOrWhiteSpace(ConstantText)) return null;
             values = [];
-            foreach (var token in ConstantText.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            foreach (var token in ConstantText.Split(',',
+                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             {
                 if (TryConstantValue(attr, token, out var v)) values.Add(v);
             }
         }
+
         return values.Count >= 2 ? new OneOfRule(values, Pick) : null;
     }
 
@@ -1212,7 +1263,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         var ops = attr switch
         {
             StringAttributeMetadata or MemoAttributeMetadata => TextOps,
-            IntegerAttributeMetadata or BigIntAttributeMetadata or DecimalAttributeMetadata or MoneyAttributeMetadata => NumericOps,
+            IntegerAttributeMetadata or BigIntAttributeMetadata or DecimalAttributeMetadata
+                or MoneyAttributeMetadata => NumericOps,
             DoubleAttributeMetadata => FloatOps,
             DateTimeAttributeMetadata => DateOps,
             BooleanAttributeMetadata => ChoiceOps,
@@ -1231,8 +1283,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         kind = default;
         return SelectedColumn is not null
-            && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
-            && TryMapKind(attr, out kind);
+               && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
+               && TryMapKind(attr, out kind);
     }
 
     private static bool TryMapKind(AttributeMetadata attr, out DataverseValueKind kind)
@@ -1424,7 +1476,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     private void AcceptPickerSelection(string column, IReadOnlyList<LookupRuleValue> result)
     {
-        if (!_byName.TryGetValue(column, out var currentAttr) || currentAttr is not LookupAttributeMetadata currentLookup)
+        if (!_byName.TryGetValue(column, out var currentAttr) ||
+            currentAttr is not LookupAttributeMetadata currentLookup)
             return;
 
         var accepted = new List<LookupRuleValue>(result.Count);

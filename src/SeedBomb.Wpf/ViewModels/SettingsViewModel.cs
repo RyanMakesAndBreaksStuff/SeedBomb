@@ -44,13 +44,6 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] private bool _darkTheme;
     [ObservableProperty] private string _paletteId = DesignThemeManager.DefaultPaletteId;
 
-    /// <summary>Gets the application version string.</summary>
-    public string AppVersion =>
-        System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
-
-    /// <summary>Gets the .NET runtime version string.</summary>
-    public string DotnetVersion => $".NET {Environment.Version}";
-
     /// <summary>Gets the palettes offered in the appearance picker.</summary>
     public IReadOnlyList<ThemePaletteOption> AvailablePalettes => DesignThemeManager.AvailablePalettes;
 

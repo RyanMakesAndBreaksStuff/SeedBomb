@@ -18,23 +18,23 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="105*"/>
-            <ColumnDefinition Width="94*"/>
-            <ColumnDefinition Width="981*"/>
+            <ColumnDefinition Width="105*" />
+            <ColumnDefinition Width="94*" />
+            <ColumnDefinition Width="981*" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="171*"/>
-            <RowDefinition Height="553*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="171*" />
+            <RowDefinition Height="553*" />
         </Grid.RowDefinitions>
 
         <ui:TitleBar
-                     Height="{DynamicResource DG.Size.TitleBar}"
-                     Background="{DynamicResource DG.TitleBar}"
-                     Title="SeedBomb — Mock data explosion"
-                     ShowMaximize="True" ShowMinimize="True" VerticalAlignment="Center" Grid.ColumnSpan="3">
+            Height="{DynamicResource DG.Size.TitleBar}"
+            Background="{DynamicResource DG.TitleBar}"
+            Title="SeedBomb — Mock data explosion"
+            ShowMaximize="True" ShowMinimize="True" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/Resources/logo.ico" Width="16" Height="16"/>
+                <ui:ImageIcon Source="pack://application:,,,/Resources/logo.ico" Width="16" Height="16" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
@@ -60,7 +60,7 @@
                                        IsEnabled="{Binding HasConnection}"
                                        Opacity="{Binding ConnectedOpacity}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Flash24"/>
+                        <ui:SymbolIcon Symbol="Flash24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
@@ -69,7 +69,7 @@
                                        IsEnabled="{Binding HasConnection}"
                                        Opacity="{Binding ConnectedOpacity}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Layer24"/>
+                        <ui:SymbolIcon Symbol="Layer24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
@@ -78,7 +78,7 @@
                                        IsEnabled="{Binding HasConnection}"
                                        Opacity="{Binding ConnectedOpacity}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="History24"/>
+                        <ui:SymbolIcon Symbol="History24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
@@ -91,14 +91,21 @@
                 <ui:NavigationViewItem Content="Connections"
                                        TargetPageType="{x:Type pages:ConnectionsPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="PlugConnected24"/>
+                        <ui:SymbolIcon Symbol="PlugConnected24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
 
                 <ui:NavigationViewItem Content="Settings"
                                        TargetPageType="{x:Type pages:SettingsPage}">
                     <ui:NavigationViewItem.Icon>
-                        <ui:SymbolIcon Symbol="Settings24"/>
+                        <ui:SymbolIcon Symbol="Settings24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+
+                <ui:NavigationViewItem Content="About"
+                                       TargetPageType="{x:Type pages:AboutPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Info24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
             </ui:NavigationView.FooterMenuItems>
@@ -115,8 +122,8 @@
                             Padding="4,10,4,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
                             <Border Grid.Column="0" Width="28" Height="28" CornerRadius="14"
@@ -125,18 +132,18 @@
                                            FontSize="{DynamicResource DG.Type.Micro}"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource DG.OnAccent}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding UserDisplayName}"
                                            FontSize="{DynamicResource DG.Type.Caption}"
                                            Foreground="{DynamicResource DG.TextNav}"
-                                           TextTrimming="CharacterEllipsis"/>
+                                           TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{Binding EnvironmentHost}"
                                            FontSize="{DynamicResource DG.Type.Label}"
                                            Foreground="{DynamicResource DG.Text3}"
-                                           TextTrimming="CharacterEllipsis"/>
+                                           TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -149,20 +156,21 @@
              when the window is resized. -->
         <ui:SnackbarPresenter Grid.Row="2" x:Name="SnackbarPresenter"
                               VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                              Margin="{DynamicResource DG.Pad.Page}" Grid.Column="2"/>
+                              Margin="{DynamicResource DG.Pad.Page}" Grid.Column="2" />
 
         <ui:ContentDialogHost Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Grid.ColumnSpan="3" />
 
         <Border x:Name="FirstRunOverlay" Grid.Row="1" Grid.Column="0" Style="{DynamicResource DG.Scrim.Style}"
-                Visibility="{Binding HasConnection, Converter={StaticResource InverseBoolToVisible}}" Grid.RowSpan="2" Grid.ColumnSpan="3">
+                Visibility="{Binding HasConnection, Converter={StaticResource InverseBoolToVisible}}" Grid.RowSpan="2"
+                Grid.ColumnSpan="3">
             <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
                 <StackPanel>
-                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Connect an environment"/>
+                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Connect an environment" />
                     <TextBlock Style="{DynamicResource DG.PageSubtitle}"
-                               Text="SeedBomb needs a Dataverse connection before it can generate data."/>
+                               Text="SeedBomb needs a Dataverse connection before it can generate data." />
                     <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
-                            Command="{Binding OpenConnectionsCommand}" Content="Add connection"/>
+                            Command="{Binding OpenConnectionsCommand}" Content="Add connection" />
                 </StackPanel>
             </Border>
         </Border>
@@ -171,15 +179,16 @@
              (e.g. an OAuth token needing re-consent). App-only profiles never hit this —
              their silent sign-in needs no user/window and always succeeds at startup. -->
         <Border x:Name="SignInOverlay" Grid.Row="1" Grid.Column="0" Style="{DynamicResource DG.Scrim.Style}"
-                Visibility="{Binding ShowSignInOverlay, Converter={StaticResource BoolToVisibilityConverter}}" Grid.RowSpan="2" Grid.ColumnSpan="3">
+                Visibility="{Binding ShowSignInOverlay, Converter={StaticResource BoolToVisibilityConverter}}"
+                Grid.RowSpan="2" Grid.ColumnSpan="3">
             <Border Style="{DynamicResource DG.Sheet}" Width="{DynamicResource DG.Size.SheetWidth}"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
                 <StackPanel>
-                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Sign in to continue"/>
+                    <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Sign in to continue" />
                     <TextBlock Style="{DynamicResource DG.PageSubtitle}"
-                               Text="SeedBomb couldn't reconnect automatically."/>
+                               Text="SeedBomb couldn't reconnect automatically." />
                     <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
-                            Command="{Binding SignInCommand}" Content="Sign in"/>
+                            Command="{Binding SignInCommand}" Content="Sign in" />
 
                     <!-- Escape hatch: the scrim blocks hit-testing on the nav pane underneath
                          (Background is set, so opacity alone doesn't let clicks through), so
@@ -187,7 +196,7 @@
                          forever with no way to reach Connections and fix or delete it. -->
                     <Button Style="{DynamicResource DG.LinkButton}" Margin="0,8,0,0"
                             HorizontalAlignment="Center"
-                            Command="{Binding OpenConnectionsCommand}" Content="Manage connections"/>
+                            Command="{Binding OpenConnectionsCommand}" Content="Manage connections" />
 
                     <!-- Bindings for both properties below are wired up in code-behind, with an
                          explicit Source, against the same ConnectionManagerViewModel instance
@@ -201,16 +210,16 @@
                             Margin="0,16,0,0" Visibility="Collapsed">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <ui:SymbolIcon Grid.Column="0" Symbol="Warning24"
                                            FontSize="{DynamicResource DG.Type.IconLg}"
                                            Foreground="{DynamicResource DG.Warning}"
-                                           VerticalAlignment="Center"/>
+                                           VerticalAlignment="Center" />
                             <TextBlock x:Name="SignInErrorText" Grid.Column="1" Style="{DynamicResource DG.Secondary}"
                                        Foreground="{DynamicResource DG.WarningText}"
-                                       Margin="14,0,0,0" LineHeight="18"/>
+                                       Margin="14,0,0,0" LineHeight="18" />
                         </Grid>
                     </Border>
                 </StackPanel>

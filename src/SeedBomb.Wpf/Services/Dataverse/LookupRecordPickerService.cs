@@ -11,7 +11,8 @@ namespace Seedbomb.Services.Dataverse;
 /// <summary>Uses the application's existing WPF-UI ContentDialogHost.</summary>
 /// <param name="dialogs">Existing app-wide dialog service.</param>
 /// <param name="createViewModel">DI factory for a fresh dialog view-model.</param>
-public sealed class LookupRecordPickerService(IContentDialogService dialogs,
+public sealed class LookupRecordPickerService(
+    IContentDialogService dialogs,
     Func<LookupRecordPickerViewModel> createViewModel) : ILookupRecordPicker
 {
     /// <inheritdoc />
@@ -35,9 +36,13 @@ public sealed class LookupRecordPickerService(IContentDialogService dialogs,
             var result = await dialogs.ShowAsync(dialog, ct);
             ct.ThrowIfCancellationRequested();
             return result == ContentDialogResult.Primary && vm.CanAccept
-                ? Array.AsReadOnly(vm.Selected.Select(v => v with { }).ToArray()) : null;
+                ? Array.AsReadOnly(vm.Selected.Select(v => v with { }).ToArray())
+                : null;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return null; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return null;
+        }
         finally
         {
             // LoadPageAsync observes/logs all failures; closing does not await an uncooperative read.

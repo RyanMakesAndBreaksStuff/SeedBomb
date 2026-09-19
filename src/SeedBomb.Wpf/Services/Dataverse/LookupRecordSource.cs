@@ -10,11 +10,14 @@ namespace Seedbomb.Services.Dataverse;
 /// <param name="connection">Existing cached connection owner.</param>
 /// <param name="metadata">Existing environment metadata cache.</param>
 /// <param name="throttle">Shared repository retry implementation.</param>
-public sealed class LookupRecordSource(IDataverseConnectionService connection,
-    IMetadataProvider metadata, ThrottlePolicy throttle) : ILookupRecordSource
+public sealed class LookupRecordSource(
+    IDataverseConnectionService connection,
+    IMetadataProvider metadata,
+    ThrottlePolicy throttle) : ILookupRecordSource
 {
     /// <summary>Picker rows fetched per forward page.</summary>
     public const int PageSize = 100;
+
     private const int MaximumSearchLength = 200;
     private const int ReadRetries = 3;
 
@@ -62,28 +65,33 @@ public sealed class LookupRecordSource(IDataverseConnectionService connection,
         else if (text.Length > 0)
         {
             if (!hasName)
-                throw new InvalidOperationException("This table has no readable primary name. Search by full GUID or browse.");
+                throw new InvalidOperationException(
+                    "This table has no readable primary name. Search by full GUID or browse.");
             var literalPrefix = text.Replace("[", "[[]", StringComparison.Ordinal)
                 .Replace("%", "[%]", StringComparison.Ordinal).Replace("_", "[_]", StringComparison.Ordinal);
             query.Criteria.AddCondition(primaryName!, ConditionOperator.Like, literalPrefix + "%");
         }
+
         var page = await throttle.ExecuteAsync(() => service.RetrieveMultipleAsync(query, ct),
             request.Target, ReadRetries, ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
         var records = new List<LookupRecord>(page.Entities.Count);
         foreach (var entity in page.Entities)
         {
-            if (entity.Id == Guid.Empty || !string.Equals(entity.LogicalName, request.Target, StringComparison.OrdinalIgnoreCase))
+            if (entity.Id == Guid.Empty ||
+                !string.Equals(entity.LogicalName, request.Target, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Dataverse returned a record outside the requested target.");
             var name = hasName ? entity.GetAttributeValue<string>(primaryName!) : null;
             var created = entity.GetAttributeValue<DateTime?>("createdon");
             var creator = entity.GetAttributeValue<EntityReference>("createdby");
             var createdText = created is { } date
-                ? DateTime.SpecifyKind(date, DateTimeKind.Utc).ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)
+                ? DateTime.SpecifyKind(date, DateTimeKind.Utc)
+                    .ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)
                 : "—";
             var creatorText = creator is null ? "—" : creator.Name ?? creator.Id.ToString("D");
             records.Add(new(new(request.Target.ToLowerInvariant(), entity.Id, name), createdText, creatorText));
         }
+
         return new(records.AsReadOnly(), page.MoreRecords, page.PagingCookie);
     }
 }

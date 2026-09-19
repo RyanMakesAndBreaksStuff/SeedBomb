@@ -121,8 +121,10 @@ public sealed class RuleColumnCatalog
         using (view.DeferRefresh())
         {
             view.SortDescriptions.Clear();
-            view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
-            view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.DisplayName), ListSortDirection.Ascending));
+            view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder),
+                ListSortDirection.Ascending));
+            view.SortDescriptions.Add(
+                new SortDescription(nameof(PickerColumn.DisplayName), ListSortDirection.Ascending));
             view.GroupDescriptions.Clear();
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
         }
@@ -175,8 +177,8 @@ public sealed class RuleColumnCatalog
         string.IsNullOrWhiteSpace(search)
             ? source
             : source.Where(c => c.LogicalName.Contains(search, StringComparison.OrdinalIgnoreCase)
-                              || c.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                                || c.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
     private static bool IsRequiredLevel(AttributeMetadata attr) =>
         attr.RequiredLevel?.Value is AttributeRequiredLevel.SystemRequired

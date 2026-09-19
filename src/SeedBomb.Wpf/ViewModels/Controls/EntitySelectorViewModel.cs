@@ -40,12 +40,10 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
     /// <summary>Currently selected entities.</summary>
     public ObservableCollection<EntitySummary> SelectedEntities { get; } = [];
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FooterLabel))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(FooterLabel))]
     private string _filterText = string.Empty;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FooterLabel))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(FooterLabel))]
     private bool _showCustomOnly;
 
     /// <summary>Footer copy: "218 tables · 3 selected · custom".</summary>
@@ -58,13 +56,10 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         }
     }
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    [NotifyPropertyChangedFor(nameof(ShowContent))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasError))] [NotifyPropertyChangedFor(nameof(ShowContent))]
     private string? _errorMessage;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowContent))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ShowContent))]
     private bool _isLoading;
 
     /// <summary>Gets a value indicating whether an error message is present.</summary>
@@ -243,7 +238,7 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
             return true;
 
         return entity.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase)
-            || entity.LogicalName.Contains(filter, StringComparison.OrdinalIgnoreCase);
+               || entity.LogicalName.Contains(filter, StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -270,7 +265,6 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         /// <summary>Gets whether this row represents a custom entity.</summary>
         public bool IsCustom => Entity.IsCustom;
 
-        [ObservableProperty]
-        private bool _isSelected;
+        [ObservableProperty] private bool _isSelected;
     }
 }

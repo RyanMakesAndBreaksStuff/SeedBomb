@@ -19,29 +19,29 @@
 
     <Grid Margin="{DynamicResource DG.Pad.Page}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Header: breadcrumb, title, table switcher, save -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Bottom">
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                     <Button Style="{DynamicResource DG.LinkButton}"
                             Command="{Binding NavigateToProfilesCommand}"
-                            Content="{Binding BreadcrumbRootLabel}"/>
+                            Content="{Binding BreadcrumbRootLabel}" />
                     <TextBlock Style="{DynamicResource DG.Tertiary}" Text=" › " />
                     <TextBlock Style="{DynamicResource DG.Tertiary}"
-                               Text="{Binding ProfileName}"/>
+                               Text="{Binding ProfileName}" />
                 </StackPanel>
-                <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Rules"/>
+                <TextBlock Style="{DynamicResource DG.PageTitle}" Text="Rules" />
             </StackPanel>
 
             <ComboBox Grid.Column="1" Style="{DynamicResource DG.ComboBox}"
@@ -50,27 +50,27 @@
                       ItemsSource="{Binding Tables}"
                       SelectedItem="{Binding SelectedTable}"
                       DisplayMemberPath="DisplayName"
-                      AutomationProperties.Name="Table"/>
+                      AutomationProperties.Name="Table" />
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
                 <Button Style="{DynamicResource DG.Button}"
                         Margin="0,0,8,0"
                         Command="{Binding SaveProfileCommand}"
                         Content="Save profile"
-                        Visibility="{Binding IsWorkingSet, Converter={StaticResource InverseBoolToVisible}}"/>
+                        Visibility="{Binding IsWorkingSet, Converter={StaticResource InverseBoolToVisible}}" />
                 <Button Style="{DynamicResource DG.PrimaryButton}"
                         Command="{Binding SaveProfileAsCommand}"
-                        Content="Save profile as"/>
+                        Content="Save profile as" />
             </StackPanel>
         </Grid>
 
         <StackPanel Grid.Row="1" Margin="0,0,0,12">
             <StackPanel.Style>
                 <Style TargetType="StackPanel">
-                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding HasMetadataError}" Value="True">
-                            <Setter Property="Visibility" Value="Visible"/>
+                            <Setter Property="Visibility" Value="Visible" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -79,25 +79,25 @@
                         Severity="Error"
                         IsClosable="False"
                         Title="Metadata unavailable"
-                        Message="{Binding MetadataError}"/>
+                        Message="{Binding MetadataError}" />
             <Button Style="{DynamicResource DG.Button}"
                     Content="Retry"
                     Command="{Binding RetryMetadataCommand}"
                     HorizontalAlignment="Left"
-                    Margin="0,8,0,0"/>
+                    Margin="0,8,0,0" />
         </StackPanel>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="14"/>
-                <ColumnDefinition Width="*" MinWidth="300"/>
-                <ColumnDefinition Width="14"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" MinWidth="300" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <controls:RuleColumnListControl Grid.Column="0"/>
-            <controls:RuleOperationPane    Grid.Column="2"/>
-            <controls:RulePreviewPane      Grid.Column="4"/>
+            <controls:RuleColumnListControl Grid.Column="0" />
+            <controls:RuleOperationPane Grid.Column="2" />
+            <controls:RulePreviewPane Grid.Column="4" />
         </Grid>
     </Grid>
 </Page>

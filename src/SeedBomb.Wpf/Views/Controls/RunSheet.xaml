@@ -19,25 +19,25 @@
 
     <Grid>
         <!-- Scrim. Swallows input so the page behind is visible but inert. -->
-        <Border Style="{DynamicResource DG.Scrim.Style}" Focusable="False"/>
+        <Border Style="{DynamicResource DG.Scrim.Style}" Focusable="False" />
 
         <Border Style="{DynamicResource DG.Sheet}"
                 Width="{DynamicResource DG.Size.SheetWidth}"
                 HorizontalAlignment="Center" VerticalAlignment="Center">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- ── Ring + headline stats ─────────────────────────── -->
                 <Grid Grid.Row="0" Margin="26,24,26,20">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <!--
@@ -51,35 +51,35 @@
                                          IsIndeterminate="{Binding IsIndeterminate}"
                                          Width="{DynamicResource DG.Size.ProgressRing}"
                                          Height="{DynamicResource DG.Size.ProgressRing}"
-                                         Foreground="{DynamicResource DG.RunSweep}"/>
+                                         Foreground="{DynamicResource DG.RunSweep}" />
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="{Binding OverallPercentLabel}"
                                            FontSize="{DynamicResource DG.Type.Hero}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource DG.Text1}"/>
+                                           Foreground="{DynamicResource DG.Text1}" />
                                 <TextBlock Text="%" FontSize="{DynamicResource DG.Type.Caption}"
                                            Foreground="{DynamicResource DG.Text2}"
-                                           VerticalAlignment="Bottom" Margin="1,0,0,2"/>
+                                           VerticalAlignment="Bottom" Margin="1,0,0,2" />
                             </StackPanel>
                             <TextBlock Style="{DynamicResource DG.Mono}"
                                        FontSize="{DynamicResource DG.Type.Label}"
                                        Text="{Binding RowsWrittenLabel}"
-                                       HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                       HorizontalAlignment="Center" Margin="0,3,0,0" />
                         </StackPanel>
                     </Grid>
 
                     <StackPanel Grid.Column="1" Margin="22,0,0,0" VerticalAlignment="Center">
                         <TextBlock Style="{DynamicResource DG.CardTitle}"
                                    FontSize="{DynamicResource DG.Type.SheetTitle}"
-                                   Text="{Binding StatusHeadline}"/>
+                                   Text="{Binding StatusHeadline}" />
                         <TextBlock Style="{DynamicResource DG.Secondary}"
                                    Text="{Binding RunDescription}"
-                                   LineHeight="19" Margin="0,5,0,0"/>
+                                   LineHeight="19" Margin="0,5,0,0" />
 
                         <ItemsControl ItemsSource="{Binding Metrics}" Margin="0,12,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Rows="1"/>
+                                    <UniformGrid Rows="1" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -87,7 +87,7 @@
                                     <StackPanel Margin="0,0,20,0">
                                         <TextBlock Style="{DynamicResource DG.GroupLabel}"
                                                    Margin="0"
-                                                   Text="{Binding Label}"/>
+                                                   Text="{Binding Label}" />
                                         <TextBlock FontSize="{DynamicResource DG.Type.Subtitle}"
                                                    Text="{Binding Value}"
                                                    Margin="0,3,0,0">
@@ -95,10 +95,12 @@
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Mono}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ValueKind}" Value="Muted">
-                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Text3}"/>
+                                                            <Setter Property="Foreground"
+                                                                    Value="{DynamicResource DG.Text3}" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding ValueKind}" Value="Warning">
-                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Warning}"/>
+                                                            <Setter Property="Foreground"
+                                                                    Value="{DynamicResource DG.Warning}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -118,23 +120,25 @@
                             <StackPanel Margin="0,0,0,11">
                                 <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Style="{DynamicResource DG.Cell}"
                                                Text="{Binding TableName}"
-                                               FontWeight="{Binding NameWeight}"/>
+                                               FontWeight="{Binding NameWeight}" />
                                     <TextBlock Grid.Column="1" Text="{Binding ProgressLabel}"
                                                Margin="8,0,8,0">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Mono}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding StateKey}" Value="Active">
-                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="{DynamicResource DG.Text1}" />
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding StateKey}" Value="Done">
-                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="{DynamicResource DG.Success}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -145,10 +149,12 @@
                                             <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Tertiary}">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding StateKey}" Value="Active">
-                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Text1}"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="{DynamicResource DG.Text1}" />
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding StateKey}" Value="Done">
-                                                        <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="{DynamicResource DG.Success}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -160,7 +166,7 @@
                                         <Style TargetType="ProgressBar" BasedOn="{StaticResource DG.ProgressBar}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding StateKey}" Value="Done">
-                                                    <Setter Property="Foreground" Value="{DynamicResource DG.Success}"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource DG.Success}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -174,22 +180,22 @@
                 <!-- ── Activity log ──────────────────────────────────── -->
                 <Grid Grid.Row="2" Margin="26,0,26,0">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
                             BorderThickness="0,1,0,0" Padding="0,12,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Style="{DynamicResource DG.GroupLabel}"
-                                       Margin="0" Text="Activity" VerticalAlignment="Center"/>
+                                       Margin="0" Text="Activity" VerticalAlignment="Center" />
                             <Button Grid.Column="1" Style="{DynamicResource DG.LinkButton}"
                                     Command="{Binding ShowFullLogCommand}"
-                                    Content="Show all"/>
+                                    Content="Show all" />
                         </Grid>
                     </Border>
 
@@ -203,7 +209,7 @@
                                                Foreground="{DynamicResource DG.TextBody}"
                                                Text="{Binding Line}"
                                                LineHeight="17"
-                                               TextTrimming="CharacterEllipsis"/>
+                                               TextTrimming="CharacterEllipsis" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -218,16 +224,16 @@
                             Visibility="{Binding IsLinking, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid Margin="0,0,0,6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Style="{DynamicResource DG.GroupLabel}"
-                                   Margin="0" Text="Linking records" VerticalAlignment="Center"/>
+                                   Margin="0" Text="Linking records" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1" Style="{DynamicResource DG.Mono}"
-                                   Text="{Binding LinkLabel}" VerticalAlignment="Center"/>
+                                   Text="{Binding LinkLabel}" VerticalAlignment="Center" />
                     </Grid>
                     <ProgressBar Style="{DynamicResource DG.ProgressBar}"
-                                 Value="{Binding LinkPercent}" Maximum="100"/>
+                                 Value="{Binding LinkPercent}" Maximum="100" />
                 </StackPanel>
 
                 <!-- ── Command bar ───────────────────────────────────── -->
@@ -239,15 +245,15 @@
                         Padding="26,14" Margin="0,18,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
                         <CheckBox Grid.Column="0"
                                   IsChecked="{Binding KeepWindowOpen}"
                                   VerticalAlignment="Center">
                             <TextBlock Style="{DynamicResource DG.Cell}"
-                                       Text="Keep window open after finish"/>
+                                       Text="Keep window open after finish" />
                         </CheckBox>
 
                         <!-- Cancel while generating; once finished the sheet holds open and this becomes Close. -->
@@ -255,13 +261,13 @@
                                 Command="{Binding CancelCommand}"
                                 Content="Cancel run"
                                 Visibility="{Binding IsRunning,
-                                             Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                             Converter={StaticResource BoolToVisibilityConverter}}" />
 
                         <Button Grid.Column="1" Style="{DynamicResource DG.PrimaryButton}"
                                 Command="{Binding CloseSheetCommand}"
                                 Content="Close"
                                 Visibility="{Binding IsRunning,
-                                             Converter={StaticResource InverseBoolToVisible}}"/>
+                                             Converter={StaticResource InverseBoolToVisible}}" />
                     </Grid>
                 </Border>
             </Grid>

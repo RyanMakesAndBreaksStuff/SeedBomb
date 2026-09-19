@@ -28,7 +28,7 @@ internal static class NavigationPageLayout
         // WPF-UI's NavigationViewContentPresenter is the logical Parent. A stock Frame
         // leaves Parent null and parents the Page visually instead.
         var host = page.Parent as FrameworkElement
-            ?? VisualTreeHelper.GetParent(page) as FrameworkElement;
+                   ?? VisualTreeHelper.GetParent(page) as FrameworkElement;
         if (host is null)
             return false;
 

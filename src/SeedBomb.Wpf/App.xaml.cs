@@ -73,8 +73,8 @@ public partial class App : Application
                 result = await auth.SignInAsync(nint.Zero);
             }
             catch (Exception ex) when (ex is Microsoft.Identity.Client.MsalException
-                or System.Runtime.InteropServices.COMException
-                or InvalidOperationException)
+                                           or System.Runtime.InteropServices.COMException
+                                           or InvalidOperationException)
             {
                 result = new AuthResult(false, null, ex.Message);
             }
@@ -166,6 +166,7 @@ public partial class App : Application
 
             _host = null;
         }
+
         base.OnExit(e);
     }
 
@@ -210,6 +211,7 @@ public partial class App : Application
         sc.AddTransient<ProfilesViewModel>();
         sc.AddTransient<HistoryViewModel>();
         sc.AddTransient<SettingsViewModel>();
+        sc.AddTransient<AboutViewModel>();
 
         sc.AddSingleton<IAppNavigator, NavigationViewNavigator>();
         sc.AddSingleton<RulesNavigationRequest>();
@@ -226,6 +228,7 @@ public partial class App : Application
         sc.AddSingleton<Seedbomb.Views.Pages.GeneratePage>();
         sc.AddTransient<Seedbomb.Views.Pages.HistoryPage>();
         sc.AddTransient<Seedbomb.Views.Pages.SettingsPage>();
+        sc.AddTransient<Seedbomb.Views.Pages.AboutPage>();
         sc.AddTransient<Seedbomb.Views.Pages.ProfilesPage>();
         sc.AddTransient<Seedbomb.Views.Pages.RulesPage>();
         sc.AddTransient<Seedbomb.Views.Pages.RunSummaryPage>();

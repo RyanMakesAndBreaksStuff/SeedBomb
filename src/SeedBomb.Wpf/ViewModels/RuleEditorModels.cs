@@ -11,8 +11,12 @@ namespace Seedbomb.ViewModels;
 /// <param name="TypeLabel">Friendly type name shown in the picker row.</param>
 /// <param name="IsSelectable">True = eligible rule target.</param>
 /// <param name="DisabledReason">Copy shown when <paramref name="IsSelectable"/> is false; null when selectable.</param>
-public sealed record PickerColumn(string LogicalName, string DisplayName, string TypeLabel,
-    bool IsSelectable, string? DisabledReason)
+public sealed record PickerColumn(
+    string LogicalName,
+    string DisplayName,
+    string TypeLabel,
+    bool IsSelectable,
+    string? DisabledReason)
 {
     /// <summary>Mapped / Unmapped / Required / Disabled. XAML maps to DG.* — no Brush.</summary>
     public string StateKey { get; init; } = "Unmapped";
@@ -59,8 +63,7 @@ public sealed partial class OptionChoice : ObservableObject
     /// <summary>The option's display label.</summary>
     public string Label { get; }
 
-    [ObservableProperty]
-    private bool _isChecked;
+    [ObservableProperty] private bool _isChecked;
 
     /// <summary>Initialises the option.</summary>
     public OptionChoice(int value, string label)

@@ -10,8 +10,7 @@ public sealed partial class EntityCountEntry : ObservableObject
     /// <summary>The entity this entry belongs to.</summary>
     public EntitySummary Entity { get; }
 
-    [ObservableProperty]
-    private int _count;
+    [ObservableProperty] private int _count;
 
     /// <summary>Initialises the entry.</summary>
     /// <param name="entity">The entity.</param>

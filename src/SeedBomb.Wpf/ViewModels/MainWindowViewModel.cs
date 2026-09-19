@@ -104,9 +104,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(EnvironmentHost))]
     private string _userDisplayName = "User";
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OrgHost))]
-    [NotifyPropertyChangedFor(nameof(EnvironmentHost))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OrgHost))] [NotifyPropertyChangedFor(nameof(EnvironmentHost))]
     private string _orgUrl = string.Empty;
 
     /// <summary>Gets initials for the signed-in user avatar.</summary>
@@ -127,7 +125,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         Uri.TryCreate(OrgUrl, UriKind.Absolute, out var uri)
             ? uri.Host
             : string.IsNullOrWhiteSpace(OrgUrl)
-                ? string.IsNullOrWhiteSpace(UserDisplayName) || UserDisplayName == "User" ? "Not connected" : "Connected"
+                ? string.IsNullOrWhiteSpace(UserDisplayName) || UserDisplayName == "User"
+                    ? "Not connected"
+                    : "Connected"
                 : OrgUrl;
 
     /// <summary>

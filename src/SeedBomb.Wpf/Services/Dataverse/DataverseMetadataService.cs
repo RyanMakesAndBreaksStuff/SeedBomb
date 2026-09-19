@@ -37,7 +37,8 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
         await (await GetInnerAsync(ct).ConfigureAwait(false)).GetEntityAsync(logicalName, ct).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<EntityMetadata>> GetEntitiesAsync(string[] logicalNames, CancellationToken ct = default) =>
+    public async Task<IReadOnlyList<EntityMetadata>> GetEntitiesAsync(string[] logicalNames,
+        CancellationToken ct = default) =>
         await (await GetInnerAsync(ct).ConfigureAwait(false)).GetEntitiesAsync(logicalNames, ct).ConfigureAwait(false);
 
     /// <inheritdoc />

@@ -117,7 +117,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<AuthResult> TryConnectAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default)
+    public async Task<AuthResult> TryConnectAsync(ConnectionProfile profile, nint parentHwnd,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(profile);
         try
@@ -136,7 +137,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     {
         var profile = await _profiles.GetLastUsedAsync(ct).ConfigureAwait(false);
         if (profile is null)
-            return new AuthResult(false, null, "No connection profile configured. Open Connection Manager to create one.");
+            return new AuthResult(false, null,
+                "No connection profile configured. Open Connection Manager to create one.");
 
         try
         {
@@ -156,7 +158,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         var result = profile.AuthType switch
         {
             AuthType.OAuth => await SignInOAuthAsync(profile, parentHwnd, commitSession, ct).ConfigureAwait(false),
-            AuthType.ClientSecret or AuthType.Certificate => await SignInAppOnlyAsync(profile, commitSession, ct).ConfigureAwait(false),
+            AuthType.ClientSecret or AuthType.Certificate => await SignInAppOnlyAsync(profile, commitSession, ct)
+                .ConfigureAwait(false),
             _ => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"),
         };
 
@@ -418,8 +421,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         return uri.Host switch
         {
             var h when h.EndsWith(".crm.microsoftdynamics.us", StringComparison.OrdinalIgnoreCase)
-                    || h.EndsWith(".crm.appsplatform.us", StringComparison.OrdinalIgnoreCase)
-                    || h.EndsWith(".crm.microsoftdynamics.de", StringComparison.OrdinalIgnoreCase)
+                       || h.EndsWith(".crm.appsplatform.us", StringComparison.OrdinalIgnoreCase)
+                       || h.EndsWith(".crm.microsoftdynamics.de", StringComparison.OrdinalIgnoreCase)
                 => AzureCloudInstance.AzureUsGovernment,
             var h when h.EndsWith(".crm.dynamics.cn", StringComparison.OrdinalIgnoreCase)
                 => AzureCloudInstance.AzureChina,

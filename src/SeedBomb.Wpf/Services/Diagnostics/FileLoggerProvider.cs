@@ -23,7 +23,9 @@ public sealed class FileLoggerProvider : ILoggerProvider
     public ILogger CreateLogger(string categoryName) => new FileLogger(this, categoryName);
 
     /// <inheritdoc />
-    public void Dispose() { }
+    public void Dispose()
+    {
+    }
 
     private bool IsLevelEnabled(LogLevel level) => level >= _minimum && level != LogLevel.None;
 
@@ -33,9 +35,16 @@ public sealed class FileLoggerProvider : ILoggerProvider
         // queued writer if logging ever shows up in a run profile.
         lock (_gate)
         {
-            try { File.AppendAllText(CurrentFile(), line + Environment.NewLine, Encoding.UTF8); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            try
+            {
+                File.AppendAllText(CurrentFile(), line + Environment.NewLine, Encoding.UTF8);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
         }
     }
 
@@ -51,8 +60,12 @@ public sealed class FileLoggerProvider : ILoggerProvider
                 if (File.GetLastWriteTime(file) < cutoff)
                     File.Delete(file);
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private sealed class FileLogger(FileLoggerProvider owner, string category) : ILogger

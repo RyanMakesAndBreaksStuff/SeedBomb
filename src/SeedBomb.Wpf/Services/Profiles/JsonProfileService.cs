@@ -308,7 +308,8 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         var (existingProfile, _) = TryParse(existingBytes);
         if (existingProfile is not null && existingProfile.Name != incomingName)
         {
-            return $"a different profile named \"{existingProfile.Name}\" already uses this file name — rename the profile and try again";
+            return
+                $"a different profile named \"{existingProfile.Name}\" already uses this file name — rename the profile and try again";
         }
 
         return null;
@@ -355,6 +356,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
                 lastWasDash = true;
             }
         }
+
         if (sb.Length > 0 && sb[^1] == '-')
             sb.Length--;
         return sb.ToString();
@@ -403,7 +405,8 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         if (profile is null)
             return (null, "not a valid profile: empty document");
         if (profile.ProfileVersion > Profile.CurrentProfileVersion)
-            return (null, $"not a valid profile: created by a newer version of the app (profileVersion {profile.ProfileVersion})");
+            return (null,
+                $"not a valid profile: created by a newer version of the app (profileVersion {profile.ProfileVersion})");
         if (profile.ProfileVersion is not (1 or 2))
             return (null, "not a valid profile: unsupported profileVersion");
         if (profile.ProfileVersion == 1 && ContainsBogusRule(profile))
@@ -487,6 +490,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
                         break;
                 }
             }
+
             return null;
         }
         catch (JsonException)

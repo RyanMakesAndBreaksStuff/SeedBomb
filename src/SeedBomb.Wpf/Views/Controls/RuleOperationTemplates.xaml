@@ -10,27 +10,27 @@
         </ObjectDataProvider.MethodParameters>
     </ObjectDataProvider>
 
-    <DataTemplate x:Key="EmptyOpTemplate"/>
+    <DataTemplate x:Key="EmptyOpTemplate" />
 
     <DataTemplate x:Key="ConstantOpTemplate">
         <StackPanel Margin="0,0,0,16">
             <StackPanel.Style>
                 <Style TargetType="StackPanel">
-                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers>
                         <MultiDataTrigger>
                             <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding SelectedOp}" Value="constant"/>
-                                <Condition Binding="{Binding IsLookupColumn}" Value="False"/>
+                                <Condition Binding="{Binding SelectedOp}" Value="constant" />
+                                <Condition Binding="{Binding IsLookupColumn}" Value="False" />
                             </MultiDataTrigger.Conditions>
-                            <Setter Property="Visibility" Value="Visible"/>
+                            <Setter Property="Visibility" Value="Visible" />
                         </MultiDataTrigger>
                     </Style.Triggers>
                 </Style>
             </StackPanel.Style>
-            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Value"/>
+            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Value" />
             <TextBox Style="{DynamicResource DG.TextBox}"
-                     Text="{Binding ConstantText, UpdateSourceTrigger=PropertyChanged}"/>
+                     Text="{Binding ConstantText, UpdateSourceTrigger=PropertyChanged}" />
         </StackPanel>
     </DataTemplate>
 
@@ -38,19 +38,19 @@
         <StackPanel Margin="0,0,0,16">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Min"/>
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Min" />
                     <TextBox Style="{DynamicResource DG.TextBox}"
-                             Text="{Binding MinText, UpdateSourceTrigger=PropertyChanged}"/>
+                             Text="{Binding MinText, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2">
-                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max"/>
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max" />
                     <TextBox Style="{DynamicResource DG.TextBox}"
-                             Text="{Binding MaxText, UpdateSourceTrigger=PropertyChanged}"/>
+                             Text="{Binding MaxText, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
             </Grid>
         </StackPanel>
@@ -60,19 +60,19 @@
         <StackPanel Margin="0,0,0,16">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Start"/>
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Start" />
                     <TextBox Style="{DynamicResource DG.TextBox}"
-                             Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}"/>
+                             Text="{Binding StartText, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2">
-                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Step"/>
+                    <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Step" />
                     <TextBox Style="{DynamicResource DG.TextBox}"
-                             Text="{Binding StepText, UpdateSourceTrigger=PropertyChanged}"/>
+                             Text="{Binding StepText, UpdateSourceTrigger=PropertyChanged}" />
                 </StackPanel>
             </Grid>
         </StackPanel>
@@ -80,7 +80,7 @@
 
     <DataTemplate x:Key="PatternOpTemplate">
         <StackPanel Margin="0,0,0,16">
-            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Template"/>
+            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Template" />
             <Border Style="{DynamicResource DG.CodeBox}">
                 <TextBox Text="{Binding TemplateExpression, UpdateSourceTrigger=PropertyChanged}"
                          Background="Transparent" BorderThickness="0"
@@ -88,13 +88,13 @@
                          FontSize="{DynamicResource DG.Type.Body}"
                          Foreground="{DynamicResource DG.TextBody}"
                          CaretBrush="{DynamicResource DG.Text1}"
-                         TextWrapping="Wrap" AcceptsReturn="False"/>
+                         TextWrapping="Wrap" AcceptsReturn="False" />
             </Border>
 
             <ItemsControl ItemsSource="{Binding AvailableTokens}" Margin="0,8,0,0">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal"/>
+                        <WrapPanel Orientation="Horizontal" />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -116,7 +116,7 @@
                                            Foreground="{DynamicResource DG.AccentText}"
                                            Text="{Binding Name}"
                                            TextTrimming="CharacterEllipsis"
-                                           MaxWidth="150"/>
+                                           MaxWidth="150" />
                             </Border>
                         </Button>
                     </DataTemplate>
@@ -130,34 +130,34 @@
             <StackPanel Margin="0,0,0,16">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
-                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
                             <MultiDataTrigger>
                                 <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding SelectedOp}" Value="oneOf"/>
-                                    <Condition Binding="{Binding IsLookupColumn}" Value="False"/>
+                                    <Condition Binding="{Binding SelectedOp}" Value="oneOf" />
+                                    <Condition Binding="{Binding IsLookupColumn}" Value="False" />
                                 </MultiDataTrigger.Conditions>
-                                <Setter Property="Visibility" Value="Visible"/>
+                                <Setter Property="Visibility" Value="Visible" />
                             </MultiDataTrigger>
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>
-                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Values"/>
+                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Values" />
                 <ItemsControl ItemsSource="{Binding Options}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <CheckBox Content="{Binding Label}"
                                       IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}"
-                                      Margin="0,2,0,0"/>
+                                      Margin="0,2,0,0" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBox Style="{DynamicResource DG.TextBox}"
                          Text="{Binding ConstantText, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,8,0,0"/>
+                         Margin="0,8,0,0" />
                 <TextBlock Style="{DynamicResource DG.Tertiary}"
                            Text="Or comma-separated values for non-choice columns"
-                           Margin="0,4,0,0"/>
+                           Margin="0,4,0,0" />
             </StackPanel>
 
             <StackPanel Margin="0,0,0,16">
@@ -166,7 +166,7 @@
                           SelectedItem="{Binding Pick}"
                           HorizontalAlignment="Left"
                           MinWidth="120"
-                          Margin="0,8,0,0"/>
+                          Margin="0,8,0,0" />
             </StackPanel>
         </StackPanel>
     </DataTemplate>
@@ -174,7 +174,7 @@
     <DataTemplate x:Key="LookupRandomOpTemplate">
         <StackPanel Margin="0,0,0,16">
             <TextBlock Style="{DynamicResource DG.Secondary}"
-                       Text="{Binding LookupRandomExplanation}" TextWrapping="Wrap"/>
+                       Text="{Binding LookupRandomExplanation}" TextWrapping="Wrap" />
         </StackPanel>
     </DataTemplate>
 
@@ -182,18 +182,18 @@
         <StackPanel Margin="0,0,0,16">
             <TextBlock x:Name="BogusApiLabel"
                        Style="{DynamicResource DG.GroupLabel}"
-                       Text="API"/>
+                       Text="API" />
             <ComboBox Style="{DynamicResource DG.ComboBox}"
                       ItemsSource="{Binding BogusInput.BogusApis}"
                       SelectedItem="{Binding BogusInput.SelectedBogusApi, Mode=TwoWay}"
                       AutomationProperties.LabeledBy="{Binding ElementName=BogusApiLabel}"
                       AutomationProperties.Name="API"
-                      TabIndex="0"/>
+                      TabIndex="0" />
 
             <TextBlock x:Name="BogusEndpointLabel"
                        Style="{DynamicResource DG.GroupLabel}"
                        Text="Endpoint"
-                       Margin="0,8,0,0"/>
+                       Margin="0,8,0,0" />
             <ComboBox Style="{DynamicResource DG.ComboBox}"
                       ItemsSource="{Binding BogusInput.BogusEndpoints}"
                       DisplayMemberPath="DisplayName"
@@ -201,35 +201,35 @@
                       SelectedValue="{Binding BogusInput.SelectedBogusEndpoint, Mode=TwoWay}"
                       AutomationProperties.LabeledBy="{Binding ElementName=BogusEndpointLabel}"
                       AutomationProperties.Name="Endpoint"
-                      TabIndex="1"/>
+                      TabIndex="1" />
 
             <Grid Margin="0,8,0,0"
                   Visibility="{Binding BogusInput.BogusHasNumericArgs,
                                Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock x:Name="BogusMinNumberLabel"
                                Style="{DynamicResource DG.GroupLabel}"
-                               Text="Minimum"/>
+                               Text="Minimum" />
                     <TextBox Style="{DynamicResource DG.TextBox}"
                              Text="{Binding BogusMinNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                              AutomationProperties.LabeledBy="{Binding ElementName=BogusMinNumberLabel}"
                              AutomationProperties.Name="Minimum"
-                             TabIndex="2"/>
+                             TabIndex="2" />
                 </StackPanel>
                 <StackPanel Grid.Column="2">
                     <TextBlock x:Name="BogusMaxNumberLabel"
                                Style="{DynamicResource DG.GroupLabel}"
-                               Text="Maximum"/>
+                               Text="Maximum" />
                     <TextBox Style="{DynamicResource DG.TextBox}"
                              Text="{Binding BogusMaxNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                              AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxNumberLabel}"
                              AutomationProperties.Name="Maximum"
-                             TabIndex="3"/>
+                             TabIndex="3" />
                 </StackPanel>
             </Grid>
 
@@ -238,60 +238,60 @@
                                      Converter={StaticResource BoolToVisibilityConverter}}">
                 <TextBlock x:Name="BogusLengthLabel"
                            Style="{DynamicResource DG.GroupLabel}"
-                           Text="Length"/>
+                           Text="Length" />
                 <TextBox Style="{DynamicResource DG.TextBox}"
                          Text="{Binding BogusLengthText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
                          AutomationProperties.LabeledBy="{Binding ElementName=BogusLengthLabel}"
                          AutomationProperties.Name="Length"
-                         TabIndex="2"/>
+                         TabIndex="2" />
             </StackPanel>
 
             <Grid Margin="0,8,0,0"
                   Visibility="{Binding BogusInput.BogusHasDateArgs,
                                Converter={StaticResource BoolToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock x:Name="BogusMinDateLabel"
                                Style="{DynamicResource DG.GroupLabel}"
-                               Text="Minimum date"/>
+                               Text="Minimum date" />
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0"
                                  Style="{DynamicResource DG.TextBox}"
                                  Text="{Binding BogusMinDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
                                  AutomationProperties.LabeledBy="{Binding ElementName=BogusMinDateLabel}"
                                  AutomationProperties.Name="Minimum date"
-                                 TabIndex="2"/>
+                                 TabIndex="2" />
                         <ui:CalendarDatePicker Grid.Column="1"
                                                Date="{Binding BogusMinDate, Mode=TwoWay}"
-                                               Margin="6,0,0,0"/>
+                                               Margin="6,0,0,0" />
                     </Grid>
                 </StackPanel>
                 <StackPanel Grid.Column="2">
                     <TextBlock x:Name="BogusMaxDateLabel"
                                Style="{DynamicResource DG.GroupLabel}"
-                               Text="Maximum date"/>
+                               Text="Maximum date" />
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0"
                                  Style="{DynamicResource DG.TextBox}"
                                  Text="{Binding BogusMaxDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True, ValidatesOnExceptions=True, StringFormat=yyyy-MM-dd}"
                                  AutomationProperties.LabeledBy="{Binding ElementName=BogusMaxDateLabel}"
                                  AutomationProperties.Name="Maximum date"
-                                 TabIndex="3"/>
+                                 TabIndex="3" />
                         <ui:CalendarDatePicker Grid.Column="1"
                                                Date="{Binding BogusMaxDate, Mode=TwoWay}"
-                                               Margin="6,0,0,0"/>
+                                               Margin="6,0,0,0" />
                     </Grid>
                 </StackPanel>
             </Grid>

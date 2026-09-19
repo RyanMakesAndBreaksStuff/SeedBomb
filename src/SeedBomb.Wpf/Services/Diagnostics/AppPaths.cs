@@ -24,10 +24,18 @@ public static class AppPaths
         // DataGen → SeedBomb rename. A failed move must not block startup — a fresh root is used.
         if (!Directory.Exists(root) && Directory.Exists(legacy))
         {
-            try { Directory.Move(legacy, root); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            try
+            {
+                Directory.Move(legacy, root);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
         }
+
         return Directory.CreateDirectory(root).FullName;
     }
 }

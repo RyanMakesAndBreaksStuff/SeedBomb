@@ -62,8 +62,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <summary>Flattened day headers and run rows for the virtualized History list.</summary>
     public ObservableCollection<object> FlatItems { get; } = [];
 
-    [ObservableProperty]
-    private string _searchText = string.Empty;
+    [ObservableProperty] private string _searchText = string.Empty;
 
     /// <summary>Gets a value indicating whether the history list is empty.</summary>
     public bool IsEmpty => !Runs.Any();

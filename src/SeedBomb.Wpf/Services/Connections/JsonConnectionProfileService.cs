@@ -62,7 +62,11 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             else store.Profiles.Add(dto);
             await PersistAsync(store, ct).ConfigureAwait(false);
         }
-        finally { _lock.Release(); }
+        finally
+        {
+            _lock.Release();
+        }
+
         ProfilesChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -77,7 +81,11 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             if (store.LastUsedId == id) store.LastUsedId = null;
             await PersistAsync(store, ct).ConfigureAwait(false);
         }
-        finally { _lock.Release(); }
+        finally
+        {
+            _lock.Release();
+        }
+
         ProfilesChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -108,15 +116,24 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             store.LastUsedId = id;
             await PersistAsync(store, ct).ConfigureAwait(false);
         }
-        finally { _lock.Release(); }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     private async Task<StoreDto> LoadAsync(CancellationToken ct)
     {
         if (_cache is not null) return _cache;
         await _lock.WaitAsync(ct).ConfigureAwait(false);
-        try { return await LoadLockedAsync(ct).ConfigureAwait(false); }
-        finally { _lock.Release(); }
+        try
+        {
+            return await LoadLockedAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     private async Task<StoreDto> LoadLockedAsync(CancellationToken ct)
@@ -127,6 +144,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             _cache = new StoreDto();
             return _cache;
         }
+
         var json = await File.ReadAllTextAsync(_storagePath, ct).ConfigureAwait(false);
         json = CoerceLegacyAuthJson(json);
         _cache = JsonSerializer.Deserialize<StoreDto>(json, JsonOpts) ?? new StoreDto();
@@ -137,6 +155,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             if (!Enum.IsDefined(profile.AuthType))
                 profile.AuthType = AuthType.OAuth;
         }
+
         return _cache;
     }
 
@@ -190,23 +209,23 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         switch (authType.ValueKind)
         {
             case JsonValueKind.String:
-                {
-                    var name = authType.GetString();
-                    if (string.Equals(name, "UserPassword", StringComparison.OrdinalIgnoreCase))
-                        return AuthType.OAuth;
-                    if (Enum.TryParse<AuthType>(name, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
-                        return parsed;
+            {
+                var name = authType.GetString();
+                if (string.Equals(name, "UserPassword", StringComparison.OrdinalIgnoreCase))
                     return AuthType.OAuth;
-                }
-            case JsonValueKind.Number when authType.TryGetInt32(out var n):
-                {
-                    var parsed = (AuthType)n;
-                    if (!Enum.IsDefined(parsed))
-                        return AuthType.OAuth;
-                    if (n == 2 && string.IsNullOrWhiteSpace(certificateThumbprint))
-                        return AuthType.OAuth;
+                if (Enum.TryParse<AuthType>(name, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
                     return parsed;
-                }
+                return AuthType.OAuth;
+            }
+            case JsonValueKind.Number when authType.TryGetInt32(out var n):
+            {
+                var parsed = (AuthType)n;
+                if (!Enum.IsDefined(parsed))
+                    return AuthType.OAuth;
+                if (n == 2 && string.IsNullOrWhiteSpace(certificateThumbprint))
+                    return AuthType.OAuth;
+                return parsed;
+            }
             default:
                 return AuthType.OAuth;
         }
@@ -284,8 +303,10 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         public string Name { get; set; } = string.Empty;
         public string EnvironmentUrl { get; set; } = string.Empty;
         public EnvironmentType EnvironmentType { get; set; }
+
         [JsonConverter(typeof(LegacyAuthTypeConverter))]
         public AuthType AuthType { get; set; }
+
         public string ClientId { get; set; } = string.Empty;
         public string TenantId { get; set; } = string.Empty;
         public string? EncryptedClientSecret { get; set; }

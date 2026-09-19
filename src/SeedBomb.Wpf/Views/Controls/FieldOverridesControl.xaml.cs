@@ -20,5 +20,4 @@ public partial class FieldOverridesControl : UserControl
         DataContext = _vm;
         InitializeComponent();
     }
-
 }

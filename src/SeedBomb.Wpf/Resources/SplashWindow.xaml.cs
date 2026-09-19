@@ -32,8 +32,8 @@ namespace Seedbomb.Resources
     /// </summary>
     public partial class SplashWindow : Window
     {
-        private const double MinVisibleMs = 3000.0;   // hard floor: splash stays up
-        private const double DoneHoldMs = 450.0;      // ✓ breathes before the fade
+        private const double MinVisibleMs = 3000.0; // hard floor: splash stays up
+        private const double DoneHoldMs = 450.0; // ✓ breathes before the fade
         private const double FadeMs = 350.0;
         private const double SpinSeconds = 2.6;
 
@@ -100,16 +100,17 @@ namespace Seedbomb.Resources
                 Dispatcher.BeginInvoke(new Action(() => SetProgress(progress)));
                 return;
             }
+
             if (_done || _closing) return;
 
             progress = Math.Min(1.0, Math.Max(0.0, progress));
-            if (progress < _progress) return;      // progress bars don't walk backwards
+            if (progress < _progress) return; // progress bars don't walk backwards
             _progress = progress;
 
             if (progress >= 1.0)
             {
                 if (_loaded) Complete();
-                else _pendingDone = true;          // finished before Loaded: honour the floor anyway
+                else _pendingDone = true; // finished before Loaded: honour the floor anyway
             }
         }
 
@@ -121,6 +122,7 @@ namespace Seedbomb.Resources
                 Dispatcher.BeginInvoke(new Action(() => SetStatus(message)));
                 return;
             }
+
             StatusText.Text = message ?? string.Empty;
         }
 
@@ -175,6 +177,7 @@ namespace Seedbomb.Resources
                 widths[i] = Measure(text[i], typeface, emSize);
                 total += widths[i] + letterSpacing;
             }
+
             total -= letterSpacing;
 
             // BuildGeometry's origin is the layout box's TOP-LEFT, not the baseline;
@@ -209,6 +212,7 @@ namespace Seedbomb.Resources
 
                 theta += adv / r;
             }
+
             return group;
         }
 

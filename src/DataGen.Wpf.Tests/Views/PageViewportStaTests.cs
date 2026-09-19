@@ -1,3 +1,4 @@
+using DataGen.Wpf.Tests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Seedbomb.Services.Auth;
@@ -72,6 +73,24 @@ public sealed class PageViewportStaTests : IDisposable
         AssertInsideHost(page, host, "PageFooter");
     }
 
+    [StaFact]
+    public void AboutPage_Header_StaysInsideLaunchViewport()
+    {
+        var (page, host) = LoadAbout(LaunchContentWidth, LaunchContentHeight);
+        AssertPinnedToHost(page, host);
+        AssertInsideHost(page, host, "PageHeader");
+        Assert.False(ScrollViewer.GetCanContentScroll(page));
+    }
+
+    [StaFact]
+    public void AboutPage_Header_StaysInsideMinViewport()
+    {
+        var (page, host) = LoadAbout(MinContentWidth, MinContentHeight);
+        AssertPinnedToHost(page, host);
+        AssertInsideHost(page, host, "PageHeader");
+        Assert.False(ScrollViewer.GetCanContentScroll(page));
+    }
+
     public void Dispose()
     {
         foreach (var window in _windows)
@@ -89,6 +108,17 @@ public sealed class PageViewportStaTests : IDisposable
         var page = new ConnectionsPage(vm);
         var host = Host(page, width, height);
         vm.NewProfileCommand.Execute(null);
+        page.UpdateLayout();
+        host.UpdateLayout();
+        Flush();
+        return (page, host);
+    }
+
+    private (AboutPage Page, Frame Host) LoadAbout(double width, double height)
+    {
+        EnsureApplication();
+        var page = new AboutPage(AboutViewModelTests.Create());
+        var host = Host(page, width, height);
         page.UpdateLayout();
         host.UpdateLayout();
         Flush();

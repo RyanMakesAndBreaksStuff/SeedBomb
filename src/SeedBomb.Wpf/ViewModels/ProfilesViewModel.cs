@@ -137,33 +137,25 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(SelectedProfileRuleSummary))]
     private ProfileListItem? _selectedItem;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
     private string? _statusMessage;
 
     /// <summary>Whether the status InfoBar should show.</summary>
     public bool HasStatusMessage => !string.IsNullOrEmpty(StatusMessage);
 
-    [ObservableProperty]
-    private bool _hasError;
+    [ObservableProperty] private bool _hasError;
 
-    [ObservableProperty]
-    private string _searchText = "";
+    [ObservableProperty] private string _searchText = "";
 
-    [ObservableProperty]
-    private int _selectedDetailTab;
+    [ObservableProperty] private int _selectedDetailTab;
 
-    [ObservableProperty]
-    private string _selectedProfileDescription = "";
+    [ObservableProperty] private string _selectedProfileDescription = "";
 
-    [ObservableProperty]
-    private string _selectedProfileSeed = "";
+    [ObservableProperty] private string _selectedProfileSeed = "";
 
-    [ObservableProperty]
-    private string _selectedProfileEditedLabel = "";
+    [ObservableProperty] private string _selectedProfileEditedLabel = "";
 
-    [ObservableProperty]
-    private string _tablesAndVolumeSummary = "";
+    [ObservableProperty] private string _tablesAndVolumeSummary = "";
 
     // ── Import summary pane (Mock F5 right) ───────────────────────────────────
 
@@ -181,36 +173,31 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Manager list visible when not showing an import summary.</summary>
     public bool ShowManager => !ShowImportSummary;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasImportApplied))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasImportApplied))]
     private string? _importAppliedMessage;
 
     /// <summary>Whether the applied InfoBar should show.</summary>
     public bool HasImportApplied => !string.IsNullOrEmpty(ImportAppliedMessage);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasImportAdjusted))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasImportAdjusted))]
     private string? _importAdjustedMessage;
 
     /// <summary>Whether the adjusted InfoBar should show.</summary>
     public bool HasImportAdjusted => !string.IsNullOrEmpty(ImportAdjustedMessage);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasImportNotImported))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasImportNotImported))]
     private string? _importNotImportedMessage;
 
     /// <summary>Whether the not-imported InfoBar should show.</summary>
     public bool HasImportNotImported => !string.IsNullOrEmpty(ImportNotImportedMessage);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasImportInfo))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasImportInfo))]
     private string? _importInfoMessage;
 
     /// <summary>Whether the info InfoBar should show.</summary>
     public bool HasImportInfo => !string.IsNullOrEmpty(ImportInfoMessage);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSchemaError))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSchemaError))]
     private string? _schemaErrorMessage;
 
     /// <summary>Whether the schema-error InfoBar should show.</summary>
@@ -480,7 +467,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     public ProfileImportReport PresentImport(Profile profile, string sourceLabel)
     {
         var metadata = GetMetadata?.Invoke()
-            ?? throw new InvalidOperationException("Metadata provider not wired for profile import.");
+                       ?? throw new InvalidOperationException("Metadata provider not wired for profile import.");
         var runId = GetRunId?.Invoke() ?? "";
 
         var report = ProfileImport.ValidateAgainstMetadata(profile, metadata, runId);
@@ -597,6 +584,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             SetError(ex.Message);
             return;
         }
+
         _navigator.Navigate(typeof(RulesPage));
     }
 

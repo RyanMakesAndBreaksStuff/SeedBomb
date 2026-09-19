@@ -171,7 +171,8 @@
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding Succeeded}" Value="True">
                                                             <Setter Property="Text" Value="Success" />
-                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Success}" />
+                                                            <Setter Property="Foreground"
+                                                                    Value="{DynamicResource DG.Success}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>

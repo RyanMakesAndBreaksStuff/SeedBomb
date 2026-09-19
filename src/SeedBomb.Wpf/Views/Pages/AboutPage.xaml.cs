@@ -4,11 +4,10 @@ using System.Windows.Controls;
 
 namespace Seedbomb.Views.Pages;
 
-/// <summary>Settings page with Appearance and Generation Defaults sections.</summary>
-public partial class SettingsPage : Page
+/// <summary>Application identity, project links, and open-source attribution.</summary>
+public partial class AboutPage : Page
 {
-    /// <summary>Initialises the page and wires the ViewModel.</summary>
-    public SettingsPage(SettingsViewModel viewModel)
+    public AboutPage(AboutViewModel viewModel)
     {
         DataContext = viewModel;
         InitializeComponent();

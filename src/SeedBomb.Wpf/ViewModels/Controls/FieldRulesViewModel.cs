@@ -1,4 +1,5 @@
 // src/DataGen.Wpf/ViewModels/Controls/FieldRulesViewModel.cs
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using DataGen.Core.Rules;
 using System.Collections.ObjectModel;
@@ -8,7 +9,14 @@ using System.Text.Json;
 namespace Seedbomb.ViewModels.Controls;
 
 /// <summary>One board row = one active rule (spec: the board lists rules, not columns).</summary>
-public sealed record RuleRow(string Table, string Column, string DisplayName, string OpBadge, string ParameterSummary, string Preview, FieldRule Rule);
+public sealed record RuleRow(
+    string Table,
+    string Column,
+    string DisplayName,
+    string OpBadge,
+    string ParameterSummary,
+    string Preview,
+    FieldRule Rule);
 
 /// <summary>Single source for draft rule plus board presentation derived by editor/Core preview.</summary>
 public sealed record RuleDraftEntry(FieldRule Rule, string DisplayName, string Preview);
@@ -31,15 +39,18 @@ public sealed partial class FieldRulesViewModel : ObservableObject
     /// <summary>Raised after a draft mutation so GenerateViewModel can invalidate preflight state.</summary>
     public event EventHandler? DraftChanged;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Rows))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(Rows))]
     private string _selectedTable = "";
 
     /// <summary>Rows for the selected table — active rules only; empty list = fully-automatic table (F1b).</summary>
     public ObservableCollection<RuleRow> Rows { get; } = [];
 
     /// <summary>Selects the table whose rules the board shows.</summary>
-    public void SelectTable(string table) { SelectedTable = table; RebuildRows(); }
+    public void SelectTable(string table)
+    {
+        SelectedTable = table;
+        RebuildRows();
+    }
 
     /// <summary>Adds or replaces the draft rule for (table, column).</summary>
     public void SetRule(string table, string column, FieldRule rule, string displayName, string preview)
@@ -65,7 +76,8 @@ public sealed partial class FieldRulesViewModel : ObservableObject
     public IReadOnlyDictionary<string, Dictionary<string, FieldRule>> GetRules() =>
         _draft.ToDictionary(
             table => table.Key,
-            table => table.Value.ToDictionary(column => column.Key, column => column.Value.Rule, StringComparer.OrdinalIgnoreCase),
+            table => table.Value.ToDictionary(column => column.Key, column => column.Value.Rule,
+                StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Promotes the draft to committed (Start pressed — the first committing action, S2).</summary>
@@ -150,7 +162,8 @@ public sealed partial class FieldRulesViewModel : ObservableObject
     private static string Summary(FieldRule r) => r switch
     {
         ConstantRule c => FormatValue(c.Value),
-        OneOfRule o => $"{{ {string.Join(", ", o.Values.Select(FormatValue))} }} · pick: {o.Pick.ToString().ToLowerInvariant()}",
+        OneOfRule o =>
+            $"{{ {string.Join(", ", o.Values.Select(FormatValue))} }} · pick: {o.Pick.ToString().ToLowerInvariant()}",
         RangeRule g => $"{g.Min} – {g.Max}",
         PatternRule p => p.Template,
         SequenceRule s => $"start {s.Start} · step {s.Step}",

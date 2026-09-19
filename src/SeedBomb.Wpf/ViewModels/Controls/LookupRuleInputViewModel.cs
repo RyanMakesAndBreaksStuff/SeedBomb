@@ -13,20 +13,31 @@ public sealed partial class LookupRuleInputViewModel : ObservableObject
     private LookupAttributeMetadata? _attribute;
     private string? _restoreError;
     private string? _entryError;
+
     /// <summary>Raised after an input changes, so the parent can revalidate.</summary>
     public event EventHandler? Changed;
+
     /// <summary>Identity-bearing entries in authored order.</summary>
     public ObservableCollection<LookupRuleValue> Records { get; } = [];
+
     /// <summary>Current metadata target names.</summary>
     public ObservableCollection<string> Targets { get; } = [];
+
     /// <summary>Target stamped onto the next manual GUID batch.</summary>
     [ObservableProperty] private string? _selectedTarget;
+
     /// <summary>Comma-separated GUID input that is not part of the rule until Add GUIDs.</summary>
     [ObservableProperty] private string _guidText = "";
 
     /// <summary>Creates local input state.</summary>
     public LookupRuleInputViewModel() => Records.CollectionChanged += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
-    partial void OnGuidTextChanged(string value) { _entryError = null; Changed?.Invoke(this, EventArgs.Empty); }
+
+    partial void OnGuidTextChanged(string value)
+    {
+        _entryError = null;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     partial void OnSelectedTargetChanged(string? value) => Changed?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Clears state before a table/column changes or a rule is restored.</summary>
@@ -61,8 +72,10 @@ public sealed partial class LookupRuleInputViewModel : ObservableObject
             if (_attribute is not null && LookupRuleValue.TryParse(json, _attribute, out var value, out var error))
                 Records.Add(value!);
             else
-                _restoreError = "The saved lookup contains an invalid target or id. Clear or replace the selection to repair it.";
+                _restoreError =
+                    "The saved lookup contains an invalid target or id. Clear or replace the selection to repair it.";
         }
+
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -82,10 +95,13 @@ public sealed partial class LookupRuleInputViewModel : ObservableObject
                 Changed?.Invoke(this, EventArgs.Empty);
                 return;
             }
+
             pending.Add(new(target, id));
         }
+
         foreach (var value in pending)
-            if (!Records.Any(v => v.Id == value.Id && string.Equals(v.Entity, value.Entity, StringComparison.OrdinalIgnoreCase)))
+            if (!Records.Any(v =>
+                    v.Id == value.Id && string.Equals(v.Entity, value.Entity, StringComparison.OrdinalIgnoreCase)))
                 Records.Add(value);
         GuidText = "";
         _entryError = null;
@@ -134,10 +150,12 @@ public sealed partial class LookupRuleInputViewModel : ObservableObject
             error = "Add the entered GUIDs to the selection, or clear the input, before saving.";
             return null;
         }
+
         if (op == "constant" && Records.Count == 1) return new ConstantRule(Records[0].ToJson());
         if (op == "oneOf" && Records.Count >= 2)
             return new OneOfRule(Array.AsReadOnly(Records.Select(v => v.ToJson()).ToArray()), pick);
-        error = op == "constant" ? "Choose exactly one record for constant."
+        error = op == "constant"
+            ? "Choose exactly one record for constant."
             : "Choose at least two records for one-of, or use constant for one record.";
         return null;
     }

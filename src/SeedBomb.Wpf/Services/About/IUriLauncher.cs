@@ -48,8 +48,8 @@ public sealed class ProcessUriLauncher : IUriLauncher
     {
         uri = null!;
         return !string.IsNullOrWhiteSpace(url)
-            && Uri.TryCreate(url, UriKind.Absolute, out uri!)
-            && uri.Scheme == Uri.UriSchemeHttps
-            && string.IsNullOrEmpty(uri.UserInfo);
+               && Uri.TryCreate(url, UriKind.Absolute, out uri!)
+               && uri.Scheme == Uri.UriSchemeHttps
+               && string.IsNullOrEmpty(uri.UserInfo);
     }
 }

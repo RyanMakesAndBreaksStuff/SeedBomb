@@ -43,7 +43,10 @@ public sealed class QueuedEntityEntry(EntitySummary entity)
 /// <param name="DisplayName">Column display name.</param>
 /// <param name="Values">Up to five formatted preview values (row 0..4).</param>
 public sealed record ReviewPreviewRow(
-    string Table, string Column, string DisplayName, IReadOnlyList<string> Values)
+    string Table,
+    string Column,
+    string DisplayName,
+    IReadOnlyList<string> Values)
 {
     /// <summary>Values joined for the 828px review row.</summary>
     public string SampleLine => string.Join(" · ", Values);
@@ -68,11 +71,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     private FieldOverridesViewModel? _fieldOverrides;
     private FieldRulesViewModel _fieldRules;
     private EntitySelectorViewModel? _entitySelector;
+
     private Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> _entityMetadata =
         new(StringComparer.OrdinalIgnoreCase);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedTableRows), nameof(PlannedTotal))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(SelectedTableRows), nameof(PlannedTotal))]
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
@@ -206,8 +209,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private bool _isRunning;
 
-    [ObservableProperty]
-    private ProgressUpdate? _currentProgress;
+    [ObservableProperty] private ProgressUpdate? _currentProgress;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
@@ -221,6 +223,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>Run-level Bogus locale. Read-only; always <c>en</c> until a picker ships.</summary>
     public string Locale => DeterministicFaker.DefaultLocale;
+
     [ObservableProperty] private int _batchSize = 500;
     [ObservableProperty] private int _maxParallelism;
 
@@ -238,14 +241,14 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     private int _currentStep;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Steps), nameof(ReviewedRuleCount), nameof(RulesLinkLabel), nameof(RunPlanStats), nameof(ProfileSummaryLine))]
+    [NotifyPropertyChangedFor(nameof(Steps), nameof(ReviewedRuleCount), nameof(RulesLinkLabel), nameof(RunPlanStats),
+        nameof(ProfileSummaryLine))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private Dictionary<string, Dictionary<string, FieldRule>>? _reviewedRules;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ReviewErrorSummary))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ReviewErrorSummary))]
     private IReadOnlyList<RuleMessage> _reviewMessages = [];
 
     [ObservableProperty]
@@ -254,8 +257,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private bool _reviewHasErrors;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     private long? _reviewedDraftRevision;
 
     [ObservableProperty] private string _runId = "";
@@ -269,7 +271,9 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     internal FieldOverridesViewModel? FieldOverrides => _fieldOverrides;
     internal EntitySelectorViewModel? EntitySelector => _entitySelector;
-    internal IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> LiveEntityMetadata => _entityMetadata;
+
+    internal IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> LiveEntityMetadata =>
+        _entityMetadata;
 
     /// <summary>Singleton run sheet bound by the overlay.</summary>
     public RunViewModel Run { get; }
@@ -306,8 +310,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             Environment.NewLine,
             ReviewMessages.Where(m => m.Severity == RuleMessageSeverity.Error).Select(m => m.Text));
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ProfileSummaryLine))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ProfileSummaryLine))]
     private string _activeProfileName = "No profile loaded";
 
     /// <summary>Step-1 SELECTED rows. Counts come from FieldOverrides when attached, else <see cref="DefaultRecordCount"/>.</summary>
@@ -316,10 +319,13 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         get
         {
             var counts = _fieldOverrides?.GetCounts();
-            return [.. SelectedEntities.Select(e => new SelectedTableRow(
-                e.DisplayName,
-                e.LogicalName,
-                counts is not null && counts.TryGetValue(e.LogicalName, out var n) ? n : DefaultRecordCount))];
+            return
+            [
+                .. SelectedEntities.Select(e => new SelectedTableRow(
+                    e.DisplayName,
+                    e.LogicalName,
+                    counts is not null && counts.TryGetValue(e.LogicalName, out var n) ? n : DefaultRecordCount))
+            ];
         }
     }
 
@@ -739,8 +745,9 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(EntityMetadataMap));
     }
 
-    private async Task<(string Name, Microsoft.Xrm.Sdk.Metadata.EntityMetadata? Meta, Exception? Error)> FetchOrFailAsync(
-        string name, CancellationToken ct)
+    private async Task<(string Name, Microsoft.Xrm.Sdk.Metadata.EntityMetadata? Meta, Exception? Error)>
+        FetchOrFailAsync(
+            string name, CancellationToken ct)
     {
         try
         {

@@ -100,8 +100,8 @@ public partial class MainWindow : FluentWindow
             Converter = (IValueConverter)FindResource("BoolToVisibilityConverter"),
         });
         BindingOperations.SetBinding(SignInErrorText, System.Windows.Controls.TextBlock.TextProperty, new Binding(
-            nameof(ConnectionManagerViewModel.SwitchError))
-        { Source = connectionManagerViewModel });
+                nameof(ConnectionManagerViewModel.SwitchError))
+            { Source = connectionManagerViewModel });
     }
 
     private async void OnSignInRequested(object? sender, EventArgs e)
@@ -196,8 +196,9 @@ public partial class MainWindow : FluentWindow
     private void SyncFirstRunOverlay()
     {
         var show = !_vm.HasConnection
-            && _currentPageContent is not ConnectionsPage
-            && _currentPageContent is not SettingsPage;
+                   && _currentPageContent is not ConnectionsPage
+                   && _currentPageContent is not SettingsPage
+                   && _currentPageContent is not AboutPage;
         FirstRunOverlay.SetCurrentValue(
             VisibilityProperty,
             show ? Visibility.Visible : Visibility.Collapsed);
@@ -208,8 +209,9 @@ public partial class MainWindow : FluentWindow
     private void SyncSignInOverlay()
     {
         var show = _vm.ShowSignInOverlay
-            && _currentPageContent is not ConnectionsPage
-            && _currentPageContent is not SettingsPage;
+                   && _currentPageContent is not ConnectionsPage
+                   && _currentPageContent is not SettingsPage
+                   && _currentPageContent is not AboutPage;
         SignInOverlay.SetCurrentValue(
             VisibilityProperty,
             show ? Visibility.Visible : Visibility.Collapsed);
