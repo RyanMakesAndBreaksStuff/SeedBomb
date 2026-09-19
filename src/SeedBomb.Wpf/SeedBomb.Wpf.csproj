@@ -63,4 +63,15 @@
     <Resource Include="Resources\logo-dark.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\LICENSE" LogicalName="Seedbomb.AppLicense.txt" />
+    <EmbeddedResource Include="Resources\ThirdParty\ThirdPartyNotices.json" LogicalName="Seedbomb.ThirdPartyNotices.json" />
+    <EmbeddedResource Include="Resources\ThirdParty\Licenses\*" LogicalName="Seedbomb.Licenses.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Target Name="ValidateThirdPartyNoticeResources"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipThirdPartyNoticeValidation)' != 'true'">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)..\..\tools\Generate-ThirdPartyNotices.ps1&quot; -ValidateResources" />
+  </Target>
+
 </Project>

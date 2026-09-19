@@ -1,0 +1,122 @@
+{
+  "licenseSources": {
+    "dotnet-mit": {
+      "file": "dotnet-mit-LICENSE.TXT",
+      "sha256": "CFC21F5E8BD655AE997EEC916138B707B1D290B83272C02A95C9F821B8C87310",
+      "url": "https://raw.githubusercontent.com/dotnet/dotnet/95017c711e6afc1085133d440e42b4bd78155701/src/runtime/LICENSE.TXT"
+    },
+    "msal-mit": {
+      "file": "msal-LICENSE",
+      "sha256": "2F07C72751AED99790B8A4869CF2311DF85A860B22DED05FA22803587A48922C",
+      "url": "https://raw.githubusercontent.com/AzureAD/microsoft-authentication-library-for-dotnet/09b427524fdae98e4bcb1fcf72e2fe50813d48f1/LICENSE"
+    },
+    "identitymodel-mit": {
+      "file": "identitymodel-LICENSE.txt",
+      "sha256": "CBA03F5387B05405E56B688376421ACAE396136AF4B5116738DC6E5160F87DDD",
+      "url": "https://raw.githubusercontent.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/c8f7d87bcda35557a68f6cb9c55856a2ee733856/LICENSE.txt"
+    },
+    "apache-2.0": {
+      "file": "apache-2.0-LICENSE.txt",
+      "sha256": "C71D239DF91726FC519C6EB72D318EC65820627232B2F796219E87DCF35D0AB4",
+      "url": "https://raw.githubusercontent.com/aspnet/Extensions/d8a50ea1cc9892cda13c5237dec402ca10ddeaa1/LICENSE.txt"
+    },
+    "dataverse-slt": {
+      "file": "dataverse-slt.html",
+      "sha256": "0A7ACC0B92150F29710D48ACB6E098C764D2ADF22E9809F2B3EDE78C334631AC",
+      "url": "https://go.microsoft.com/fwlink/?linkid=2108407"
+    },
+    "winsdk-rtf": {
+      "file": "sdk_license.rtf",
+      "sha256": "DD07EB178E00C6BBA4148457FC00FF77CD4887EB521D504186FE59C9EC8BBE62",
+      "url": "https://download.microsoft.com/download/0/F/F/0FF2B061-47DD-4F55-89B6-FD1D8C44F14D/sdk_license.rtf"
+    }
+  },
+  "packages": {
+    "Bogus/35.6.5": {
+      "featured": true,
+      "featuredOrder": 1,
+      "purpose": "Synthetic data generation",
+      "credit": "Synthetic data generation powered by Bogus, created by Brian Chavez.",
+      "license": "MIT AND BSD-3-Clause",
+      "copyright": "Copyright (c) 2015 Brian Chavez"
+    },
+    "WPF-UI/4.3.0": {
+      "featured": true,
+      "featuredOrder": 2,
+      "purpose": "Windows desktop UI framework"
+    },
+    "CommunityToolkit.Mvvm/8.4.2": {
+      "featured": true,
+      "featuredOrder": 3,
+      "purpose": "MVVM application infrastructure"
+    },
+    "Microsoft.PowerPlatform.Dataverse.Client/1.2.27": {
+      "featured": true,
+      "featuredOrder": 4,
+      "purpose": "Dataverse connectivity",
+      "license": "LicenseRef-Microsoft-Dynamics-365-SDK",
+      "licenseSource": "dataverse-slt",
+      "projectUrl": "https://github.com/microsoft/PowerPlatform-DataverseServiceClient"
+    },
+    "Microsoft.Windows.SDK.NET.Ref/10.0.17763.57": {
+      "license": "LicenseRef-Microsoft-Windows-SDK",
+      "licenseSource": "winsdk-rtf",
+      "projectUrl": "https://learn.microsoft.com/windows/apps/windows-sdk/",
+      "purpose": "Windows SDK projection for WPF"
+    },
+    "Microsoft.Identity.Client/4.90.0": {
+      "licenseSource": "msal-mit",
+      "projectUrl": "https://github.com/AzureAD/microsoft-authentication-library-for-dotnet"
+    },
+    "Microsoft.Identity.Client.Extensions.Msal/4.90.0": {
+      "licenseSource": "msal-mit",
+      "projectUrl": "https://github.com/AzureAD/microsoft-authentication-library-for-dotnet"
+    },
+    "Microsoft.IdentityModel.Abstractions/8.14.0": {
+      "licenseSource": "identitymodel-mit"
+    },
+    "Microsoft.Extensions.Http/3.1.9": {
+      "license": "Apache-2.0",
+      "licenseSource": "apache-2.0"
+    },
+    "Microsoft.Extensions.ObjectPool/8.0.10": {
+      "licenseSource": "dotnet-mit"
+    },
+    "Microsoft.NETCore.App.Runtime.win-x64/10.0.12": { "purpose": ".NET runtime" },
+    "Microsoft.WindowsDesktop.App.Runtime.win-x64/10.0.12": { "purpose": "Windows desktop runtime" }
+  },
+  "mitWithoutLicenseFile": [
+    "Microsoft.Extensions.Caching.Abstractions/10.0.12",
+    "Microsoft.Extensions.Caching.Memory/10.0.12",
+    "Microsoft.Extensions.Configuration/10.0.12",
+    "Microsoft.Extensions.Configuration.Abstractions/10.0.12",
+    "Microsoft.Extensions.Configuration.Binder/10.0.12",
+    "Microsoft.Extensions.Configuration.CommandLine/10.0.12",
+    "Microsoft.Extensions.Configuration.EnvironmentVariables/10.0.12",
+    "Microsoft.Extensions.Configuration.FileExtensions/10.0.12",
+    "Microsoft.Extensions.Configuration.Json/10.0.12",
+    "Microsoft.Extensions.Configuration.UserSecrets/10.0.12",
+    "Microsoft.Extensions.DependencyInjection/10.0.12",
+    "Microsoft.Extensions.DependencyInjection.Abstractions/10.0.12",
+    "Microsoft.Extensions.Diagnostics/10.0.12",
+    "Microsoft.Extensions.Diagnostics.Abstractions/10.0.12",
+    "Microsoft.Extensions.FileProviders.Abstractions/10.0.12",
+    "Microsoft.Extensions.FileProviders.Physical/10.0.12",
+    "Microsoft.Extensions.FileSystemGlobbing/10.0.12",
+    "Microsoft.Extensions.Hosting/10.0.12",
+    "Microsoft.Extensions.Hosting.Abstractions/10.0.12",
+    "Microsoft.Extensions.Logging/10.0.12",
+    "Microsoft.Extensions.Logging.Abstractions/10.0.12",
+    "Microsoft.Extensions.Logging.Configuration/10.0.12",
+    "Microsoft.Extensions.Logging.Console/10.0.12",
+    "Microsoft.Extensions.Logging.Debug/10.0.12",
+    "Microsoft.Extensions.Logging.EventLog/10.0.12",
+    "Microsoft.Extensions.Logging.EventSource/10.0.12",
+    "Microsoft.Extensions.Options/10.0.12",
+    "Microsoft.Extensions.Options.ConfigurationExtensions/10.0.12",
+    "Microsoft.Extensions.Primitives/10.0.12",
+    "System.Formats.Asn1/11.0.0-preview.7.26381.103",
+    "System.Security.Cryptography.Pkcs/11.0.0-preview.7.26381.103",
+    "System.Security.Cryptography.Xml/11.0.0-preview.7.26381.103"
+  ]
+}

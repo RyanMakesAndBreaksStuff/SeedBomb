@@ -61,3 +61,8 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+# Verbatim third-party legal text — do not renormalize line endings.
+licenses/** -text
+src/SeedBomb.Wpf/Resources/ThirdParty/Licenses/** -text
+tools/notice-sources/** -text
