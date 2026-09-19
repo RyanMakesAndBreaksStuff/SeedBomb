@@ -1,10 +1,7 @@
-using System.IO;
-using System.Text.Json;
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
-using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using Seedbomb.Services.Generation;
@@ -13,6 +10,7 @@ using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
+using System.Text.Json;
 using Wpf.Ui;
 using Xunit;
 

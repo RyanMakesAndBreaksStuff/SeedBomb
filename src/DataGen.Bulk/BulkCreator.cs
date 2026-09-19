@@ -1,14 +1,14 @@
 using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
-using DataGen.Core.Exceptions;
 using DataGen.Core.EdgeCases;
+using DataGen.Core.Exceptions;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
-using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;

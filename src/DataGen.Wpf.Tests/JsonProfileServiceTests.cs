@@ -1,7 +1,6 @@
-using System.IO;
-using System.Text.Json;
 using DataGen.Core.Rules;
 using Seedbomb.Services.Profiles;
+using System.Text.Json;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;

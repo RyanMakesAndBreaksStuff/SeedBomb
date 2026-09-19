@@ -4,6 +4,7 @@
     <IsTestProject>true</IsTestProject>
     <!-- Test methods don't require XML doc comments -->
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />

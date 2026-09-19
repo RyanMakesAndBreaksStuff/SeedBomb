@@ -1,6 +1,6 @@
-using System.Text.Json;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
+using System.Text.Json;
 
 namespace DataGen.Core.Rules;
 

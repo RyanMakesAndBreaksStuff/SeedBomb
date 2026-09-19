@@ -1,8 +1,5 @@
-using System.Text.Json;
 using DataGen.Core.Rules;
-using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Metadata;
-using Xunit;
+using System.Text.Json;
 
 namespace DataGen.Core.Tests.Rules;
 
@@ -16,7 +13,8 @@ public sealed class LookupRuleTests
     {
         var attr = new LookupAttributeMetadata
         {
-            LogicalName = "parentaccountid", Targets = ["account"],
+            LogicalName = "parentaccountid",
+            Targets = ["account"],
             IsValidForCreate = true,
         };
         var id = Guid.Parse("11111111-1111-1111-1111-111111111111");

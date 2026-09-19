@@ -1,6 +1,6 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DataGen.Core.Contracts;
+using System.Collections.ObjectModel;
 
 namespace Seedbomb.ViewModels.Controls;
 

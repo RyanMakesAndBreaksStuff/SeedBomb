@@ -1,7 +1,5 @@
-using System.Text.Json;
 using DataGen.Core.Rules;
-using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Metadata;
+using System.Text.Json;
 
 namespace DataGen.Core.Tests.Rules;
 

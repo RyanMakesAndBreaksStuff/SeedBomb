@@ -1,5 +1,5 @@
-using System.Reflection;
 using DataGen.Core.Rules;
+using System.Reflection;
 
 namespace DataGen.Core.Tests;
 

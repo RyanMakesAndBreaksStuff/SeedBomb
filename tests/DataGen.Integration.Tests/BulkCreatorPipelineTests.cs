@@ -1,6 +1,6 @@
+using DataGen.Core.Rules;
 using System.Reflection;
 using System.ServiceModel;
-using DataGen.Core.Rules;
 
 namespace DataGen.Integration.Tests;
 
@@ -378,11 +378,15 @@ public class BulkCreatorPipelineTests
         var restored = System.Text.Json.JsonSerializer.Deserialize<FieldRule>(json, FieldRule.JsonOptions)!;
         var sourceA = MakeEntity("sourcea", new LookupAttributeMetadata
         {
-            LogicalName = "sourcebid", Targets = ["sourceb"], IsValidForCreate = true,
+            LogicalName = "sourcebid",
+            Targets = ["sourceb"],
+            IsValidForCreate = true,
         });
         var sourceB = MakeEntity("sourceb", new LookupAttributeMetadata
         {
-            LogicalName = "sourceaid", Targets = ["sourcea"], IsValidForCreate = true,
+            LogicalName = "sourceaid",
+            Targets = ["sourcea"],
+            IsValidForCreate = true,
         });
         var metadata = new Mock<IMetadataProvider>();
         metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
@@ -419,7 +423,8 @@ public class BulkCreatorPipelineTests
         {
             EntityLogicalNames = ["sourcea", "sourceb"],
             RecordCounts = new() { ["sourcea"] = 2, ["sourceb"] = 2 },
-            BatchSize = 5, MaxParallelism = 1,
+            BatchSize = 5,
+            MaxParallelism = 1,
             FieldRules = new() { ["sourcea"] = new() { ["sourcebid"] = restored } },
         };
         var pipeline = new GenerationPipeline(metadata.Object, NullLoggerFactory.Instance);
@@ -445,11 +450,15 @@ public class BulkCreatorPipelineTests
         var restored = System.Text.Json.JsonSerializer.Deserialize<FieldRule>(json, FieldRule.JsonOptions)!;
         var sourceA = MakeEntity("sourcea", new LookupAttributeMetadata
         {
-            LogicalName = "sourcebid", Targets = ["sourceb"], IsValidForCreate = true,
+            LogicalName = "sourcebid",
+            Targets = ["sourceb"],
+            IsValidForCreate = true,
         });
         var sourceB = MakeEntity("sourceb", new LookupAttributeMetadata
         {
-            LogicalName = "sourceaid", Targets = ["sourcea"], IsValidForCreate = true,
+            LogicalName = "sourceaid",
+            Targets = ["sourcea"],
+            IsValidForCreate = true,
         });
         var metadata = new Mock<IMetadataProvider>();
         metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
@@ -486,7 +495,8 @@ public class BulkCreatorPipelineTests
         {
             EntityLogicalNames = ["sourcea", "sourceb"],
             RecordCounts = new() { ["sourcea"] = 2, ["sourceb"] = 2 },
-            BatchSize = 5, MaxParallelism = 1,
+            BatchSize = 5,
+            MaxParallelism = 1,
             FieldRules = new() { ["sourcea"] = new() { ["sourcebid"] = restored } },
         };
         var pipeline = new GenerationPipeline(metadata.Object, NullLoggerFactory.Instance);
@@ -512,11 +522,15 @@ public class BulkCreatorPipelineTests
         var restored = System.Text.Json.JsonSerializer.Deserialize<FieldRule>(json, FieldRule.JsonOptions)!;
         var sourceA = MakeEntity("sourcea", new LookupAttributeMetadata
         {
-            LogicalName = "accountid", Targets = ["account"], IsValidForCreate = true,
+            LogicalName = "accountid",
+            Targets = ["account"],
+            IsValidForCreate = true,
         });
         var sourceB = MakeEntity("sourceb", new LookupAttributeMetadata
         {
-            LogicalName = "accountid", Targets = ["account"], IsValidForCreate = true,
+            LogicalName = "accountid",
+            Targets = ["account"],
+            IsValidForCreate = true,
         });
         var account = MakeEntity("account",
             new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 100 });
@@ -577,7 +591,8 @@ public class BulkCreatorPipelineTests
         {
             EntityLogicalNames = ["sourcea", "sourceb", "account"],
             RecordCounts = new() { ["sourcea"] = 2, ["sourceb"] = 2, ["account"] = 2 },
-            BatchSize = 5, MaxParallelism = 1,
+            BatchSize = 5,
+            MaxParallelism = 1,
             FieldRules = new()
             {
                 ["sourcea"] = new() { ["accountid"] = restored },

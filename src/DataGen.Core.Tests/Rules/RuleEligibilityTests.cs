@@ -1,5 +1,4 @@
 using DataGen.Core.Rules;
-using Microsoft.Xrm.Sdk.Metadata;
 
 namespace DataGen.Core.Tests.Rules;
 

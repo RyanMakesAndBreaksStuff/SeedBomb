@@ -1,10 +1,10 @@
-using System.ServiceModel;
 using DataGen.Core.Exceptions;
 using DataGen.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Dataverse;
+using System.ServiceModel;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 

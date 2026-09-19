@@ -1,7 +1,6 @@
-using System.Globalization;
-using System.Text.Json;
 using DataGen.Core.Generators;
 using Microsoft.Xrm.Sdk.Metadata;
+using System.Globalization;
 
 namespace DataGen.Core.Rules;
 
@@ -141,41 +140,41 @@ public static class BogusRulePreparer
         switch (descriptor.Arguments)
         {
             case NumericRangeContract contract:
-            {
-                decimal min;
-                decimal max;
-                if (rule.Args.TryGetValue("min", out var minEl)
-                    && rule.Args.TryGetValue("max", out var maxEl)
-                    && minEl.TryGetDecimal(out min)
-                    && maxEl.TryGetDecimal(out max))
                 {
+                    decimal min;
+                    decimal max;
+                    if (rule.Args.TryGetValue("min", out var minEl)
+                        && rule.Args.TryGetValue("max", out var maxEl)
+                        && minEl.TryGetDecimal(out min)
+                        && maxEl.TryGetDecimal(out max))
+                    {
+                        return new NumericRangeArgs(min, max, scale);
+                    }
+
+                    min = contract.DefaultMin;
+                    max = contract.DefaultMax;
+                    var (metaMin, metaMax) = MetadataBounds(attr);
+                    min = decimal.Max(min, metaMin);
+                    max = decimal.Min(max, metaMax);
                     return new NumericRangeArgs(min, max, scale);
                 }
-
-                min = contract.DefaultMin;
-                max = contract.DefaultMax;
-                var (metaMin, metaMax) = MetadataBounds(attr);
-                min = decimal.Max(min, metaMin);
-                max = decimal.Min(max, metaMax);
-                return new NumericRangeArgs(min, max, scale);
-            }
             case LengthContract contract:
-            {
-                var length = rule.Args.TryGetValue("length", out var lenEl) && lenEl.TryGetInt32(out var parsed)
-                    ? parsed
-                    : contract.DefaultLength;
-                return new LengthArgs(length);
-            }
+                {
+                    var length = rule.Args.TryGetValue("length", out var lenEl) && lenEl.TryGetInt32(out var parsed)
+                        ? parsed
+                        : contract.DefaultLength;
+                    return new LengthArgs(length);
+                }
             case DateRangeContract:
-            {
-                var minText = rule.Args["min"].GetString()
-                    ?? throw new InvalidOperationException("DATE.between requires min.");
-                var maxText = rule.Args["max"].GetString()
-                    ?? throw new InvalidOperationException("DATE.between requires max.");
-                var min = DateOnly.ParseExact(minText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                var max = DateOnly.ParseExact(maxText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                return new DateRangeArgs(min, max);
-            }
+                {
+                    var minText = rule.Args["min"].GetString()
+                        ?? throw new InvalidOperationException("DATE.between requires min.");
+                    var maxText = rule.Args["max"].GetString()
+                        ?? throw new InvalidOperationException("DATE.between requires max.");
+                    var min = DateOnly.ParseExact(minText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    var max = DateOnly.ParseExact(maxText, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    return new DateRangeArgs(min, max);
+                }
             default:
                 return NormalizedBogusArgs.None;
         }

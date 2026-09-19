@@ -1,8 +1,8 @@
+using DataGen.Core.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+using Seedbomb.ViewModels.Controls;
 using System.Windows;
 using System.Windows.Controls;
-using DataGen.Core.Contracts;
-using Seedbomb.ViewModels.Controls;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Seedbomb.Views.Controls;
 

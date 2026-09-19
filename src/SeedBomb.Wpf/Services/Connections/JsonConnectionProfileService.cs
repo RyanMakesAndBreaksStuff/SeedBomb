@@ -1,10 +1,10 @@
+using Seedbomb.Services.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.Connections;
 
@@ -190,23 +190,23 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         switch (authType.ValueKind)
         {
             case JsonValueKind.String:
-            {
-                var name = authType.GetString();
-                if (string.Equals(name, "UserPassword", StringComparison.OrdinalIgnoreCase))
+                {
+                    var name = authType.GetString();
+                    if (string.Equals(name, "UserPassword", StringComparison.OrdinalIgnoreCase))
+                        return AuthType.OAuth;
+                    if (Enum.TryParse<AuthType>(name, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+                        return parsed;
                     return AuthType.OAuth;
-                if (Enum.TryParse<AuthType>(name, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
-                    return parsed;
-                return AuthType.OAuth;
-            }
+                }
             case JsonValueKind.Number when authType.TryGetInt32(out var n):
-            {
-                var parsed = (AuthType)n;
-                if (!Enum.IsDefined(parsed))
-                    return AuthType.OAuth;
-                if (n == 2 && string.IsNullOrWhiteSpace(certificateThumbprint))
-                    return AuthType.OAuth;
-                return parsed;
-            }
+                {
+                    var parsed = (AuthType)n;
+                    if (!Enum.IsDefined(parsed))
+                        return AuthType.OAuth;
+                    if (n == 2 && string.IsNullOrWhiteSpace(certificateThumbprint))
+                        return AuthType.OAuth;
+                    return parsed;
+                }
             default:
                 return AuthType.OAuth;
         }

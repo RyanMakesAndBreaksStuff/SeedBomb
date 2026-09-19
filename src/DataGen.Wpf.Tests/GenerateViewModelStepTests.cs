@@ -1,7 +1,9 @@
 using DataGen.Core.Contracts;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
+using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
+using Moq;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
@@ -10,8 +12,6 @@ using Seedbomb.Services.Settings;
 using Seedbomb.ViewModels;
 using Seedbomb.ViewModels.Controls;
 using Seedbomb.Views.Pages;
-using Microsoft.Extensions.Logging;
-using Moq;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;

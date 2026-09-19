@@ -1,14 +1,13 @@
-using System.Collections.Frozen;
 using DataGen.Core.Contracts;
 using DataGen.Core.Exceptions;
 using DataGen.Core.Generators;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
-using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Collections.Frozen;
 
 namespace DataGen.Bulk;
 

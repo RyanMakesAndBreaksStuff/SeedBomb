@@ -1,7 +1,7 @@
+using Seedbomb.ViewModels;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using Seedbomb.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
 
 namespace Seedbomb.Views.Pages;

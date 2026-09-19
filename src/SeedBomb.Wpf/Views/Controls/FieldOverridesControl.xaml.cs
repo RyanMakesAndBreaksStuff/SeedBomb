@@ -1,5 +1,5 @@
-using System.Windows.Controls;
 using Seedbomb.ViewModels.Controls;
+using System.Windows.Controls;
 
 namespace Seedbomb.Views.Controls;
 

@@ -1,6 +1,6 @@
+using Seedbomb.Services.Auth;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using Seedbomb.Services.Auth;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;

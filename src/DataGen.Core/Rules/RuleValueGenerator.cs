@@ -1,8 +1,8 @@
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Metadata;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Metadata;
 
 namespace DataGen.Core.Rules;
 

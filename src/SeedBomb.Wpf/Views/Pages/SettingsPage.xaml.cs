@@ -1,6 +1,6 @@
+using Seedbomb.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
-using Seedbomb.ViewModels;
 
 namespace Seedbomb.Views.Pages;
 

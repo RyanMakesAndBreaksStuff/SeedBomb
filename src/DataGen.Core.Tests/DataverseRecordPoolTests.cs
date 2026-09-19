@@ -1,5 +1,3 @@
-using Bogus;
-
 namespace DataGen.Core.Tests;
 
 public class DataverseRecordPoolTests

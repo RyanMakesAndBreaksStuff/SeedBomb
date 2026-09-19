@@ -1,7 +1,6 @@
 using DataGen.Core.Contracts;
 using DataGen.Core.Rules;
 using Microsoft.Extensions.Logging;
-using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.ViewModels.Controls;

@@ -1,27 +1,25 @@
 using DataGen.Bulk;
-using DataGen.Bulk.Contracts;
 using DataGen.Core.Metadata;
-using Seedbomb.ViewModels;
-using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Seedbomb.Resources;
 using Seedbomb.Services;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
+using Seedbomb.Services.Diagnostics;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
+using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
-using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Theme;
-using Seedbomb.Services.Diagnostics;
-using Seedbomb.Resources;
+using Seedbomb.ViewModels;
+using Seedbomb.ViewModels.Controls;
+using Seedbomb.Views.Windows;
 using System.Windows;
 using Wpf.Ui;
-using Wpf.Ui.Appearance;
 
 namespace Seedbomb;
 

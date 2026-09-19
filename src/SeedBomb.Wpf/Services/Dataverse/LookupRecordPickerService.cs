@@ -1,8 +1,8 @@
-using System.Windows.Data;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.ViewModels.Controls;
 using Seedbomb.Views.Controls;
+using System.Windows.Data;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
@@ -24,7 +24,8 @@ public sealed class LookupRecordPickerService(IContentDialogService dialogs,
         {
             Title = single ? "Choose one record" : "Choose at least two records",
             Content = new LookupRecordPicker { DataContext = vm },
-            PrimaryButtonText = "Add", CloseButtonText = "Cancel",
+            PrimaryButtonText = "Add",
+            CloseButtonText = "Cancel",
         };
         dialog.SetBinding(ContentDialog.IsPrimaryButtonEnabledProperty,
             new Binding(nameof(vm.CanAccept)) { Source = vm, Mode = BindingMode.OneWay });

@@ -1,8 +1,6 @@
 using DataGen.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
-using System.IO;
-using System.Net.Http;
 using System.ServiceModel;
 
 namespace DataGen.Bulk;

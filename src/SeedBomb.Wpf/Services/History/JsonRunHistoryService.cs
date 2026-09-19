@@ -1,6 +1,6 @@
+using Seedbomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
-using Seedbomb.Services.Diagnostics;
 
 namespace Seedbomb.Services.History;
 

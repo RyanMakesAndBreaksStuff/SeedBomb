@@ -1,7 +1,7 @@
-using System.Diagnostics;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.ViewModels;
+using System.Diagnostics;
 using Xunit;
 
 namespace DataGen.Wpf.Tests.Performance;

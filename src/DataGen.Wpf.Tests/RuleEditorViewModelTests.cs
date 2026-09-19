@@ -1106,7 +1106,9 @@ public sealed class RuleEditorViewModelTests
     {
         var attr = new LookupAttributeMetadata
         {
-            LogicalName = "parentcustomerid", IsValidForCreate = true, Targets = ["account", "contact"],
+            LogicalName = "parentcustomerid",
+            IsValidForCreate = true,
+            Targets = ["account", "contact"],
         };
         typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
             .SetValue(attr, AttributeTypeCode.Customer);

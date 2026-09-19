@@ -1,6 +1,3 @@
-using System.Collections.ObjectModel;
-using System.Globalization;
-using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Rules;
@@ -8,6 +5,9 @@ using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Views.Pages;
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;

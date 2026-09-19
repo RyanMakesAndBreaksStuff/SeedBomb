@@ -1,10 +1,10 @@
-using System.Text.Json;
 using DataGen.Core.EdgeCases;
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Text.Json;
 
 namespace DataGen.Bulk.Tests;
 
@@ -265,7 +265,9 @@ public class RuledGenerationTests
     {
         var attr = new LookupAttributeMetadata
         {
-            LogicalName = "parentaccountid", Targets = ["account"], IsValidForCreate = true,
+            LogicalName = "parentaccountid",
+            Targets = ["account"],
+            IsValidForCreate = true,
             RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired),
         };
         var graph = new DependencyGraph();
@@ -573,7 +575,9 @@ public class RuledGenerationTests
     {
         var attr = new LookupAttributeMetadata
         {
-            LogicalName = "parentaccountid", Targets = ["account"], IsValidForCreate = true,
+            LogicalName = "parentaccountid",
+            Targets = ["account"],
+            IsValidForCreate = true,
         };
         var meta = BuildMetaWithAttribute(attr);
         typeof(EntityMetadata).GetProperty(nameof(EntityMetadata.PrimaryIdAttribute))!
@@ -955,7 +959,9 @@ public class RuledGenerationTests
         var contactId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var meta = new Dictionary<string, EntityMetadata>
         {
-            ["incident"] = source, ["account"] = account, ["contact"] = contact,
+            ["incident"] = source,
+            ["account"] = account,
+            ["contact"] = contact,
         };
         var graph = new DependencyGraph();
         graph.AddNode("incident");
@@ -1112,12 +1118,16 @@ public class RuledGenerationTests
 
     private static LookupAttributeMetadata LookupAttr(string logicalName, params string[] targets) => new()
     {
-        LogicalName = logicalName, Targets = targets, IsValidForCreate = true,
+        LogicalName = logicalName,
+        Targets = targets,
+        IsValidForCreate = true,
     };
 
     private static StringAttributeMetadata NameAttr() => new()
     {
-        LogicalName = "name", MaxLength = 100, IsValidForCreate = true,
+        LogicalName = "name",
+        MaxLength = 100,
+        IsValidForCreate = true,
     };
 
     private static EntityMetadata WithPrimaryId(EntityMetadata meta, string primaryId)

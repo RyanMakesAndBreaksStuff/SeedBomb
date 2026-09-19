@@ -1,4 +1,3 @@
-using Microsoft.Xrm.Sdk.Query;
 using System.ServiceModel;
 
 namespace DataGen.Bulk.Tests;

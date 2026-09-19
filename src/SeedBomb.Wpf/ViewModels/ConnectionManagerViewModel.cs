@@ -1,10 +1,10 @@
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
@@ -59,8 +59,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private string? _testResult;
     [ObservableProperty] private bool _testSucceeded;
-    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SelectProfileCommand))] private bool _isSwitchingConnection;
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSwitchError))] private string? _switchError;
+    [ObservableProperty][NotifyCanExecuteChangedFor(nameof(SelectProfileCommand))] private bool _isSwitchingConnection;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(HasSwitchError))] private string? _switchError;
 
     /// <summary>Not persisted. Id of the profile the app is actually connected to right now, if any.</summary>
     [ObservableProperty] private Guid? _connectedProfileId;

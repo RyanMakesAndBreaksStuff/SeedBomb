@@ -1,9 +1,9 @@
-using System.Diagnostics;
 using DataGen.Bulk;
 using DataGen.Bulk.Contracts;
 using DataGen.Core.Contracts;
 using Microsoft.Extensions.Logging;
 using Seedbomb.Services.Dataverse;
+using System.Diagnostics;
 
 namespace Seedbomb.Services.Generation;
 

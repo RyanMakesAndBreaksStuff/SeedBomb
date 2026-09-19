@@ -1,8 +1,8 @@
+using DataGen.Core.Rules;
+using Microsoft.Xrm.Sdk.Metadata;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
-using DataGen.Core.Rules;
-using Microsoft.Xrm.Sdk.Metadata;
 
 namespace Seedbomb.ViewModels;
 

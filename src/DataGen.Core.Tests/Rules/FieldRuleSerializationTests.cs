@@ -1,5 +1,5 @@
-using System.Text.Json;
 using DataGen.Core.Rules;
+using System.Text.Json;
 
 namespace DataGen.Core.Tests.Rules;
 

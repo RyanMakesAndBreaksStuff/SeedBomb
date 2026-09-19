@@ -1,11 +1,11 @@
-using System.Buffers;
-using System.Buffers.Binary;
-using System.Security.Cryptography;
-using System.Text;
 using Bogus;
 using DataGen.Core.Generators;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace DataGen.Core.Rules;
 

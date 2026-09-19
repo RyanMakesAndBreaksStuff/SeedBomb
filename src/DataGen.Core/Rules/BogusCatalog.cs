@@ -1,8 +1,7 @@
+using Bogus;
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Globalization;
-using Bogus;
-using DataGen.Core.Generators;
 
 namespace DataGen.Core.Rules;
 

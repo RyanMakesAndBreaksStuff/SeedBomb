@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Exceptions;
@@ -7,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Dataverse;
+using System.Collections.ObjectModel;
 using System.ServiceModel;
 
 namespace Seedbomb.ViewModels.Controls;

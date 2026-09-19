@@ -6,7 +6,6 @@ using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
 using Seedbomb.Services.Settings;
 using Seedbomb.Services.Theme;
-using Seedbomb.ViewModels;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 

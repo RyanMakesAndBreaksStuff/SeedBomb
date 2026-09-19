@@ -1,21 +1,21 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Contracts;
 using DataGen.Core.Generators;
 using DataGen.Core.Metadata;
 using DataGen.Core.Rules;
-using Microsoft.Xrm.Sdk;
-using Seedbomb.ViewModels.Controls;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui;
-using Wpf.Ui.Extensions;
+using Microsoft.Xrm.Sdk;
 using Seedbomb.Services.Generation;
 using Seedbomb.Services.History;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;
 using Seedbomb.Services.Settings;
+using Seedbomb.ViewModels.Controls;
 using Seedbomb.Views.Pages;
+using System.Collections.ObjectModel;
+using Wpf.Ui;
+using Wpf.Ui.Extensions;
 
 namespace Seedbomb.ViewModels;
 

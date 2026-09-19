@@ -1,12 +1,12 @@
-using System.Windows;
-using System.Windows.Data;
-using System.Windows.Interop;
-using System.Windows.Threading;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Navigation;
 using Seedbomb.ViewModels;
 using Seedbomb.Views.Pages;
+using System.Windows;
+using System.Windows.Data;
+using System.Windows.Interop;
+using System.Windows.Threading;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
@@ -100,7 +100,8 @@ public partial class MainWindow : FluentWindow
             Converter = (IValueConverter)FindResource("BoolToVisibilityConverter"),
         });
         BindingOperations.SetBinding(SignInErrorText, System.Windows.Controls.TextBlock.TextProperty, new Binding(
-            nameof(ConnectionManagerViewModel.SwitchError)) { Source = connectionManagerViewModel });
+            nameof(ConnectionManagerViewModel.SwitchError))
+        { Source = connectionManagerViewModel });
     }
 
     private async void OnSignInRequested(object? sender, EventArgs e)

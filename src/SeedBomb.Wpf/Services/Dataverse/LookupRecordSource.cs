@@ -1,9 +1,8 @@
-using System.Globalization;
 using DataGen.Bulk;
 using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
+using System.Globalization;
 
 namespace Seedbomb.Services.Dataverse;
 
@@ -48,7 +47,9 @@ public sealed class LookupRecordSource(IDataverseConnectionService connection,
             ColumnSet = new ColumnSet(columns.ToArray()),
             PageInfo = new PagingInfo
             {
-                Count = PageSize, PageNumber = request.PageNumber, PagingCookie = request.PagingCookie,
+                Count = PageSize,
+                PageNumber = request.PageNumber,
+                PagingCookie = request.PagingCookie,
             },
         };
         query.AddOrder(meta.PrimaryIdAttribute, OrderType.Ascending);

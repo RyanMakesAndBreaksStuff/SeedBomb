@@ -1,9 +1,3 @@
-using System.ServiceModel;
-using DataGen.Core.Exceptions;
-using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
-using Moq;
-
 namespace DataGen.Integration.Tests;
 
 public class DeferredLookupBackfillIntegrationTests

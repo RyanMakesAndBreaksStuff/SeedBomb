@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Seedbomb.Services.Connections;
+using System.Text.Json;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;

@@ -1,5 +1,5 @@
-using System.Runtime.CompilerServices;
 using Seedbomb.Services.Theme;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;

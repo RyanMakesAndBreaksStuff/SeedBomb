@@ -1,8 +1,8 @@
-using System.Windows;
-using System.Windows.Controls;
 using Microsoft.Win32;
 using Seedbomb.Services.Navigation;
 using Seedbomb.ViewModels;
+using System.Windows;
+using System.Windows.Controls;
 using Wpf.Ui.Abstractions.Controls;
 
 namespace Seedbomb.Views.Pages;

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using Bogus;
+using System.Collections.Concurrent;
 
 namespace DataGen.Core.Generators;
 

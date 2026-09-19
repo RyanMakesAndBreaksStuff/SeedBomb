@@ -1,8 +1,3 @@
-using System.ServiceModel;
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging.Abstractions;
-
 namespace DataGen.Integration.Tests;
 
 public class ManyToManyAssociationTests

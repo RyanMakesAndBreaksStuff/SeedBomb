@@ -1,6 +1,5 @@
 using DataGen.Core.Generators;
 using DataGen.Core.Graph;
-using System.ServiceModel;
 
 namespace DataGen.Bulk.Tests;
 

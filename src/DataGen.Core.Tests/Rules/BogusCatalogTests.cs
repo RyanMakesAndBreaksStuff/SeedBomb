@@ -1,6 +1,5 @@
-using System.Globalization;
-using DataGen.Core.Generators;
 using DataGen.Core.Rules;
+using System.Globalization;
 
 namespace DataGen.Core.Tests.Rules;
 

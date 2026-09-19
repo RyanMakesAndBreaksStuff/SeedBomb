@@ -1,15 +1,37 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
   <Folder Name="/src/">
-    <Project Path="src/DataGen.Bulk/DataGen.Bulk.csproj" />
-    <Project Path="src/DataGen.Core/DataGen.Core.csproj" />
-    <Project Path="src/DataGen.Web/DataGen.Web.csproj" />
-    <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj" />
+    <Project Path="src/DataGen.Bulk/DataGen.Bulk.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/DataGen.Core/DataGen.Core.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/DataGen.Web/DataGen.Web.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="src/DataGen.Bulk.Tests/DataGen.Bulk.Tests.csproj" />
-    <Project Path="src/DataGen.Core.Tests/DataGen.Core.Tests.csproj" />
-    <Project Path="src/DataGen.Web.Tests/DataGen.Web.Tests.csproj" />
-    <Project Path="src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj" />
-    <Project Path="tests/DataGen.Integration.Tests/DataGen.Integration.Tests.csproj" />
+    <Project Path="src/DataGen.Bulk.Tests/DataGen.Bulk.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/DataGen.Core.Tests/DataGen.Core.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/DataGen.Web.Tests/DataGen.Web.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="tests/DataGen.Integration.Tests/DataGen.Integration.Tests.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
 </Solution>

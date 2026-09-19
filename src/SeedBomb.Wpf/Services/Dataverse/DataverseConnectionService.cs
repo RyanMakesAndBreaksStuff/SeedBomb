@@ -47,12 +47,13 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             _cached = new ServiceClient(
                 instanceUrl: new Uri(profile.EnvironmentUrl),
                 tokenProviderFunction: CreateTokenProvider(scopes),
-                useUniqueInstance: true);
-
-            // Disable built-in retries — BulkCreator's ThrottlePolicy owns retry logic.
-            _cached.MaxRetryCount = 0;
-            _cached.RetryPauseTime = TimeSpan.Zero;
-            _cached.EnableAffinityCookie = false;
+                useUniqueInstance: true)
+            {
+                // Disable built-in retries — BulkCreator's ThrottlePolicy owns retry logic.
+                MaxRetryCount = 0,
+                RetryPauseTime = TimeSpan.Zero,
+                EnableAffinityCookie = false
+            };
 
             if (!_cached.IsReady)
                 throw new InvalidOperationException(

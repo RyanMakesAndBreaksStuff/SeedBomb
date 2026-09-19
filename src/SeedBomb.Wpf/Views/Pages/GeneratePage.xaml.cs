@@ -1,7 +1,7 @@
-using System.Windows;
-using System.Windows.Controls;
 using DataGen.Core.Contracts;
 using Seedbomb.ViewModels;
+using System.Windows;
+using System.Windows.Controls;
 using Wpf.Ui.Abstractions.Controls;
 
 namespace Seedbomb.Views.Pages;

@@ -1,7 +1,7 @@
-using System.Globalization;
-using System.Windows;
 using Seedbomb.Converters;
 using Seedbomb.Services.Connections;
+using System.Globalization;
+using System.Windows;
 using Xunit;
 
 namespace DataGen.Wpf.Tests;

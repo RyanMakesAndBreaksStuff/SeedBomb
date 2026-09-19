@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../SeedBomb.Wpf/SeedBomb.Wpf.csproj" />

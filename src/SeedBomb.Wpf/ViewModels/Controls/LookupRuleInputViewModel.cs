@@ -1,9 +1,9 @@
-using System.Collections.ObjectModel;
-using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataGen.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
+using System.Collections.ObjectModel;
+using System.Text.Json;
 
 namespace Seedbomb.ViewModels.Controls;
 

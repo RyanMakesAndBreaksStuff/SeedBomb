@@ -1,7 +1,7 @@
-using System.IO;
-using System.Text.Json;
 using DataGen.Core.Rules;
 using Seedbomb.Services.Diagnostics;
+using System.IO;
+using System.Text.Json;
 
 namespace Seedbomb.Services.Profiles;
 

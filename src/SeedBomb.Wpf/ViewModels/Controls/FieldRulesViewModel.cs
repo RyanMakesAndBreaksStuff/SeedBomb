@@ -1,9 +1,9 @@
 // src/DataGen.Wpf/ViewModels/Controls/FieldRulesViewModel.cs
+using CommunityToolkit.Mvvm.ComponentModel;
+using DataGen.Core.Rules;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
-using CommunityToolkit.Mvvm.ComponentModel;
-using DataGen.Core.Rules;
 
 namespace Seedbomb.ViewModels.Controls;
 

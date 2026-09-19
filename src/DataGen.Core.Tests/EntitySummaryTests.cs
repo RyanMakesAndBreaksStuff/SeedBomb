@@ -1,5 +1,3 @@
-using DataGen.Core.Contracts;
-
 namespace DataGen.Core.Tests;
 
 public class EntitySummaryTests

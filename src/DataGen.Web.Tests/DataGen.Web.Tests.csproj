@@ -4,6 +4,7 @@
     <IsTestProject>true</IsTestProject>
     <NoWarn>$(NoWarn);1591;xUnit1051</NoWarn>
     <NuGetAudit>False</NuGetAudit>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DataGen.Web/DataGen.Web.csproj" />
