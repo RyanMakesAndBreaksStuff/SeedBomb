@@ -165,11 +165,18 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.Cell}"
-                                       FontSize="{DynamicResource DG.Type.Subtitle}"
-                                       Text="{Binding LogicalName}" Margin="9,0,0,0"
-                                       TextTrimming="CharacterEllipsis"
-                                       ToolTip="{Binding LogicalName}"/>
+                            <StackPanel Grid.Column="1" Margin="9,0,0,0">
+                                <TextBlock Style="{DynamicResource DG.Cell}"
+                                           FontSize="{DynamicResource DG.Type.Subtitle}"
+                                           Text="{Binding DisplayName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding DisplayName}"/>
+                                <TextBlock Style="{DynamicResource DG.Tertiary}"
+                                           FontSize="{DynamicResource DG.Type.Micro}"
+                                           Text="{Binding LogicalName}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding LogicalName}"/>
+                            </StackPanel>
                             <TextBlock Grid.Column="2" Style="{DynamicResource DG.Tertiary}"
                                        FontSize="{DynamicResource DG.Type.Small}"
                                        Text="{Binding TypeLabel}" Margin="9,0,4,0"
