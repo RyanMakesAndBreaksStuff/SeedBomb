@@ -111,6 +111,10 @@ Verified test counts:
 - **WPF**: publish a self-contained single-file exe with `dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -c Release -p:PublishProfile=GitHubRelease -o ./publish`. GitHub Actions workflow **SeedBomb Publish** uploads `SeedBomb.exe` to GitHub Releases (push a `v*.*.*` tag, or run the workflow manually).
 - **Secrets** must always be supplied through secure configuration providers; never commit credentials to the repo.
 
+## License
+
+DataGen and SeedBomb are licensed under the [BSD 3-Clause License](LICENSE) (`BSD-3-Clause`). See [LICENSE](LICENSE).
+
 ## Project conventions
 
 - Plans and specs live in `plans/` (e.g., `plans/connection.md`).
