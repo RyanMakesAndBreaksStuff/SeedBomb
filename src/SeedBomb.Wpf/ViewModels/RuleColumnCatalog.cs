@@ -122,6 +122,7 @@ public sealed class RuleColumnCatalog
         {
             view.SortDescriptions.Clear();
             view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.GroupOrder), ListSortDirection.Ascending));
+            view.SortDescriptions.Add(new SortDescription(nameof(PickerColumn.DisplayName), ListSortDirection.Ascending));
             view.GroupDescriptions.Clear();
             view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PickerColumn.GroupName)));
         }
