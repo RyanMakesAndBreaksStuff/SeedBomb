@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Seedbomb.Resources;
 using Seedbomb.Services;
+using Seedbomb.Services.About;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
@@ -191,6 +192,10 @@ public partial class App : Application
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
         sc.AddSingleton<IWpfGenerationService, WpfGenerationService>();
         sc.AddSingleton<IProfileService, JsonProfileService>();
+        sc.AddSingleton<IEmbeddedResourceReader>(_ =>
+            new AssemblyResourceReader(typeof(App).Assembly));
+        sc.AddSingleton<IThirdPartyNoticeService, ThirdPartyNoticeService>();
+        sc.AddSingleton<IUriLauncher, ProcessUriLauncher>();
 
         // Windows — singleton so only one instance exists at a time
         sc.AddSingleton<MainWindow>();
