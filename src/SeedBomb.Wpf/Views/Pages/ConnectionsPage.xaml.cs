@@ -1,4 +1,4 @@
-using Seedbomb.ViewModels;
+﻿using Seedbomb.ViewModels;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,6 +22,7 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         InitializeComponent();
         Loaded += OnPageLoaded;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        Unloaded += (_, _) => ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     /// <inheritdoc />
@@ -50,7 +51,10 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         // ConnectionsPage is Transient while ConnectionManagerViewModel is Singleton, so a
         // still-showing toast would otherwise reappear on a fresh page instance if the user
         // navigates away and back while it's up.
+        // The view-model is a Singleton and this page is Transient, so anything left on it
+        // outlives the page - including the decrypted ClientSecret loaded by EditProfileAsync.
         ViewModel.ShowConnectedToast = false;
+        ViewModel.EditingProfile = null;
         return Task.CompletedTask;
     }
 
