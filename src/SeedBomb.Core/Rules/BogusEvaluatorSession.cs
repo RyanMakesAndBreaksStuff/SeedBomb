@@ -48,7 +48,8 @@ public sealed class BogusEvaluatorSession : IDisposable
         BinaryPrimitives.WriteInt32BigEndian(key, seed);
 
         var message = new ArrayBufferWriter<byte>();
-        WriteLengthPrefixed(message, "SeedBomb.Bogus/v1");
+        // Frozen v1 domain-separation tag — changing it reseeds every existing deterministic run.
+        WriteLengthPrefixed(message, "DataGen.Bogus/v1");
         WriteLengthPrefixed(message, table);
         WriteLengthPrefixed(message, rule.CanonicalColumn);
         WriteLengthPrefixed(message, rule.Descriptor.Id.Api);
