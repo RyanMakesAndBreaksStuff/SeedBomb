@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
@@ -189,20 +189,31 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private async Task EditProfileAsync(ConnectionProfile profile)
     {
-        EditingProfile = new ConnectionProfile
+        SwitchError = null;
+        try
         {
-            Id = profile.Id,
-            Name = profile.Name,
-            EnvironmentUrl = profile.EnvironmentUrl,
-            EnvironmentType = profile.EnvironmentType,
-            AuthType = profile.AuthType,
-            ClientId = profile.ClientId,
-            TenantId = profile.TenantId,
-            ClientSecret = await _profileService.GetSecretAsync(profile.Id),
-            CertificateThumbprint = profile.CertificateThumbprint,
-        };
-        IsEditing = true;
-        IsDirty = false;
+            EditingProfile = new ConnectionProfile
+            {
+                Id = profile.Id,
+                Name = profile.Name,
+                EnvironmentUrl = profile.EnvironmentUrl,
+                EnvironmentType = profile.EnvironmentType,
+                AuthType = profile.AuthType,
+                ClientId = profile.ClientId,
+                TenantId = profile.TenantId,
+                ClientSecret = await _profileService.GetSecretAsync(profile.Id),
+                CertificateThumbprint = profile.CertificateThumbprint,
+            };
+            IsEditing = true;
+            IsDirty = false;
+        }
+        catch (Exception ex)
+        {
+            // A profile copied from another machine or account cannot be DPAPI-decrypted here
+            // (CurrentUser scope). Surface it in the existing banner instead of killing the app
+            // via the fire-and-forget call in OnSelectedProfileChanged.
+            SwitchError = ex.Message;
+        }
     }
 
     /// <summary>Persists the editing profile. Connecting is a separate, explicit step (<see cref="ConnectAsync"/>).</summary>

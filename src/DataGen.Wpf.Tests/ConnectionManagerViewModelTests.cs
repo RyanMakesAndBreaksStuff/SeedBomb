@@ -1,4 +1,4 @@
-using Moq;
+﻿using Moq;
 using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
@@ -586,6 +586,29 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         };
         await svc.SaveAsync(profile, TestContext.Current.CancellationToken);
         return (svc, profile.Id);
+    }
+
+    [Fact]
+    public async Task EditProfileAsync_ReportsSwitchError_WhenSecretCannotBeDecrypted()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetSecretAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new System.Security.Cryptography.CryptographicException("Key not valid for use in specified state."));
+
+        var vm = new ConnectionManagerViewModel(
+            profiles.Object, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
+
+        var profile = new ConnectionProfile
+        {
+            Name = "Dev",
+            EnvironmentUrl = "https://org.crm.dynamics.com",
+            AuthType = AuthType.ClientSecret,
+        };
+
+        await vm.EditProfileCommand.ExecuteAsync(profile);
+
+        Assert.Contains("Key not valid", vm.SwitchError, StringComparison.Ordinal);
+        Assert.False(vm.IsEditing);
     }
 
     public void Dispose()
