@@ -1,7 +1,7 @@
 using SeedBomb.Wpf.Tests.Views;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.ViewModels;
+using SeedBomb.ViewModels;
 using System.Windows.Data;
 using Xunit;
 

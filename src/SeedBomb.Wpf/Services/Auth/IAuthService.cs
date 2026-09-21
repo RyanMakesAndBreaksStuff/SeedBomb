@@ -1,6 +1,6 @@
-using Seedbomb.Services.Connections;
+using SeedBomb.Services.Connections;
 
-namespace Seedbomb.Services.Auth;
+namespace SeedBomb.Services.Auth;
 
 /// <summary>
 /// Provides MSAL-based authentication for the desktop application.

@@ -7,7 +7,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 using Moq;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Dataverse;
 using System.ServiceModel;
 using Xunit;
 

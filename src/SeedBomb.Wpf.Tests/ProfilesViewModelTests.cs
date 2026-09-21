@@ -1,6 +1,6 @@
 using SeedBomb.Core.Rules;
-using Seedbomb.Services.Profiles;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Profiles;
+using SeedBomb.ViewModels;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

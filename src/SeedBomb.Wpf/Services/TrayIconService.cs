@@ -5,7 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
-namespace Seedbomb.Services;
+namespace SeedBomb.Services;
 
 /// <summary>
 /// Owns the system tray icon. Switches between the colored and white glyph variants to match

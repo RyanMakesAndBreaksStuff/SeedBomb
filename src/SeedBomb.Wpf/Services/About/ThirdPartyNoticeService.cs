@@ -1,13 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
-/// <summary>Deserializes <c>Seedbomb.ThirdPartyNotices.json</c> and reads license resources.</summary>
+/// <summary>Deserializes <c>SeedBomb.ThirdPartyNotices.json</c> and reads license resources.</summary>
 public sealed class ThirdPartyNoticeService(IEmbeddedResourceReader resources) : IThirdPartyNoticeService
 {
-    internal const string ManifestName = "Seedbomb.ThirdPartyNotices.json";
-    internal const string AppLicenseName = "Seedbomb.AppLicense.txt";
+    internal const string ManifestName = "SeedBomb.ThirdPartyNotices.json";
+    internal const string AppLicenseName = "SeedBomb.AppLicense.txt";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <inheritdoc />
@@ -84,7 +84,7 @@ public sealed class ThirdPartyNoticeService(IEmbeddedResourceReader resources) :
             return null;
         }
 
-        if (!resource.StartsWith("Seedbomb.Licenses.", StringComparison.Ordinal)
+        if (!resource.StartsWith("SeedBomb.Licenses.", StringComparison.Ordinal)
             || resource.Contains("..", StringComparison.Ordinal)
             || resource.IndexOfAny(['/', '\\']) >= 0)
         {

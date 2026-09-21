@@ -1,15 +1,15 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Dataverse;
-using Seedbomb.Services.Settings;
-using Seedbomb.Services.Theme;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Settings;
+using SeedBomb.Services.Theme;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>ViewModel for the Settings page.</summary>
 /// <remarks>Initialises the view-model.</remarks>

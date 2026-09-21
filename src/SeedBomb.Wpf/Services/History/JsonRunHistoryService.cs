@@ -1,8 +1,8 @@
-using Seedbomb.Services.Diagnostics;
+using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
-namespace Seedbomb.Services.History;
+namespace SeedBomb.Services.History;
 
 /// <summary>
 /// Persists run history to <c>%LOCALAPPDATA%\SeedBomb\history.json</c>.

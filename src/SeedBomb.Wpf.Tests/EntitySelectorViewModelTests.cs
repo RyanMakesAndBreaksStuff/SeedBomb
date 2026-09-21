@@ -2,7 +2,7 @@ using SeedBomb.Core.Contracts;
 using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Seedbomb.ViewModels.Controls;
+using SeedBomb.ViewModels.Controls;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

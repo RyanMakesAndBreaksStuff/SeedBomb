@@ -5,15 +5,15 @@ using SeedBomb.Core.Exceptions;
 using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Diagnostics;
-using Seedbomb.Services.Export;
-using Seedbomb.Services.Generation;
-using Seedbomb.Services.History;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Settings;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Diagnostics;
+using SeedBomb.Services.Export;
+using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Settings;
+using SeedBomb.Views.Pages;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -23,7 +23,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Label/value row for sheet metrics and summary tiles. <see cref="ValueKind"/> maps to DG.* — no Brush.</summary>
 public sealed record RunValueRow(string Label, string Value, string? ValueKind = null);

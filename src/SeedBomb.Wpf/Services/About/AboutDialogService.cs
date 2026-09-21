@@ -4,7 +4,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using TextBox = System.Windows.Controls.TextBox;
 
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>Displays bundled license text in the application's dialog host.</summary>
 public sealed class AboutDialogService(

@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-namespace Seedbomb.Views.Controls;
+namespace SeedBomb.Views.Controls;
 
 /// <summary>Centre pane of the Rules page: operation picker and the active editor template.</summary>
 public partial class RuleOperationPane : UserControl

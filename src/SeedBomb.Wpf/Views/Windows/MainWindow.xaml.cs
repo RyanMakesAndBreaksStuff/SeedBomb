@@ -1,8 +1,8 @@
-﻿using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Navigation;
-using Seedbomb.ViewModels;
-using Seedbomb.Views.Pages;
+﻿using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Navigation;
+using SeedBomb.ViewModels;
+using SeedBomb.Views.Pages;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Interop;
@@ -10,7 +10,7 @@ using System.Windows.Threading;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.Views.Windows;
+namespace SeedBomb.Views.Windows;
 
 /// <summary>Main application window. Hosts the 1a left NavigationView.</summary>
 public partial class MainWindow : FluentWindow

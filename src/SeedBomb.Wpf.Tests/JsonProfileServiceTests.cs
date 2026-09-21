@@ -1,5 +1,5 @@
 using SeedBomb.Core.Rules;
-using Seedbomb.Services.Profiles;
+using SeedBomb.Services.Profiles;
 using System.Text.Json;
 using Xunit;
 

@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
-using Seedbomb.Services.Dataverse;
-using Seedbomb.ViewModels.Controls;
+using SeedBomb.Services.Dataverse;
+using SeedBomb.ViewModels.Controls;
 using System.ServiceModel;
 using Xunit;
 

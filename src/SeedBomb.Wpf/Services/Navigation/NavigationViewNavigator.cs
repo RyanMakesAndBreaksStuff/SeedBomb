@@ -1,6 +1,6 @@
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.Services.Navigation;
+namespace SeedBomb.Services.Navigation;
 
 /// <summary>Forwards navigation to the live <see cref="NavigationView"/>.</summary>
 public sealed class NavigationViewNavigator : IAppNavigator

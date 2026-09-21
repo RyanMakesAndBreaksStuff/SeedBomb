@@ -2,11 +2,11 @@
     Profiles — 3a. List + detail, deliberately not a card grid.
     Left pane fixed at DG.Size.ListPane; detail pane takes the rest.
 -->
-<Page x:Class="Seedbomb.Views.Pages.ProfilesPage"
+<Page x:Class="SeedBomb.Views.Pages.ProfilesPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      xmlns:vm="clr-namespace:Seedbomb.ViewModels"
+      xmlns:vm="clr-namespace:SeedBomb.ViewModels"
       d:DataContext="{d:DesignInstance Type=vm:ProfilesViewModel}"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"

@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace Seedbomb.Converters;
+namespace SeedBomb.Converters;
 
 /// <summary>
 /// True when two multi-binding values are equal, or when a single value equals ConverterParameter.

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Profiles;
+using SeedBomb.Services.Profiles;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Debounced draft persist for the Generate wizard. Owns the coalesce CTS.</summary>
 internal sealed class GenerateDraftAutosave

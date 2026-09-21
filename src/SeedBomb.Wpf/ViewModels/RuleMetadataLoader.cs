@@ -3,12 +3,12 @@ using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Dataverse;
 using System.ServiceModel;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Outcome of one metadata fetch generation.</summary>
 /// <param name="Generation">Monotonic fetch id used to drop stale completions.</param>

@@ -1,8 +1,8 @@
 using Microsoft.Identity.Client;
 using Moq;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Diagnostics;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Diagnostics;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

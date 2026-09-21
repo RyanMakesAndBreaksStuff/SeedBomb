@@ -9,7 +9,7 @@ public sealed class SplashScreenAssetTests
     public void StartupShowsAndCompletesCustomSplash()
     {
         var app = ReadRepoFile("src/SeedBomb.Wpf/App.xaml.cs");
-        Assert.Contains("using Seedbomb.Resources;", app, StringComparison.Ordinal);
+        Assert.Contains("using SeedBomb.Resources;", app, StringComparison.Ordinal);
         AssertOrdered(app, "splash = new SplashWindow();", "splash.Show();",
             "await _host.StartAsync();",
             "await ShowMainWindow(result.DisplayName ?? string.Empty, result.Succeeded);",

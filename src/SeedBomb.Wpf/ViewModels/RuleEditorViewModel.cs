@@ -5,11 +5,11 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.Services.Dataverse;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Profiles;
-using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
+using SeedBomb.ViewModels.Controls;
+using SeedBomb.Views.Pages;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -19,7 +19,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>
 /// ViewModel for the rule editor dialog — the one place settable vs. platform-owned columns

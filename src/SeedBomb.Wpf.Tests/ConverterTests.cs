@@ -1,5 +1,5 @@
-using Seedbomb.Converters;
-using Seedbomb.Services.Connections;
+using SeedBomb.Converters;
+using SeedBomb.Services.Connections;
 using System.Globalization;
 using System.Windows;
 using Xunit;

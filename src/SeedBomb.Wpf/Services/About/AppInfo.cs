@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>Canonical SeedBomb identity and project links.</summary>
 public static class AppInfo

@@ -7,7 +7,7 @@
       "license": "MIT AND BSD-3-Clause",
       "copyright": "Copyright (c) 2015 Brian Chavez",
       "projectUrl": "https://github.com/bchavez/Bogus",
-      "licenseResource": "Seedbomb.Licenses.Bogus-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Bogus-LICENSE.txt",
       "featured": true,
       "featuredOrder": 1
     },
@@ -18,7 +18,7 @@
       "license": "MIT",
       "copyright": "(c) .NET Foundation and Contributors. All rights reserved.",
       "projectUrl": "https://github.com/CommunityToolkit/dotnet",
-      "licenseResource": "Seedbomb.Licenses.CommunityToolkit.Mvvm-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.CommunityToolkit.Mvvm-DISPLAY.txt",
       "featured": true,
       "featuredOrder": 3
     },
@@ -29,7 +29,7 @@
       "license": "MIT",
       "copyright": "Copyright (c) 2009 - 2019 Philipp Sumi, 2019 - 2024 Philipp Sumi, Robin Krom, Jan Karger",
       "projectUrl": "https://github.com/hardcodet/wpf-notifyicon",
-      "licenseResource": "Seedbomb.Licenses.Hardcodet.NotifyIcon.Wpf-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Hardcodet.NotifyIcon.Wpf-LICENSE.txt",
       "featured": false
     },
     {
@@ -39,7 +39,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Caching.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Caching.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -49,7 +49,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Caching.Memory-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Caching.Memory-DISPLAY.txt",
       "featured": false
     },
     {
@@ -59,7 +59,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration-DISPLAY.txt",
       "featured": false
     },
     {
@@ -69,7 +69,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -79,7 +79,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.Binder-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.Binder-DISPLAY.txt",
       "featured": false
     },
     {
@@ -89,7 +89,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.CommandLine-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.CommandLine-DISPLAY.txt",
       "featured": false
     },
     {
@@ -99,7 +99,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.EnvironmentVariables-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.EnvironmentVariables-DISPLAY.txt",
       "featured": false
     },
     {
@@ -109,7 +109,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.FileExtensions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.FileExtensions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -119,7 +119,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.Json-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.Json-DISPLAY.txt",
       "featured": false
     },
     {
@@ -129,7 +129,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Configuration.UserSecrets-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Configuration.UserSecrets-DISPLAY.txt",
       "featured": false
     },
     {
@@ -139,7 +139,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.DependencyInjection-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.DependencyInjection-DISPLAY.txt",
       "featured": false
     },
     {
@@ -149,7 +149,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.DependencyInjection.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.DependencyInjection.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -159,7 +159,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Diagnostics-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Diagnostics-DISPLAY.txt",
       "featured": false
     },
     {
@@ -169,7 +169,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Diagnostics.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Diagnostics.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -179,7 +179,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.FileProviders.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.FileProviders.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -189,7 +189,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.FileProviders.Physical-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.FileProviders.Physical-DISPLAY.txt",
       "featured": false
     },
     {
@@ -199,7 +199,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.FileSystemGlobbing-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.FileSystemGlobbing-DISPLAY.txt",
       "featured": false
     },
     {
@@ -209,7 +209,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Hosting-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Hosting-DISPLAY.txt",
       "featured": false
     },
     {
@@ -219,7 +219,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Hosting.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Hosting.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -229,7 +229,7 @@
       "license": "Apache-2.0",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://asp.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Http-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Http-LICENSE.txt",
       "featured": false
     },
     {
@@ -239,7 +239,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging-DISPLAY.txt",
       "featured": false
     },
     {
@@ -249,7 +249,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging.Abstractions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -259,7 +259,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging.Configuration-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging.Configuration-DISPLAY.txt",
       "featured": false
     },
     {
@@ -269,7 +269,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging.Console-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging.Console-DISPLAY.txt",
       "featured": false
     },
     {
@@ -279,7 +279,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging.Debug-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging.Debug-DISPLAY.txt",
       "featured": false
     },
     {
@@ -289,7 +289,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging.EventLog-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging.EventLog-DISPLAY.txt",
       "featured": false
     },
     {
@@ -299,7 +299,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Logging.EventSource-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Logging.EventSource-DISPLAY.txt",
       "featured": false
     },
     {
@@ -309,7 +309,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://asp.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.ObjectPool-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.ObjectPool-DISPLAY.txt",
       "featured": false
     },
     {
@@ -319,7 +319,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Options-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Options-DISPLAY.txt",
       "featured": false
     },
     {
@@ -329,7 +329,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Options.ConfigurationExtensions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Options.ConfigurationExtensions-DISPLAY.txt",
       "featured": false
     },
     {
@@ -339,7 +339,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Extensions.Primitives-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Extensions.Primitives-DISPLAY.txt",
       "featured": false
     },
     {
@@ -349,7 +349,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/AzureAD/microsoft-authentication-library-for-dotnet",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Identity.Client-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Identity.Client-LICENSE.txt",
       "featured": false
     },
     {
@@ -359,7 +359,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/AzureAD/microsoft-authentication-library-for-dotnet",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Identity.Client.Extensions.Msal-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Identity.Client.Extensions.Msal-LICENSE.txt",
       "featured": false
     },
     {
@@ -369,7 +369,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.IdentityModel.Abstractions-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.IdentityModel.Abstractions-LICENSE.txt",
       "featured": false
     },
     {
@@ -379,7 +379,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.NETCore.App.Runtime.win-x64-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.NETCore.App.Runtime.win-x64-DISPLAY.txt",
       "featured": false
     },
     {
@@ -389,7 +389,7 @@
       "license": "LicenseRef-Microsoft-Dynamics-365-SDK",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/microsoft/PowerPlatform-DataverseServiceClient",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.PowerPlatform.Dataverse.Client-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.PowerPlatform.Dataverse.Client-DISPLAY.txt",
       "featured": true,
       "featuredOrder": 4
     },
@@ -400,7 +400,7 @@
       "license": "LicenseRef-Microsoft-Windows-SDK",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://learn.microsoft.com/windows/apps/windows-sdk/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.Windows.SDK.NET.Ref-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.Windows.SDK.NET.Ref-DISPLAY.txt",
       "featured": false
     },
     {
@@ -410,7 +410,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.Microsoft.WindowsDesktop.App.Runtime.win-x64-LICENSE.txt",
+      "licenseResource": "SeedBomb.Licenses.Microsoft.WindowsDesktop.App.Runtime.win-x64-LICENSE.txt",
       "featured": false
     },
     {
@@ -420,7 +420,7 @@
       "license": "MIT",
       "copyright": "Copyright © James Newton-King 2008",
       "projectUrl": "https://www.newtonsoft.com/json",
-      "licenseResource": "Seedbomb.Licenses.Newtonsoft.Json-LICENSE.md",
+      "licenseResource": "SeedBomb.Licenses.Newtonsoft.Json-LICENSE.md",
       "featured": false
     },
     {
@@ -430,7 +430,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.System.Formats.Asn1-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.System.Formats.Asn1-DISPLAY.txt",
       "featured": false
     },
     {
@@ -440,7 +440,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/dotnet/corefx",
-      "licenseResource": "Seedbomb.Licenses.System.Runtime.Caching-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.System.Runtime.Caching-DISPLAY.txt",
       "featured": false
     },
     {
@@ -450,7 +450,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.System.Security.Cryptography.Pkcs-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.System.Security.Cryptography.Pkcs-DISPLAY.txt",
       "featured": false
     },
     {
@@ -460,7 +460,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://dot.net/",
-      "licenseResource": "Seedbomb.Licenses.System.Security.Cryptography.Xml-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.System.Security.Cryptography.Xml-DISPLAY.txt",
       "featured": false
     },
     {
@@ -470,7 +470,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/dotnet/wcf",
-      "licenseResource": "Seedbomb.Licenses.System.ServiceModel.Http-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.System.ServiceModel.Http-DISPLAY.txt",
       "featured": false
     },
     {
@@ -480,7 +480,7 @@
       "license": "MIT",
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/dotnet/wcf",
-      "licenseResource": "Seedbomb.Licenses.System.ServiceModel.Primitives-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.System.ServiceModel.Primitives-DISPLAY.txt",
       "featured": false
     },
     {
@@ -490,7 +490,7 @@
       "license": "MIT",
       "copyright": "Copyright (C) 2021-2026 Leszek Pomianowski and WPF UI Contributors",
       "projectUrl": "https://github.com/lepoco/wpfui",
-      "licenseResource": "Seedbomb.Licenses.WPF-UI-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.WPF-UI-DISPLAY.txt",
       "featured": true,
       "featuredOrder": 2
     },
@@ -501,7 +501,7 @@
       "license": "MIT",
       "copyright": "Copyright (C) 2021-2026 Leszek Pomianowski and WPF UI Contributors",
       "projectUrl": "https://github.com/lepoco/wpfui",
-      "licenseResource": "Seedbomb.Licenses.WPF-UI.Abstractions-DISPLAY.txt",
+      "licenseResource": "SeedBomb.Licenses.WPF-UI.Abstractions-DISPLAY.txt",
       "featured": false
     }
   ]

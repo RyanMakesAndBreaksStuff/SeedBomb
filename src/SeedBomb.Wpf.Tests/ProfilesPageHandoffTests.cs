@@ -2,11 +2,11 @@ using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
-using Seedbomb.Services.Generation;
-using Seedbomb.Services.History;
-using Seedbomb.Services.Profiles;
-using Seedbomb.Services.Settings;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
+using SeedBomb.Services.Profiles;
+using SeedBomb.Services.Settings;
+using SeedBomb.ViewModels;
 using Wpf.Ui;
 using Xunit;
 
@@ -34,7 +34,7 @@ public sealed class ProfilesPageHandoffTests
             metadataMock.Object,
             Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(),
-            new Seedbomb.ViewModels.RunViewModel(Mock.Of<IWpfGenerationService>()));
+            new SeedBomb.ViewModels.RunViewModel(Mock.Of<IWpfGenerationService>()));
     }
 
     [Fact]

@@ -1,7 +1,7 @@
 using Moq;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Profiles;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
+using SeedBomb.ViewModels;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

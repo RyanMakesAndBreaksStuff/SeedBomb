@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>Opens an external https URL in the system browser.</summary>
 public interface IUriLauncher

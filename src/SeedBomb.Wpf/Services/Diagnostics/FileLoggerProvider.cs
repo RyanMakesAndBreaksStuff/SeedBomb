@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using System.IO;
 using System.Text;
 
-namespace Seedbomb.Services.Diagnostics;
+namespace SeedBomb.Services.Diagnostics;
 
 /// <summary>Appends log lines to one file per day under <see cref="AppPaths.Logs"/>.</summary>
 public sealed class FileLoggerProvider : ILoggerProvider

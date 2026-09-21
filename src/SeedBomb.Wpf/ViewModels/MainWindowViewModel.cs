@@ -2,12 +2,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
-/// <summary>ViewModel for <see cref="Seedbomb.Views.Windows.MainWindow"/>.</summary>
+/// <summary>ViewModel for <see cref="SeedBomb.Views.Windows.MainWindow"/>.</summary>
 public partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private readonly IConnectionProfileService? _profileService;

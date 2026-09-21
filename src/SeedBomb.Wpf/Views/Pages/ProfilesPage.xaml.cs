@@ -1,11 +1,11 @@
 using Microsoft.Win32;
-using Seedbomb.Services.Navigation;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Navigation;
+using SeedBomb.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 using Wpf.Ui.Abstractions.Controls;
 
-namespace Seedbomb.Views.Pages;
+namespace SeedBomb.Views.Pages;
 
 /// <summary>Profiles library — list and detail (1a/3a).</summary>
 public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
@@ -55,7 +55,7 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
     private void OnPageLoaded(object sender, RoutedEventArgs e) =>
         NavigationPageLayout.PinHeightToHost(this);
 
-    private void OnProfileApplied(object? sender, Seedbomb.Services.Profiles.ProfileImportReport report)
+    private void OnProfileApplied(object? sender, SeedBomb.Services.Profiles.ProfileImportReport report)
     {
         _generate.ApplyImportReport(report);
         _navigator.Navigate(typeof(GeneratePage));

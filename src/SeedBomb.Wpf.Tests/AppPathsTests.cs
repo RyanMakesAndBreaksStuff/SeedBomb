@@ -1,7 +1,7 @@
 using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Diagnostics;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Diagnostics;
+using SeedBomb.ViewModels;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

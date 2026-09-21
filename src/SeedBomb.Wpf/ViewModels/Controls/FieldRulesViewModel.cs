@@ -6,7 +6,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
 
-namespace Seedbomb.ViewModels.Controls;
+namespace SeedBomb.ViewModels.Controls;
 
 /// <summary>One board row = one active rule (spec: the board lists rules, not columns).</summary>
 public sealed record RuleRow(

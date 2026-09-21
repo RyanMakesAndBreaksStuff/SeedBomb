@@ -5,7 +5,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Dataverse;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

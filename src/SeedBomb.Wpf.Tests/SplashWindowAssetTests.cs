@@ -21,7 +21,7 @@ public sealed class SplashWindowAssetTests
     public void SplashWindowUsesPackagedDarkLogo()
     {
         var splash = ReadRepoFile("src/SeedBomb.Wpf/Resources/SplashWindow.xaml");
-        Assert.Contains("x:Class=\"Seedbomb.Resources.SplashWindow\"", splash, StringComparison.Ordinal);
+        Assert.Contains("x:Class=\"SeedBomb.Resources.SplashWindow\"", splash, StringComparison.Ordinal);
         Assert.Contains("Source=\"pack://application:,,,/Resources/logo-dark.png\"", splash, StringComparison.Ordinal);
         Assert.DoesNotContain("Source=\"Assets/", splash, StringComparison.Ordinal);
     }

@@ -1,5 +1,5 @@
-using Seedbomb;
-using Seedbomb.Services.About;
+using SeedBomb;
+using SeedBomb.Services.About;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -19,7 +19,7 @@ public sealed class ThirdPartyNoticeServiceTests
                   "license": "MIT AND BSD-3-Clause",
                   "copyright": "Copyright (c) 2015 Brian Chavez",
                   "projectUrl": "https://github.com/bchavez/Bogus",
-                  "licenseResource": "Seedbomb.Licenses.Bogus-LICENSE.txt",
+                  "licenseResource": "SeedBomb.Licenses.Bogus-LICENSE.txt",
                   "featured": true,
                   "credit": "Synthetic data generation powered by Bogus, created by Brian Chavez.",
                   "featuredOrder": 1
@@ -30,7 +30,7 @@ public sealed class ThirdPartyNoticeServiceTests
                   "version": "1.0.0",
                   "license": "MIT",
                   "projectUrl": "http://example.com",
-                  "licenseResource": "Seedbomb.Licenses.x"
+                  "licenseResource": "SeedBomb.Licenses.x"
                 }
               ]
             }
@@ -38,7 +38,7 @@ public sealed class ThirdPartyNoticeServiceTests
         var resources = new FakeResources
         {
             [ThirdPartyNoticeService.ManifestName] = json,
-            ["Seedbomb.Licenses.Bogus-LICENSE.txt"] = "BOGUS LICENSE TEXT",
+            ["SeedBomb.Licenses.Bogus-LICENSE.txt"] = "BOGUS LICENSE TEXT",
         };
         var service = new ThirdPartyNoticeService(resources);
 

@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Settings;
+namespace SeedBomb.Services.Settings;
 
 /// <summary>
 /// Persisted application settings. Connection details live in connection profiles,

@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Navigation;
+namespace SeedBomb.Services.Navigation;
 
 /// <summary>Navigates the shell NavigationView from view models.</summary>
 public interface IAppNavigator

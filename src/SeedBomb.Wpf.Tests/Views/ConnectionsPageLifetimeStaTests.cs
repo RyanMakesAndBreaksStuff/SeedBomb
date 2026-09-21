@@ -1,9 +1,9 @@
 ﻿using Moq;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Dataverse;
-using Seedbomb.ViewModels;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Dataverse;
+using SeedBomb.ViewModels;
+using SeedBomb.Views.Pages;
 using System.ComponentModel;
 using System.Reflection;
 using System.Windows;

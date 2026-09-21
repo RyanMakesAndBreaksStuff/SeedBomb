@@ -1,6 +1,6 @@
 using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.ViewModels;
+using SeedBomb.ViewModels;
 using System.Diagnostics;
 using Xunit;
 

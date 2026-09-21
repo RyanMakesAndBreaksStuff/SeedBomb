@@ -1,4 +1,4 @@
-using Seedbomb.Services.Theme;
+using SeedBomb.Services.Theme;
 using System.Runtime.CompilerServices;
 using Xunit;
 

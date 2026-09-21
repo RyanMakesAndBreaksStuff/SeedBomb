@@ -4,7 +4,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Collections.ObjectModel;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Debounced rule-preview samples for the Rules page.</summary>
 public sealed class RulePreviewController

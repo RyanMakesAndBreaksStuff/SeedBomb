@@ -1,6 +1,6 @@
 using Moq;
-using Seedbomb.Services.About;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.About;
+using SeedBomb.ViewModels;
 using Wpf.Ui;
 using Xunit;
 

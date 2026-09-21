@@ -1,8 +1,8 @@
-using Seedbomb.Services.Diagnostics;
+using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
-namespace Seedbomb.Services.Settings;
+namespace SeedBomb.Services.Settings;
 
 /// <summary>
 /// Loads and saves <see cref="AppSettings"/> to <c>%LOCALAPPDATA%\SeedBomb\settings.json</c>.

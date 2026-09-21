@@ -5,11 +5,11 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Dataverse;
 using System.Collections.ObjectModel;
 using System.ServiceModel;
 
-namespace Seedbomb.ViewModels.Controls;
+namespace SeedBomb.ViewModels.Controls;
 
 /// <summary>Owns temporary picker selection and ignores superseded reads.</summary>
 public sealed partial class LookupRecordPickerViewModel : ObservableObject, IDisposable

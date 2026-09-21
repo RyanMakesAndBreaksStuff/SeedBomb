@@ -1,4 +1,4 @@
-using Seedbomb.Services.Auth;
+using SeedBomb.Services.Auth;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Xunit;

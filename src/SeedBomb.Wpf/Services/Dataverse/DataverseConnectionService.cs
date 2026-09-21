@@ -1,8 +1,8 @@
 using Microsoft.PowerPlatform.Dataverse.Client;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
 
-namespace Seedbomb.Services.Dataverse;
+namespace SeedBomb.Services.Dataverse;
 
 /// <summary>
 /// Manages a lazily-created, cached <see cref="ServiceClient"/> connection.

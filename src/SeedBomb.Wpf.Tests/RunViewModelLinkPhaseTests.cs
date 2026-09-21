@@ -1,6 +1,6 @@
 using SeedBomb.Core.Contracts;
-using Seedbomb.Services.Generation;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Generation;
+using SeedBomb.ViewModels;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

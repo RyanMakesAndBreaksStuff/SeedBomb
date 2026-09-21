@@ -1,7 +1,7 @@
 using Moq;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Dataverse;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

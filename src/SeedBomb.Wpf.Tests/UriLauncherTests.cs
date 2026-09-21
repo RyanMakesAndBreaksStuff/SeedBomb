@@ -1,4 +1,4 @@
-using Seedbomb.Services.About;
+using SeedBomb.Services.About;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

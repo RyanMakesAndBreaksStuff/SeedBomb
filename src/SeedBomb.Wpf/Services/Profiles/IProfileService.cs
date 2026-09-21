@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Profiles;
+namespace SeedBomb.Services.Profiles;
 
 /// <summary>
 /// Stores and retrieves rule profiles under <c>%LOCALAPPDATA%\SeedBomb\profiles</c> (§3.6).

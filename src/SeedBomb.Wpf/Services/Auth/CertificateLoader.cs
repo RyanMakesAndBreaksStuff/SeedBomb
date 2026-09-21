@@ -1,6 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 
-namespace Seedbomb.Services.Auth;
+namespace SeedBomb.Services.Auth;
 
 /// <summary>Resolves a client certificate from the CurrentUser store by thumbprint.</summary>
 public static class CertificateLoader

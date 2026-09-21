@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using SeedBomb.Core.Contracts;
 using System.Collections.ObjectModel;
 
-namespace Seedbomb.ViewModels.Controls;
+namespace SeedBomb.ViewModels.Controls;
 
 /// <summary>Represents a single entity's record-count entry in <see cref="FieldOverridesViewModel"/>.</summary>
 public sealed partial class EntityCountEntry : ObservableObject
@@ -22,7 +22,7 @@ public sealed partial class EntityCountEntry : ObservableObject
     }
 }
 
-/// <summary>ViewModel for <see cref="Seedbomb.Views.Controls.FieldOverridesControl"/>.</summary>
+/// <summary>ViewModel for <see cref="SeedBomb.Views.Controls.FieldOverridesControl"/>.</summary>
 public sealed class FieldOverridesViewModel : ObservableObject
 {
     /// <summary>One entry per selected entity.</summary>

@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace Seedbomb.Views.Controls;
+namespace SeedBomb.Views.Controls;
 
 /// <summary>
 /// Run sheet (1a/3c). Hosted as an overlay child of GeneratePage, not a window, so the wizard

@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Seedbomb.Services.Diagnostics;
+namespace SeedBomb.Services.Diagnostics;
 
 /// <summary>Single owner of the per-user data root. Carries the pre-rename DataGen folder across once.</summary>
 public static class AppPaths

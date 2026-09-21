@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using SeedBomb.Core.Rules;
 using System.Text.Json;
 
-namespace Seedbomb.ViewModels.Controls;
+namespace SeedBomb.ViewModels.Controls;
 
 /// <summary>Input-only Bogus catalog state; the parent retains Core validation and rule saving.</summary>
 public sealed partial class BogusRuleInputViewModel : ObservableObject

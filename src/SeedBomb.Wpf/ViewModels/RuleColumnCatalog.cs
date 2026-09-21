@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Column picker lists, grouping, and chip filters for the rule editor.</summary>
 public sealed class RuleColumnCatalog

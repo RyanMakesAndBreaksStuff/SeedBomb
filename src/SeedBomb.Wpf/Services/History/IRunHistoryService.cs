@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.History;
+namespace SeedBomb.Services.History;
 
 /// <summary>
 /// Persists and retrieves generation run history.

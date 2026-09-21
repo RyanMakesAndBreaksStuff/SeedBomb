@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.History;
+namespace SeedBomb.Services.History;
 
 /// <summary>
 /// Persisted record of a completed generation run.

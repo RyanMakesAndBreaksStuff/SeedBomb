@@ -1,8 +1,8 @@
 using SeedBomb.Core.Contracts;
 using Moq;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Generation;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Generation;
+using SeedBomb.ViewModels;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;

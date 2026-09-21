@@ -2,10 +2,10 @@ using SeedBomb.Bulk;
 using SeedBomb.Bulk.Contracts;
 using SeedBomb.Core.Contracts;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Dataverse;
 using System.Diagnostics;
 
-namespace Seedbomb.Services.Generation;
+namespace SeedBomb.Services.Generation;
 
 /// <summary>
 /// Runs the Bulk/Core generation pipeline from a WPF desktop context.

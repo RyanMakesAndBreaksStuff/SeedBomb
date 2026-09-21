@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace Seedbomb.Converters;
+namespace SeedBomb.Converters;
 
 /// <summary>
 /// Returns <see cref="Visibility.Visible"/> when value is non-null,

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Moq;
-using Seedbomb.Services.Settings;
-using Seedbomb.ViewModels;
+using SeedBomb.Services.Settings;
+using SeedBomb.ViewModels;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;

@@ -1,10 +1,10 @@
 using SeedBomb.Core.Contracts;
-using Seedbomb.ViewModels;
+using SeedBomb.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 using Wpf.Ui.Abstractions.Controls;
 
-namespace Seedbomb.Views.Pages;
+namespace SeedBomb.Views.Pages;
 
 /// <summary>
 /// Four-step wizard page: tables → volume &amp; rules → review → run.

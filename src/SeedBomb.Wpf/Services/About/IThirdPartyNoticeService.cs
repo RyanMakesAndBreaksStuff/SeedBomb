@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>Loads third-party notice metadata and license text from embedded resources.</summary>
 public interface IThirdPartyNoticeService

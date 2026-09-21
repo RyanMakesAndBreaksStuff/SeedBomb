@@ -6,18 +6,18 @@ using SeedBomb.Core.Metadata;
 using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
-using Seedbomb.Services.Generation;
-using Seedbomb.Services.History;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Profiles;
-using Seedbomb.Services.Settings;
-using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
+using SeedBomb.Services.Settings;
+using SeedBomb.ViewModels.Controls;
+using SeedBomb.Views.Pages;
 using System.Collections.ObjectModel;
 using Wpf.Ui;
 using Wpf.Ui.Extensions;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Step entry in the horizontal stepper strip above the wizard cards.</summary>
 /// <param name="Glyph">Displayed circle glyph.</param>
@@ -442,7 +442,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Attaches the <see cref="FieldOverridesViewModel"/> instance owned by the page's
-    /// <see cref="Seedbomb.Views.Controls.FieldOverridesControl"/> so counts can be
+    /// <see cref="SeedBomb.Views.Controls.FieldOverridesControl"/> so counts can be
     /// read at generation time.
     /// </summary>
     /// <param name="vm">The FieldOverrides view-model.</param>
@@ -465,7 +465,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Attaches the <see cref="EntitySelectorViewModel"/> instance owned by the page's
-    /// <see cref="Seedbomb.Views.Controls.EntitySelectorControl"/> so a table selection made
+    /// <see cref="SeedBomb.Views.Controls.EntitySelectorControl"/> so a table selection made
     /// programmatically (e.g. <see cref="ApplyImportReport"/>) is mirrored into the picker's
     /// checkboxes rather than only updating <see cref="SelectedEntities"/> internally.
     /// </summary>

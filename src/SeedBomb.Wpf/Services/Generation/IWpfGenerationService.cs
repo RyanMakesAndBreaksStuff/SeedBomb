@@ -1,6 +1,6 @@
 using SeedBomb.Core.Contracts;
 
-namespace Seedbomb.Services.Generation;
+namespace SeedBomb.Services.Generation;
 
 /// <summary>
 /// Runs the Core/Bulk generation pipeline from a WPF context.

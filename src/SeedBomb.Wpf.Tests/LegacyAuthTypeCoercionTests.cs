@@ -1,4 +1,4 @@
-using Seedbomb.Services.Connections;
+using SeedBomb.Services.Connections;
 using System.Text.Json;
 using Xunit;
 

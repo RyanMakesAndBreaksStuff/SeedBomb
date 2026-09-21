@@ -1,10 +1,10 @@
 // src/SeedBomb.Wpf.Tests/FieldRulesViewModelTests.cs
 using SeedBomb.Core.Rules;
-using Seedbomb.ViewModels.Controls;
+using SeedBomb.ViewModels.Controls;
 using System.Text.Json;
 using Xunit;
 
-namespace Seedbomb.Tests;
+namespace SeedBomb.Tests;
 
 public class FieldRulesViewModelTests
 {

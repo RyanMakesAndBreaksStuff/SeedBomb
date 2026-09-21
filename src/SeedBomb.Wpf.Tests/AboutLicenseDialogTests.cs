@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Seedbomb;
-using Seedbomb.Services.About;
-using Seedbomb.ViewModels;
+using SeedBomb;
+using SeedBomb.Services.About;
+using SeedBomb.ViewModels;
 using SeedBomb.Wpf.Tests.Views;
 using System.Reflection;
 using System.Windows.Controls;
@@ -63,7 +63,7 @@ public sealed class AboutLicenseDialogTests
 
         shown.Clear();
         var component = new ThirdPartyComponent("Missing", "1.0", "", "MIT", "",
-            "https://example.com", "Seedbomb.Licenses.Missing.txt", true);
+            "https://example.com", "SeedBomb.Licenses.Missing.txt", true);
         vm.ShowComponentLicenseCommand.ExecuteAsync(component).GetAwaiter().GetResult();
         AssertText(Assert.Single(shown), "License text is not available for this component.");
     }

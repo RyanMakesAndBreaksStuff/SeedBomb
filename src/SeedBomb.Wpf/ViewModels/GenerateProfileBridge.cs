@@ -1,12 +1,12 @@
 using SeedBomb.Core.Contracts;
 using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Profiles;
-using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
+using SeedBomb.ViewModels.Controls;
+using SeedBomb.Views.Pages;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>
 /// Profile snapshot, import apply, rules-page handoff, and draft restore for

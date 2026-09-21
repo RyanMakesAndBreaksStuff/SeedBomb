@@ -33,7 +33,7 @@ The same core generation engine is exposed through two front ends:
 | `SeedBomb.Core` | Class library | Dataverse metadata provider, dependency graph (`GraphBuilder`, `CycleDetector`, `TopologicalSort`), field generators, edge-case validation, contracts, exceptions. |
 | `SeedBomb.Bulk` | Class library | `BulkCreator`, `GenerationPipeline`, throttle/retry policy, deferred lookup backfill, N:N association handling. References Core. |
 | `SeedBomb.Web` | ASP.NET Core Blazor Server app | DI wiring, scoped Dataverse client factory, lazy metadata/bulk-creator adapters, MudBlazor UI. References Core and Bulk. |
-| `SeedBomb.Wpf` | WPF executable (`net10.0-windows10.0.17763.0`) | MVVM view models, connection manager, MSAL auth service, DPAPI profile storage, desktop generation service. Root namespace `Seedbomb`. References Core and Bulk. |
+| `SeedBomb.Wpf` | WPF executable (`net10.0-windows10.0.17763.0`) | MVVM view models, connection manager, MSAL auth service, DPAPI profile storage, desktop generation service. Root namespace `SeedBomb`. References Core and Bulk. |
 
 ### Test projects
 

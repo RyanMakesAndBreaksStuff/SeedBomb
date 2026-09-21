@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>Shows license and related About dialogs.</summary>
 public interface IAboutDialogService

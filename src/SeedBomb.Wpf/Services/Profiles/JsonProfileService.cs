@@ -1,9 +1,9 @@
 using SeedBomb.Core.Rules;
-using Seedbomb.Services.Diagnostics;
+using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
-namespace Seedbomb.Services.Profiles;
+namespace SeedBomb.Services.Profiles;
 
 /// <summary>
 /// JSON-backed <see cref="IProfileService"/>. Profiles live under

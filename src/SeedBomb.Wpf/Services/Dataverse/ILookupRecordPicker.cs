@@ -1,7 +1,7 @@
 using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace Seedbomb.Services.Dataverse;
+namespace SeedBomb.Services.Dataverse;
 
 /// <summary>Edits lookup selection without changing a rule until the caller accepts the result.</summary>
 public interface ILookupRecordPicker
