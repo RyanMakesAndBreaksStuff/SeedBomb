@@ -10,9 +10,9 @@ public static class AppInfo
     public const string Description = "Synthetic data generation for Microsoft Dataverse";
     public const string Author = "Ryan Rettinger";
     public const string LicenseId = "BSD-3-Clause";
-    public const string SourceCodeUrl = "https://github.com/RyanMakesAndBreaksStuff/DataGen";
-    public const string DocumentationUrl = "https://github.com/RyanMakesAndBreaksStuff/DataGen/blob/master/README.md";
-    public const string IssuesUrl = "https://github.com/RyanMakesAndBreaksStuff/DataGen/issues/new";
+    public const string SourceCodeUrl = "https://github.com/RyanMakesAndBreaksStuff/SeedBomb";
+    public const string DocumentationUrl = "https://github.com/RyanMakesAndBreaksStuff/SeedBomb/blob/master/README.md";
+    public const string IssuesUrl = "https://github.com/RyanMakesAndBreaksStuff/SeedBomb/issues/new";
 
     public static string ReadVersion(Assembly assembly)
     {

@@ -7,7 +7,7 @@ public sealed class UriLauncherTests
 {
     [Theory]
     [InlineData("https://github.com/bchavez/Bogus")]
-    [InlineData("https://github.com/RyanMakesAndBreaksStuff/DataGen")]
+    [InlineData("https://github.com/RyanMakesAndBreaksStuff/SeedBomb")]
     public void CanOpen_https_without_userinfo(string url) =>
         Assert.True(new ProcessUriLauncher().CanOpen(url));
 
