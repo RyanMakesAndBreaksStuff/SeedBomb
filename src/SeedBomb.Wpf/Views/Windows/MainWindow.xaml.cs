@@ -1,4 +1,4 @@
-using Seedbomb.Services.Auth;
+﻿using Seedbomb.Services.Auth;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Navigation;
 using Seedbomb.ViewModels;
@@ -142,6 +142,10 @@ public partial class MainWindow : FluentWindow
 
     private async void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
+        // Loaded raises again whenever the window is re-added to a live visual tree; this wiring
+        // is startup-only and re-running it resets navigation. Matches OnSourceInitialized.
+        Loaded -= OnWindowLoaded;
+
         _navigator.Control = RootNavigation;
         _snackbarService.SetSnackbarPresenter(SnackbarPresenter);
 
