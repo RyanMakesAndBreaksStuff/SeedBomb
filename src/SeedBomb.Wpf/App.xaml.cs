@@ -196,6 +196,7 @@ public partial class App : Application
         sc.AddSingleton<IEmbeddedResourceReader>(_ =>
             new AssemblyResourceReader(typeof(App).Assembly));
         sc.AddSingleton<IThirdPartyNoticeService, ThirdPartyNoticeService>();
+        sc.AddSingleton<IAboutDialogService, AboutDialogService>();
         sc.AddSingleton<IUriLauncher, ProcessUriLauncher>();
 
         // Windows — singleton so only one instance exists at a time

@@ -8,7 +8,8 @@ if (-not (Test-Path $gen)) { throw 'Generator script not found' }
 $root = Join-Path ([IO.Path]::GetTempPath()) ("notice-fixture-" + [guid]::NewGuid().ToString('n'))
 $nuget = Join-Path $root 'nuget/demo.pkg/1.0.0'
 New-Item -ItemType Directory -Force -Path $nuget, (Join-Path $root 'repo/tools') | Out-Null
-Set-Content -LiteralPath (Join-Path $nuget 'LICENSE') -Value "MIT DEMO`n" -NoNewline
+$licenseHtml = '<!DOCTYPE html><html><head><title>Fixture license title</title></head><body><h1>DEMO LICENSE</h1><p>Terms</p></body></html>'
+Set-Content -LiteralPath (Join-Path $nuget 'LICENSE.html') -Value $licenseHtml -NoNewline
 $nuspec = @'
 <?xml version="1.0"?>
 <package>
@@ -16,7 +17,7 @@ $nuspec = @'
     <id>Demo.Pkg</id>
     <version>1.0.0</version>
     <authors>Demo</authors>
-    <license type="file">LICENSE</license>
+    <license type="file">LICENSE.html</license>
     <projectUrl>https://example.com/demo</projectUrl>
     <copyright>Copyright (c) Demo</copyright>
   </metadata>
@@ -49,8 +50,11 @@ pwsh -NoProfile -File (Join-Path $root 'repo/tools/Generate-ThirdPartyNotices.ps
 $manifest = Get-Content (Join-Path $root 'repo/src/SeedBomb.Wpf/Resources/ThirdParty/ThirdPartyNotices.json') -Raw | ConvertFrom-Json
 if ($manifest.components.Count -ne 1) { throw "expected 1 component, got $($manifest.components.Count)" }
 if ($manifest.components[0].name -ne 'Demo.Pkg') { throw 'unexpected component name' }
-$lic = Join-Path $root 'repo/licenses/Demo.Pkg-LICENSE.txt'
-if ((Get-Content $lic -Raw) -ne "MIT DEMO`n") { throw 'license bytes were rewritten' }
+$lic = Join-Path $root 'repo/licenses/Demo.Pkg-LICENSE.html'
+if ((Get-Content $lic -Raw) -ne $licenseHtml) { throw 'license bytes were rewritten' }
+$display = Get-Content (Join-Path $root 'repo/licenses/Demo.Pkg-DISPLAY.txt') -Raw
+if (-not $display.StartsWith('DEMO LICENSE')) { throw 'display text should start with body content' }
+if ($display.Contains('Fixture license title')) { throw 'display text should not include HTML head content' }
 
 pwsh -NoProfile -File (Join-Path $root 'repo/tools/Generate-ThirdPartyNotices.ps1') -DepsPath $depsPath -AssetsPath $assetsPath -Verify
 pwsh -NoProfile -File (Join-Path $root 'repo/tools/Generate-ThirdPartyNotices.ps1') -ValidateResources
@@ -63,7 +67,7 @@ catch { $failed = $true }
 if ($LASTEXITCODE -ne 0) { $failed = $true }
 if (-not $failed) { throw 'Verify should fail after a manifest edit.' }
 
-Remove-Item (Join-Path $root 'repo/licenses/Demo.Pkg-LICENSE.txt')
+Remove-Item (Join-Path $root 'repo/src/SeedBomb.Wpf/Resources/ThirdParty/Licenses/Demo.Pkg-DISPLAY.txt')
 $failed = $false
 try { pwsh -NoProfile -File (Join-Path $root 'repo/tools/Generate-ThirdPartyNotices.ps1') -ValidateResources }
 catch { $failed = $true }

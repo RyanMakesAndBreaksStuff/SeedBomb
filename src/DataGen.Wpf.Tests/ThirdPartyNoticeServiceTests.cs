@@ -78,6 +78,12 @@ public sealed class ThirdPartyNoticeServiceTests
         Assert.Contains("BSD", text, StringComparison.Ordinal);
         Assert.True(text.Length > 3000);
         Assert.NotNull(typeof(App).Assembly.GetManifestResourceStream(bogus.LicenseResource));
+
+        var dataverse = featured.Single(component =>
+            component.Name == "Microsoft.PowerPlatform.Dataverse.Client");
+        var dataverseText = service.ReadLicense(dataverse);
+        Assert.StartsWith("MICROSOFT SOFTWARE LICENSE", dataverseText, StringComparison.Ordinal);
+        Assert.DoesNotContain("slt dynamics365 sdk", dataverseText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

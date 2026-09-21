@@ -1,30 +1,13 @@
-slt dynamics365 sdk
-
-
-
-
-
-
-
-
-
-
-
 MICROSOFT SOFTWARE LICENSE
 TERMS
-
 
 MICROSOFT POWER
 APPS SOFTWARE DEVELOPMENT KIT
 
-
 MICROSOFT
 DYNAMICS 365 SOFTWARE DEVELOPMENT KIT
 
-
-
 Last Updated: June 2025
-
 
 These license terms are an agreement between you and
 Microsoft Corporation (or one of its affiliates). They apply to the
@@ -36,78 +19,54 @@ pre-updated software or services). IF YOU COMPLY WITH THESE LICENSE
 TERMS, YOU HAVE THE RIGHTS BELOW. BY USING THE SOFTWARE, YOU ACCEPT
 THESE TERMS.
 
-
-
 INSTALLATION AND USE RIGHTS.
-
-
 
 General. You may install and use any number of
 copies of the software to develop and test your applications.
-
 
 Third Party Software. The software may include
 third party applications that Microsoft, not the third party, licenses
 to you under this agreement. Any included notices for third party
 applications are for your information only.
 
-
-
 DISTRIBUTABLE CODE. The software may contain
 code you are permitted to distribute (i.e. make available for third
 parties) in applications you develop, as described in this Section.
 
-
-
 Distribution Rights. The code and test files
 described below are distributable if included with the software.
-
-
 
 Sample Code and Templates. You may copy, modify, and distribute
 the source and object code form of code marked as “sample” and
 “template”;
 
-
 Other Distributable Code. You may copy and distribute the object
 code form of code if it is a file with the extension *.dll.
-
 
 Third Party Distribution. You may permit distributors of your
 applications to copy and distribute any of this distributable code you
 elect to distribute with your applications.
 
-
-
 Distribution Requirements. For any code you
 distribute, you must:
-
-
 
 add significant primary functionality to it in your
 applications;
 
-
 require distributors and external end users to agree to terms
 that protect it and Microsoft at least as much as this agreement;
 and
-
 
 indemnify, defend, and hold harmless Microsoft from any claims,
 including attorneys’ fees, related to the distribution or use of your
 applications, except to the extent that any claim is based solely on the
 unmodified distributable code.
 
-
-
 Distribution Restrictions. You may not:
-
-
 
 use Microsoft’s trademarks or trade dress in your application in
 any way that suggests your application comes from or is endorsed by
 Microsoft; or
-
 
 modify or distribute the source code of any distributable code so
 that any part of it becomes subject to any license that requires that
@@ -115,12 +74,7 @@ the distributable code, any other part of the software, or any of
 Microsoft’s other intellectual property be disclosed or distributed in
 source code form, or that others have the right to modify it.
 
-
-
-
 DATA
-
-
 
 Data Collection. The software may collect
 information about you and your use of the software and send that to
@@ -138,7 +92,6 @@ Privacy Statement at https://go.microsoft.com/fwlink/?LinkId=521839. You
 agree to comply with all applicable provisions of the Microsoft Privacy
 Statement.
 
-
 Processing of Personal Data. To the extent
 Microsoft is a processor or subprocessor of personal data in connection
 with the software, Microsoft makes to all customers, effective May 25,
@@ -149,36 +102,26 @@ in the European Union General Data Protection Regulation Terms in
 Attachment 3 of the Online Services Data Protection Addendum (https://go.microsoft.com/fwlink/?linkid=2153219)
 .
 
-
-
 SCOPE OF LICENSE. The software is licensed, not
 sold. Microsoft reserves all other rights. Unless applicable law gives
 you more rights despite this limitation, you will not (and have no right
 to):
 
-
-
 work around any technical limitations in the software that only
 allow you to use it in certain ways;
 
-
 reverse engineer, decompile or disassemble the software;
-
 
 remove, minimize, block, or modify any notices of Microsoft or
 its suppliers in the software;
 
-
 use the software in any way that is against the law or to create
 or propagate malware; or
-
 
 share, publish, distribute, or lend the software (except for any
 distributable code, subject to the terms above), provide the software as
 a stand-alone hosted solution for others to use, or transfer the
 software or this agreement to any third party.
-
-
 
 COMPLIANCE WITH TRADE LAWS. Microsoft products,
 software, technology, and services (“Items”) may be subject to U.S. and
@@ -200,17 +143,14 @@ Affiliates’ compliance with this section and, to the extent applicable,
 the Regional Trade Compliance Addendum incorporated herein by reference.
 For additional information, see https://go.microsoft.com/fwlink/?linkid=2147444.
 
-
 SUPPORT SERVICES. Microsoft is not obligated
 under this agreement to provide any support services for the software.
 Any support provided is “as is”, “with all faults”, and without warranty
 of any kind.
 
-
 ENTIRE AGREEMENT. This agreement, and any other
 terms Microsoft may provide for supplements, updates, or third-party
 applications, is the entire agreement for the software.
-
 
 APPLICABLE LAW AND PLACE TO RESOLVE DISPUTES. If
 you acquired the software in the United States or Canada, the laws of
@@ -226,7 +166,6 @@ not, you and Microsoft consent to exclusive jurisdiction and venue in
 the Superior Court of King County, Washington for all disputes heard in
 court.
 
-
 CONSUMER RIGHTS; REGIONAL VARIATIONS. This
 agreement describes certain legal rights. You may have other rights,
 including consumer rights, under the laws of your state or country.
@@ -237,12 +176,9 @@ of your state or country do not permit it to do so. For example, if you
 acquired the software in one of the below regions, or mandatory country
 law applies, then the following provisions apply to you:
 
-
-
 Australia. You have statutory guarantees under
 the Australian Consumer Law and nothing in this agreement is intended to
 affect those rights.
-
 
 Canada. If you acquired this software in Canada,
 you may stop receiving updates by turning off the automatic update
@@ -252,33 +188,17 @@ for and installing updates), or uninstalling the software. The product
 documentation, if any, may also specify how to turn off updates for your
 specific device or software.
 
-
 Germany and Austria.
-
-
-
-
-
-
 
 Warranty. The properly licensed software will
 perform substantially as described in any Microsoft materials that
 accompany the software. However, Microsoft gives no contractual
 guarantee in relation to the licensed software.
 
-
-
-
-
-
 Limitation of Liability. In case of intentional
 conduct, gross negligence, claims based on the Product Liability Act, as
 well as, in case of death or personal or physical injury, Microsoft is
 liable according to the statutory law.
-
-
-
-
 
 Subject to the foregoing clause ii., Microsoft will only be liable
 for slight negligence if Microsoft is in breach of such material
@@ -289,17 +209,12 @@ constantly trust in (so-called "cardinal obligations"). In other cases
 of slight negligence, Microsoft will not be liable for slight
 negligence.
 
-
-
-
-
 DISCLAIMER OF WARRANTY. THE SOFTWARE IS LICENSED “AS IS.”
 YOU BEAR THE RISK OF USING IT. MICROSOFT GIVES NO EXPRESS WARRANTIES,
 GUARANTEES, OR CONDITIONS. TO THE EXTENT PERMITTED UNDER APPLICABLE
 LAWS, MICROSOFT EXCLUDES ALL IMPLIED WARRANTIES, INCLUDING
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
 NON-INFRINGEMENT.
-
 
 LIMITATION ON AND EXCLUSION OF DAMAGES. IF YOU HAVE ANY
 BASIS FOR RECOVERING DAMAGES DESPITE THE PRECEDING DISCLAIMER OF
@@ -308,9 +223,6 @@ DAMAGES UP TO U.S. $5.00. YOU CANNOT RECOVER ANY OTHER DAMAGES,
 INCLUDING CONSEQUENTIAL, LOST PROFITS, SPECIAL, INDIRECT, OR INCIDENTAL
 DAMAGES.
 
-
-
-
 This limitation applies to (a) anything related to the
 software, services, content (including code) on third party Internet
 sites, or third party applications; and (b) claims for breach of
@@ -318,27 +230,19 @@ contract, warranty, guarantee, or condition; strict liability,
 negligence, or other tort; or any other claim; in each case to the
 extent permitted by applicable law.
 
-
-
-
 It also applies even if Microsoft knew or should have known
 about the possibility of the damages. The above limitation or exclusion
 may not apply to you because your state, province, or country may not
 allow the exclusion or limitation of incidental, consequential, or other
 damages.
 
-
-
 Regional Trade Compliance Addendum
-
-
 
 You shall ensure that you, any of your directors or officers, or
 to the best of your knowledge, your employees or agents, Enrolled
 Affiliates, or Enrolled Affiliates’ directors, officers, employees, or
 agents are not sanctioned persons designated under applicable Trade
 Laws.
-
 
 You shall provide Microsoft with prompt written notice if you, or
 any of your Enrolled Affiliates receive notice (oral or written) from
@@ -347,11 +251,9 @@ inquiry, or proceeding for any actual or alleged noncompliance of or
 with any Trade Laws related to activities subject to this
 agreement.
 
-
 You shall comply with global use restrictions in Microsoft’s
 product or service terms relevant to this agreement, as updated from
 time to time.
-
 
 You shall not make available Microsoft Items to any entity or
 individual designated on any export or sanctions restriction lists under

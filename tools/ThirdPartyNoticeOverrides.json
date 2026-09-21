@@ -36,7 +36,6 @@
       "featured": true,
       "featuredOrder": 1,
       "purpose": "Synthetic data generation",
-      "credit": "Synthetic data generation powered by Bogus, created by Brian Chavez.",
       "license": "MIT AND BSD-3-Clause",
       "copyright": "Copyright (c) 2015 Brian Chavez"
     },

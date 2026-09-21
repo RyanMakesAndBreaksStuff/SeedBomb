@@ -40,14 +40,17 @@ function Assert-SafeRelative([string]$Relative) {
 }
 
 function Convert-HtmlToPlainText([string]$Html) {
-    $t = [regex]::Replace($Html, '(?is)<script[^>]*>.*?</script>', '')
+    $t = [regex]::Replace($Html, '(?is)<head[^>]*>.*?</head>', '')
+    $t = [regex]::Replace($t, '(?is)<script[^>]*>.*?</script>', '')
     $t = [regex]::Replace($t, '(?is)<style[^>]*>.*?</style>', '')
     $t = [regex]::Replace($t, '(?i)<br\s*/?>', "`n")
     $t = [regex]::Replace($t, '(?i)</p>', "`n`n")
     $t = [regex]::Replace($t, '(?i)</h[1-6]>', "`n`n")
     $t = [regex]::Replace($t, '(?s)<[^>]+>', '')
     $t = [System.Net.WebUtility]::HtmlDecode($t)
-    return ([regex]::Replace($t, "[ \t]+\r?\n", "`n")).Trim()
+    $t = [regex]::Replace($t, "\r\n?", "`n")
+    $t = [regex]::Replace($t, "[ \t]+\n", "`n")
+    return ([regex]::Replace($t, "\n(?:[ \t]*\n){2,}", "`n`n")).Trim()
 }
 
 function Convert-DocxToPlainText([string]$Path) {

@@ -12,17 +12,18 @@ public sealed partial class AboutViewModel : ViewModelBase
 {
     private readonly IThirdPartyNoticeService _notices;
     private readonly IUriLauncher _uriLauncher;
-    private readonly IAboutDialogService? _dialogs;
+    private readonly IAboutDialogService _dialogs;
     private readonly ISnackbarService? _snackbar;
 
     public AboutViewModel(
         IThirdPartyNoticeService notices,
         IUriLauncher uriLauncher,
-        IAboutDialogService? dialogs = null,
+        IAboutDialogService dialogs,
         ISnackbarService? snackbar = null)
     {
         ArgumentNullException.ThrowIfNull(notices);
         ArgumentNullException.ThrowIfNull(uriLauncher);
+        ArgumentNullException.ThrowIfNull(dialogs);
         _notices = notices;
         _uriLauncher = uriLauncher;
         _dialogs = dialogs;
@@ -72,14 +73,13 @@ public sealed partial class AboutViewModel : ViewModelBase
     [RelayCommand]
     private async Task ShowAppLicenseAsync()
     {
-        if (_dialogs is null) return;
         await _dialogs.ShowAppLicenseAsync(Version);
     }
 
     [RelayCommand]
     private async Task ShowComponentLicenseAsync(ThirdPartyComponent? component)
     {
-        if (_dialogs is null || component is null) return;
+        if (component is null) return;
         await _dialogs.ShowLicenseAsync(component);
     }
 }
