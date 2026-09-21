@@ -29,7 +29,6 @@ public sealed class TrayIconService : IDisposable
             ToolTipText = "SeedBomb - Mock Data Explosion",
             ContextMenu = BuildContextMenu(),
         };
-        _trayIcon.TrayLeftMouseUp += (_, _) => RestoreMainWindow();
 
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
@@ -83,24 +82,12 @@ public sealed class TrayIconService : IDisposable
 
     private static ContextMenu BuildContextMenu()
     {
-        var open = new MenuItem { Header = "Open" };
-        open.Click += (_, _) => RestoreMainWindow();
-
         var exit = new MenuItem { Header = "Exit" };
         exit.Click += (_, _) => Application.Current?.Shutdown();
 
         var menu = new ContextMenu();
-        menu.Items.Add(open);
         menu.Items.Add(exit);
         return menu;
-    }
-
-    private static void RestoreMainWindow()
-    {
-        if (Application.Current?.MainWindow is not { } window) return;
-        window.Show();
-        window.WindowState = WindowState.Normal;
-        window.Activate();
     }
 
     private static BitmapImage LoadIconSource() =>
