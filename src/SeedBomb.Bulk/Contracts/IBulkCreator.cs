@@ -1,8 +1,8 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Graph;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Graph;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Bulk.Contracts;
+namespace SeedBomb.Bulk.Contracts;
 
 /// <summary>
 /// Creates large volumes of synthetic Dataverse records in topological dependency order,

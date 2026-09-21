@@ -4,7 +4,7 @@ using Seedbomb.ViewModels;
 using Wpf.Ui;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class AboutViewModelTests
 {
@@ -12,7 +12,7 @@ public sealed class AboutViewModelTests
     public void Metadata_uses_assembly_and_runtime_apis()
     {
         var vm = Create();
-        Assert.Equal("DataGen / SeedBomb", vm.ProductName);
+        Assert.Equal("SeedBomb", vm.ProductName);
         Assert.Equal("Synthetic data generation for Microsoft Dataverse", vm.Description);
         Assert.Equal("Ryan Rettinger", vm.Author);
         Assert.False(string.IsNullOrWhiteSpace(vm.Version));

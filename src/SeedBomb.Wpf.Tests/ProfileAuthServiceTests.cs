@@ -5,7 +5,7 @@ using Seedbomb.Services.Connections;
 using Seedbomb.Services.Diagnostics;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class ProfileAuthServiceTests
 {

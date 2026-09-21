@@ -1,5 +1,5 @@
-using DataGen.Core.Exceptions;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -9,7 +9,7 @@ using Seedbomb.ViewModels.Controls;
 using System.ServiceModel;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class LookupRecordPickerViewModelTests
 {

@@ -2,7 +2,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Text.Json;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>A lookup identity with an optional, non-authoritative display hint.</summary>
 /// <param name="Entity">Canonical target logical name.</param>

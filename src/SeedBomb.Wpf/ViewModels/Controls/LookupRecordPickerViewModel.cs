@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Exceptions;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;

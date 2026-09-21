@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.EdgeCases;
+namespace SeedBomb.Core.EdgeCases;
 
 /// <summary>
 /// Validates attributes against 14 edge-case categories to determine how each

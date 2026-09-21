@@ -1,14 +1,14 @@
-using DataGen.Bulk.Contracts;
-using DataGen.Core.Contracts;
-using DataGen.Core.EdgeCases;
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Bulk.Contracts;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.EdgeCases;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DataGen.Bulk;
+namespace SeedBomb.Bulk;
 
 /// <summary>
 /// Default Core/Bulk orchestration boundary for Dataverse generation runs.

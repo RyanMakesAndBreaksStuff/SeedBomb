@@ -3,7 +3,7 @@ using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk.Query;
 using System.Collections.Concurrent;
 
-namespace DataGen.Bulk;
+namespace SeedBomb.Bulk;
 
 /// <summary>
 /// Checks and caches whether the UpdateMultiple SDK message is available for a given entity,

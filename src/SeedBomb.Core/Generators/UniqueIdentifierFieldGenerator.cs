@@ -1,7 +1,7 @@
 using Bogus;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Generators;
+namespace SeedBomb.Core.Generators;
 
 /// <summary>
 /// Generates fake unique identifier (GUID) values.

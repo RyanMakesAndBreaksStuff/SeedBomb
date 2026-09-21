@@ -1,6 +1,6 @@
 using System.ServiceModel;
 
-namespace DataGen.Bulk.Tests;
+namespace SeedBomb.Bulk.Tests;
 
 public class ThrottlePolicyTests
 {

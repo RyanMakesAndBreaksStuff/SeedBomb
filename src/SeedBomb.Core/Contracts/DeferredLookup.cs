@@ -1,4 +1,4 @@
-namespace DataGen.Core.Contracts;
+namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// Represents a lookup field whose value must be backfilled after initial record creation

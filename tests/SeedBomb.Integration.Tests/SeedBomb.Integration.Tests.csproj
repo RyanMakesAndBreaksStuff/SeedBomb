@@ -6,8 +6,8 @@
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/DataGen.Core/DataGen.Core.csproj" />
-    <ProjectReference Include="../../src/DataGen.Bulk/DataGen.Bulk.csproj" />
+    <ProjectReference Include="../../src/SeedBomb.Core/SeedBomb.Core.csproj" />
+    <ProjectReference Include="../../src/SeedBomb.Bulk/SeedBomb.Bulk.csproj" />
     <PackageReference Include="AngleSharp" />
     <PackageReference Include="bunit" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

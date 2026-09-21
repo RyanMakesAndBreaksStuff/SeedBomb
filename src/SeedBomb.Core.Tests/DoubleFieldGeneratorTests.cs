@@ -1,6 +1,6 @@
 using Bogus;
 
-namespace DataGen.Core.Tests;
+namespace SeedBomb.Core.Tests;
 
 public class DoubleFieldGeneratorTests
 {

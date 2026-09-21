@@ -1,4 +1,4 @@
-namespace DataGen.Bulk.Contracts;
+namespace SeedBomb.Bulk.Contracts;
 
 /// <summary>
 /// Reports high-level orchestration and bulk creation progress for a generation run.

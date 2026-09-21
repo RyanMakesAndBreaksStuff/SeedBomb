@@ -22,7 +22,7 @@ $InventoryPath = Join-Path $PSScriptRoot 'notice-inventory.json'
 $DefaultDeps = Join-Path $RepoRoot 'src/SeedBomb.Wpf/bin/Release/net10.0-windows10.0.17763.0/win-x64/SeedBomb.deps.json'
 $DefaultAssets = Join-Path $RepoRoot 'src/SeedBomb.Wpf/obj/project.assets.json'
 $RidTarget = '.NETCoreApp,Version=v10.0/win-x64'
-$OwnProjects = [System.Collections.Generic.HashSet[string]]::new([string[]]@('SeedBomb', 'DataGen.Core', 'DataGen.Bulk'))
+$OwnProjects = [System.Collections.Generic.HashSet[string]]::new([string[]]@('SeedBomb', 'SeedBomb.Core', 'SeedBomb.Bulk'))
 
 function Write-Utf8([string]$Path, [string]$Text) {
     [IO.File]::WriteAllText($Path, $Text, $Utf8)

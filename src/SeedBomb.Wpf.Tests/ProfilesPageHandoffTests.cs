@@ -1,4 +1,4 @@
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
@@ -10,7 +10,7 @@ using Seedbomb.ViewModels;
 using Wpf.Ui;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class ProfilesPageHandoffTests
 {

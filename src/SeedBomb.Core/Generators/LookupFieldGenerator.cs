@@ -2,7 +2,7 @@ using Bogus;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Generators;
+namespace SeedBomb.Core.Generators;
 
 /// <summary>
 /// Generates fake lookup (entity reference) values using the record pool.

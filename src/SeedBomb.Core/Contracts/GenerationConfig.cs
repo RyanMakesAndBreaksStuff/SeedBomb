@@ -1,4 +1,4 @@
-namespace DataGen.Core.Contracts;
+namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// Configuration for a data generation run.

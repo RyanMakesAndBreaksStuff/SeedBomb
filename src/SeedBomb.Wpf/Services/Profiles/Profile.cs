@@ -1,4 +1,4 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 
 namespace Seedbomb.Services.Profiles;
 

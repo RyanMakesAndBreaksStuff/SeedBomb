@@ -1,10 +1,10 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.ViewModels;
 using System.Diagnostics;
 using Xunit;
 
-namespace DataGen.Wpf.Tests.Performance;
+namespace SeedBomb.Wpf.Tests.Performance;
 
 public sealed class RuleEditorPreviewPerformanceTests
 {

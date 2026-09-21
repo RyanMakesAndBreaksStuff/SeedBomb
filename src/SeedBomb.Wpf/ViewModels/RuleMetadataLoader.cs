@@ -1,5 +1,5 @@
-using DataGen.Core.Exceptions;
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;

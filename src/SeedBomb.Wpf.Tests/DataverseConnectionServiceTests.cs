@@ -4,7 +4,7 @@ using Seedbomb.Services.Connections;
 using Seedbomb.Services.Dataverse;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class DataverseConnectionServiceTests
 {

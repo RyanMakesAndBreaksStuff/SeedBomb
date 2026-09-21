@@ -1,7 +1,7 @@
-// src/DataGen.Wpf/ViewModels/Controls/FieldRulesViewModel.cs
+// src/SeedBomb.Wpf/ViewModels/Controls/FieldRulesViewModel.cs
 
 using CommunityToolkit.Mvvm.ComponentModel;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;

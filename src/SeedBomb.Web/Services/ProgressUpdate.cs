@@ -1,4 +1,4 @@
-namespace DataGen.Web.Services;
+namespace SeedBomb.Web.Services;
 
 /// <summary>
 /// Immutable progress snapshot reported from the generation pipeline to the Blazor UI.

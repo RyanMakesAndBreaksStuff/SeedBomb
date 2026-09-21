@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("DataGen.Web.Tests")]
+[assembly: InternalsVisibleTo("SeedBomb.Web.Tests")]

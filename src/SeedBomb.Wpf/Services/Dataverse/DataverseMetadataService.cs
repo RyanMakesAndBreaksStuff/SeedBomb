@@ -1,5 +1,5 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;

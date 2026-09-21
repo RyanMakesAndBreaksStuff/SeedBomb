@@ -1,4 +1,4 @@
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>Maps graph/backfill column names to explicit lookup rule ownership.</summary>
 public static class LookupRulePolicy

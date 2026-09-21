@@ -1,4 +1,4 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 
 namespace Seedbomb.Services.Generation;
 

@@ -1,13 +1,13 @@
-using DataGen.Bulk.Contracts;
-using DataGen.Core.Contracts;
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
+using SeedBomb.Bulk.Contracts;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 
-namespace DataGen.Bulk;
+namespace SeedBomb.Bulk;
 
 /// <summary>
 /// Backfills deferred lookup fields and N:N associations after the initial record creation pass.

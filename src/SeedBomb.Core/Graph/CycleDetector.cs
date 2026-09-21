@@ -1,9 +1,9 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Exceptions;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Graph;
+namespace SeedBomb.Core.Graph;
 
 /// <summary>
 /// Detects strongly connected components (cycles) in the dependency graph

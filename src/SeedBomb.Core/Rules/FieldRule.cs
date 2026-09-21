@@ -2,7 +2,7 @@ using System.Collections.Frozen;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>
 /// One allowlisted generation rule attached to a column. Discriminated by <c>op</c>;

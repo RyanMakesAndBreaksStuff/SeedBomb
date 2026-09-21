@@ -3,7 +3,7 @@
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
+    <ProjectReference Include="../SeedBomb.Core/SeedBomb.Core.csproj" />
     <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" />
   </ItemGroup>
 </Project>

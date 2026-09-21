@@ -1,4 +1,4 @@
-namespace DataGen.Core.Exceptions;
+namespace SeedBomb.Core.Exceptions;
 
 /// <summary>
 /// Thrown when a cycle consists entirely of system-required edges and cannot be broken by deferral.

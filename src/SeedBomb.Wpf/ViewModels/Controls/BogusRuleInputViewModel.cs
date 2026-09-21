@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using System.Text.Json;
 
 namespace Seedbomb.ViewModels.Controls;

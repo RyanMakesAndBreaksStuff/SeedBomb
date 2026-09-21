@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace DataGen.Core.Tests;
+namespace SeedBomb.Core.Tests;
 
 public class CycleDetectorTests
 {

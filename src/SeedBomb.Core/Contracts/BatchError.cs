@@ -1,4 +1,4 @@
-namespace DataGen.Core.Contracts;
+namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// Represents an error that occurred during a batch creation operation.

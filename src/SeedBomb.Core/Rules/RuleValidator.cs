@@ -2,7 +2,7 @@ using Microsoft.Xrm.Sdk.Metadata;
 using System.Globalization;
 using System.Text.Json;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>Message severity for the editor MessageBar and pre-flight report (§3.3).</summary>
 public enum RuleMessageSeverity

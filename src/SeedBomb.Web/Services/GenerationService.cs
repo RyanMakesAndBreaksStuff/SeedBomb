@@ -1,15 +1,15 @@
-using DataGen.Bulk;
-using DataGen.Bulk.Contracts;
-using DataGen.Core.Contracts;
-using DataGen.Core.EdgeCases;
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Bulk;
+using SeedBomb.Bulk.Contracts;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.EdgeCases;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DataGen.Web.Services;
+namespace SeedBomb.Web.Services;
 
 /// <summary>
 /// Orchestrates the full generation pipeline: schema inspection → dependency resolution → bulk creation.

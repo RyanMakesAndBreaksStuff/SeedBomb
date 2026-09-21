@@ -1,6 +1,6 @@
 using MudBlazor;
 
-namespace DataGen.Web.Theme;
+namespace SeedBomb.Web.Theme;
 
 /// <summary>Aurora Rift MudBlazor theme — teal-black base, neon green accent.</summary>
 internal static class AppTheme

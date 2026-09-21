@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;

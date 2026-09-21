@@ -1,11 +1,11 @@
-using DataGen.Bulk.Contracts;
-using DataGen.Core.Contracts;
-using DataGen.Core.EdgeCases;
-using DataGen.Core.Exceptions;
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Bulk.Contracts;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.EdgeCases;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
@@ -15,7 +15,7 @@ using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 using System.ServiceModel;
 
-namespace DataGen.Bulk;
+namespace SeedBomb.Bulk;
 
 /// <summary>
 /// Generates and bulk-creates Dataverse records in topological dependency order.
@@ -613,7 +613,7 @@ public class BulkCreator : IBulkCreator
     }
 
     // Custom lookups pointing at systemuser (approver/manager/requested-by style fields) are never
-    // part of the generation graph — DataGen doesn't create fake users — so without this pre-seed
+    // part of the generation graph — SeedBomb doesn't create fake users — so without this pre-seed
     // LookupFieldGenerator.Generate finds an empty pool for "systemuser" and silently leaves the
     // field null. Mirrors PopulateCurrencyPoolAsync above.
     private async Task PopulateSystemUserPoolAsync(DataverseRecordPool pool, CancellationToken ct)

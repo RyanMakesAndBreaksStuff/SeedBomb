@@ -1,4 +1,4 @@
-namespace DataGen.Core.Contracts;
+namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// The result of a data generation run including created records and any errors.

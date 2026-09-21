@@ -1,6 +1,6 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 
-namespace DataGen.Core.Graph;
+namespace SeedBomb.Core.Graph;
 
 /// <summary>
 /// Represents the dependency relationships between Dataverse entities based on lookup fields.

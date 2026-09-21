@@ -1,5 +1,5 @@
-using DataGen.Bulk;
-using DataGen.Core.Metadata;
+using SeedBomb.Bulk;
+using SeedBomb.Core.Metadata;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using System.Globalization;

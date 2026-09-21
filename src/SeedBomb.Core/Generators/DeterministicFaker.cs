@@ -1,6 +1,6 @@
 using Bogus;
 
-namespace DataGen.Core.Generators;
+namespace SeedBomb.Core.Generators;
 
 /// <summary>
 /// Creates deterministic Faker instances with a fixed seed and reference date

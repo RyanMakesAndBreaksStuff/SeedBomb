@@ -56,7 +56,7 @@ public sealed class ThirdPartyNoticeService(IEmbeddedResourceReader resources) :
                ?? "License text is not available for this component.";
     }
 
-    /// <summary>Reads the DataGen/SeedBomb project license.</summary>
+    /// <summary>Reads the SeedBomb project license.</summary>
     public string ReadAppLicense() =>
         resources.ReadUtf8(AppLicenseName)
         ?? "The application license could not be loaded.";

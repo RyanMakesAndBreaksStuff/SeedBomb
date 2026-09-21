@@ -1,9 +1,9 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Seedbomb.Services.Generation;
 using Seedbomb.ViewModels;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 /// <summary>
 /// The link phase must keep the sheet honest: record creation finishing is not the run

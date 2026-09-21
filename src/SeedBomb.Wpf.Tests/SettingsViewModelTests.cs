@@ -6,7 +6,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class SettingsViewModelTests
 {

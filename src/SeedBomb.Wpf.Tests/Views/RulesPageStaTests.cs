@@ -1,4 +1,4 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
@@ -31,7 +31,7 @@ using ContentDialogHost = Wpf.Ui.Controls.ContentDialogHost;
 using SymbolIcon = Wpf.Ui.Controls.SymbolIcon;
 using SymbolRegular = Wpf.Ui.Controls.SymbolRegular;
 
-namespace DataGen.Wpf.Tests.Views;
+namespace SeedBomb.Wpf.Tests.Views;
 
 [Collection("StaUi")]
 public sealed class RulesPageStaTests : IDisposable

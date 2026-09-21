@@ -1,6 +1,6 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
@@ -16,7 +16,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class GenerateViewModelStepTests
 {
@@ -768,7 +768,7 @@ public sealed class GenerateViewModelStepTests
     }
 
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
-    // RuleEditorViewModelTests / DataGen.Bulk.Tests/RuledGenerationTests.
+    // RuleEditorViewModelTests / SeedBomb.Bulk.Tests/RuledGenerationTests.
     private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)
     {
         var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 100 };

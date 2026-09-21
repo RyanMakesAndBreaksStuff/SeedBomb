@@ -1,4 +1,4 @@
-namespace DataGen.Web.Tests;
+namespace SeedBomb.Web.Tests;
 
 public class GenerationServiceTests
 {

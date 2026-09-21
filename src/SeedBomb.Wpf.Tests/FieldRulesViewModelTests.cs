@@ -1,5 +1,5 @@
-// src/DataGen.Wpf.Tests/FieldRulesViewModelTests.cs
-using DataGen.Core.Rules;
+// src/SeedBomb.Wpf.Tests/FieldRulesViewModelTests.cs
+using SeedBomb.Core.Rules;
 using Seedbomb.ViewModels.Controls;
 using System.Text.Json;
 using Xunit;

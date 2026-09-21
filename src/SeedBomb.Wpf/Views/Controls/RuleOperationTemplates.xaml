@@ -2,7 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
-                    xmlns:rules="clr-namespace:DataGen.Core.Rules;assembly=DataGen.Core">
+                    xmlns:rules="clr-namespace:SeedBomb.Core.Rules;assembly=SeedBomb.Core">
 
     <ObjectDataProvider x:Key="OneOfPickValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
         <ObjectDataProvider.MethodParameters>

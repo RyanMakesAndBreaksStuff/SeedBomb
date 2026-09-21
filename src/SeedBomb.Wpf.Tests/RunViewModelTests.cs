@@ -1,11 +1,11 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Moq;
 using Seedbomb.Services.Connections;
 using Seedbomb.Services.Generation;
 using Seedbomb.ViewModels;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class RunViewModelTests
 {
@@ -97,9 +97,9 @@ public sealed class RunViewModelTests
             EntityLogicalNames = ["account"],
             RecordCounts = new Dictionary<string, int> { ["account"] = 3 },
             Seed = 7,
-            FieldRules = new Dictionary<string, Dictionary<string, DataGen.Core.Rules.FieldRule>>
+            FieldRules = new Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>
             {
-                ["account"] = new() { ["emailaddress1"] = new DataGen.Core.Rules.BogusRule("INTERNET", "email", 1) },
+                ["account"] = new() { ["emailaddress1"] = new SeedBomb.Core.Rules.BogusRule("INTERNET", "email", 1) },
             },
         };
 
@@ -131,9 +131,9 @@ public sealed class RunViewModelTests
             RecordCounts = new Dictionary<string, int> { ["account"] = 3 },
             Seed = 7,
             AllowRiskyBogusValues = true,
-            FieldRules = new Dictionary<string, Dictionary<string, DataGen.Core.Rules.FieldRule>>
+            FieldRules = new Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>
             {
-                ["account"] = new() { ["emailaddress1"] = new DataGen.Core.Rules.BogusRule("INTERNET", "email", 1) },
+                ["account"] = new() { ["emailaddress1"] = new SeedBomb.Core.Rules.BogusRule("INTERNET", "email", 1) },
             },
         };
         vm.ApplyResult(new GenerationResult

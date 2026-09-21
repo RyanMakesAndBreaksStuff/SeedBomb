@@ -1,7 +1,7 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using System.Reflection;
 
-namespace DataGen.Core.Tests;
+namespace SeedBomb.Core.Tests;
 
 public class GraphBuilderTests
 {

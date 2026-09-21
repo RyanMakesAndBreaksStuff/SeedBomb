@@ -1,6 +1,6 @@
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Metadata;
+namespace SeedBomb.Core.Metadata;
 
 /// <summary>
 /// Determines which attributes should be included in data generation

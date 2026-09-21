@@ -1,7 +1,7 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Metadata;
+namespace SeedBomb.Core.Metadata;
 
 /// <summary>
 /// Provides access to Dataverse entity metadata with caching.

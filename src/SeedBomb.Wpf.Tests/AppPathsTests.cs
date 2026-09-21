@@ -1,10 +1,10 @@
-using DataGen.Core.Exceptions;
+using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 using Seedbomb.Services.Diagnostics;
 using Seedbomb.ViewModels;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class AppPathsTests
 {

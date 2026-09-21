@@ -1,6 +1,6 @@
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DataGen.Web.Services;
+namespace SeedBomb.Web.Services;
 
 /// <summary>IServiceClientFactory creates per-circuit Dataverse ServiceClient instances.</summary>
 public interface IServiceClientFactory : IAsyncDisposable

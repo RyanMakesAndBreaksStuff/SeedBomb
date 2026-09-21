@@ -1,7 +1,7 @@
-using DataGen.Core.Exceptions;
+using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 
-namespace DataGen.Core.Graph;
+namespace SeedBomb.Core.Graph;
 
 /// <summary>
 /// Produces a topological ordering of entities using Kahn's algorithm.

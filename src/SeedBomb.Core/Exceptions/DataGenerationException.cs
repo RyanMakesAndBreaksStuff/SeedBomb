@@ -1,4 +1,4 @@
-namespace DataGen.Core.Exceptions;
+namespace SeedBomb.Core.Exceptions;
 
 /// <summary>
 /// Base exception for all data generation errors.

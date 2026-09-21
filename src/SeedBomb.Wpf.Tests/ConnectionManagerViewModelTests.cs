@@ -7,7 +7,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class ConnectionManagerViewModelTests : IDisposable
 {
@@ -571,7 +571,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
 
     private async Task<(JsonConnectionProfileService svc, Guid id)> StoreWithOneSecretProfileAsync()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "DataGen.Wpf.Tests", Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         _tempDirs.Add(dir);
 

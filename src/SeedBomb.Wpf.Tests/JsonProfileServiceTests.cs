@@ -1,9 +1,9 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Seedbomb.Services.Profiles;
 using System.Text.Json;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class JsonProfileServiceTests : IDisposable
 {

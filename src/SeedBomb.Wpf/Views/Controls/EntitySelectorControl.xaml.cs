@@ -1,4 +1,4 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Seedbomb.ViewModels.Controls;
 using System.Windows;

@@ -1,4 +1,4 @@
-namespace DataGen.Core.Exceptions;
+namespace SeedBomb.Core.Exceptions;
 
 /// <summary>
 /// Thrown when there is an issue with the Dataverse schema.

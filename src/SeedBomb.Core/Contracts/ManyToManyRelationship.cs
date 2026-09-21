@@ -1,4 +1,4 @@
-namespace DataGen.Core.Contracts;
+namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// Represents a many-to-many relationship between two Dataverse entities.

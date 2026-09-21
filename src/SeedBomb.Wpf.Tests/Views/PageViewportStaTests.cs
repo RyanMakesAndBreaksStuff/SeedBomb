@@ -1,4 +1,4 @@
-using DataGen.Wpf.Tests;
+using SeedBomb.Wpf.Tests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Seedbomb.Services.Auth;
@@ -16,7 +16,7 @@ using Wpf.Ui.Appearance;
 using Wpf.Ui.Markup;
 using Xunit;
 
-namespace DataGen.Wpf.Tests.Views;
+namespace SeedBomb.Wpf.Tests.Views;
 
 /// <summary>
 /// Connections and Settings overflow the launch window when WPF-UI's Frame measures

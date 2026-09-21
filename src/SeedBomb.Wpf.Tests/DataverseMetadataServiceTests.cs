@@ -1,4 +1,4 @@
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
@@ -8,7 +8,7 @@ using Moq;
 using Seedbomb.Services.Dataverse;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class DataverseMetadataServiceTests
 {

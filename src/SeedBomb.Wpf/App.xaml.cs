@@ -1,5 +1,5 @@
-using DataGen.Bulk;
-using DataGen.Core.Metadata;
+using SeedBomb.Bulk;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -183,7 +183,7 @@ public partial class App : Application
         sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
-        sc.AddSingleton<DataGen.Bulk.ThrottlePolicy>();
+        sc.AddSingleton<SeedBomb.Bulk.ThrottlePolicy>();
         sc.AddTransient<ILookupRecordSource, LookupRecordSource>();
         sc.AddTransient<LookupRecordPickerViewModel>();
         sc.AddTransient<Func<LookupRecordPickerViewModel>>(sp =>

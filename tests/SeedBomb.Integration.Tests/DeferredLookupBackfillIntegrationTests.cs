@@ -1,4 +1,4 @@
-namespace DataGen.Integration.Tests;
+namespace SeedBomb.Integration.Tests;
 
 public class DeferredLookupBackfillIntegrationTests
 {

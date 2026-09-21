@@ -12,6 +12,6 @@ public interface IThirdPartyNoticeService
     /// <summary>Reads verbatim license text for <paramref name="component"/>.</summary>
     string ReadLicense(ThirdPartyComponent component);
 
-    /// <summary>Reads the DataGen/SeedBomb project license.</summary>
+    /// <summary>Reads the SeedBomb project license.</summary>
     string ReadAppLicense();
 }

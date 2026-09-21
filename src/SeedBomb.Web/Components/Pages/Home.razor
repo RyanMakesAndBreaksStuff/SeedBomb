@@ -263,7 +263,7 @@
                 _progress = update;
                 StateHasChanged();
                 _ = JSRuntime.InvokeVoidAsync("console.log",
-                    "[DataGen]", update.Phase, update.EntityName,
+                    "[SeedBomb]", update.Phase, update.EntityName,
                     $"{update.RecordsCreated}/{update.TotalRecords}",
                     $"batch {update.BatchesCompleted}/{update.TotalBatches}",
                     $"{update.RecordsPerMinute:F0} rec/min");

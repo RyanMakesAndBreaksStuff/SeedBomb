@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>
 /// Parsed pattern template: literals plus the closed token set {seq[:0N]}, {random:N}, {runId}.

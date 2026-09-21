@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using System.Collections.ObjectModel;
 
 namespace Seedbomb.ViewModels.Controls;

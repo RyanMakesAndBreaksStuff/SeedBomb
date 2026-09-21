@@ -1,11 +1,11 @@
-using DataGen.Wpf.Tests.Views;
+using SeedBomb.Wpf.Tests.Views;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using Seedbomb.ViewModels;
 using System.Windows.Data;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 [Collection("StaUi")]
 public sealed class RuleColumnCatalogTests

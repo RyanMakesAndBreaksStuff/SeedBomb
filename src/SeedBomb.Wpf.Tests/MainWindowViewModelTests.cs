@@ -5,7 +5,7 @@ using Seedbomb.Services.Dataverse;
 using Seedbomb.ViewModels;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class MainWindowViewModelTests
 {

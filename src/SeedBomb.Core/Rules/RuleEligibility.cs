@@ -1,7 +1,7 @@
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Metadata;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>Reason codes from spec §3.2 — shown verbatim in the Add-rule picker and import reports.</summary>
 public enum EligibilityReason

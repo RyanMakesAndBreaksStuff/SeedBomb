@@ -1,8 +1,8 @@
-using DataGen.Core.Generators;
+using SeedBomb.Core.Generators;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Globalization;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>Inputs shared by preview, review, preparation, and production evaluation.</summary>
 /// <param name="Table">Canonical table logical name.</param>

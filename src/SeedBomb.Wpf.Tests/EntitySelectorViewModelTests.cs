@@ -1,11 +1,11 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Seedbomb.ViewModels.Controls;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class EntitySelectorViewModelTests
 {

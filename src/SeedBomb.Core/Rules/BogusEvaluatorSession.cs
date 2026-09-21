@@ -1,5 +1,5 @@
 using Bogus;
-using DataGen.Core.Generators;
+using SeedBomb.Core.Generators;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Buffers;
@@ -7,7 +7,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>One Faker per generation or preparation worker. Never shared across concurrent workers.</summary>
 public sealed class BogusEvaluatorSession : IDisposable
@@ -48,7 +48,7 @@ public sealed class BogusEvaluatorSession : IDisposable
         BinaryPrimitives.WriteInt32BigEndian(key, seed);
 
         var message = new ArrayBufferWriter<byte>();
-        WriteLengthPrefixed(message, "DataGen.Bogus/v1");
+        WriteLengthPrefixed(message, "SeedBomb.Bogus/v1");
         WriteLengthPrefixed(message, table);
         WriteLengthPrefixed(message, rule.CanonicalColumn);
         WriteLengthPrefixed(message, rule.Descriptor.Id.Api);

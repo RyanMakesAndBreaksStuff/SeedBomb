@@ -1,8 +1,8 @@
-global using DataGen.Bulk.Contracts;
-global using DataGen.Core.Contracts;
-global using DataGen.Core.Graph;
-global using DataGen.Core.Metadata;
-global using DataGen.Web.Services;
+global using SeedBomb.Bulk.Contracts;
+global using SeedBomb.Core.Contracts;
+global using SeedBomb.Core.Graph;
+global using SeedBomb.Core.Metadata;
+global using SeedBomb.Web.Services;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Logging.Abstractions;

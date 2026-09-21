@@ -1,10 +1,10 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Web.Services;
+namespace SeedBomb.Web.Services;
 
 /// <summary>
 /// Scoped adapter that defers <see cref="DataverseMetadataProvider"/> construction until the first

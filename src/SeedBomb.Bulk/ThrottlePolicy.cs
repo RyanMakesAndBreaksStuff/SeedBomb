@@ -1,9 +1,9 @@
-using DataGen.Core.Exceptions;
+using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using System.ServiceModel;
 
-namespace DataGen.Bulk;
+namespace SeedBomb.Bulk;
 
 /// <summary>
 /// Executes Dataverse API calls with automatic retry on transient timeout and network faults.

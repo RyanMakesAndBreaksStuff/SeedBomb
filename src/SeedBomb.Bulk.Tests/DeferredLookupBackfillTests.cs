@@ -1,7 +1,7 @@
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
 
-namespace DataGen.Bulk.Tests;
+namespace SeedBomb.Bulk.Tests;
 
 public class DeferredLookupBackfillTests
 {

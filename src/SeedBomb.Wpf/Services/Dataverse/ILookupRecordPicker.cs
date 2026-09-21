@@ -1,4 +1,4 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 
 namespace Seedbomb.Services.Dataverse;

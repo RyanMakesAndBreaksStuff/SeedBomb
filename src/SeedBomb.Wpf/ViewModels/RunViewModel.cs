@@ -1,8 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Contracts;
-using DataGen.Core.Exceptions;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Seedbomb.Services.Auth;
@@ -459,7 +459,7 @@ public sealed partial class RunViewModel : ObservableObject
         foreach (var group in selected)
             counts[group.TableName] = counts.GetValueOrDefault(group.TableName) + group.RowCount;
 
-        Dictionary<string, Dictionary<string, DataGen.Core.Rules.FieldRule>>? rules = null;
+        Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>? rules = null;
         if (_lastConfig.FieldRules is { } existing)
         {
             rules = existing

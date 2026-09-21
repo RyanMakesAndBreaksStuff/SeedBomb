@@ -1,11 +1,11 @@
-using DataGen.Core.EdgeCases;
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
+using SeedBomb.Core.EdgeCases;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 using System.ServiceModel;
 
-namespace DataGen.Bulk.Tests;
+namespace SeedBomb.Bulk.Tests;
 
 public class BulkCreatorTests
 {

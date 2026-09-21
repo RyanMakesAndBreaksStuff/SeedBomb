@@ -41,11 +41,11 @@
     <DebugType>full</DebugType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DataGen.Core\DataGen.Core.csproj" />
-    <ProjectReference Include="..\DataGen.Bulk\DataGen.Bulk.csproj" />
+    <ProjectReference Include="..\SeedBomb.Core\SeedBomb.Core.csproj" />
+    <ProjectReference Include="..\SeedBomb.Bulk\SeedBomb.Bulk.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DataGen.Wpf.Tests" />
+    <InternalsVisibleTo Include="SeedBomb.Wpf.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" />

@@ -1,4 +1,4 @@
-namespace DataGen.Core.Exceptions;
+namespace SeedBomb.Core.Exceptions;
 
 /// <summary>
 /// Thrown when cyclical dependencies are detected in the entity graph.

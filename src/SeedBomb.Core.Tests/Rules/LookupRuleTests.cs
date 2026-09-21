@@ -1,7 +1,7 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using System.Text.Json;
 
-namespace DataGen.Core.Tests.Rules;
+namespace SeedBomb.Core.Tests.Rules;
 
 public sealed class LookupRuleTests
 {

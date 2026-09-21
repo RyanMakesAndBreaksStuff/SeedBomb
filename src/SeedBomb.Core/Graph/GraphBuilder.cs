@@ -1,8 +1,8 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Graph;
+namespace SeedBomb.Core.Graph;
 
 /// <summary>
 /// Builds a <see cref="DependencyGraph"/> from Dataverse entity metadata by

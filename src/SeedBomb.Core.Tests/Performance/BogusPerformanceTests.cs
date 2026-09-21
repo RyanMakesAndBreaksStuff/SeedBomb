@@ -1,10 +1,10 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DataGen.Core.Tests.Performance;
+namespace SeedBomb.Core.Tests.Performance;
 
 public sealed class BogusPerformanceTests
 {

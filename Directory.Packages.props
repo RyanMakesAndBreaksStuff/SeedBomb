@@ -4,7 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Central CVE pin for the Dataverse SDK's transitive System.Security.Cryptography.Xml.
-         Applied to every project centrally so DataGen.Core/DataGen.Bulk do not need a
+         Applied to every project centrally so SeedBomb.Core/SeedBomb.Bulk do not need a
          direct PackageReference; NuGet emits NU1603 if only the transitive 8.0.2 resolves. -->
     <GlobalPackageReference Include="System.Security.Cryptography.Xml" Version="11.0.0-preview.7.26381.103" />
   </ItemGroup>

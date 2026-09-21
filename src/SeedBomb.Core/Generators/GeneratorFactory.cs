@@ -2,7 +2,7 @@ using Bogus;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Core.Generators;
+namespace SeedBomb.Core.Generators;
 
 /// <summary>
 /// Maps Dataverse attribute metadata types to their corresponding field generators

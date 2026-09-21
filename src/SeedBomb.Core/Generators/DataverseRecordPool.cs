@@ -1,7 +1,7 @@
 using Bogus;
 using System.Collections.Concurrent;
 
-namespace DataGen.Core.Generators;
+namespace SeedBomb.Core.Generators;
 
 /// <summary>
 /// Thread-safe pool of created record IDs, used by generators to resolve lookups

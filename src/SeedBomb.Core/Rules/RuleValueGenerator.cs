@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>
 /// Evaluates a validated rule for one (table, column, row) into an exact SDK payload (§3.4, S6/S8).

@@ -1,7 +1,7 @@
 using Seedbomb.Services.About;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class UriLauncherTests
 {

@@ -3,7 +3,7 @@ using Moq;
 using Seedbomb;
 using Seedbomb.Services.About;
 using Seedbomb.ViewModels;
-using DataGen.Wpf.Tests.Views;
+using SeedBomb.Wpf.Tests.Views;
 using System.Reflection;
 using System.Windows.Controls;
 using Wpf.Ui;
@@ -11,7 +11,7 @@ using Wpf.Ui.Controls;
 using Xunit;
 using TextBox = System.Windows.Controls.TextBox;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 [Collection("StaUi")]
 public sealed class AboutLicenseDialogTests

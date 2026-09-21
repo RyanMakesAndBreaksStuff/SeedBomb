@@ -1,6 +1,6 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
@@ -14,7 +14,7 @@ using System.Text.Json;
 using Wpf.Ui;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 /// <summary>
 /// Task 11 / P2 exit criterion: schema import + metadata validation → board state,

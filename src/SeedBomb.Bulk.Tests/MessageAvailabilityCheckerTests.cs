@@ -1,6 +1,6 @@
 using Microsoft.Xrm.Sdk.Query;
 
-namespace DataGen.Bulk.Tests;
+namespace SeedBomb.Bulk.Tests;
 
 public class MessageAvailabilityCheckerTests
 {

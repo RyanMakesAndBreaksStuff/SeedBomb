@@ -1,5 +1,5 @@
-using DataGen.Core.Generators;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Collections.ObjectModel;

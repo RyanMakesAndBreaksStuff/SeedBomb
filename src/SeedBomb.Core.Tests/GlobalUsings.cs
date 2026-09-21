@@ -1,9 +1,9 @@
-global using DataGen.Core.Contracts;
-global using DataGen.Core.EdgeCases;
-global using DataGen.Core.Exceptions;
-global using DataGen.Core.Generators;
-global using DataGen.Core.Graph;
-global using DataGen.Core.Metadata;
+global using SeedBomb.Core.Contracts;
+global using SeedBomb.Core.EdgeCases;
+global using SeedBomb.Core.Exceptions;
+global using SeedBomb.Core.Generators;
+global using SeedBomb.Core.Graph;
+global using SeedBomb.Core.Metadata;
 global using Microsoft.Extensions.Logging.Abstractions;
 global using Microsoft.Xrm.Sdk;
 global using Microsoft.Xrm.Sdk.Metadata;

@@ -1,13 +1,13 @@
-using DataGen.Bulk;
-using DataGen.Bulk.Contracts;
-using DataGen.Core.Contracts;
-using DataGen.Core.EdgeCases;
-using DataGen.Core.Generators;
-using DataGen.Core.Graph;
+using SeedBomb.Bulk;
+using SeedBomb.Bulk.Contracts;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.EdgeCases;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Graph;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace DataGen.Web.Services;
+namespace SeedBomb.Web.Services;
 
 /// <summary>
 /// Scoped adapter that defers <see cref="BulkCreator"/> construction until the first

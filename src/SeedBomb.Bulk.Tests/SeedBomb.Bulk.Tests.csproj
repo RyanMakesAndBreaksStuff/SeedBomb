@@ -6,8 +6,8 @@
     <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../DataGen.Bulk/DataGen.Bulk.csproj" />
-    <ProjectReference Include="../DataGen.Core/DataGen.Core.csproj" />
+    <ProjectReference Include="../SeedBomb.Bulk/SeedBomb.Bulk.csproj" />
+    <ProjectReference Include="../SeedBomb.Core/SeedBomb.Core.csproj" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Moq" />
   </ItemGroup>

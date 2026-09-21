@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class SplashWindowAssetTests
 {

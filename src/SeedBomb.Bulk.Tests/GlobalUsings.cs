@@ -1,5 +1,5 @@
-global using DataGen.Core.Contracts;
-global using DataGen.Core.Exceptions;
+global using SeedBomb.Core.Contracts;
+global using SeedBomb.Core.Exceptions;
 global using Microsoft.Extensions.Logging.Abstractions;
 global using Microsoft.PowerPlatform.Dataverse.Client;
 global using Microsoft.Xrm.Sdk;

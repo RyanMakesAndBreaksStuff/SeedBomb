@@ -1,5 +1,5 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Seedbomb.Services.Navigation;
 using Seedbomb.Services.Profiles;

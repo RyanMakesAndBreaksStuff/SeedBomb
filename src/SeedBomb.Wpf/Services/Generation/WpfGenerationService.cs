@@ -1,6 +1,6 @@
-using DataGen.Bulk;
-using DataGen.Bulk.Contracts;
-using DataGen.Core.Contracts;
+using SeedBomb.Bulk;
+using SeedBomb.Bulk.Contracts;
+using SeedBomb.Core.Contracts;
 using Microsoft.Extensions.Logging;
 using Seedbomb.Services.Dataverse;
 using System.Diagnostics;

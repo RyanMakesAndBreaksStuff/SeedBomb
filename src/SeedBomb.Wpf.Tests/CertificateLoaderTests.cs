@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class CertificateLoaderTests
 {
@@ -38,7 +38,7 @@ public sealed class CertificateLoaderTests
     {
         using var key = RSA.Create(2048);
         var request = new CertificateRequest(
-            "CN=DataGen.Wpf CertificateLoader Test",
+            "CN=SeedBomb.Wpf CertificateLoader Test",
             key,
             HashAlgorithmName.SHA256,
             RSASignaturePadding.Pkcs1);

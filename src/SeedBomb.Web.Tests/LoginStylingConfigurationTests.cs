@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace DataGen.Web.Tests;
+namespace SeedBomb.Web.Tests;
 
 public class LoginStylingConfigurationTests
 {
@@ -45,6 +45,6 @@ public class LoginStylingConfigurationTests
             ?? throw new InvalidOperationException("Unable to resolve test file directory.");
 
         return Path.GetFullPath(
-            Path.Combine([testDirectory, "..", "DataGen.Web", .. relativePath]));
+            Path.Combine([testDirectory, "..", "SeedBomb.Web", .. relativePath]));
     }
 }

@@ -1,7 +1,7 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Exceptions;
-using DataGen.Core.Generators;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk.Messages;
@@ -9,7 +9,7 @@ using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 using System.Collections.Frozen;
 
-namespace DataGen.Bulk;
+namespace SeedBomb.Bulk;
 
 /// <summary>One column's candidate sources: rows read before the run, plus targets this run creates first.</summary>
 /// <param name="Existing">Canonically ordered rows read from the environment before generation.</param>

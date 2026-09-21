@@ -1,6 +1,6 @@
-using DataGen.Bulk;
-using DataGen.Core.Exceptions;
-using DataGen.Core.Metadata;
+using SeedBomb.Bulk;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
@@ -11,7 +11,7 @@ using Seedbomb.Services.Dataverse;
 using System.ServiceModel;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class LookupRecordSourceTests
 {

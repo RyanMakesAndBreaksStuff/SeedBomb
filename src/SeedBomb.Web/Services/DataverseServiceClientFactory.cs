@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Identity.Web;
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace DataGen.Web.Services;
+namespace SeedBomb.Web.Services;
 
 /// <summary>
 /// Scoped-per-circuit factory that creates and caches a Dataverse <see cref="ServiceClient"/>

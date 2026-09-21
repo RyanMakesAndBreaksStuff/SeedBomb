@@ -1,4 +1,4 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Seedbomb.ViewModels;
 using System.Windows;
 using System.Windows.Controls;

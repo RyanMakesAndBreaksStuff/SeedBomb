@@ -1,4 +1,4 @@
-namespace DataGen.Bulk.Contracts;
+namespace SeedBomb.Bulk.Contracts;
 
 /// <summary>
 /// Reports progress for a bulk data generation run.

@@ -1,6 +1,6 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 
-namespace DataGen.Core.Tests.Rules;
+namespace SeedBomb.Core.Tests.Rules;
 
 public class PatternTemplateTests
 {

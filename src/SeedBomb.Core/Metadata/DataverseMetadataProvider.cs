@@ -1,5 +1,5 @@
-using DataGen.Core.Contracts;
-using DataGen.Core.Exceptions;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
@@ -8,7 +8,7 @@ using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Metadata.Query;
 using Microsoft.Xrm.Sdk.Query;
 
-namespace DataGen.Core.Metadata;
+namespace SeedBomb.Core.Metadata;
 
 /// <summary>
 /// Retrieves and caches Dataverse entity metadata using the ServiceClient SDK.

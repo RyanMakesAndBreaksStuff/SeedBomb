@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -24,7 +24,7 @@ namespace Seedbomb.ViewModels;
 /// <summary>
 /// ViewModel for the rule editor dialog — the one place settable vs. platform-owned columns
 /// are enumerated (S3). Bodies delegate entirely to <see cref="RuleEligibility"/>,
-/// <see cref="RuleValidator"/>, and <see cref="RuleValueGenerator"/> (Wave 1, DataGen.Core.Rules);
+/// <see cref="RuleValidator"/>, and <see cref="RuleValueGenerator"/> (Wave 1, SeedBomb.Core.Rules);
 /// this class owns no eligibility, validation, or evaluation semantics of its own.
 /// </summary>
 public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataErrorInfo

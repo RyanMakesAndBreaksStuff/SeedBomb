@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Contracts;
-using DataGen.Core.Generators;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Generators;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using Seedbomb.Services.Generation;

@@ -1,4 +1,4 @@
-namespace DataGen.Core.EdgeCases;
+namespace SeedBomb.Core.EdgeCases;
 
 /// <summary>
 /// The outcome of validating a field for data generation.

@@ -3,10 +3,10 @@ using System.Runtime.InteropServices;
 
 namespace Seedbomb.Services.About;
 
-/// <summary>Canonical DataGen/SeedBomb identity and project links.</summary>
+/// <summary>Canonical SeedBomb identity and project links.</summary>
 public static class AppInfo
 {
-    public const string ProductName = "DataGen / SeedBomb";
+    public const string ProductName = "SeedBomb";
     public const string Description = "Synthetic data generation for Microsoft Dataverse";
     public const string Author = "Ryan Rettinger";
     public const string LicenseId = "BSD-3-Clause";

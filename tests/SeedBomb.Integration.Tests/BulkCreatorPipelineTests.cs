@@ -1,8 +1,8 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using System.Reflection;
 using System.ServiceModel;
 
-namespace DataGen.Integration.Tests;
+namespace SeedBomb.Integration.Tests;
 
 /// <summary>
 /// Integration tests that verify the Core + Bulk pipeline end-to-end using a mocked

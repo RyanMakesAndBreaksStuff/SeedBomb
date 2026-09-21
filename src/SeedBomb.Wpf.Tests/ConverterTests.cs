@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Windows;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class ConverterTests
 {

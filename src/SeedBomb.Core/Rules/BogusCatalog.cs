@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Globalization;
 
-namespace DataGen.Core.Rules;
+namespace SeedBomb.Core.Rules;
 
 /// <summary>Dataverse column kinds a catalog endpoint may target.</summary>
 public enum DataverseValueKind

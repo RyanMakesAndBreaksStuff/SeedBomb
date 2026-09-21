@@ -11,7 +11,7 @@ using Wpf.Ui.Appearance;
 using Wpf.Ui.Markup;
 using Xunit;
 
-namespace DataGen.Wpf.Tests.Views;
+namespace SeedBomb.Wpf.Tests.Views;
 
 /// <summary>
 /// ConnectionsPage is Transient while ConnectionManagerViewModel is Singleton, so anything the

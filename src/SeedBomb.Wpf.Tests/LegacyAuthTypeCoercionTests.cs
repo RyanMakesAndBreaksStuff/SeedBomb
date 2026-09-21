@@ -2,7 +2,7 @@ using Seedbomb.Services.Connections;
 using System.Text.Json;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class LegacyAuthTypeCoercionTests
 {

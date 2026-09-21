@@ -1,6 +1,6 @@
-using DataGen.Core.Exceptions;
-using DataGen.Core.Metadata;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Metadata;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
@@ -13,7 +13,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;
 
-namespace DataGen.Wpf.Tests;
+namespace SeedBomb.Wpf.Tests;
 
 public sealed class RuleEditorViewModelTests
 {
@@ -28,7 +28,7 @@ public sealed class RuleEditorViewModelTests
     }
 
     // EntityMetadata.Attributes/Keys setters are non-public — same reflection-set pattern
-    // already used by DataGen.Bulk.Tests/RuledGenerationTests.cs to build SDK metadata fixtures.
+    // already used by SeedBomb.Bulk.Tests/RuledGenerationTests.cs to build SDK metadata fixtures.
     private static EntityMetadata BuildEntity()
     {
         var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
