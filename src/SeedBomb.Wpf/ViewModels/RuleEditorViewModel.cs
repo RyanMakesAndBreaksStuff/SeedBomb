@@ -352,13 +352,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         Revalidate();
     }
 
-    /// <summary>Bogus API names compatible with the selected column.</summary>
-    public IReadOnlyList<string> BogusApis
-    {
-        get => BogusInput.BogusApis;
-        set => BogusInput.BogusApis = value;
-    }
-
     /// <summary>Selected Bogus API id, or null.</summary>
     public string? SelectedBogusApi
     {
@@ -366,39 +359,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         set => BogusInput.SelectedBogusApi = value;
     }
 
-    /// <summary>Endpoints of <see cref="SelectedBogusApi"/> compatible with the selected column.</summary>
-    public IReadOnlyList<BogusEndpointOption> BogusEndpoints
-    {
-        get => BogusInput.BogusEndpoints;
-        set => BogusInput.BogusEndpoints = value;
-    }
-
     /// <summary>Selected Bogus endpoint id (<c>API.endpoint</c>), or null.</summary>
     public string? SelectedBogusEndpoint
     {
         get => BogusInput.SelectedBogusEndpoint;
         set => BogusInput.SelectedBogusEndpoint = value;
-    }
-
-    /// <summary>True when the selected endpoint takes a numeric min/max.</summary>
-    public bool BogusHasNumericArgs
-    {
-        get => BogusInput.BogusHasNumericArgs;
-        set => BogusInput.BogusHasNumericArgs = value;
-    }
-
-    /// <summary>True when the selected endpoint takes a length argument.</summary>
-    public bool BogusHasLengthArg
-    {
-        get => BogusInput.BogusHasLengthArg;
-        set => BogusInput.BogusHasLengthArg = value;
-    }
-
-    /// <summary>True when the selected endpoint takes a date min/max.</summary>
-    public bool BogusHasDateArgs
-    {
-        get => BogusInput.BogusHasDateArgs;
-        set => BogusInput.BogusHasDateArgs = value;
     }
 
     /// <summary>Authored numeric minimum, or empty.</summary>

@@ -63,7 +63,7 @@ public sealed class RulesPageStaTests : IDisposable
         Flush();
         SelectEndpoint(numericVm, "RANDOM.number");
 
-        Assert.True(numericVm.BogusHasNumericArgs);
+        Assert.True(numericVm.BogusInput.BogusHasNumericArgs);
         numericVm.BogusMinNumber = "3";
         numericVm.BogusMaxNumber = "9";
         Flush();
@@ -77,7 +77,7 @@ public sealed class RulesPageStaTests : IDisposable
         lengthVm.SelectedBogusApi = "RANDOM";
         Flush();
         SelectEndpoint(lengthVm, "RANDOM.digits");
-        Assert.True(lengthVm.BogusHasLengthArg);
+        Assert.True(lengthVm.BogusInput.BogusHasLengthArg);
         lengthVm.BogusLengthText = "8";
         Flush();
         Assert.Equal("8", lengthVm.BogusLengthText);
@@ -88,7 +88,7 @@ public sealed class RulesPageStaTests : IDisposable
         dateVm.SelectedBogusApi = "DATE";
         Flush();
         SelectEndpoint(dateVm, "DATE.between");
-        Assert.True(dateVm.BogusHasDateArgs);
+        Assert.True(dateVm.BogusInput.BogusHasDateArgs);
         dateVm.BogusMinDate = new DateTime(2020, 1, 1);
         dateVm.BogusMaxDate = new DateTime(2020, 12, 31);
         Flush();
@@ -128,7 +128,7 @@ public sealed class RulesPageStaTests : IDisposable
         SelectEndpoint(vm, "NAME.firstName");
 
         Assert.Equal("", vm.BogusLengthText);
-        Assert.False(vm.BogusHasLengthArg);
+        Assert.False(vm.BogusInput.BogusHasLengthArg);
         Assert.True(vm.CanSave);
         Assert.Empty(CapturedBindingErrors);
     }

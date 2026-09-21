@@ -651,10 +651,10 @@ public sealed class RuleEditorViewModelTests
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "donotemail");
         vm.SelectedOp = "bogus";
 
-        Assert.Equal(["RANDOM"], vm.BogusApis);
+        Assert.Equal(["RANDOM"], vm.BogusInput.BogusApis);
         vm.SelectedBogusApi = "RANDOM";
-        Assert.Contains(vm.BogusEndpoints, o => o.Id == "RANDOM.bool");
-        Assert.DoesNotContain(vm.BogusEndpoints, o => o.Id != "RANDOM.bool");
+        Assert.Contains(vm.BogusInput.BogusEndpoints, o => o.Id == "RANDOM.bool");
+        Assert.DoesNotContain(vm.BogusInput.BogusEndpoints, o => o.Id != "RANDOM.bool");
     }
 
     [Fact]
@@ -716,7 +716,7 @@ public sealed class RuleEditorViewModelTests
         vm.ApplyExistingRule(numeric);
         Assert.Equal("3", vm.BogusMinNumber);
         Assert.Equal("9", vm.BogusMaxNumber);
-        Assert.True(vm.BogusHasNumericArgs);
+        Assert.True(vm.BogusInput.BogusHasNumericArgs);
 
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
         var length = new BogusRule("RANDOM", "digits", 1, new Dictionary<string, System.Text.Json.JsonElement>
@@ -725,7 +725,7 @@ public sealed class RuleEditorViewModelTests
         });
         vm.ApplyExistingRule(length);
         Assert.Equal("8", vm.BogusLengthText);
-        Assert.True(vm.BogusHasLengthArg);
+        Assert.True(vm.BogusInput.BogusHasLengthArg);
 
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "scheduledon");
         var dates = new BogusRule("DATE", "between", 1, new Dictionary<string, System.Text.Json.JsonElement>
@@ -736,7 +736,7 @@ public sealed class RuleEditorViewModelTests
         vm.ApplyExistingRule(dates);
         Assert.Equal(new DateTime(2020, 1, 1), vm.BogusMinDate);
         Assert.Equal(new DateTime(2020, 12, 31), vm.BogusMaxDate);
-        Assert.True(vm.BogusHasDateArgs);
+        Assert.True(vm.BogusInput.BogusHasDateArgs);
     }
 
     [Fact]

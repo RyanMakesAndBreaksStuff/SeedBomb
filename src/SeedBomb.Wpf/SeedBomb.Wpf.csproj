@@ -62,7 +62,6 @@
     <Resource Include="Resources\logo-dark.ico" />
     <Resource Include="Resources\logo-256.png" />
     <Resource Include="Resources\logo-dark.png" />
-    <Resource Include="Resources\bomb-indigo-light.png" />
   </ItemGroup>
 
   <ItemGroup>
