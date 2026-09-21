@@ -43,6 +43,7 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] private int _defaultDop;
     [ObservableProperty] private bool _darkTheme;
     [ObservableProperty] private string _paletteId = DesignThemeManager.DefaultPaletteId;
+    [ObservableProperty] private bool _keepRunSheetOpen = true;
 
     /// <summary>Gets the palettes offered in the appearance picker.</summary>
     public IReadOnlyList<ThemePaletteOption> AvailablePalettes => DesignThemeManager.AvailablePalettes;
@@ -102,6 +103,7 @@ public sealed partial class SettingsViewModel(
             DefaultDop = s.DefaultDop;
             DarkTheme = s.DarkTheme;
             PaletteId = DesignThemeManager.ResolvePaletteId(s.PaletteId);
+            KeepRunSheetOpen = s.KeepRunSheetOpen;
         }
         catch (OperationCanceledException)
         {
@@ -124,7 +126,7 @@ public sealed partial class SettingsViewModel(
         {
             var settings = new AppSettings(
                 DefaultRecordCount, DefaultBatchSize, DefaultDop,
-                DarkTheme, PaletteId, _loadedSettings.KeepRunSheetOpen);
+                DarkTheme, PaletteId, KeepRunSheetOpen);
 
             CancelPendingAppearanceSave();
             await _settingsService.SaveAsync(settings);

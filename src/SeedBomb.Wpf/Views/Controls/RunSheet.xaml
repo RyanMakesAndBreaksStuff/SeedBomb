@@ -249,13 +249,6 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <CheckBox Grid.Column="0"
-                                  IsChecked="{Binding KeepWindowOpen}"
-                                  VerticalAlignment="Center">
-                            <TextBlock Style="{DynamicResource DG.Cell}"
-                                       Text="Keep window open after finish" />
-                        </CheckBox>
-
                         <!-- Cancel while generating; once finished the sheet holds open and this becomes Close. -->
                         <Button Grid.Column="1" Style="{DynamicResource DG.DangerButton}"
                                 Command="{Binding CancelCommand}"

@@ -55,4 +55,26 @@ public sealed class SettingsViewModelTests
             ControlAppearance.Danger, It.IsAny<IconElement?>(), It.IsAny<TimeSpan>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task KeepRunSheetOpen_RoundTripsThroughLoadAndSave()
+    {
+        AppSettings? saved = null;
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AppSettings.Default with { KeepRunSheetOpen = false });
+        settings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>(), It.IsAny<CancellationToken>()))
+            .Callback<AppSettings, CancellationToken>((s, _) => saved = s)
+            .Returns(Task.CompletedTask);
+
+        var vm = new SettingsViewModel(settings.Object, Mock.Of<ILogger<SettingsViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.KeepRunSheetOpen);
+
+        vm.KeepRunSheetOpen = true;
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.True(saved?.KeepRunSheetOpen);
+    }
 }

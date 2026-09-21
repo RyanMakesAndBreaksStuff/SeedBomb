@@ -68,7 +68,6 @@ public sealed partial class RunViewModel : ObservableObject
     private int _plannedTotal;
     private int _seed;
     private string _environmentHost = "";
-    private bool _suppressKeepPersist;
 
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
     internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
@@ -79,7 +78,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Optional services so grouping tests can <c>new RunViewModel()</c> and retry can pass a mock.</summary>
     /// <param name="generation">Pipeline used for first run and retry. Null disables retry.</param>
     /// <param name="contentDialogService">Cancel and log dialogs. Null skips them.</param>
-    /// <param name="settings">Persists <see cref="KeepWindowOpen"/>.</param>
+    /// <param name="settings">Reads <see cref="KeepWindowOpen"/>; the Settings page owns writing it.</param>
     /// <param name="navigator">Used by <see cref="OpenInHistory"/>.</param>
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
@@ -178,7 +177,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>When true the list shows only retryable groups.</summary>
     [ObservableProperty] private bool _retryableOnly;
 
-    /// <summary>Persisted via <see cref="AppSettings.KeepRunSheetOpen"/>. Defaults true.</summary>
+    /// <summary>Read from <see cref="AppSettings.KeepRunSheetOpen"/> at run start. Defaults true.</summary>
     [ObservableProperty] private bool _keepWindowOpen = true;
 
     /// <summary>Elapsed / remaining / throughput / rejected.</summary>
@@ -649,13 +648,6 @@ public sealed partial class RunViewModel : ObservableObject
         }
     }
 
-    partial void OnKeepWindowOpenChanged(bool value)
-    {
-        if (_suppressKeepPersist || _settings is null)
-            return;
-        _ = PersistKeepWindowOpenAsync(value);
-    }
-
     partial void OnSelectedTableFilterChanged(string value) => RebuildVisibleGroups();
 
     partial void OnRetryableOnlyChanged(bool value) => RebuildVisibleGroups();
@@ -668,32 +660,11 @@ public sealed partial class RunViewModel : ObservableObject
         try
         {
             var loaded = await _settings.LoadAsync();
-            _suppressKeepPersist = true;
             KeepWindowOpen = loaded.KeepRunSheetOpen;
         }
         catch (Exception)
         {
             // Keep default.
-        }
-        finally
-        {
-            _suppressKeepPersist = false;
-        }
-    }
-
-    private async Task PersistKeepWindowOpenAsync(bool value)
-    {
-        if (_settings is null)
-            return;
-
-        try
-        {
-            var loaded = await _settings.LoadAsync();
-            await _settings.SaveAsync(loaded with { KeepRunSheetOpen = value });
-        }
-        catch (Exception)
-        {
-            // Settings I/O is best-effort.
         }
     }
 

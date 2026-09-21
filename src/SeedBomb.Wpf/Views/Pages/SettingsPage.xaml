@@ -181,6 +181,22 @@
                             </StackPanel>
                         </WrapPanel>
 
+                        <Grid Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                <TextBlock Style="{DynamicResource DG.Body}" Text="Keep the run sheet open" />
+                                <TextBlock Style="{DynamicResource DG.Tertiary}" Margin="0,2,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="Stay on the run sheet when a run finishes instead of closing it." />
+                            </StackPanel>
+                            <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center"
+                                             IsChecked="{Binding KeepRunSheetOpen, Mode=TwoWay}"
+                                             AutomationProperties.Name="Keep the run sheet open" />
+                        </Grid>
+
                         <TextBlock Style="{DynamicResource DG.Tertiary}"
                                    Text="Leave parallelism at 0 to let SeedBomb pick based on the environment's throttling response."
                                    Margin="0,10,0,0" TextWrapping="Wrap" />
