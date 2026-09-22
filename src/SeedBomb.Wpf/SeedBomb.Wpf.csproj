@@ -13,7 +13,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <Platforms>AnyCPU</Platforms>
+    <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject>SeedBomb.App</StartupObject>
     <AssemblyTitle>SeedBomb</AssemblyTitle>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
