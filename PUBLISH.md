@@ -1,16 +1,16 @@
 # Publish SeedBomb
 
-This repo ships the desktop app as a **self-contained Windows x64 executable**. Recipients do **not** need the .NET SDK or Desktop Runtime installed.
+This repo ships the desktop app as a **self-contained Windows executable**, in both x64 and x86 builds. Recipients do **not** need the .NET SDK or Desktop Runtime installed.
 
 | | |
 |---|---|
 | Project | `src/SeedBomb.Wpf/SeedBomb.Wpf.csproj` |
-| Artifact | `SeedBomb.exe` (~85 MB) |
-| Runtime | `win-x64`, self-contained, single-file |
+| Artifacts | `SeedBomb.exe` (x64, ~85 MB), `SeedBomb-x86.exe` (x86) |
+| Runtime | `win-x64` / `win-x86`, self-contained, single-file |
 | Workflow | **SeedBomb Publish** (`.github/workflows/seedbomb-publish.yml`) |
-| Profile | `src/SeedBomb.Wpf/Properties/PublishProfiles/GitHubRelease.pubxml` |
+| Profiles | `src/SeedBomb.Wpf/Properties/PublishProfiles/GitHubRelease.pubxml` (x64), `GitHubRelease-x86.pubxml` (x86) |
 
-The exe targets **Windows 10 1809 (build 17763) or later**, 64-bit. It will not run on 32-bit Windows, Windows 7/8, or non-Windows OSes.
+Both exes target **Windows 10 1809 (build 17763) or later**. They will not run on Windows 7/8 or non-Windows OSes. Most users want `SeedBomb.exe` (x64); `SeedBomb-x86.exe` is for 32-bit Windows only.
 
 ---
 
@@ -41,7 +41,7 @@ Also required:
 
 ## 3. Publish via GitHub Actions
 
-Pick **one** of the two triggers. Both run tests, publish `SeedBomb.exe`, and attach it to a GitHub Release.
+Pick **one** of the two triggers. Both run tests, publish `SeedBomb.exe` and `SeedBomb-x86.exe`, and attach both to a GitHub Release.
 
 ### Option A — Push a version tag (typical)
 
@@ -76,20 +76,20 @@ The workflow creates tag `v1.0.0` on that commit and the GitHub Release.
 1. Resolves the version from the tag name or the manual input
 2. Installs .NET 10
 3. Restores and runs `src/SeedBomb.Wpf.Tests` (`dotnet run --project … -c Release`)
-4. Publishes a self-contained single-file exe:
+4. Publishes two self-contained single-file exes, once per runtime:
 
    ```bash
    dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj \
-     -c Release \
-     -r win-x64 \
-     --self-contained true \
-     -p:PublishProfile=GitHubRelease \
-     -p:Version=<version> \
-     -o ./publish
+     -c Release -r win-x64 --self-contained true \
+     -p:PublishProfile=GitHubRelease -p:Version=<version> -o ./publish/x64
+
+   dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj \
+     -c Release -r win-x86 --self-contained true \
+     -p:PublishProfile=GitHubRelease-x86 -p:Version=<version> -o ./publish/x86
    ```
 
-5. Checks that `publish/SeedBomb.exe` exists and is larger than 1 MB
-6. Creates a GitHub Release titled `SeedBomb <version>`, generates notes from commits, and uploads `SeedBomb.exe`
+5. Checks that both `SeedBomb.exe` files exist and are larger than 1 MB
+6. Creates a GitHub Release titled `SeedBomb <version>`, generates notes from commits, and uploads `SeedBomb.exe` (x64) and `SeedBomb-x86.exe` (the x86 build, renamed on upload to avoid a filename clash)
 
 If the version contains `-` (for example `1.0.0-rc.1`), the release is marked **prerelease**.
 
@@ -98,7 +98,7 @@ If the version contains `-` (for example `1.0.0-rc.1`), the release is marked **
 ## 5. Download and run
 
 1. Open the repo **Releases** page
-2. Download `SeedBomb.exe` from the release assets
+2. Download `SeedBomb.exe` (64-bit Windows — almost everyone wants this) or `SeedBomb-x86.exe` (32-bit Windows) from the release assets
 3. Place it anywhere and double-click
 
 No installer, no extra DLLs, no .NET install. The first launch can take a few extra seconds while native libraries extract under `%TEMP%\.net`. Later launches are faster.
@@ -121,7 +121,7 @@ dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj `
   -o ./publish
 ```
 
-Output: `publish/SeedBomb.exe`
+Output: `publish/SeedBomb.exe`. Swap `win-x64`/`GitHubRelease` for `win-x86`/`GitHubRelease-x86` to build the 32-bit exe instead.
 
 Optional checks before tagging:
 
@@ -130,7 +130,7 @@ dotnet build src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -c Release
 dotnet run --project src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj -c Release
 ```
 
-In Visual Studio: right-click **SeedBomb.Wpf → Publish** and use the **GitHubRelease** or **FolderProfile** profile (`win-x64`, self-contained, single-file).
+In Visual Studio: right-click **SeedBomb.Wpf → Publish** and use the **GitHubRelease** (`win-x64`), **GitHubRelease-x86** (`win-x86`), or **FolderProfile** (`win-x64`) profile — all self-contained, single-file.
 
 ---
 
@@ -156,7 +156,7 @@ Prefer bumping the patch version (`1.0.1`) instead of rewriting a shipped tag.
 | Tests fail in CI | Same command as local: `dotnet run --project src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj -c Release` |
 | `SeedBomb.exe was not produced` | Inspect the Publish step log; confirm `AssemblyName` is still `SeedBomb` |
 | Exe is only a few hundred KB | Self-contained publish failed; the file must be tens of MB |
-| Exe will not start on another PC | Needs 64-bit Windows 10 1809+; SmartScreen/AV may quarantine an unsigned exe |
+| Exe will not start on another PC | Needs Windows 10 1809+ matching its bitness; SmartScreen/AV may quarantine an unsigned exe |
 | First start is slow | Expected — single-file extraction to `%TEMP%\.net` |
 
 ---
@@ -164,6 +164,7 @@ Prefer bumping the patch version (`1.0.1`) instead of rewriting a shipped tag.
 ## Related files
 
 - `.github/workflows/seedbomb-publish.yml` — CI release pipeline
-- `src/SeedBomb.Wpf/Properties/PublishProfiles/GitHubRelease.pubxml` — self-contained single-file settings
-- `src/SeedBomb.Wpf/Properties/PublishProfiles/FolderProfile.pubxml` — local Visual Studio folder publish
+- `src/SeedBomb.Wpf/Properties/PublishProfiles/GitHubRelease.pubxml` — x64 self-contained single-file settings
+- `src/SeedBomb.Wpf/Properties/PublishProfiles/GitHubRelease-x86.pubxml` — x86 self-contained single-file settings
+- `src/SeedBomb.Wpf/Properties/PublishProfiles/FolderProfile.pubxml` — local Visual Studio folder publish (x64)
 - `src/SeedBomb.Wpf/SeedBomb.Wpf.csproj` — `AssemblyName` / `Product` = `SeedBomb`

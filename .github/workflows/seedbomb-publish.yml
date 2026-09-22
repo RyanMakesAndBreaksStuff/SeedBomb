@@ -71,7 +71,7 @@ jobs:
       - name: Test
         run: dotnet run --project ${{ env.TEST_PROJECT }} -c Release --no-restore
 
-      - name: Publish self-contained single-file exe
+      - name: Publish self-contained single-file exe (x64)
         run: |
           dotnet publish ${{ env.PROJECT }} `
             -c Release `
@@ -82,28 +82,47 @@ jobs:
             -p:AssemblyVersion=$env:ASSEMBLY_VERSION `
             -p:FileVersion=$env:ASSEMBLY_VERSION `
             -p:InformationalVersion=$env:VERSION `
-            -o $env:PUBLISH_DIR
+            -o $env:PUBLISH_DIR/x64
 
-      - name: Verify exe
+      - name: Publish self-contained single-file exe (x86)
         run: |
-          $exe = Join-Path $env:PUBLISH_DIR "SeedBomb.exe"
-          if (-not (Test-Path $exe)) {
-            Get-ChildItem $env:PUBLISH_DIR | Format-Table Name, Length
-            throw "SeedBomb.exe was not produced."
+          dotnet publish ${{ env.PROJECT }} `
+            -c Release `
+            -r win-x86 `
+            --self-contained true `
+            -p:PublishProfile=GitHubRelease-x86 `
+            -p:Version=$env:VERSION `
+            -p:AssemblyVersion=$env:ASSEMBLY_VERSION `
+            -p:FileVersion=$env:ASSEMBLY_VERSION `
+            -p:InformationalVersion=$env:VERSION `
+            -o $env:PUBLISH_DIR/x86
+
+      - name: Verify exes
+        run: |
+          function Assert-Exe([string]$Dir) {
+            $exe = Join-Path $Dir "SeedBomb.exe"
+            if (-not (Test-Path $exe)) {
+              Get-ChildItem $Dir | Format-Table Name, Length
+              throw "SeedBomb.exe was not produced in $Dir."
+            }
+            $file = Get-Item $exe
+            if ($file.Length -lt 1MB) {
+              throw "$($file.FullName) is unexpectedly small ($($file.Length) bytes); self-contained publish likely failed."
+            }
+            Write-Host "Published $($file.FullName) ($([math]::Round($file.Length / 1MB, 1)) MB)"
           }
-          $file = Get-Item $exe
-          if ($file.Length -lt 1MB) {
-            throw "SeedBomb.exe is unexpectedly small ($($file.Length) bytes); self-contained publish likely failed."
-          }
-          Write-Host "Published $($file.Name) ($([math]::Round($file.Length / 1MB, 1)) MB)"
+          Assert-Exe "$env:PUBLISH_DIR/x64"
+          Assert-Exe "$env:PUBLISH_DIR/x86"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $exe = Join-Path $env:PUBLISH_DIR "SeedBomb.exe"
+          $exeX64 = Join-Path $env:PUBLISH_DIR "x64/SeedBomb.exe"
+          $exeX86 = Join-Path $env:PUBLISH_DIR "x86/SeedBomb-x86.exe"
+          Copy-Item (Join-Path $env:PUBLISH_DIR "x86/SeedBomb.exe") $exeX86
           $ghArgs = @(
-            "release", "create", $env:RELEASE_TAG, $exe,
+            "release", "create", $env:RELEASE_TAG, $exeX64, $exeX86,
             "--title", "SeedBomb $($env:VERSION)",
             "--generate-notes",
             "--target", $env:GITHUB_SHA
