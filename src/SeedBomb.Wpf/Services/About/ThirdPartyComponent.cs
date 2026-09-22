@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>One third-party component shown on About or in the notices list.</summary>
 public sealed record ThirdPartyComponent(

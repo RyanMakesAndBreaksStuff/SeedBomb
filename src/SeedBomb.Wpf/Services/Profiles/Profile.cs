@@ -1,6 +1,6 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 
-namespace Seedbomb.Services.Profiles;
+namespace SeedBomb.Services.Profiles;
 
 /// <summary>
 /// Profile schema: a named, saveable rule configuration — selected tables,

@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);1591;xUnit1051</NoWarn>
+    <Platforms>AnyCPU;x64</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/SeedBomb.Core/SeedBomb.Core.csproj" />
+    <ProjectReference Include="../../src/SeedBomb.Bulk/SeedBomb.Bulk.csproj" />
+    <PackageReference Include="AngleSharp" />
+    <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace Seedbomb.Converters;
+namespace SeedBomb.Converters;
 
 /// <summary>Negates a Boolean. Used for IsEnabled when the source flag means busy.</summary>
 [ValueConversion(typeof(bool), typeof(bool))]

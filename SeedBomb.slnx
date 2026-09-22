@@ -4,13 +4,13 @@
     <Platform Name="x64" />
   </Configurations>
   <Folder Name="/src/">
-    <Project Path="src/DataGen.Bulk/DataGen.Bulk.csproj">
+    <Project Path="src/SeedBomb.Bulk/SeedBomb.Bulk.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/DataGen.Core/DataGen.Core.csproj">
+    <Project Path="src/SeedBomb.Core/SeedBomb.Core.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/DataGen.Web/DataGen.Web.csproj">
+    <Project Path="src/SeedBomb.Web/SeedBomb.Web.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj">
@@ -18,19 +18,19 @@
     </Project>
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="src/DataGen.Bulk.Tests/DataGen.Bulk.Tests.csproj">
+    <Project Path="src/SeedBomb.Bulk.Tests/SeedBomb.Bulk.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/DataGen.Core.Tests/DataGen.Core.Tests.csproj">
+    <Project Path="src/SeedBomb.Core.Tests/SeedBomb.Core.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/DataGen.Web.Tests/DataGen.Web.Tests.csproj">
+    <Project Path="src/SeedBomb.Web.Tests/SeedBomb.Web.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj">
+    <Project Path="src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="tests/DataGen.Integration.Tests/DataGen.Integration.Tests.csproj">
+    <Project Path="tests/SeedBomb.Integration.Tests/SeedBomb.Integration.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
   </Folder>

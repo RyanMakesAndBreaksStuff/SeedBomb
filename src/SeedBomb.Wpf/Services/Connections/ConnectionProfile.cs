@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Seedbomb.Services.Connections;
+namespace SeedBomb.Services.Connections;
 
 /// <summary>Authentication mechanism for a connection profile.</summary>
 public enum AuthType

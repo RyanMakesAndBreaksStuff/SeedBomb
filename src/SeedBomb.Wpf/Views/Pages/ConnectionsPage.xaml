@@ -6,12 +6,12 @@
     EditingProfile, IsEditing, IsTesting, TestResult, TestSucceeded, IsSwitchingConnection,
     SwitchError, HasSwitchError + the commands.
 -->
-<Page x:Class="Seedbomb.Views.Pages.ConnectionsPage"
+<Page x:Class="SeedBomb.Views.Pages.ConnectionsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      xmlns:conn="clr-namespace:Seedbomb.Services.Connections"
-      xmlns:vm="clr-namespace:Seedbomb.ViewModels"
+      xmlns:conn="clr-namespace:SeedBomb.Services.Connections"
+      xmlns:vm="clr-namespace:SeedBomb.ViewModels"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:ConnectionManagerViewModel}"

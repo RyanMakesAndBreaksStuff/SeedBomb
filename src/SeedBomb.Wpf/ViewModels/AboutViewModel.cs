@@ -1,11 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Seedbomb.Services.About;
+using SeedBomb.Services.About;
 using System.Collections.ObjectModel;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>ViewModel for the About page.</summary>
 public sealed partial class AboutViewModel : ViewModelBase
@@ -32,7 +32,7 @@ public sealed partial class AboutViewModel : ViewModelBase
         ProductName = AppInfo.ProductName;
         Description = AppInfo.Description;
         Author = AppInfo.Author;
-        Version = AppInfo.ReadVersion(typeof(Seedbomb.App).Assembly);
+        Version = AppInfo.ReadVersion(typeof(SeedBomb.App).Assembly);
         Runtime = AppInfo.ReadRuntime();
         SourceCodeUrl = AppInfo.SourceCodeUrl;
         DocumentationUrl = AppInfo.DocumentationUrl;

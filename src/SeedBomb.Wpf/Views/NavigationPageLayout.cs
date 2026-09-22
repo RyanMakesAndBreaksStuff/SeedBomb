@@ -4,7 +4,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace Seedbomb.Views.Pages;
+namespace SeedBomb.Views.Pages;
 
 /// <summary>
 /// WPF-UI's Frame measures a <see cref="Page"/> with infinite height, so star rows

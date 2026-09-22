@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Seedbomb.Services.Export;
+namespace SeedBomb.Services.Export;
 
 /// <summary>Resolves the destination folder for user-facing CSV exports.</summary>
 public static class ExportPaths

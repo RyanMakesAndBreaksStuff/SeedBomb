@@ -1,11 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Collections.ObjectModel;
 using System.Text.Json;
 
-namespace Seedbomb.ViewModels.Controls;
+namespace SeedBomb.ViewModels.Controls;
 
 /// <summary>Input-only lookup state; the parent retains Core validation and rule saving.</summary>
 public sealed partial class LookupRuleInputViewModel : ObservableObject

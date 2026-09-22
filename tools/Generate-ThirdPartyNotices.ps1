@@ -22,7 +22,7 @@ $InventoryPath = Join-Path $PSScriptRoot 'notice-inventory.json'
 $DefaultDeps = Join-Path $RepoRoot 'src/SeedBomb.Wpf/bin/Release/net10.0-windows10.0.17763.0/win-x64/SeedBomb.deps.json'
 $DefaultAssets = Join-Path $RepoRoot 'src/SeedBomb.Wpf/obj/project.assets.json'
 $RidTarget = '.NETCoreApp,Version=v10.0/win-x64'
-$OwnProjects = [System.Collections.Generic.HashSet[string]]::new([string[]]@('SeedBomb', 'DataGen.Core', 'DataGen.Bulk'))
+$OwnProjects = [System.Collections.Generic.HashSet[string]]::new([string[]]@('SeedBomb', 'SeedBomb.Core', 'SeedBomb.Bulk'))
 
 function Write-Utf8([string]$Path, [string]$Text) {
     [IO.File]::WriteAllText($Path, $Text, $Utf8)
@@ -324,7 +324,7 @@ function Build-Inventory {
             license         = [string]$licenseId
             copyright       = [string]$copyright
             projectUrl      = [string]$projectUrl
-            licenseResource = "Seedbomb.Licenses.$resourceFile"
+            licenseResource = "SeedBomb.Licenses.$resourceFile"
             featured        = $featured
             credit          = $(if ($credit) { [string]$credit } else { $null })
             featuredOrder   = $(if ($featured) { $featuredOrder } else { $null })
@@ -345,7 +345,7 @@ function Write-Index($Components) {
     [void]$lines.Add('Full license texts are in [`licenses/`](licenses/).')
     [void]$lines.Add('')
     foreach ($c in $Components) {
-        $file = $c.licenseResource.Substring('Seedbomb.Licenses.'.Length)
+        $file = $c.licenseResource.Substring('SeedBomb.Licenses.'.Length)
         [void]$lines.Add("## $($c.name) $($c.version)")
         [void]$lines.Add('')
         [void]$lines.Add("- License: $($c.license)")
@@ -418,11 +418,11 @@ function Invoke-ValidateResources {
         }
         $key = "$($c.name)/$($c.version)"
         if (-not $keys.Add($key)) { $errors.Add("Duplicate $key") }
-        if ($c.licenseResource -notmatch '^Seedbomb\.Licenses\.[A-Za-z0-9._-]+$') {
+        if ($c.licenseResource -notmatch '^SeedBomb\.Licenses\.[A-Za-z0-9._-]+$') {
             $errors.Add("$($c.name) has unsafe licenseResource '$($c.licenseResource)'")
             continue
         }
-        $file = $c.licenseResource.Substring('Seedbomb.Licenses.'.Length)
+        $file = $c.licenseResource.Substring('SeedBomb.Licenses.'.Length)
         foreach ($dir in @($LicensesDir, $EmbedDir)) {
             if (-not (Test-Path -LiteralPath (Join-Path $dir $file))) {
                 $errors.Add("Missing $file in $dir")

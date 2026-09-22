@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Dataverse;
+using SeedBomb.Services.Dataverse;
 using Wpf.Ui;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>One row in the column picker — settable or platform-owned-with-reason (§3.2).</summary>
 /// <param name="LogicalName">Attribute logical name.</param>

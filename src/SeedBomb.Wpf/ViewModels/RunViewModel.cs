@@ -1,19 +1,19 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Contracts;
-using DataGen.Core.Exceptions;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Exceptions;
+using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Diagnostics;
-using Seedbomb.Services.Export;
-using Seedbomb.Services.Generation;
-using Seedbomb.Services.History;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Settings;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Diagnostics;
+using SeedBomb.Services.Export;
+using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Settings;
+using SeedBomb.Views.Pages;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -23,7 +23,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Label/value row for sheet metrics and summary tiles. <see cref="ValueKind"/> maps to DG.* — no Brush.</summary>
 public sealed record RunValueRow(string Label, string Value, string? ValueKind = null);
@@ -459,7 +459,7 @@ public sealed partial class RunViewModel : ObservableObject
         foreach (var group in selected)
             counts[group.TableName] = counts.GetValueOrDefault(group.TableName) + group.RowCount;
 
-        Dictionary<string, Dictionary<string, DataGen.Core.Rules.FieldRule>>? rules = null;
+        Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>? rules = null;
         if (_lastConfig.FieldRules is { } existing)
         {
             rules = existing

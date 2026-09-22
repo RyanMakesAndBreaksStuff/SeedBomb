@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Seedbomb.Services.Diagnostics;
+namespace SeedBomb.Services.Diagnostics;
 
 /// <summary>Best-effort crash diagnostics. Never throws — a failed log must not mask the crash.</summary>
 public static class CrashLog

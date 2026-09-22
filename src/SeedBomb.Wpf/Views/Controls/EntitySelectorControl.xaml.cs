@@ -1,10 +1,10 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 using Microsoft.Extensions.DependencyInjection;
-using Seedbomb.ViewModels.Controls;
+using SeedBomb.ViewModels.Controls;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace Seedbomb.Views.Controls;
+namespace SeedBomb.Views.Controls;
 
 /// <summary>
 /// Lists Dataverse user entities with multi-select. Raises

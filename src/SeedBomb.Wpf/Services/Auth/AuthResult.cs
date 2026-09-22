@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Auth;
+namespace SeedBomb.Services.Auth;
 
 /// <summary>
 /// Result returned by <see cref="IAuthService.SignInAsync"/>.

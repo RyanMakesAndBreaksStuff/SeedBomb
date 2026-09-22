@@ -1,6 +1,6 @@
 using Microsoft.PowerPlatform.Dataverse.Client;
 
-namespace Seedbomb.Services.Dataverse;
+namespace SeedBomb.Services.Dataverse;
 
 /// <summary>
 /// Manages a cached <see cref="IOrganizationServiceAsync2"/> connection to Dataverse.

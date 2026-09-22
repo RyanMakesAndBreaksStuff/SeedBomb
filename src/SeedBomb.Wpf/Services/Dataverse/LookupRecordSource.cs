@@ -1,10 +1,10 @@
-using DataGen.Bulk;
-using DataGen.Core.Metadata;
+using SeedBomb.Bulk;
+using SeedBomb.Core.Metadata;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using System.Globalization;
 
-namespace Seedbomb.Services.Dataverse;
+namespace SeedBomb.Services.Dataverse;
 
 /// <summary>Metadata-aware, cancellable lookup reads through the cached connection.</summary>
 /// <param name="connection">Existing cached connection owner.</param>

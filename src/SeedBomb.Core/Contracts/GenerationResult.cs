@@ -1,0 +1,28 @@
+namespace SeedBomb.Core.Contracts;
+
+/// <summary>
+/// The result of a data generation run including created records and any errors.
+/// </summary>
+public record GenerationResult
+{
+    /// <summary>
+    /// Gets the records created per entity, keyed by entity logical name.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<Guid>> CreatedRecords { get; init; }
+        = new Dictionary<string, IReadOnlyList<Guid>>();
+
+    /// <summary>
+    /// Gets the total number of records created across all entities.
+    /// </summary>
+    public int TotalRecords => CreatedRecords.Values.Sum(v => v.Count);
+
+    /// <summary>
+    /// Gets the total elapsed time for the generation run.
+    /// </summary>
+    public TimeSpan Elapsed { get; init; }
+
+    /// <summary>
+    /// Gets any errors that occurred during generation.
+    /// </summary>
+    public IReadOnlyList<BatchError> Errors { get; init; } = [];
+}

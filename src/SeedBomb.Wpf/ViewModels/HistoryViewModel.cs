@@ -1,15 +1,15 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Services.Export;
-using Seedbomb.Services.History;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Export;
+using SeedBomb.Services.History;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Views.Pages;
 using System.Collections.ObjectModel;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>One calendar day of run history.</summary>
 /// <param name="DayLabel">Today, Yesterday, or a formatted date.</param>

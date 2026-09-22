@@ -1,4 +1,4 @@
-using Seedbomb.Services.Diagnostics;
+using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,11 +6,11 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Seedbomb.Services.Connections;
+namespace SeedBomb.Services.Connections;
 
 /// <summary>
 /// JSON-backed implementation of <see cref="IConnectionProfileService"/>.
-/// Profiles are stored in <c>%LOCALAPPDATA%\DataGen\connections.json</c>.
+/// Profiles are stored in <c>%LOCALAPPDATA%\SeedBomb\connections.json</c>.
 /// Sensitive fields (client secret) are encrypted with DPAPI
 /// (<see cref="DataProtectionScope.CurrentUser"/>) before being written to disk.
 /// </summary>

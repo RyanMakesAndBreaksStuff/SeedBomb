@@ -7,23 +7,23 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Web.Tests", "src\DataGen.Web.Tests\DataGen.Web.Tests.csproj", "{2AA5727A-D28B-3F59-2026-BB04FCCD3CE3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Web.Tests", "src\SeedBomb.Web.Tests\SeedBomb.Web.Tests.csproj", "{2AA5727A-D28B-3F59-2026-BB04FCCD3CE3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Core.Tests", "src\DataGen.Core.Tests\DataGen.Core.Tests.csproj", "{56E8B90E-1856-1BB9-F3FA-1820DFCD582B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Core.Tests", "src\SeedBomb.Core.Tests\SeedBomb.Core.Tests.csproj", "{56E8B90E-1856-1BB9-F3FA-1820DFCD582B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Bulk", "src\DataGen.Bulk\DataGen.Bulk.csproj", "{75ABD09C-1A50-1EC6-FD4D-16B80C438BDD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Bulk", "src\SeedBomb.Bulk\SeedBomb.Bulk.csproj", "{75ABD09C-1A50-1EC6-FD4D-16B80C438BDD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Web", "src\DataGen.Web\DataGen.Web.csproj", "{D8812534-E836-C0AF-E378-2744BF7DB9A1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Web", "src\SeedBomb.Web\SeedBomb.Web.csproj", "{D8812534-E836-C0AF-E378-2744BF7DB9A1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Bulk.Tests", "src\DataGen.Bulk.Tests\DataGen.Bulk.Tests.csproj", "{357E65DB-832D-883D-9C74-A0E4B233391A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Bulk.Tests", "src\SeedBomb.Bulk.Tests\SeedBomb.Bulk.Tests.csproj", "{357E65DB-832D-883D-9C74-A0E4B233391A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Core", "src\DataGen.Core\DataGen.Core.csproj", "{BD7B6FFC-7EC3-237F-83FD-6498506970D3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Core", "src\SeedBomb.Core\SeedBomb.Core.csproj", "{BD7B6FFC-7EC3-237F-83FD-6498506970D3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Integration.Tests", "tests\DataGen.Integration.Tests\DataGen.Integration.Tests.csproj", "{1A4CD2DA-1F44-F663-A0D4-829AE2D14C06}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Integration.Tests", "tests\SeedBomb.Integration.Tests\SeedBomb.Integration.Tests.csproj", "{1A4CD2DA-1F44-F663-A0D4-829AE2D14C06}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Wpf", "src\SeedBomb.Wpf\SeedBomb.Wpf.csproj", "{FBF86FAE-C1EA-4F28-A793-5237927917F8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataGen.Wpf.Tests", "src\DataGen.Wpf.Tests\DataGen.Wpf.Tests.csproj", "{33B437FC-27CD-439B-87E2-6D9126218140}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SeedBomb.Wpf.Tests", "src\SeedBomb.Wpf.Tests\SeedBomb.Wpf.Tests.csproj", "{33B437FC-27CD-439B-87E2-6D9126218140}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

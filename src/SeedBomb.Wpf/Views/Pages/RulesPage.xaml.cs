@@ -1,9 +1,9 @@
-using Seedbomb.ViewModels;
+using SeedBomb.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 using Wpf.Ui.Abstractions.Controls;
 
-namespace Seedbomb.Views.Pages;
+namespace SeedBomb.Views.Pages;
 
 /// <summary>
 /// Rules editor as a full page (1a/3b). Previously a dialog owned by the Generate flow.

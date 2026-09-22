@@ -1,10 +1,10 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>Column picker lists, grouping, and chip filters for the rule editor.</summary>
 public sealed class RuleColumnCatalog
@@ -185,7 +185,7 @@ public sealed class RuleColumnCatalog
             or AttributeRequiredLevel.ApplicationRequired;
 
     // Reason copy sourced verbatim from the XML doc comments on EligibilityReason
-    // (src/DataGen.Core/Rules/RuleEligibility.cs) — the authoritative §3.2 wording.
+    // (src/SeedBomb.Core/Rules/RuleEligibility.cs) — the authoritative §3.2 wording.
     private static string? ReasonText(EligibilityReason reason) => reason switch
     {
         EligibilityReason.Settable => null,

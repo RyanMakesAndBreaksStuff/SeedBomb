@@ -1,7 +1,7 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace Seedbomb.Services.Dataverse;
+namespace SeedBomb.Services.Dataverse;
 
 /// <summary>A page request scoped to the edited lookup's live allowed targets.</summary>
 /// <param name="Attribute">Lookup metadata captured for the editor session.</param>

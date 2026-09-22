@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Generation;
+namespace SeedBomb.Services.Generation;
 
 /// <summary>
 /// Immutable progress snapshot reported from the generation pipeline to the WPF UI.

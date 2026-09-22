@@ -1,6 +1,6 @@
 using System.Windows.Controls;
 
-namespace Seedbomb.Views.Controls;
+namespace SeedBomb.Views.Controls;
 
 /// <summary>Left pane of the Rules page: filter chips and the grouped column list.</summary>
 public partial class RuleColumnListControl : UserControl

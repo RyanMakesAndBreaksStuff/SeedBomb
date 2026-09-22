@@ -1,8 +1,8 @@
-using Seedbomb.ViewModels;
+using SeedBomb.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace Seedbomb.Views.Pages;
+namespace SeedBomb.Views.Pages;
 
 /// <summary>Settings page with Appearance and Generation Defaults sections.</summary>
 public partial class SettingsPage : Page

@@ -1,12 +1,12 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Controls;
+using SeedBomb.ViewModels.Controls;
+using SeedBomb.Views.Controls;
 using System.Windows.Data;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
-namespace Seedbomb.Services.Dataverse;
+namespace SeedBomb.Services.Dataverse;
 
 /// <summary>Uses the application's existing WPF-UI ContentDialogHost.</summary>
 /// <param name="dialogs">Existing app-wide dialog service.</param>

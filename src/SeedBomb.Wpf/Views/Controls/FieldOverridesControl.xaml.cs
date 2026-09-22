@@ -1,7 +1,7 @@
-using Seedbomb.ViewModels.Controls;
+using SeedBomb.ViewModels.Controls;
 using System.Windows.Controls;
 
-namespace Seedbomb.Views.Controls;
+namespace SeedBomb.Views.Controls;
 
 /// <summary>
 /// Displays a <see cref="Wpf.Ui.Controls.NumberBox"/> per selected entity so the user

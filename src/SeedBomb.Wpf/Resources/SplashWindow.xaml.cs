@@ -4,7 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
-namespace Seedbomb.Resources
+namespace SeedBomb.Resources
 {
     /// <summary>
     /// Splash screen for Seed Bomb for Microsoft Dataverse — WPF port of

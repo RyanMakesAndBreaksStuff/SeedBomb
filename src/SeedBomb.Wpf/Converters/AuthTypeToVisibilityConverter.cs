@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace Seedbomb.Converters;
+namespace SeedBomb.Converters;
 
 /// <summary>
 /// Visible when the bound value's string form equals <c>ConverterParameter</c>.

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace Seedbomb.Converters;
+namespace SeedBomb.Converters;
 
 /// <summary>Visible when two bound values are equal, otherwise collapsed. Equality is delegated to
 /// <see cref="EqualityToBoolConverter"/> rather than reimplemented here.</summary>

@@ -1,6 +1,6 @@
-using Seedbomb.Services.Profiles;
+using SeedBomb.Services.Profiles;
 
-namespace Seedbomb.Services.Navigation;
+namespace SeedBomb.Services.Navigation;
 
 /// <summary>One-shot payload for RulesPage. Written by the caller, consumed in OnNavigatedToAsync.</summary>
 public sealed class RulesNavigationRequest

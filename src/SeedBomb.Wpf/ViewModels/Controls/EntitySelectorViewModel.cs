@@ -1,14 +1,14 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Contracts;
-using DataGen.Core.Metadata;
+using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
-namespace Seedbomb.ViewModels.Controls;
+namespace SeedBomb.ViewModels.Controls;
 
-/// <summary>ViewModel for <see cref="Seedbomb.Views.Controls.EntitySelectorControl"/>.</summary>
+/// <summary>ViewModel for <see cref="SeedBomb.Views.Controls.EntitySelectorControl"/>.</summary>
 public sealed partial class EntitySelectorViewModel : ObservableObject
 {
     private readonly IMetadataProvider _metadata;

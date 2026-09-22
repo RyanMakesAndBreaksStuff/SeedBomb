@@ -1,9 +1,9 @@
-using DataGen.Core.Rules;
-using Seedbomb.Services.Diagnostics;
+using SeedBomb.Core.Rules;
+using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
-namespace Seedbomb.Services.Profiles;
+namespace SeedBomb.Services.Profiles;
 
 /// <summary>
 /// JSON-backed <see cref="IProfileService"/>. Profiles live under
@@ -33,7 +33,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     private readonly string _root;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    /// <summary>Stores profiles under <c>%LOCALAPPDATA%\DataGen\profiles</c>.</summary>
+    /// <summary>Stores profiles under <c>%LOCALAPPDATA%\SeedBomb\profiles</c>.</summary>
     public JsonProfileService() : this(DefaultRoot)
     {
     }

@@ -1,10 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Profiles;
-using Seedbomb.Views.Pages;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
+using SeedBomb.Views.Pages;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -12,7 +12,7 @@ using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
 
-namespace Seedbomb.ViewModels;
+namespace SeedBomb.ViewModels;
 
 /// <summary>One row in the Profiles list.</summary>
 /// <param name="Name">Profile display name.</param>

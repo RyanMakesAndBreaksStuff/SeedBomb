@@ -75,7 +75,7 @@ The workflow creates tag `v1.0.0` on that commit and the GitHub Release.
 
 1. Resolves the version from the tag name or the manual input
 2. Installs .NET 10
-3. Restores and runs `src/DataGen.Wpf.Tests` (`dotnet run --project … -c Release`)
+3. Restores and runs `src/SeedBomb.Wpf.Tests` (`dotnet run --project … -c Release`)
 4. Publishes a self-contained single-file exe:
 
    ```bash
@@ -127,7 +127,7 @@ Optional checks before tagging:
 
 ```bash
 dotnet build src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -c Release
-dotnet run --project src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj -c Release
+dotnet run --project src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj -c Release
 ```
 
 In Visual Studio: right-click **SeedBomb.Wpf → Publish** and use the **GitHubRelease** or **FolderProfile** profile (`win-x64`, self-contained, single-file).
@@ -153,7 +153,7 @@ Prefer bumping the patch version (`1.0.1`) instead of rewriting a shipped tag.
 | Tag push did not start a run | Tag must match `v*.*.*` (use `v1.0.0`, not `1.0.0` or `release-1.0.0`) |
 | `Version must look like 1.2.3` | Use `1.2.3` or `v1.2.3` (optional `-beta.1` suffix is fine) |
 | `release already exists` | That tag already has a release — bump the version or delete the old release |
-| Tests fail in CI | Same command as local: `dotnet run --project src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj -c Release` |
+| Tests fail in CI | Same command as local: `dotnet run --project src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj -c Release` |
 | `SeedBomb.exe was not produced` | Inspect the Publish step log; confirm `AssemblyName` is still `SeedBomb` |
 | Exe is only a few hundred KB | Self-contained publish failed; the file must be tens of MB |
 | Exe will not start on another PC | Needs 64-bit Windows 10 1809+; SmartScreen/AV may quarantine an unsigned exe |

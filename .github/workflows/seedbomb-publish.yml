@@ -22,7 +22,7 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
   PROJECT: src/SeedBomb.Wpf/SeedBomb.Wpf.csproj
-  TEST_PROJECT: src/DataGen.Wpf.Tests/DataGen.Wpf.Tests.csproj
+  TEST_PROJECT: src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj
   PUBLISH_DIR: ${{ github.workspace }}/publish
 
 jobs:

@@ -1,28 +1,28 @@
-using DataGen.Bulk;
-using DataGen.Core.Metadata;
+using SeedBomb.Bulk;
+using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Seedbomb.Resources;
-using Seedbomb.Services;
-using Seedbomb.Services.About;
-using Seedbomb.Services.Auth;
-using Seedbomb.Services.Connections;
-using Seedbomb.Services.Dataverse;
-using Seedbomb.Services.Diagnostics;
-using Seedbomb.Services.Generation;
-using Seedbomb.Services.History;
-using Seedbomb.Services.Navigation;
-using Seedbomb.Services.Profiles;
-using Seedbomb.Services.Settings;
-using Seedbomb.Services.Theme;
-using Seedbomb.ViewModels;
-using Seedbomb.ViewModels.Controls;
-using Seedbomb.Views.Windows;
+using SeedBomb.Resources;
+using SeedBomb.Services;
+using SeedBomb.Services.About;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Diagnostics;
+using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
+using SeedBomb.Services.Settings;
+using SeedBomb.Services.Theme;
+using SeedBomb.ViewModels;
+using SeedBomb.ViewModels.Controls;
+using SeedBomb.Views.Windows;
 using System.Windows;
 using Wpf.Ui;
 
-namespace Seedbomb;
+namespace SeedBomb;
 
 /// <summary>WPF application entry point. Hosts the generic host and owns window lifetime.</summary>
 public partial class App : Application
@@ -183,7 +183,7 @@ public partial class App : Application
         sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
-        sc.AddSingleton<DataGen.Bulk.ThrottlePolicy>();
+        sc.AddSingleton<SeedBomb.Bulk.ThrottlePolicy>();
         sc.AddTransient<ILookupRecordSource, LookupRecordSource>();
         sc.AddTransient<LookupRecordPickerViewModel>();
         sc.AddTransient<Func<LookupRecordPickerViewModel>>(sp =>
@@ -226,13 +226,13 @@ public partial class App : Application
         sc.AddTransient<RuleEditorViewModel>();
 
         // Real pages — NavigationView resolves these from DI via SetServiceProvider
-        sc.AddSingleton<Seedbomb.Views.Pages.GeneratePage>();
-        sc.AddTransient<Seedbomb.Views.Pages.HistoryPage>();
-        sc.AddTransient<Seedbomb.Views.Pages.SettingsPage>();
-        sc.AddTransient<Seedbomb.Views.Pages.AboutPage>();
-        sc.AddTransient<Seedbomb.Views.Pages.ProfilesPage>();
-        sc.AddTransient<Seedbomb.Views.Pages.RulesPage>();
-        sc.AddTransient<Seedbomb.Views.Pages.RunSummaryPage>();
-        sc.AddTransient<Seedbomb.Views.Pages.ConnectionsPage>();
+        sc.AddSingleton<SeedBomb.Views.Pages.GeneratePage>();
+        sc.AddTransient<SeedBomb.Views.Pages.HistoryPage>();
+        sc.AddTransient<SeedBomb.Views.Pages.SettingsPage>();
+        sc.AddTransient<SeedBomb.Views.Pages.AboutPage>();
+        sc.AddTransient<SeedBomb.Views.Pages.ProfilesPage>();
+        sc.AddTransient<SeedBomb.Views.Pages.RulesPage>();
+        sc.AddTransient<SeedBomb.Views.Pages.RunSummaryPage>();
+        sc.AddTransient<SeedBomb.Views.Pages.ConnectionsPage>();
     }
 }

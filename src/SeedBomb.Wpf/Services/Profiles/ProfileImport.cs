@@ -1,7 +1,7 @@
-using DataGen.Core.Rules;
+using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk.Metadata;
 
-namespace Seedbomb.Services.Profiles;
+namespace SeedBomb.Services.Profiles;
 
 /// <summary>
 /// Outcome of §07 metadata-stage import (layer 2). Board receives only

@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Connections;
+namespace SeedBomb.Services.Connections;
 
 /// <summary>Persists and retrieves Dataverse connection profiles.</summary>
 public interface IConnectionProfileService

@@ -1,6 +1,6 @@
-using DataGen.Core.Contracts;
+using SeedBomb.Core.Contracts;
 
-namespace Seedbomb.Services.Generation;
+namespace SeedBomb.Services.Generation;
 
 /// <summary>Decides whether a batch error can be retried without a data fix.</summary>
 public static class RejectionClassifier

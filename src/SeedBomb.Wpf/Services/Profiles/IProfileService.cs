@@ -1,7 +1,7 @@
-namespace Seedbomb.Services.Profiles;
+namespace SeedBomb.Services.Profiles;
 
 /// <summary>
-/// Stores and retrieves rule profiles under <c>%LOCALAPPDATA%\DataGen\profiles</c> (§3.6).
+/// Stores and retrieves rule profiles under <c>%LOCALAPPDATA%\SeedBomb\profiles</c> (§3.6).
 /// Load/Import validate profile schema v1 structurally only (§08 layer 1 — JSON well-formed,
 /// required fields, unique names, allowed rule shapes). Neither method runs metadata validation
 /// against a connected environment; that is layer 2, owned by the caller (Task 11).

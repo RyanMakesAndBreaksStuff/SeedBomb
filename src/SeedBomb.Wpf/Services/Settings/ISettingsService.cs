@@ -1,4 +1,4 @@
-namespace Seedbomb.Services.Settings;
+namespace SeedBomb.Services.Settings;
 
 /// <summary>
 /// Loads and saves application settings to local storage.

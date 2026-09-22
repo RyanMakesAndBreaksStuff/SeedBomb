@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>Seedbomb</RootNamespace>
+    <RootNamespace>SeedBomb</RootNamespace>
     <AssemblyName>SeedBomb</AssemblyName>
     <Product>SeedBomb</Product>
     <!-- Embeds logo.ico as the Win32 EXE resource: taskbar, Alt+Tab, and Explorer all read this. -->
@@ -14,7 +14,7 @@
     <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
     <Platforms>AnyCPU</Platforms>
-    <StartupObject>Seedbomb.App</StartupObject>
+    <StartupObject>SeedBomb.App</StartupObject>
     <AssemblyTitle>SeedBomb</AssemblyTitle>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
@@ -41,11 +41,11 @@
     <DebugType>full</DebugType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DataGen.Core\DataGen.Core.csproj" />
-    <ProjectReference Include="..\DataGen.Bulk\DataGen.Bulk.csproj" />
+    <ProjectReference Include="..\SeedBomb.Core\SeedBomb.Core.csproj" />
+    <ProjectReference Include="..\SeedBomb.Bulk\SeedBomb.Bulk.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DataGen.Wpf.Tests" />
+    <InternalsVisibleTo Include="SeedBomb.Wpf.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" />
@@ -65,9 +65,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\..\LICENSE" LogicalName="Seedbomb.AppLicense.txt" />
-    <EmbeddedResource Include="Resources\ThirdParty\ThirdPartyNotices.json" LogicalName="Seedbomb.ThirdPartyNotices.json" />
-    <EmbeddedResource Include="Resources\ThirdParty\Licenses\*" LogicalName="Seedbomb.Licenses.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\LICENSE" LogicalName="SeedBomb.AppLicense.txt" />
+    <EmbeddedResource Include="Resources\ThirdParty\ThirdPartyNotices.json" LogicalName="SeedBomb.ThirdPartyNotices.json" />
+    <EmbeddedResource Include="Resources\ThirdParty\Licenses\*" LogicalName="SeedBomb.Licenses.%(Filename)%(Extension)" />
   </ItemGroup>
   <Target Name="ValidateThirdPartyNoticeResources"
           BeforeTargets="BeforeBuild"

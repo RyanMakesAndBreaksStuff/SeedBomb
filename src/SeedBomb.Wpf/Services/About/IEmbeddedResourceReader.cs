@@ -1,7 +1,7 @@
 using System.IO;
 using System.Reflection;
 
-namespace Seedbomb.Services.About;
+namespace SeedBomb.Services.About;
 
 /// <summary>Reads embedded UTF-8 resources by logical name.</summary>
 public interface IEmbeddedResourceReader
