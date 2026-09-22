@@ -24,23 +24,7 @@
     <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
     <DebugType>full</DebugType>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <Optimize>True</Optimize>
-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
-    <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
-    <DebugType>full</DebugType>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
-    <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
-    <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
     <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
     <DebugType>full</DebugType>
@@ -65,7 +49,7 @@
     <!-- Embedded as pack://application:,,,/Resources/<filename>. -->
     <Resource Include="Resources\logo.ico" />
     <Resource Include="Resources\logo-dark.ico" />
-    <Resource Include="Resources\logo-256.png" />
+    <Resource Include="Resources\logo-light.png" />
     <Resource Include="Resources\logo-dark.png" />
   </ItemGroup>
 
@@ -79,5 +63,4 @@
           Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipThirdPartyNoticeValidation)' != 'true'">
     <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)..\..\tools\Generate-ThirdPartyNotices.ps1&quot; -ValidateResources" />
   </Target>
-
 </Project>
