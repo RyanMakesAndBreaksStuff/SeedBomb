@@ -10,15 +10,6 @@
         Background="Transparent"
         WindowStartupLocation="CenterScreen"
         Topmost="True">
-
-    <!-- ================================================================
-         Seed Bomb splash — WPF port of concept 07 (Indigo Dark · halo +
-         ring loader), 800 x 480. Layer order is the contract: backdrop,
-         frame, halo/ticks, loader ring, pips, bomb — and ALL type last
-         (the three arc Paths + corner tags), so text is always the top
-         level, no exceptions. Arc type is real vector geometry built in
-         SplashWindow.xaml.cs (per-glyph FormattedText -> Geometry).
-         ================================================================ -->
     <Window.Resources>
         <RadialGradientBrush x:Key="PageGlow" Center="0.5,0" GradientOrigin="0.5,0" RadiusX="0.62" RadiusY="0.62">
             <GradientStop Color="#1E2340" Offset="0" />
@@ -56,7 +47,7 @@
             <Line Canvas.Left="0" Canvas.Top="0" X1="302.42" Y1="140.42" X2="293.93" Y2="131.93" Stroke="#3A4050"
                   StrokeThickness="1.5" />
 
-            <!-- 3 · seal ring track + circling loader arc (C2 style).
+            <!--seal ring track + circling loader arc (C2 style).
                  The arc is ALWAYS indeterminate ambiance: constant rhythm from
                  Loaded to fade, never reflecting loading % and never reacting
                  to completion. SetProgress() only drives the lifecycle: at 1.0
@@ -90,7 +81,7 @@
             <!-- 5 · bomb (soft periwinkle glow, then shadowed image) -->
             <Ellipse Canvas.Left="250" Canvas.Top="88" Width="300" Height="300" Fill="{StaticResource BombGlow}" />
             <Image Canvas.Left="261.3" Canvas.Top="120.5" Width="277.4" Height="235"
-                   Source="pack://application:,,,/Resources/logo-dark.png"
+                   Source="/Resources/logo-light.png"
                    RenderOptions.BitmapScalingMode="HighQuality">
                 <Image.Effect>
                     <DropShadowEffect Color="#000000" BlurRadius="36" ShadowDepth="18" Opacity="0.6" />
