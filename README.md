@@ -22,7 +22,7 @@ The same core generation engine is exposed through two front ends:
 
 ## Solution structure
 
-- `SeedBomb.sln` / `SeedBomb.slnx` — solution files.
+- `SeedBomb.slnx` — solution file.
 - `Directory.Build.props` — shared MSBuild properties (`net10.0`, warnings as errors, XML documentation files).
 - `Directory.Packages.props` — central package management.
 
@@ -49,10 +49,10 @@ The same core generation engine is exposed through two front ends:
 
 ```bash
 # Full solution (Windows)
-dotnet build SeedBomb.sln
+dotnet build SeedBomb.slnx
 
 # Full solution on non-Windows hosts (required for WPF)
-dotnet build SeedBomb.sln -p:EnableWindowsTargeting=true
+dotnet build SeedBomb.slnx -p:EnableWindowsTargeting=true
 
 # Individual projects
 dotnet build src/SeedBomb.Web/SeedBomb.Web.csproj
@@ -87,7 +87,7 @@ dotnet run --project tests/SeedBomb.Integration.Tests/SeedBomb.Integration.Tests
 
 > `SeedBomb.Wpf.Tests` requires the .NET **Windows Desktop** runtime and must be run on Windows.
 
-`dotnet test SeedBomb.sln` may fail in some environments because the VSTest host cannot discover the xunit.v3 runner. Use `dotnet run --project <test.csproj>` as the fallback.
+`dotnet test SeedBomb.slnx` may fail in some environments because the VSTest host cannot discover the xunit.v3 runner. Use `dotnet run --project <test.csproj>` as the fallback.
 
 > The repo's `global.json` pins the Microsoft.Testing.Platform (MTP) test runner for .NET 10. Without it, `dotnet test` can silently report 0 tests discovered as a "pass" — always confirm the reported test count against the verified counts below.
 

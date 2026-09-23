@@ -105,7 +105,7 @@ public sealed class HistoryViewModelTests
             history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
         await vm.LoadCommand.ExecuteAsync(null);
 
-        var exportDir = Directory.CreateTempSubdirectory("datagen-history-export-test-");
+        var exportDir = Directory.CreateTempSubdirectory("seedbomb-history-export-test-");
         vm.ExportDirectoryOverride = exportDir.FullName;
         try
         {

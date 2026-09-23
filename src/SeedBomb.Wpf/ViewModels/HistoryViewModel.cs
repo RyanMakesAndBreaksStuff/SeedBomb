@@ -149,7 +149,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
             var directory = ExportDirectoryOverride ?? ExportPaths.Downloads();
             var path = System.IO.Path.Combine(
                 directory,
-                $"datagen-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+                $"seedbomb-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
 
             var lines = new List<string>
             {

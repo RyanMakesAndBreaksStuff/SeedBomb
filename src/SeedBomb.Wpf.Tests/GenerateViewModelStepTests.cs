@@ -591,7 +591,7 @@ public sealed class GenerateViewModelStepTests
     [Fact]
     public async Task CommitThenResetThenDiscard_LeavesNoPersistedDraft()
     {
-        var root = Path.Combine(Path.GetTempPath(), "datagen-t3-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "seedbomb-t3-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
