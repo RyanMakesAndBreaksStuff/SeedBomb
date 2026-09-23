@@ -199,10 +199,10 @@ internal static class Harness
     private static string RepoRoot([CallerFilePath] string sourceFile = "")
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SeedBomb.sln")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SeedBomb.slnx")))
             directory = directory.Parent;
         return directory?.FullName
-            ?? throw new InvalidOperationException("SeedBomb.sln not found from test source path.");
+            ?? throw new InvalidOperationException("SeedBomb.slnx not found from test source path.");
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()

@@ -28,7 +28,7 @@
                     </Style.Triggers>
                 </Style>
             </StackPanel.Style>
-            <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Value" />
+            <TextBlock Style="{DynamicResource DG.GroupLabel}"><Run Text="Value" /><Run Text=" *" Foreground="{DynamicResource DG.Error}" /></TextBlock>
             <TextBox Style="{DynamicResource DG.TextBox}"
                      Text="{Binding ConstantText, UpdateSourceTrigger=PropertyChanged}" />
         </StackPanel>
@@ -181,8 +181,7 @@
     <DataTemplate x:Key="BogusOpTemplate">
         <StackPanel Margin="0,0,0,16">
             <TextBlock x:Name="BogusApiLabel"
-                       Style="{DynamicResource DG.GroupLabel}"
-                       Text="API" />
+                       Style="{DynamicResource DG.GroupLabel}"><Run Text="API" /><Run Text=" *" Foreground="{DynamicResource DG.Error}" /></TextBlock>
             <ComboBox Style="{DynamicResource DG.ComboBox}"
                       ItemsSource="{Binding BogusInput.BogusApis}"
                       SelectedItem="{Binding BogusInput.SelectedBogusApi, Mode=TwoWay}"
@@ -192,8 +191,7 @@
 
             <TextBlock x:Name="BogusEndpointLabel"
                        Style="{DynamicResource DG.GroupLabel}"
-                       Text="Endpoint"
-                       Margin="0,8,0,0" />
+                       Margin="0,8,0,0"><Run Text="Endpoint" /><Run Text=" *" Foreground="{DynamicResource DG.Error}" /></TextBlock>
             <ComboBox Style="{DynamicResource DG.ComboBox}"
                       ItemsSource="{Binding BogusInput.BogusEndpoints}"
                       DisplayMemberPath="DisplayName"

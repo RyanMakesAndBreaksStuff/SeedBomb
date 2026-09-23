@@ -213,6 +213,16 @@ public sealed class RuleEditorViewModelTests
     }
 
     [Fact]
+    public void Rule_level_errors_reach_the_InfoBar_but_not_the_Operation_field()
+    {
+        var vm = EditorFor(StringColumn());
+        vm.SelectedOp = "pattern";   // Template empty => no draft => "Enter a value for this rule."
+
+        Assert.Contains("Enter a value for this rule.", vm.GetErrors(null).Cast<string>());
+        Assert.Empty(vm.GetErrors(nameof(vm.SelectedOp)).Cast<string>());
+    }
+
+    [Fact]
     public async Task ApplyExistingBogusRule_PreviewsThroughEvaluatorSession()
     {
         var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 42, runId: "r1");

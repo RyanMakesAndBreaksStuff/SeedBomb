@@ -1350,7 +1350,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     private static string? PropertyNameFor(RuleInputTarget target) => target switch
     {
-        RuleInputTarget.Rule => nameof(SelectedOp),
         RuleInputTarget.Api => nameof(SelectedBogusApi),
         RuleInputTarget.Endpoint => nameof(SelectedBogusEndpoint),
         RuleInputTarget.Minimum => nameof(BogusMinNumber),
@@ -1358,7 +1357,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         RuleInputTarget.Length => nameof(BogusLengthText),
         RuleInputTarget.MinimumDate => nameof(BogusMinDate),
         RuleInputTarget.MaximumDate => nameof(BogusMaxDate),
-        _ => nameof(SelectedOp),
+        _ => null,   // Rule-level errors belong to the InfoBar, not to one input's adorner.
     };
 
     /// <summary>Starts page lifetime: captures the UI context and listens for connection resets.</summary>

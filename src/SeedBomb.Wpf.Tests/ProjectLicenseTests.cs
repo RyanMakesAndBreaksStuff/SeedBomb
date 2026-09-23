@@ -28,7 +28,7 @@ public sealed class ProjectLicenseTests
     private static string FindRepoRoot([CallerFilePath] string sourceFile = "")
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SeedBomb.sln")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "SeedBomb.slnx")))
             directory = directory.Parent;
         Assert.NotNull(directory);
         return directory.FullName;
