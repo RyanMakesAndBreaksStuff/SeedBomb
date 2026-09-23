@@ -114,10 +114,3 @@ Verified test counts:
 ## License
 
 SeedBomb is licensed under the [BSD 3-Clause License](LICENSE) (`BSD-3-Clause`). See [LICENSE](LICENSE).
-
-## Project conventions
-
-- Plans and specs live in `plans/` (e.g., `plans/connection.md`).
-- Active task tracking is in `tasks/todo.md`; lessons learned are captured in `tasks/lessons.md`.
-- Historical documentation is archived in `Docs/olddoc/`.
-- See `AGENTS.md` for the full agent guide, code style guidelines, and security notes.
