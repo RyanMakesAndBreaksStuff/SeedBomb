@@ -59,23 +59,38 @@
 
             <Border Style="{DynamicResource DG.CardBorder}"
                     Visibility="{Binding IsEmpty, Converter={StaticResource InverseBoolToVisible}}">
-                <Grid>
+                <!-- Header column widths are the source of truth; rows follow via SharedSizeGroup. -->
+                <Grid Grid.IsSharedSizeScope="True">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
+                    <Grid.Resources>
+                        <!-- Invisible drag handle straddling a column boundary. -->
+                        <Style x:Key="ColumnGrip" TargetType="Thumb">
+                            <Setter Property="Width" Value="8" />
+                            <Setter Property="Cursor" Value="SizeWE" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Border Background="Transparent" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Grid.Resources>
 
                     <Border Grid.Row="0" Style="{DynamicResource DG.TableHeader}">
-                        <Grid>
+                        <Grid x:Name="HeaderGrid">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="72" />   <!-- Time -->
-                                <ColumnDefinition Width="*" MinWidth="160" />  <!-- Tables -->
-                                <ColumnDefinition Width="160" />  <!-- Environment -->
-                                <ColumnDefinition Width="150" />  <!-- User -->
-                                <ColumnDefinition Width="130" />  <!-- Profile -->
-                                <ColumnDefinition Width="88" />   <!-- Records -->
-                                <ColumnDefinition Width="72" />   <!-- Duration -->
-                                <ColumnDefinition Width="80" />   <!-- Status -->
+                                <ColumnDefinition Width="72" MinWidth="48" SharedSizeGroup="Time" />
+                                <ColumnDefinition x:Name="TablesColumn" Width="*" MinWidth="160" />
+                                <ColumnDefinition Width="160" MinWidth="48" SharedSizeGroup="Environment" />
+                                <ColumnDefinition Width="150" MinWidth="48" SharedSizeGroup="User" />
+                                <ColumnDefinition Width="130" MinWidth="48" SharedSizeGroup="Profile" />
+                                <ColumnDefinition Width="88" MinWidth="48" SharedSizeGroup="Records" />
+                                <ColumnDefinition Width="72" MinWidth="48" SharedSizeGroup="Duration" />
+                                <ColumnDefinition Width="80" MinWidth="48" SharedSizeGroup="Status" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Style="{DynamicResource DG.TableHeaderText}" Text="Time" />
                             <TextBlock Grid.Column="1" Style="{DynamicResource DG.TableHeaderText}" Text="Tables" />
@@ -85,6 +100,25 @@
                             <TextBlock Grid.Column="5" Style="{DynamicResource DG.TableHeaderText}" Text="Records" />
                             <TextBlock Grid.Column="6" Style="{DynamicResource DG.TableHeaderText}" Text="Duration" />
                             <TextBlock Grid.Column="7" Style="{DynamicResource DG.TableHeaderText}" Text="Status" />
+
+                            <!--
+                                Tables is the star column, so Time is left-anchored (grip on its right edge) and
+                                every column after Tables is right-anchored (grip on its left edge).
+                            -->
+                            <Thumb Grid.Column="0" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Right"
+                                   Margin="0,0,-4,0" DragDelta="OnColumnGripDragDelta" />
+                            <Thumb Grid.Column="2" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Left"
+                                   Margin="-4,0,0,0" DragDelta="OnColumnGripDragDelta" />
+                            <Thumb Grid.Column="3" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Left"
+                                   Margin="-4,0,0,0" DragDelta="OnColumnGripDragDelta" />
+                            <Thumb Grid.Column="4" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Left"
+                                   Margin="-4,0,0,0" DragDelta="OnColumnGripDragDelta" />
+                            <Thumb Grid.Column="5" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Left"
+                                   Margin="-4,0,0,0" DragDelta="OnColumnGripDragDelta" />
+                            <Thumb Grid.Column="6" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Left"
+                                   Margin="-4,0,0,0" DragDelta="OnColumnGripDragDelta" />
+                            <Thumb Grid.Column="7" Style="{StaticResource ColumnGrip}" HorizontalAlignment="Left"
+                                   Margin="-4,0,0,0" DragDelta="OnColumnGripDragDelta" />
                         </Grid>
                     </Border>
 
@@ -105,22 +139,24 @@
                                            Margin="{DynamicResource DG.Pad.Row}" />
                             </DataTemplate>
                             <DataTemplate DataType="{x:Type history:RunRecord}">
-                                <Border Style="{DynamicResource DG.TableRow}" Cursor="Hand">
+                                <!-- Transparent (not null) background so the gaps between cells take the click too. -->
+                                <Border Style="{DynamicResource DG.TableRow}" Background="Transparent" Cursor="Hand">
                                     <Border.InputBindings>
                                         <MouseBinding MouseAction="LeftClick"
                                                       Command="{Binding DataContext.OpenRunCommand, RelativeSource={RelativeSource AncestorType=Page}}"
                                                       CommandParameter="{Binding}" />
                                     </Border.InputBindings>
                                     <Grid>
+                                        <!-- No Width: a shared group takes the largest pixel Width, which is the header's. -->
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="72" />   <!-- Time -->
-                                            <ColumnDefinition Width="*" MinWidth="160" />  <!-- Tables -->
-                                            <ColumnDefinition Width="160" />  <!-- Environment -->
-                                            <ColumnDefinition Width="150" />  <!-- User -->
-                                            <ColumnDefinition Width="130" />  <!-- Profile -->
-                                            <ColumnDefinition Width="88" />   <!-- Records -->
-                                            <ColumnDefinition Width="72" />   <!-- Duration -->
-                                            <ColumnDefinition Width="80" />   <!-- Status -->
+                                            <ColumnDefinition SharedSizeGroup="Time" />
+                                            <ColumnDefinition Width="*" MinWidth="160" />
+                                            <ColumnDefinition SharedSizeGroup="Environment" />
+                                            <ColumnDefinition SharedSizeGroup="User" />
+                                            <ColumnDefinition SharedSizeGroup="Profile" />
+                                            <ColumnDefinition SharedSizeGroup="Records" />
+                                            <ColumnDefinition SharedSizeGroup="Duration" />
+                                            <ColumnDefinition SharedSizeGroup="Status" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0"
                                                    Style="{DynamicResource DG.Cell}"

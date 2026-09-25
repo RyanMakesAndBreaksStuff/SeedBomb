@@ -102,16 +102,23 @@ public sealed partial class RunViewModel : ObservableObject
         _logger = logger;
         _connections = connections;
         _auth = auth;
+        SummaryView = this;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
+
+    /// <summary>What <see cref="RunSummaryPage"/> shows: this live run, or a detached copy of a historical run.</summary>
+    public RunViewModel SummaryView { get; private set; }
 
     /// <summary>Host of the environment the last run targeted, e.g. <c>contoso.crm.dynamics.com</c>.</summary>
     public string EnvironmentLabel => _environmentHost;
 
     /// <summary>Signed-in user for the last run, or "" when unknown.</summary>
     public string UserLabel => _auth?.CurrentUserDisplayName ?? "";
+
+    /// <summary>Full activity log for the last run, oldest first. Persisted with the history record.</summary>
+    public string[] ActivityLines => _activityLog.Select(l => l.Line).ToArray();
 
     /// <summary>True while generation is in flight. Drives the ring, headline, and Cancel/Close swap.</summary>
     [ObservableProperty] private bool _isRunning;
@@ -267,6 +274,7 @@ public sealed partial class RunViewModel : ObservableObject
         _plannedTotal = plannedTotal;
         _plannedTables = tables;
         _tableWritten.Clear();
+        SummaryView = this;
         // A new run must not inherit the previous run's lines — this is the only reset point,
         // and ShowFullLogAsync reads the same backing list as the RecentActivity tail.
         _activityLog.Clear();
@@ -409,10 +417,27 @@ public sealed partial class RunViewModel : ObservableObject
         AppendActivity($"Finished — {written:N0} written, {rejected:N0} rejected");
     }
 
-    /// <summary>History hydration: stats only, no rejection rows, retry disabled. Does not change <see cref="CurrentRunId"/>.</summary>
-    public void HydrateFrom(RunRecord run)
+    /// <summary>
+    /// Points <see cref="SummaryView"/> at a detached copy hydrated from <paramref name="run"/>.
+    /// The live run's rejections, retry config and log stay intact for when History reopens it.
+    /// </summary>
+    public void ShowHistorical(RunRecord run)
     {
         ArgumentNullException.ThrowIfNull(run);
+
+        var view = new RunViewModel(contentDialogService: _dialogs, navigator: _navigator, snackbar: _snackbar, logger: _logger);
+        view.HydrateFrom(run);
+        SummaryView = view;
+    }
+
+    /// <summary>Points <see cref="SummaryView"/> back at the live run.</summary>
+    public void ShowLive() => SummaryView = this;
+
+    /// <summary>History hydration of a fresh instance: stats and saved activity, no rejection rows, retry disabled.</summary>
+    private void HydrateFrom(RunRecord run)
+    {
+        foreach (var line in run.ActivityLog ?? [])
+            AppendActivity(line);
 
         _lastConfig = null;
         IsRunning = false;

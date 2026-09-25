@@ -132,4 +132,36 @@ public sealed class HistoryViewModelTests
             exportDir.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public void OpenRun_HistoricalThenLive_LiveSummaryIsIntact()
+    {
+        var live = new RunViewModel(generation: Mock.Of<SeedBomb.Services.Generation.IWpfGenerationService>());
+        live.ApplyResult(new SeedBomb.Core.Contracts.GenerationResult
+        {
+            Elapsed = TimeSpan.FromMinutes(1),
+            Errors = [new SeedBomb.Core.Contracts.BatchError("account", 0, "request throttled", -2147220956, 7)],
+        }, seed: 42, environmentHost: "contoso-dev",
+            new SeedBomb.Core.Contracts.GenerationConfig {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 7 },
+                Seed = 42,
+            });
+        var liveLog = live.ActivityLines;
+        var vm = new HistoryViewModel(
+            Mock.Of<IRunHistoryService>(), Mock.Of<ILogger<HistoryViewModel>>(), live);
+
+        vm.OpenRunCommand.Execute(new RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["contact"], 3,
+            TimeSpan.FromSeconds(2), true, 0, ActivityLog: ["old run"]));
+        Assert.NotSame(live, live.SummaryView);
+        Assert.Equal(["old run"], live.SummaryView.ActivityLines);
+
+        vm.OpenRunCommand.Execute(new RunRecord(live.CurrentRunId, DateTimeOffset.Now, ["account"], 0,
+            TimeSpan.FromMinutes(1), false, 7));
+        Assert.Same(live, live.SummaryView);
+        Assert.Equal(7, Assert.Single(live.RejectionGroups).RowCount);
+        Assert.True(live.RetrySelectedCommand.CanExecute(null));
+        Assert.Equal(liveLog, live.ActivityLines);
+        Assert.Contains("seed 42", live.RunMetaLine, StringComparison.Ordinal);
+    }
 }

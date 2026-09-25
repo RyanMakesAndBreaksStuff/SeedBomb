@@ -391,4 +391,18 @@ public sealed class RunViewModelTests
         Assert.Equal(500, Assert.Single(vm.RejectionGroups).RowCount);
         Assert.Contains("500 rejected rows", vm.OutcomeHeadline, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ShowHistorical_ShowsSavedActivity()
+    {
+        var vm = new RunViewModel();
+        var run = new SeedBomb.Services.History.RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["account"], 10,
+            TimeSpan.FromSeconds(3), true, 0, ActivityLog: ["Generating  account  10/10", "Finished — 10 written, 0 rejected"]);
+
+        vm.ShowHistorical(run);
+        Assert.Equal(run.ActivityLog, vm.SummaryView.ActivityLines);
+
+        vm.ShowHistorical(run with { ActivityLog = null });
+        Assert.Empty(vm.SummaryView.ActivityLines);
+    }
 }

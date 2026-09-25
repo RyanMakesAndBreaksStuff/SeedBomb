@@ -193,12 +193,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
             return;
 
         if (_run is not null && run.Id == _run.CurrentRunId)
-        {
-            _navigator?.Navigate(typeof(RunSummaryPage));
-            return;
-        }
-
-        _run?.HydrateFrom(run);
+            _run.ShowLive();
+        else
+            _run?.ShowHistorical(run);
         _navigator?.Navigate(typeof(RunSummaryPage));
     }
 

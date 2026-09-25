@@ -13,6 +13,7 @@ namespace SeedBomb.Services.History;
 /// <param name="Environment">Host of the environment the run targeted, or "" when unknown.</param>
 /// <param name="User">Signed-in user for the run, or "" when unknown.</param>
 /// <param name="Profile">Rule profile active for the run, or "" when unknown.</param>
+/// <param name="ActivityLog">Activity log lines, oldest first. Null for runs recorded before the log was persisted.</param>
 public record RunRecord(
     Guid Id,
     DateTimeOffset Timestamp,
@@ -23,4 +24,5 @@ public record RunRecord(
     int ErrorCount,
     string Environment = "",
     string User = "",
-    string Profile = "");
+    string Profile = "",
+    string[]? ActivityLog = null);
