@@ -75,15 +75,56 @@
                          VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                          VirtualizingPanel.VirtualizationMode="Recycling"
                          VirtualizingPanel.ScrollUnit="Pixel">
+                    <!-- Accordion: each group header toggles its rows. Expanded state lives in
+                         code-behind because every ColumnsView.Refresh() regenerates the GroupItems. -->
                     <ListBox.GroupStyle>
                         <GroupStyle>
-                            <GroupStyle.HeaderTemplate>
-                                <DataTemplate>
-                                    <TextBlock Style="{DynamicResource DG.GroupLabel}"
-                                               Text="{Binding Name}"
-                                               Margin="10,8,10,4" />
-                                </DataTemplate>
-                            </GroupStyle.HeaderTemplate>
+                            <GroupStyle.ContainerStyle>
+                                <Style TargetType="GroupItem">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="GroupItem">
+                                                <StackPanel>
+                                                    <ToggleButton x:Name="Header" IsChecked="True"
+                                                                  Cursor="Hand"
+                                                                  AutomationProperties.Name="{Binding Name}"
+                                                                  Loaded="OnGroupHeaderLoaded"
+                                                                  DataContextChanged="OnGroupHeaderDataContextChanged"
+                                                                  Click="OnGroupHeaderClick">
+                                                        <ToggleButton.Template>
+                                                            <ControlTemplate TargetType="ToggleButton">
+                                                                <Border Background="Transparent" Padding="10,8,10,4">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <ui:SymbolIcon x:Name="Chevron" Symbol="ChevronDown16"
+                                                                                       FontSize="{DynamicResource DG.Type.Micro}"
+                                                                                       Foreground="{DynamicResource DG.Text2}"
+                                                                                       VerticalAlignment="Center"
+                                                                                       Margin="0,0,6,0" />
+                                                                        <TextBlock Style="{DynamicResource DG.GroupLabel}" Margin="0">
+                                                                            <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" (" /><Run Text="{Binding ItemCount, Mode=OneWay}" /><Run Text=")" />
+                                                                        </TextBlock>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsChecked" Value="False">
+                                                                        <Setter TargetName="Chevron" Property="Symbol" Value="ChevronRight16" />
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </ToggleButton.Template>
+                                                    </ToggleButton>
+                                                    <ItemsPresenter x:Name="Items" />
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger SourceName="Header" Property="IsChecked" Value="False">
+                                                        <Setter TargetName="Items" Property="Visibility" Value="Collapsed" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </GroupStyle.ContainerStyle>
                         </GroupStyle>
                     </ListBox.GroupStyle>
 

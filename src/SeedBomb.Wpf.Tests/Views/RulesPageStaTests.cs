@@ -1,3 +1,4 @@
+using SeedBomb.Core.Metadata;
 using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Xrm.Sdk.Metadata;
@@ -5,6 +6,8 @@ using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Navigation;
+using SeedBomb.Services.Profiles;
 using SeedBomb.ViewModels;
 using SeedBomb.ViewModels.Controls;
 using SeedBomb.Views.Controls;
@@ -16,6 +19,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -180,6 +184,43 @@ public sealed class RulesPageStaTests : IDisposable
         }
 
         Assert.Equal(7, templates.Count);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void OperationTemplateHost_DoesNotAdornRuleLevelErrors()
+    {
+        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var host = FindVisualChildren<ContentControl>(page).Single(c => ReferenceEquals(c.Content, vm));
+
+        foreach (var op in new[] { "pattern", "range", "bogus" })
+        {
+            vm.SelectedOp = op;
+            Flush();
+            Assert.True(vm.HasMessages, $"{op} should carry a rule message for the InfoBar.");
+            Assert.False(Validation.GetHasError(host), $"{op}: template host shows the red validation outline.");
+        }
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void ColumnGroups_CollapseOnHeaderClick_AndStayCollapsedAcrossRefresh()
+    {
+        var (page, vm) = LoadRulesPageForProfileOnSta();
+        var header = GroupHeader(page, "Disabled");
+        Assert.True(header.IsChecked);
+        Assert.Contains(FindVisualChildren<ListBoxItem>(FindAncestor<GroupItem>(header)), i => i.IsVisible);
+
+        InvokeClick(header);
+        Flush();
+        Assert.False(header.IsChecked);
+        Assert.DoesNotContain(FindVisualChildren<ListBoxItem>(FindAncestor<GroupItem>(header)), i => i.IsVisible);
+
+        // Every rule save refreshes the view, which regenerates the group containers.
+        vm.ColumnsView!.Refresh();
+        Flush();
+        Assert.False(GroupHeader(page, "Disabled").IsChecked);
+        Assert.True(GroupHeader(page, "Unmapped").IsChecked);
         Assert.Empty(CapturedBindingErrors);
     }
 
@@ -531,6 +572,51 @@ public sealed class RulesPageStaTests : IDisposable
         Flush();
         return (page, vm);
     }
+
+    // Profile path: the only one that creates the grouped ColumnsView.
+    private (RulesPage page, RuleEditorViewModel vm) LoadRulesPageForProfileOnSta()
+    {
+        EnsureApplication();
+        StartBindingTrace();
+        CapturedBindingErrors.Clear();
+
+        var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
+        var calc = new StringAttributeMetadata { LogicalName = "calc", IsValidForCreate = false, MaxLength = 20 };
+        var account = new EntityMetadata { LogicalName = "account" };
+        account.GetType().GetProperty("Attributes")!.SetValue(account, new AttributeMetadata[] { name, calc });
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([account]);
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(1, "p", null, 42, [new ProfileTable("account", 10, null)]),
+            TableName = "account",
+        };
+        var vm = new RuleEditorViewModel(metadata.Object, Mock.Of<IProfileService>(), Mock.Of<IAppNavigator>(), request);
+        var load = vm.LoadForProfileAsync();
+        PumpUntil(() => load.IsCompleted);
+        load.GetAwaiter().GetResult();
+
+        var page = new RulesPage(vm);
+        var window = new Window
+        {
+            Content = page,
+            Width = 1280,
+            Height = 800,
+            ShowInTaskbar = false,
+            ShowActivated = false,
+            WindowStyle = WindowStyle.ToolWindow,
+        };
+        _windows.Add(window);
+        window.Show();
+        page.UpdateLayout();
+        Flush();
+        return (page, vm);
+    }
+
+    private static ToggleButton GroupHeader(DependencyObject root, string group) =>
+        FindVisualChildren<ToggleButton>(root)
+            .Single(t => t.DataContext is CollectionViewGroup g && Equals(g.Name, group));
 
     private (ConnectionsPage page, ConnectionManagerViewModel vm) LoadConnectionsPageOnSta()
     {
