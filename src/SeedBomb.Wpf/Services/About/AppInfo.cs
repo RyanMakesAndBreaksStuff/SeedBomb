@@ -14,6 +14,9 @@ public static class AppInfo
     public const string DocumentationUrl = "https://github.com/RyanMakesAndBreaksStuff/SeedBomb/blob/master/README.md";
     public const string IssuesUrl = "https://github.com/RyanMakesAndBreaksStuff/SeedBomb/issues/new";
 
+    /// <summary>Splash-tag version label, e.g. <c>V2.0.1</c>, from the project's &lt;Version&gt;.</summary>
+    public static string VersionTag { get; } = "V" + ReadVersion(typeof(AppInfo).Assembly);
+
     public static string ReadVersion(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);

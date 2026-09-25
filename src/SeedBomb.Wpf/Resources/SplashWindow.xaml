@@ -1,6 +1,7 @@
 <Window x:Class="SeedBomb.Resources.SplashWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:about="clr-namespace:SeedBomb.Services.About"
         Title="Seed Bomb for Microsoft Dataverse"
         Width="800" Height="480"
         WindowStyle="None"
@@ -97,9 +98,9 @@
                        FontFamily="Consolas" FontSize="10" Foreground="#838A9E" />
 
             <!-- 7 · corner tags -->
-            <TextBlock Canvas.Left="32" Canvas.Top="446" Text="TOKENS / DARK"
+            <TextBlock Canvas.Left="32" Canvas.Top="446" Text=""
                        FontFamily="Consolas" FontWeight="Bold" FontSize="9" Foreground="#5C6377" />
-            <TextBlock Canvas.Left="736" Canvas.Top="446" Text="V1.0.0"
+            <TextBlock Canvas.Left="736" Canvas.Top="446" Text="{x:Static about:AppInfo.VersionTag}"
                        FontFamily="Consolas" FontWeight="Bold" FontSize="9" Foreground="#5C6377" />
         </Canvas>
     </Grid>
