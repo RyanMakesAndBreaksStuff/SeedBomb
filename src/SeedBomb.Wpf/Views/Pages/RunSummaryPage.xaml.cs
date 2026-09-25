@@ -14,8 +14,9 @@ public partial class RunSummaryPage : Page, INavigableView<RunViewModel>
     /// <summary>Initialises the page.</summary>
     public RunSummaryPage(RunViewModel viewModel)
     {
-        ViewModel = viewModel;
-        DataContext = viewModel;
+        // Transient page, so each navigation picks up whichever run History (or a new run) selected.
+        ViewModel = viewModel.SummaryView;
+        DataContext = ViewModel;
         InitializeComponent();
         Loaded += OnPageLoaded;
     }

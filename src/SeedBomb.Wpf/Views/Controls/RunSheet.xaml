@@ -228,7 +228,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Style="{DynamicResource DG.GroupLabel}"
-                                   Margin="0" Text="Linking records" VerticalAlignment="Center" />
+                                   Margin="0" Text="Populating Relationships" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1" Style="{DynamicResource DG.Mono}"
                                    Text="{Binding LinkLabel}" VerticalAlignment="Center" />
                     </Grid>
