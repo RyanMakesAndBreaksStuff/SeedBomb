@@ -218,7 +218,8 @@ public sealed class RuleEditorViewModelTests
         var vm = EditorFor(StringColumn());
         vm.SelectedOp = "pattern";   // Template empty => no draft => "Enter a value for this rule."
 
-        Assert.Contains("Enter a value for this rule.", vm.GetErrors(null).Cast<string>());
+        Assert.Equal("Enter a value for this rule.", vm.InfoBarMessage);
+        Assert.Empty(vm.GetErrors(null).Cast<string>());
         Assert.Empty(vm.GetErrors(nameof(vm.SelectedOp)).Cast<string>());
     }
 

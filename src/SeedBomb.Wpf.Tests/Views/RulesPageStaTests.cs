@@ -184,6 +184,22 @@ public sealed class RulesPageStaTests : IDisposable
     }
 
     [StaFact]
+    public void OperationTemplateHost_DoesNotAdornRuleLevelErrors()
+    {
+        var (page, vm) = LoadRulesPageOnSta(StringColumn());
+        var host = FindVisualChildren<ContentControl>(page).Single(c => ReferenceEquals(c.Content, vm));
+
+        foreach (var op in new[] { "pattern", "range", "bogus" })
+        {
+            vm.SelectedOp = op;
+            Flush();
+            Assert.True(vm.HasMessages, $"{op} should carry a rule message for the InfoBar.");
+            Assert.False(Validation.GetHasError(host), $"{op}: template host shows the red validation outline.");
+        }
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
     public void ConnectionsTestResultBanner_SwapsBrushGlyphAndVisibility()
     {
         var (page, vm) = LoadConnectionsPageOnSta();

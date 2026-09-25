@@ -409,8 +409,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <inheritdoc />
     public IEnumerable GetErrors(string? propertyName)
     {
+        // Entity-level errors would adorn every {Binding} host, i.e. the whole operation template.
+        // Rule-level messages already surface through HasMessages / InfoBarMessage.
         if (string.IsNullOrEmpty(propertyName))
-            return _messages.Select(m => m.Text).ToList();
+            return Array.Empty<string>();
 
         return _messages
             .Where(m => PropertyNameFor(m.Target) == propertyName)
