@@ -659,6 +659,7 @@
     <Style x:Key="DG.Chip" TargetType="Border">
         <Setter Property="Height" Value="{DynamicResource DG.Size.Chip}" />
         <Setter Property="Padding" Value="9,0" />
+        <Setter Property="Margin" Value="2,2" />
         <Setter Property="Background" Value="{DynamicResource DG.ItemSelected}" />
         <Setter Property="BorderBrush" Value="{DynamicResource DG.ControlBorder}" />
         <Setter Property="BorderThickness" Value="1" />

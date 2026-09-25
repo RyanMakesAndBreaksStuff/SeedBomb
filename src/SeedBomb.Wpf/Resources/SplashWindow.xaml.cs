@@ -32,7 +32,7 @@ namespace SeedBomb.Resources
     /// </summary>
     public partial class SplashWindow : Window
     {
-        private const double MinVisibleMs = 3000.0; // hard floor: splash stays up
+        private const double MinVisibleMs = 4000.0; // hard floor: splash stays up
         private const double DoneHoldMs = 450.0; // ✓ breathes before the fade
         private const double FadeMs = 350.0;
         private const double SpinSeconds = 2.6;
