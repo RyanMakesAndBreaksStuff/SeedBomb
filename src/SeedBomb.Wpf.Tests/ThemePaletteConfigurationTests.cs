@@ -150,6 +150,28 @@ public sealed class ThemePaletteConfigurationTests
         Assert.Contains("WindowBackdropType.None", manager, StringComparison.Ordinal);
     }
 
+    // WPF-UI's theme dictionaries build these from Color keys via StaticResource, so the
+    // TextFillColor*/Accent* Brush overrides never reach the nav pane; each key needs its own Set.
+    [Fact]
+    public void ApplyPublishesNavPaneBrushesFromPaletteTokens()
+    {
+        var manager = ReadRepoFile("src/SeedBomb.Wpf/Services/Theme/DesignThemeManager.cs");
+        string[] expected =
+        [
+            "Set(\"NavigationViewItemForeground\", p.TextNav);",
+            "Set(\"NavigationViewItemForegroundPointerOver\", p.Text1);",
+            "Set(\"NavigationViewItemForegroundPressed\", p.Text2);",
+            "Set(\"NavigationViewItemBackgroundPointerOver\", p.ControlHover);",
+            "Set(\"NavigationViewItemBackgroundSelected\", p.ItemSelected);",
+            "Set(\"NavigationViewItemBackgroundPressed\", p.ControlHover);",
+            "Set(\"NavigationViewSelectionIndicatorForeground\", p.SelectionIndicator);",
+            "Set(\"NavigationViewItemSeparatorForeground\", p.Divider);",
+            "Set(\"LeftNavigationViewSeparatorBrush\", p.Divider);",
+        ];
+        foreach (var line in expected)
+            Assert.Contains(line, manager, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);

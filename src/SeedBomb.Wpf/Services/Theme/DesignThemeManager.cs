@@ -150,6 +150,18 @@ public static class DesignThemeManager
         Set("DividerStrokeColorDefaultBrush", p.Border);
         Set("NavigationViewContentBackground", p.Surface1);
         Set("NavigationViewContentGridBorderBrush", p.Border);
+        // WPF-UI builds these from Color keys via StaticResource, so the Brush overrides above
+        // never reach the nav pane. Background (rest) stays WPF-UI's transparent.
+        Set("NavigationViewItemForeground", p.TextNav);
+        Set("NavigationViewItemForegroundPointerOver", p.Text1);
+        Set("NavigationViewItemForegroundPressed", p.Text2);
+        Set("NavigationViewItemBackgroundPointerOver", p.ControlHover);
+        Set("NavigationViewItemBackgroundSelected", p.ItemSelected);
+        Set("NavigationViewItemBackgroundPressed", p.ControlHover);
+        // Otherwise the pill takes SystemAccentColorPrimary, i.e. the Windows accent color.
+        Set("NavigationViewSelectionIndicatorForeground", p.SelectionIndicator);
+        Set("NavigationViewItemSeparatorForeground", p.Divider);
+        Set("LeftNavigationViewSeparatorBrush", p.Divider);
         Set("TextFillColorPrimaryBrush", p.Text1);
         Set("TextFillColorSecondaryBrush", p.Text2);
         Set("TextFillColorTertiaryBrush", p.Text3);
