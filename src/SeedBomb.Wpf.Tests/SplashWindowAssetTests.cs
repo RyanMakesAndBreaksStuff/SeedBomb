@@ -13,16 +13,17 @@ public sealed class SplashWindowAssetTests
         Assert.Contains("<Resource Include=\"Resources\\logo.ico\" />", project, StringComparison.Ordinal);
         Assert.Contains("<Resource Include=\"Resources\\logo-dark.ico\" />", project, StringComparison.Ordinal);
         Assert.Contains("<Resource Include=\"Resources\\logo-dark.png\" />", project, StringComparison.Ordinal);
+        Assert.Contains("<Resource Include=\"Resources\\logo-light.png\" />", project, StringComparison.Ordinal);
         Assert.DoesNotContain("<SplashScreen Include=", project, StringComparison.Ordinal);
         Assert.DoesNotContain("SB_logo", project, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void SplashWindowUsesPackagedDarkLogo()
+    public void SplashWindowUsesPackagedLightLogo()
     {
         var splash = ReadRepoFile("src/SeedBomb.Wpf/Resources/SplashWindow.xaml");
         Assert.Contains("x:Class=\"SeedBomb.Resources.SplashWindow\"", splash, StringComparison.Ordinal);
-        Assert.Contains("Source=\"pack://application:,,,/Resources/logo-dark.png\"", splash, StringComparison.Ordinal);
+        Assert.Contains("Source=\"/Resources/logo-light.png\"", splash, StringComparison.Ordinal);
         Assert.DoesNotContain("Source=\"Assets/", splash, StringComparison.Ordinal);
     }
 
