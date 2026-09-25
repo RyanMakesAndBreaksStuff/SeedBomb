@@ -134,6 +134,22 @@ public sealed class ThemePaletteConfigurationTests
         Assert.DoesNotContain("Foreground=\"{DynamicResource DG.Accent}\"", sheet, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ShellPaintsCanvasOnRootGridWithBackdropOff()
+    {
+        var window = ReadRepoFile("src/SeedBomb.Wpf/Views/Windows/MainWindow.xaml");
+        var manager = ReadRepoFile("src/SeedBomb.Wpf/Services/Theme/DesignThemeManager.cs");
+
+        // WPF-UI assigns Window.Background a local fallback brush on startup and on every theme
+        // switch, which drops a DynamicResource there; the canvas must live on the root Grid.
+        var start = window.IndexOf("<ui:FluentWindow", StringComparison.Ordinal);
+        var windowTag = window[start..(window.IndexOf('>', start) + 1)];
+        Assert.Contains("WindowBackdropType=\"None\"", windowTag, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=", windowTag, StringComparison.Ordinal);
+        Assert.Contains("<Grid Background=\"{DynamicResource DG.Bg}\">", window, StringComparison.Ordinal);
+        Assert.Contains("WindowBackdropType.None", manager, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);

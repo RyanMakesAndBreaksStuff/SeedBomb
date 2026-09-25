@@ -60,7 +60,11 @@ public static class DesignThemeManager
         if (Application.Current is not { } app || !app.Dispatcher.CheckAccess())
             return;
 
-        ApplicationThemeManager.Apply(isDark ? ApplicationTheme.Dark : ApplicationTheme.Light);
+        // None matches MainWindow. The default (Mica) re-enables the DWM backdrop and clears the
+        // window background on every switch, under an opaque palette that would hide it anyway.
+        ApplicationThemeManager.Apply(
+            isDark ? ApplicationTheme.Dark : ApplicationTheme.Light,
+            Wpf.Ui.Controls.WindowBackdropType.None);
 
         var variants = Palettes[paletteId];
         var p = isDark ? variants.Dark : variants.Light;
