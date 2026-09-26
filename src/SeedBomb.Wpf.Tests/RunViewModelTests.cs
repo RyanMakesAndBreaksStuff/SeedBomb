@@ -9,10 +9,20 @@ namespace SeedBomb.Wpf.Tests;
 
 public sealed class RunViewModelTests
 {
+    [Theory]
+    [InlineData(-2147015902)] // Number of requests exceeded the limit
+    [InlineData(-2147015903)] // Combined execution time exceeded the limit
+    [InlineData(-2147015898)] // Number of concurrent requests exceeded the limit
+    public void Classifier_ServiceProtectionFaultsAreRetryable(int faultCode) =>
+        Assert.True(RejectionClassifier.IsRetryable(new BatchError(
+            "account", 0, "Number of requests exceeded the limit of 6000 over time window of 300 seconds.", faultCode)));
+
     [Fact]
-    public void Classifier_ThrottleIsRetryable_DuplicateIsNot()
+    public void Classifier_PluginFailureAndDuplicateAreNotRetryable()
     {
-        Assert.True(RejectionClassifier.IsRetryable(new BatchError("account", 0, "throttled 429", -2147220956)));
+        // 0x80040224 IsvUnExpected: an unexpected error from plugin code needs a fix, not a retry.
+        Assert.False(RejectionClassifier.IsRetryable(new BatchError(
+            "account", 0, "An unexpected error occurred from ISV code.", -2147220956)));
         Assert.False(RejectionClassifier.IsRetryable(new BatchError("account", 0, "Duplicate key on emailaddress1", null)));
     }
 
@@ -31,7 +41,7 @@ public sealed class RunViewModelTests
             [
                 new BatchError("account", 0, "Duplicate key on emailaddress1", null),
                 new BatchError("account", 1, "Duplicate key on emailaddress1", null),
-                new BatchError("account", 2, "request throttled", -2147220956),
+                new BatchError("account", 2, "request throttled", -2147015902),
             ],
         }, seed: 40719, environmentHost: "contoso-dev");
 
@@ -73,7 +83,7 @@ public sealed class RunViewModelTests
         {
             CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
             Elapsed = TimeSpan.FromSeconds(1),
-            Errors = [new BatchError("account", 2, "request throttled", -2147220956)],
+            Errors = [new BatchError("account", 2, "request throttled", -2147015902)],
         }, seed: 40719, environmentHost: "contoso-dev", config: config);
 
         await vm.RetrySelectedCommand.ExecuteAsync(null);
@@ -138,7 +148,7 @@ public sealed class RunViewModelTests
         };
         vm.ApplyResult(new GenerationResult
         {
-            Errors = [new BatchError("account", 2, "request throttled", -2147220956)],
+            Errors = [new BatchError("account", 2, "request throttled", -2147015902)],
         }, seed: 7, environmentHost: "contoso-dev", config: config);
 
         // Retry swallows cancellation and reports via ReportRunFailure — the bound command must not throw.
@@ -186,7 +196,7 @@ public sealed class RunViewModelTests
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", 0, "request throttled", -2147220956)],
+                Errors = [new BatchError("account", 0, "request throttled", -2147015902)],
             })
             .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
 
@@ -384,7 +394,7 @@ public sealed class RunViewModelTests
                 ["account"] = [Guid.NewGuid()],
             },
             Elapsed = TimeSpan.FromMinutes(1),
-            Errors = [new BatchError("account", 15, "request throttled", -2147220956, 500)],
+            Errors = [new BatchError("account", 15, "request throttled", -2147015902, 500)],
         }, seed: 42, environmentHost: "contoso-dev");
 
         Assert.Equal("500", Assert.Single(vm.SummaryStats, s => s.Label == "Rejected").Value);
