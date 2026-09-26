@@ -42,6 +42,9 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
     public event EventHandler? ProfilesChanged;
 
     /// <inheritdoc/>
+    public string? LoadWarning { get; private set; }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<ConnectionProfile>> GetAllAsync(CancellationToken ct = default)
     {
         var store = await LoadAsync(ct).ConfigureAwait(false);
@@ -147,7 +150,18 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
 
         var json = await File.ReadAllTextAsync(_storagePath, ct).ConfigureAwait(false);
         json = CoerceLegacyAuthJson(json);
-        _cache = JsonSerializer.Deserialize<StoreDto>(json, JsonOpts) ?? new StoreDto();
+        try
+        {
+            _cache = JsonSerializer.Deserialize<StoreDto>(json, JsonOpts) ?? new StoreDto();
+        }
+        catch (JsonException)
+        {
+            // CR-006: an unreadable store must not stop the app starting. Keep the file for
+            // recovery and start empty; the Connections page shows LoadWarning.
+            var kept = AtomicFile.Quarantine(_storagePath);
+            LoadWarning = $"Saved connections could not be read, so SeedBomb started without them. The file was kept at {kept}.";
+            _cache = new StoreDto();
+        }
         foreach (var profile in _cache.Profiles)
         {
             // Legacy ROPC profiles (AuthType 2 / "UserPassword") predate WR-010b.
@@ -165,6 +179,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var json = JsonSerializer.Serialize(store, JsonOpts);
         await AtomicFile.WriteAllTextAsync(_storagePath, json, ct).ConfigureAwait(false);
+        LoadWarning = null;
     }
 
     private static ProfileDto Encrypt(ConnectionProfile p, ProfileDto? existing) => new()
@@ -283,9 +298,18 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
     private static string? DecryptString(string? value)
     {
         if (string.IsNullOrEmpty(value)) return null;
-        var bytes = Convert.FromBase64String(value);
-        var decrypted = ProtectedData.Unprotect(bytes, null, DataProtectionScope.CurrentUser);
-        return Encoding.UTF8.GetString(decrypted);
+        try
+        {
+            var bytes = Convert.FromBase64String(value);
+            var decrypted = ProtectedData.Unprotect(bytes, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(decrypted);
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            // CR-006: protected by another Windows user or machine (or damaged). Treat it as not
+            // saved, so sign-in asks for it again and the editor still opens to take a new one.
+            return null;
+        }
     }
 
     /// <inheritdoc/>

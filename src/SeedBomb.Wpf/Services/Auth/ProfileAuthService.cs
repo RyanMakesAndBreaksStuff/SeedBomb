@@ -135,18 +135,20 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public async Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default)
     {
-        var profile = await _profiles.GetLastUsedAsync(ct).ConfigureAwait(false);
-        if (profile is null)
-            return new AuthResult(false, null,
-                "No connection profile configured. Open Connection Manager to create one.");
-
+        // CR-006: never throws — startup has no other handler, so a store or credential failure
+        // must come back as a result the sign-in overlay can show.
         try
         {
+            var profile = await _profiles.GetLastUsedAsync(ct).ConfigureAwait(false);
+            if (profile is null)
+                return new AuthResult(false, null,
+                    "No connection profile configured. Open Connection Manager to create one.");
+
             ValidateProfile(profile);
             await _profiles.SetLastUsedAsync(profile.Id, ct).ConfigureAwait(false);
             return await AuthenticateCoreAsync(profile, parentHwnd, commitSession: true, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new AuthResult(false, null, ex.Message);
         }
@@ -289,7 +291,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             clientSecret ??= await _profiles.GetSecretAsync(profile.Id, ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(clientSecret))
-                return new AuthResult(false, null, "Client Secret is not configured for this profile.");
+                return new AuthResult(false, null,
+                    "Re-enter the client secret for this connection — none is saved, or the saved one can't be decrypted for this Windows user.");
         }
 
         var cca = await GetOrCreateCca(profile, commitSession, clientSecret).ConfigureAwait(false);

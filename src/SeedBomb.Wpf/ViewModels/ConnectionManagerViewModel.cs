@@ -130,6 +130,10 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                 p.IsLastUsed = lastUsed?.Id == p.Id;
                 Profiles.Add(p);
             }
+
+            // CR-006: say where an unreadable connections.json went instead of showing an empty list.
+            if (_profileService.LoadWarning is { } warning)
+                SwitchError = warning;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

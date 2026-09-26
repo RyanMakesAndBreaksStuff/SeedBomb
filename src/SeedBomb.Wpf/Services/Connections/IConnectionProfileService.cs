@@ -23,7 +23,8 @@ public interface IConnectionProfileService
 
     /// <summary>
     /// Decrypts and returns the client secret for one profile, or <see langword="null"/> when the
-    /// profile has none. The only source of a plaintext secret — list projections never carry one.
+    /// profile has none or it can't be decrypted for this Windows user (DPAPI CurrentUser scope).
+    /// The only source of a plaintext secret — list projections never carry one.
     /// </summary>
     /// <param name="id">Profile to read.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -31,4 +32,10 @@ public interface IConnectionProfileService
 
     /// <summary>Records <paramref name="id"/> as the most-recently-used profile.</summary>
     Task SetLastUsedAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Set when the stored file could not be read and was moved aside, so the store started empty;
+    /// cleared by the next successful write. Null when there is nothing to report.
+    /// </summary>
+    string? LoadWarning => null;
 }
