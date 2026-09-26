@@ -291,7 +291,9 @@ public class DeferredLookupBackfill(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "UpdateMultiple failed for {Entity}; falling back to ExecuteMultiple updates.", entityName);
-                return await SubmitUpdateBatchesAsync(entityName, updates, batchSize, maxRetries, ct).ConfigureAwait(false);
+                // WR-011: batches 0..i-1 already committed — re-send only the ones UpdateMultiple did not.
+                return await SubmitUpdateBatchesAsync(
+                    entityName, batches.Skip(i).SelectMany(b => b).ToList(), batchSize, maxRetries, ct).ConfigureAwait(false);
             }
         }
 

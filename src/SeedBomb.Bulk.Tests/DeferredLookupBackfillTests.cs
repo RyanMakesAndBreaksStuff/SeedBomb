@@ -527,4 +527,36 @@ public class DeferredLookupBackfillTests
             Times.Never);
         Assert.DoesNotContain(captured.SelectMany(r => r.Requests), r => r is UpdateRequest or UpdateMultipleRequest);
     }
+
+    [Fact]
+    public async Task BackfillLookupsAsync_UpdateMultipleFailsMidway_ResendsOnlyUnsentBatches()
+    {
+        // WR-011: batches UpdateMultiple already committed must not be re-sent — a re-send fires
+        // update plugins and flows on those rows again.
+        var captured = new List<ExecuteMultipleRequest>();
+        var serviceMock = BuildServiceMock(captured);
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(It.IsAny<Microsoft.Xrm.Sdk.Query.QueryBase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityCollection([new Entity("sdkmessagefilter")]));
+        serviceMock
+            .SetupSequence(s => s.ExecuteAsync(It.IsAny<UpdateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrganizationResponse())
+            .ThrowsAsync(new InvalidOperationException("second UpdateMultiple batch rejected"));
+        var sut = BuildSut(serviceMock.Object);
+
+        var graph = new DependencyGraph();
+        graph.AddNode("contact");
+        graph.AddNode("account");
+        graph.DeferEdge("contact", new DeferredLookup("contact", "parentcustomerid", ["account"]));
+
+        var pool = new DataverseRecordPool();
+        pool.Add("contact", [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()]);
+        pool.Add("account", [Guid.NewGuid()]);
+
+        var errors = await sut.BackfillLookupsAsync(graph, pool, batchSize: 2);
+
+        Assert.Empty(errors);
+        // Batch 1 (two rows) landed through UpdateMultiple; only batch 2's single row is re-sent.
+        Assert.Equal(1, captured.Sum(r => r.Requests.Count));
+    }
 }
