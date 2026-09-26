@@ -1,5 +1,6 @@
 using SeedBomb.Core.Contracts;
 using Moq;
+using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Generation;
 using SeedBomb.ViewModels;
@@ -295,11 +296,12 @@ public sealed class RunViewModelTests
                 Errors = [],
             });
 
-        var connections = new Mock<IConnectionProfileService>();
-        connections.Setup(c => c.GetLastUsedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ConnectionProfile { EnvironmentUrl = "https://contoso-uat.crm.dynamics.com" });
+        // CR-002: the host comes from the live session, never from last-used.
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile)
+            .Returns(new ConnectionProfile { EnvironmentUrl = "https://contoso-uat.crm.dynamics.com" });
 
-        var vm = new RunViewModel(generation: gen.Object, connections: connections.Object);
+        var vm = new RunViewModel(generation: gen.Object, auth: auth.Object);
         await vm.ExecuteAsync(
             new GenerationConfig
             {

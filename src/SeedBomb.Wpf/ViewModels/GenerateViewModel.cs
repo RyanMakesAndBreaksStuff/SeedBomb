@@ -355,9 +355,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Step 4 confirmation sentence.</summary>
+    /// <summary>Step 4 confirmation sentence, naming the environment the run writes to (CR-002).</summary>
     public string RunConfirmationLine =>
-        $"Write {PlannedTotal:N0} rows across {SelectedEntities.Count} table(s) using seed {Seed}. Nothing is written until you start.";
+        $"Write {PlannedTotal:N0} rows across {SelectedEntities.Count} table(s) to "
+        + $"{(Run.TargetHost is { Length: > 0 } host ? host : "the connected environment")} "
+        + $"using seed {Seed}. Nothing is written until you start.";
 
     /// <summary>Step 4 stat tiles.</summary>
     public IReadOnlyList<RunValueRow> RunPlanStats =>
