@@ -76,4 +76,32 @@ public sealed class DataverseConnectionServiceTests
 
         Assert.StartsWith("Not signed in", ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ServiceClient_is_built_off_the_calling_thread()
+    {
+        // WR-006: the constructor signs in and connects synchronously. Built inline, it froze the
+        // UI thread on the first Dataverse call after startup or a connection switch.
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile)
+            .Returns(new ConnectionProfile { EnvironmentUrl = "https://org.crm.dynamics.com" });
+        using var svc = new DataverseConnectionService(auth.Object);
+        bool? builtOnPool = null;
+        svc.CreateClientOverride = _ =>
+        {
+            builtOnPool = Thread.CurrentThread.IsThreadPoolThread;
+            throw new InvalidOperationException("stop before dialling out");
+        };
+
+        // A dedicated thread stands in for the dispatcher: it is not a pool thread.
+        var caller = new Thread(() =>
+        {
+            try { svc.GetOrganizationServiceAsync().GetAwaiter().GetResult(); }
+            catch (InvalidOperationException) { }
+        });
+        caller.Start();
+        caller.Join();
+
+        Assert.True(builtOnPool);
+    }
 }

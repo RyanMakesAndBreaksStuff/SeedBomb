@@ -16,6 +16,12 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     /// <inheritdoc />
     public event EventHandler? ConnectionReset;
 
+    /// <summary>
+    /// Test seam: given the environment URL, replaces the real client, whose constructor dials the
+    /// org. Null builds the real <see cref="ServiceClient"/>.
+    /// </summary>
+    internal Func<string, ServiceClient>? CreateClientOverride { get; set; }
+
     /// <summary>Initialises the service with required dependencies.</summary>
     /// <param name="auth">Auth service: supplies the signed-in profile and its bearer tokens.</param>
     public DataverseConnectionService(IAuthService auth)
@@ -41,7 +47,9 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                           ?? throw new InvalidOperationException("Not signed in. Connect to an environment first.");
             var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
-            _cached = new ServiceClient(
+            // WR-006: the constructor signs in and connects synchronously, and the awaits above
+            // usually complete inline — so build it on the pool, never on the dispatcher.
+            _cached = await Task.Run(() => CreateClientOverride?.Invoke(profile.EnvironmentUrl) ?? new ServiceClient(
                 instanceUrl: new Uri(profile.EnvironmentUrl),
                 tokenProviderFunction: CreateTokenProvider(scopes),
                 useUniqueInstance: true)
@@ -49,7 +57,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 // CR-001: keep the SDK's own retries — they honour Retry-After on service-protection
                 // faults, which ThrottlePolicy deliberately does not retry.
                 EnableAffinityCookie = false
-            };
+            }, ct).ConfigureAwait(false);
 
             if (!_cached.IsReady)
                 throw new InvalidOperationException(
