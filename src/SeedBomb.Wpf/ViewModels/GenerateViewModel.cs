@@ -869,29 +869,23 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         // §07: Start promotes draft (Commit) and persists the promoted snapshot.
         await _draftAutosave.PersistAsync();
         var config = BuildConfig();
+        // WR-002: captured before the run — the History row must not depend on later wizard state.
+        var tableNames = SelectedEntities.Select(e => e.DisplayName).ToArray();
+        Exception? failure = null;
         try
         {
             var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
             LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token);
-            var result = LastResult!;
-            await _historyService.AddRunAsync(new RunRecord(
-                Run.CurrentRunId,
-                DateTimeOffset.Now,
-                SelectedEntities.Select(e => e.DisplayName).ToArray(),
-                result.TotalRecords,
-                result.Elapsed,
-                result.Errors.Count == 0,
-                result.Errors.Sum(e => e.RowCount),
-                Run.EnvironmentLabel,
-                Run.UserLabel,
-                ActiveProfileName,
-                Run.ActivityLines));
-            ReportOutcome(result);
+            if (LastResult.Cancelled)
+                Run.ReportRunFailure(new OperationCanceledException());
+            else
+                ReportOutcome(LastResult);
             if (!Run.KeepWindowOpen)
                 _navigator?.Navigate(typeof(RunSummaryPage));
         }
         catch (Exception ex)
         {
+            failure = ex;
             Run.ReportRunFailure(ex);
         }
         finally
@@ -899,6 +893,37 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             IsRunning = false;
             _cts?.Dispose();
             _cts = null;
+        }
+
+        // WR-002: one History write for every run that returned a result or failed. A cancel
+        // that throws (including a declined risky-value prompt) wrote nothing, so it has no row.
+        if (LastResult is not null || failure is not (null or OperationCanceledException))
+            await RecordRunAsync(tableNames, LastResult);
+    }
+
+    private async Task RecordRunAsync(string[] tableNames, GenerationResult? result)
+    {
+        try
+        {
+            await _historyService.AddRunAsync(new RunRecord(
+                Run.CurrentRunId,
+                DateTimeOffset.Now,
+                tableNames,
+                result?.TotalRecords ?? 0,
+                result?.Elapsed ?? TimeSpan.Zero,
+                result is { Cancelled: false, Errors.Count: 0 },
+                result?.Errors.Sum(e => e.RowCount) ?? 0,
+                Run.EnvironmentLabel,
+                Run.UserLabel,
+                ActiveProfileName,
+                Run.ActivityLines));
+        }
+        catch (Exception ex)
+        {
+            // A History failure is not a generation failure — report it on its own.
+            _logger.LogError(ex, "Failed to record the run in history");
+            _snackbar.Show("Couldn't save run history", ex.Message,
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 

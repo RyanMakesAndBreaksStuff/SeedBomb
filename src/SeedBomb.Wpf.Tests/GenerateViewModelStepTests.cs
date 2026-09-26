@@ -639,6 +639,64 @@ public sealed class GenerateViewModelStepTests
 
     // ── fixtures ──────────────────────────────────────────────────────────────
 
+    [Fact]
+    public async Task Cancelled_run_that_wrote_rows_is_recorded_as_not_succeeded()
+    {
+        // WR-002: rows written before a cancel are not rolled back, so History must list them.
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Cancelled = true,
+            });
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        historyMock.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => !r.Succeeded && r.TotalRecords == 1 && r.EntityNames.Single() == "Account"),
+            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("Cancelled", viewModel.Run.StatusHeadline);
+    }
+
+    [Fact]
+    public async Task Failed_run_is_recorded_as_not_succeeded()
+    {
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new SeedBomb.Core.Exceptions.DataGenerationException("Entity 'account': required lookup 'parentid' (SystemRequired) has no generator — cannot create records."));
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        historyMock.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => !r.Succeeded && r.TotalRecords == 0),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task History_write_failure_is_not_reported_as_a_failed_run()
+    {
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock, out var snackbarMock);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult());
+        historyMock
+            .Setup(h => h.AddRunAsync(It.IsAny<RunRecord>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("history.json is locked"));
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        snackbarMock.Verify(
+            s => s.Show("Couldn't save run history", "history.json is locked", ControlAppearance.Danger, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+        Assert.Equal("", viewModel.Run.LastFailureMessage);
+    }
+
     private static GenerateViewModel CreateViewModel(
         out Mock<IWpfGenerationService> generationMock,
         out Mock<IMetadataProvider> metadataMock,

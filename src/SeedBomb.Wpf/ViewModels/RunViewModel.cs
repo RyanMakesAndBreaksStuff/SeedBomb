@@ -406,15 +406,16 @@ public sealed partial class RunViewModel : ObservableObject
         RowsWrittenLabel = written.ToString("N0");
         RunDescription = BuildRunDescription(written, planned, environmentHost, seed);
 
-        RunMetaLine = $"Finished {DateTime.Now:d MMM yyyy, HH:mm} · {FormatDuration(result.Elapsed)} · seed {seed}";
+        var ended = result.Cancelled ? "Cancelled" : "Finished"; // WR-002: a partial result is not a finished run
+        RunMetaLine = $"{ended} {DateTime.Now:d MMM yyyy, HH:mm} · {FormatDuration(result.Elapsed)} · seed {seed}";
         ApplyOutcome(written, rejected, result.Elapsed, tableCount: CountTables(result, _plannedTables));
-        StatusHeadline = OutcomeHeadline;
+        StatusHeadline = result.Cancelled ? "Cancelled" : OutcomeHeadline;
 
         ReplaceGroups(result.Errors
             .GroupBy(e => (e.EntityLogicalName, e.ErrorMessage))
             .Select(BuildGroup));
 
-        AppendActivity($"Finished — {written:N0} written, {rejected:N0} rejected");
+        AppendActivity($"{ended} — {written:N0} written, {rejected:N0} rejected");
     }
 
     /// <summary>
