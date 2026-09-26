@@ -66,21 +66,34 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <Grid.Resources>
-                        <!-- Invisible drag handle straddling a column boundary. -->
+                        <!-- Drag handle straddling a column boundary; draws the 1px divider on that boundary. -->
                         <Style x:Key="ColumnGrip" TargetType="Thumb">
                             <Setter Property="Width" Value="8" />
                             <Setter Property="Cursor" Value="SizeWE" />
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Thumb">
-                                        <Border Background="Transparent" />
+                                        <Border Background="Transparent">
+                                            <!-- -6 bleeds through DG.Pad.Row's vertical padding so the line spans the header. -->
+                                            <Rectangle x:Name="Divider" Width="1" Margin="0,-6"
+                                                       SnapsToDevicePixels="True"
+                                                       Fill="{DynamicResource DG.BorderStrong}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Divider" Property="Fill" Value="{DynamicResource DG.Accent}" />
+                                            </Trigger>
+                                            <Trigger Property="IsDragging" Value="True">
+                                                <Setter TargetName="Divider" Property="Fill" Value="{DynamicResource DG.Accent}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </Setter.Value>
                             </Setter>
                         </Style>
                     </Grid.Resources>
 
-                    <Border Grid.Row="0" Style="{DynamicResource DG.TableHeader}">
+                    <Border Grid.Row="0" Style="{DynamicResource DG.TableHeader}" SizeChanged="OnHeaderSizeChanged">
                         <Grid x:Name="HeaderGrid">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="72" MinWidth="48" SharedSizeGroup="Time" />
@@ -93,13 +106,13 @@
                                 <ColumnDefinition Width="80" MinWidth="48" SharedSizeGroup="Status" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Style="{DynamicResource DG.TableHeaderText}" Text="Time" />
-                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.TableHeaderText}" Text="Tables" />
-                            <TextBlock Grid.Column="2" Style="{DynamicResource DG.TableHeaderText}" Text="Environment" />
-                            <TextBlock Grid.Column="3" Style="{DynamicResource DG.TableHeaderText}" Text="User" />
-                            <TextBlock Grid.Column="4" Style="{DynamicResource DG.TableHeaderText}" Text="Profile" />
-                            <TextBlock Grid.Column="5" Style="{DynamicResource DG.TableHeaderText}" Text="Records" />
-                            <TextBlock Grid.Column="6" Style="{DynamicResource DG.TableHeaderText}" Text="Duration" />
-                            <TextBlock Grid.Column="7" Style="{DynamicResource DG.TableHeaderText}" Text="Status" />
+                            <TextBlock Grid.Column="1" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="Tables" />
+                            <TextBlock Grid.Column="2" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="Environment" />
+                            <TextBlock Grid.Column="3" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="User" />
+                            <TextBlock Grid.Column="4" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="Profile" />
+                            <TextBlock Grid.Column="5" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="Records" />
+                            <TextBlock Grid.Column="6" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="Duration" />
+                            <TextBlock Grid.Column="7" Style="{DynamicResource DG.TableHeaderText}" Margin="8,0,0,0" Text="Status" />
 
                             <!--
                                 Tables is the star column, so Time is left-anchored (grip on its right edge) and
@@ -161,7 +174,7 @@
                                         <TextBlock Grid.Column="0"
                                                    Style="{DynamicResource DG.Cell}"
                                                    Text="{Binding Timestamp, StringFormat={}{0:HH:mm}}" />
-                                        <ItemsControl Grid.Column="1" ItemsSource="{Binding EntityNames}">
+                                        <ItemsControl Grid.Column="1" ItemsSource="{Binding EntityNames}" Margin="8,0,0,0">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
                                                     <StackPanel Orientation="Horizontal" />
@@ -180,26 +193,28 @@
                                                    Text="{Binding Environment}"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding Environment}"
-                                                   Margin="0,0,8,0" />
+                                                   Margin="8,0,8,0" />
                                         <TextBlock Grid.Column="3"
                                                    Style="{DynamicResource DG.Cell}"
                                                    Text="{Binding User}"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding User}"
-                                                   Margin="0,0,8,0" />
+                                                   Margin="8,0,8,0" />
                                         <TextBlock Grid.Column="4"
                                                    Style="{DynamicResource DG.Cell}"
                                                    Text="{Binding Profile}"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding Profile}"
-                                                   Margin="0,0,8,0" />
+                                                   Margin="8,0,8,0" />
                                         <TextBlock Grid.Column="5"
                                                    Style="{DynamicResource DG.Cell}"
-                                                   Text="{Binding TotalRecords, StringFormat=N0}" />
+                                                   Text="{Binding TotalRecords, StringFormat=N0}"
+                                                   Margin="8,0,0,0" />
                                         <TextBlock Grid.Column="6"
                                                    Style="{DynamicResource DG.Cell}"
-                                                   Text="{Binding Duration, StringFormat={}{0:mm\\:ss}}" />
-                                        <TextBlock Grid.Column="7">
+                                                   Text="{Binding Duration, StringFormat={}{0:mm\\:ss}}"
+                                                   Margin="8,0,0,0" />
+                                        <TextBlock Grid.Column="7" Margin="8,0,0,0">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Cell}">
                                                     <Setter Property="Text" Value="Failed" />
