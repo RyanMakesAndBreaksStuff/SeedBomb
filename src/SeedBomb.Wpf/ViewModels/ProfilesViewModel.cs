@@ -578,6 +578,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         try
         {
             _rulesRequest.Profile = await _profiles.LoadAsync(SelectedItem.Name);
+            _rulesRequest.IsStored = true; // CR-003: rule edits go back to this profile's file
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

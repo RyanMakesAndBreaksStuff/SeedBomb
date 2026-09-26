@@ -60,6 +60,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private Profile? _profile;
     private Action<Profile>? _onSaved;
     private Type? _returnPage;
+    private bool _isStored;
 
     private IReadOnlyList<RuleMessage> _messages = [];
     private FieldRule? _effectiveRule;
@@ -581,6 +582,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         _onSaved = _request?.OnSaved;
         _returnPage = _request?.ReturnPage;
+        _isStored = _request?.IsStored ?? false;
         OnPropertyChanged(nameof(BreadcrumbRootLabel));
         var profile = _request?.Profile;
         var tableName = _request?.TableName;
@@ -832,11 +834,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         tables[idx] = tables[idx] with { Columns = cols };
         _profile = _profile with { Tables = tables };
 
-        // Generate working-set snapshots are not in the store — callback only, no disk write.
+        // CR-003: only a saved profile is written back. Generate's working set is callback-only.
+        // Decided by where the edit came from — the display name never matched the file stem.
         try
         {
-            var names = await _profiles.ListAsync(ct);
-            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+            if (_isStored)
                 await _profiles.SaveAsync(_profile, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -929,6 +931,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         }
 
         _profile = newProfile;
+        _isStored = true; // CR-003: it now has a file, so later rule edits persist
         ProfileName = newProfile.Name;
         _onSaved?.Invoke(newProfile);
         RefreshMappedColumn();
@@ -981,8 +984,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         try
         {
-            var names = await _profiles.ListAsync(ct);
-            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+            if (_isStored) // CR-003
                 await _profiles.SaveAsync(_profile, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

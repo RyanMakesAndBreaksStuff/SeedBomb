@@ -17,6 +17,13 @@ public sealed class RulesNavigationRequest
     /// <summary>Page to navigate after breadcrumb Back. Null means ProfilesPage.</summary>
     public Type? ReturnPage { get; set; }
 
+    /// <summary>
+    /// True when <see cref="Profile"/> is a saved profile, so rule edits are written back to its
+    /// file. False for Generate's in-memory working set, which is updated through
+    /// <see cref="OnSaved"/> only.
+    /// </summary>
+    public bool IsStored { get; set; }
+
     /// <summary>Clears the payload after the page reads it.</summary>
     public void Clear()
     {
@@ -24,5 +31,6 @@ public sealed class RulesNavigationRequest
         TableName = null;
         OnSaved = null;
         ReturnPage = null;
+        IsStored = false;
     }
 }
