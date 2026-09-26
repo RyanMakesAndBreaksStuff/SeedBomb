@@ -76,6 +76,18 @@ public sealed class HistoryViewModelTests
     }
 
     [Fact]
+    public async Task ClearAll_never_clears_without_a_confirmation()
+    {
+        // WR-010: one misclick used to erase the only record of what was written where.
+        var history = new Mock<IRunHistoryService>();
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
+
+        await vm.ClearHistoryCommand.ExecuteAsync(null);
+
+        history.Verify(h => h.ClearAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task ClearHistoryAsync_ShowsDangerSnackbar_WhenClearFails()
     {
         var history = new Mock<IRunHistoryService>();
@@ -84,7 +96,10 @@ public sealed class HistoryViewModelTests
 
         var snackbar = new Mock<ISnackbarService>();
         var vm = new HistoryViewModel(
-            history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
+            history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object)
+        {
+            ConfirmClear = () => Task.FromResult(true),
+        };
 
         await vm.ClearHistoryCommand.ExecuteAsync(null);
 
