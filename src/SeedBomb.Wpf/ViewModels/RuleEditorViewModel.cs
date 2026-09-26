@@ -1156,11 +1156,18 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             : null;
     }
 
-    private FieldRule TrySequence()
+    private FieldRule? TrySequence() =>
+        TryInvariantNumber(StartText, 0m, out var start) && TryInvariantNumber(StepText, 1m, out var step)
+            ? new SequenceRule(start, step)
+            : null;
+
+    // WR-007: invariant, like the restore path (ApplyScalarRule) and RuleValidator's numbers.
+    // Blank keeps the default; anything else that doesn't parse is a validation error.
+    private static bool TryInvariantNumber(string? text, decimal fallback, out decimal value)
     {
-        _ = decimal.TryParse(StartText, out var start);
-        var step = decimal.TryParse(StepText, out var s) ? s : 1;
-        return new SequenceRule(start, step);
+        value = fallback;
+        return string.IsNullOrWhiteSpace(text)
+               || decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
     }
 
     private static bool TryConstantValue(AttributeMetadata attr, string? text, out JsonElement value)
@@ -1171,8 +1178,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         {
             var json = attr switch
             {
-                StringAttributeMetadata or MemoAttributeMetadata or DateTimeAttributeMetadata
-                    => JsonSerializer.Serialize(text),
+                StringAttributeMetadata or MemoAttributeMetadata => JsonSerializer.Serialize(text),
+                // WR-007: typed in the user's culture, stored as round-trip UTC text that Core reads invariantly.
+                DateTimeAttributeMetadata => JsonSerializer.Serialize(DateTime.Parse(
+                        text, CultureInfo.CurrentCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
+                    .ToString("o", CultureInfo.InvariantCulture)),
                 BooleanAttributeMetadata => bool.Parse(text) ? "true" : "false",
                 _ => text.Trim(),
             };

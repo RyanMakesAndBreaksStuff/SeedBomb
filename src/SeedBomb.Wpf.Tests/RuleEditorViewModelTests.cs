@@ -1278,6 +1278,37 @@ public sealed class RuleEditorViewModelTests
         }
     }
 
+    [Fact]
+    public void Date_constant_is_stored_as_round_trip_utc_text()
+    {
+        // WR-007: store one culture- and zone-free form so every machine reads the same instant.
+        var scheduled = new DateTimeAttributeMetadata { LogicalName = "scheduledon", IsValidForCreate = true };
+        var vm = EditorForExtra(scheduled);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "scheduledon");
+        vm.SelectedOp = "constant";
+
+        vm.ConstantText = "2031-06-15T00:00:00Z";
+
+        var constant = Assert.IsType<ConstantRule>(vm.BuildRule());
+        Assert.Equal("2031-06-15T00:00:00.0000000Z", constant.Value.GetString());
+    }
+
+    [Fact]
+    public void Sequence_text_that_is_not_an_invariant_number_is_an_error()
+    {
+        // WR-007: a typo used to become start 0, and "1,5" read as 15 (en-US) or 1.5 (de-DE).
+        var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 42, runId: "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "numberofemployees");
+        vm.SelectedOp = "sequence";
+        vm.StepText = "1";
+
+        vm.StartText = "abc";
+        Assert.Null(vm.BuildRule());
+
+        vm.StartText = "1,5";
+        Assert.Null(vm.BuildRule());
+    }
+
     private static RuleEditorViewModel EditorForExtra(params AttributeMetadata[] extra)
     {
         var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
