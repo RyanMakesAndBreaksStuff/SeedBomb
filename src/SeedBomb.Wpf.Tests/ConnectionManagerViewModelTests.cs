@@ -632,6 +632,59 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         Assert.Equal("User canceled authentication.", vm.SwitchError);
     }
 
+    [Fact]
+    public void Connection_changes_are_blocked_while_a_run_is_writing()
+    {
+        // WR-001: each of these can dispose the ServiceClient the running pipeline writes through.
+        var profile = new ConnectionProfile
+        {
+            Name = "Dev",
+            EnvironmentUrl = "https://contoso.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+        };
+        var run = new RunViewModel { IsRunning = true };
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(), Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>(),
+            run: run)
+        {
+            EditingProfile = profile,
+        };
+
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+        Assert.False(vm.DeleteProfileCommand.CanExecute(profile));
+        Assert.False(vm.SelectProfileCommand.CanExecute(profile));
+
+        var raised = false;
+        vm.SaveProfileCommand.CanExecuteChanged += (_, _) => raised = true;
+        run.IsRunning = false;
+
+        Assert.True(raised);
+        Assert.True(vm.SaveProfileCommand.CanExecute(null));
+        Assert.True(vm.DeleteProfileCommand.CanExecute(profile));
+        Assert.True(vm.SelectProfileCommand.CanExecute(profile));
+    }
+
+    [Fact]
+    public async Task Only_deleting_the_connected_profile_resets_the_connection()
+    {
+        // WR-001: saves and deletes of other profiles used to drop the live connection too.
+        var connected = new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://dev.crm.dynamics.com" };
+        var other = new ConnectionProfile { Name = "Test", EnvironmentUrl = "https://test.crm.dynamics.com" };
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([connected, other]);
+        var connection = new Mock<IDataverseConnectionService>();
+        var vm = new ConnectionManagerViewModel(profiles.Object, Mock.Of<IAuthService>(), connection.Object)
+        {
+            ConnectedProfileId = connected.Id,
+        };
+
+        await vm.DeleteProfileCommand.ExecuteAsync(other);
+        connection.Verify(c => c.ResetAsync(), Times.Never);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(connected);
+        connection.Verify(c => c.ResetAsync(), Times.Once);
+    }
+
     public void Dispose()
     {
         foreach (var dir in _tempDirs)

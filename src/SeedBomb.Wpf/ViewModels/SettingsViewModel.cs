@@ -19,13 +19,15 @@ namespace SeedBomb.ViewModels;
 /// <param name="auth">Optional auth service for sign-out. Tests may omit it.</param>
 /// <param name="connections">Optional Dataverse connection cache to reset on sign-out.</param>
 /// <param name="profiles">Optional connection profile store, used to tailor the sign-out message to the active profile's auth type.</param>
+/// <param name="run">Optional run sheet. While it is writing, sign-out is blocked.</param>
 public sealed partial class SettingsViewModel(
     ISettingsService settingsService,
     ILogger<SettingsViewModel> logger,
     ISnackbarService? snackbar = null,
     IAuthService? auth = null,
     IDataverseConnectionService? connections = null,
-    IConnectionProfileService? profiles = null) : ViewModelBase
+    IConnectionProfileService? profiles = null,
+    RunViewModel? run = null) : ViewModelBase
 {
     private readonly ISettingsService _settingsService = settingsService;
     private readonly ILogger<SettingsViewModel> _logger = logger;
@@ -33,6 +35,7 @@ public sealed partial class SettingsViewModel(
     private readonly IAuthService? _auth = auth;
     private readonly IDataverseConnectionService? _connections = connections;
     private readonly IConnectionProfileService? _profiles = profiles;
+    private readonly RunViewModel? _run = run;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private CancellationTokenSource? _appearanceSaveCts;
@@ -69,6 +72,13 @@ public sealed partial class SettingsViewModel(
     /// <inheritdoc />
     public override Task OnNavigatedToAsync()
     {
+        // Transient page VM: subscribe only while shown so the singleton run never pins it.
+        if (_run is not null)
+        {
+            _run.PropertyChanged -= OnRunPropertyChanged;
+            _run.PropertyChanged += OnRunPropertyChanged;
+        }
+
         _navCts?.Cancel();
         _navCts?.Dispose();
         _navCts = new CancellationTokenSource();
@@ -78,6 +88,8 @@ public sealed partial class SettingsViewModel(
     /// <inheritdoc />
     public override async Task OnNavigatedFromAsync()
     {
+        if (_run is not null)
+            _run.PropertyChanged -= OnRunPropertyChanged;
         _navCts?.Cancel();
         await _appearanceSaveTask;
     }
@@ -140,8 +152,17 @@ public sealed partial class SettingsViewModel(
         }
     }
 
+    // WR-001: sign-out disposes the ServiceClient a running pipeline writes through.
+    private bool CanSignOut() => _run is not { IsRunning: true };
+
+    private void OnRunPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(RunViewModel.IsRunning))
+            SignOutCommand.NotifyCanExecuteChanged();
+    }
+
     /// <summary>Signs out of the current session and drops the cached Dataverse connection.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSignOut))]
     private async Task SignOutAsync()
     {
         if (_auth is null) return;

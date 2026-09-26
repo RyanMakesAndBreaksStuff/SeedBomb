@@ -1,6 +1,5 @@
 using Microsoft.PowerPlatform.Dataverse.Client;
 using SeedBomb.Services.Auth;
-using SeedBomb.Services.Connections;
 
 namespace SeedBomb.Services.Dataverse;
 
@@ -11,7 +10,6 @@ namespace SeedBomb.Services.Dataverse;
 public sealed class DataverseConnectionService : IDataverseConnectionService, IDisposable
 {
     private readonly IAuthService _auth;
-    private readonly IConnectionProfileService _profileService;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cached;
 
@@ -19,13 +17,10 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     public event EventHandler? ConnectionReset;
 
     /// <summary>Initialises the service with required dependencies.</summary>
-    /// <param name="auth">Auth service used to supply bearer tokens.</param>
-    /// <param name="profileService">Profile service supplying the environment URL.</param>
-    public DataverseConnectionService(IAuthService auth, IConnectionProfileService profileService)
+    /// <param name="auth">Auth service: supplies the signed-in profile and its bearer tokens.</param>
+    public DataverseConnectionService(IAuthService auth)
     {
         _auth = auth;
-        _profileService = profileService;
-        _profileService.ProfilesChanged += OnProfilesChanged;
     }
 
     /// <inheritdoc />
@@ -93,12 +88,9 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         ConnectionReset?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnProfilesChanged(object? sender, EventArgs e) => _ = ResetAsync();
-
     /// <inheritdoc />
     public void Dispose()
     {
-        _profileService.ProfilesChanged -= OnProfilesChanged;
         ServiceClient? cached;
         _lock.Wait();
         try
