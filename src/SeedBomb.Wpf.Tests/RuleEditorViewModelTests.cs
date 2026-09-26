@@ -1323,6 +1323,21 @@ public sealed class RuleEditorViewModelTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task Rules_opened_from_Profiles_never_apply_to_the_Generate_board()
+    {
+        // CR-004: a payload Generate stamped earlier used to survive Edit rules, so saving a rule
+        // replaced the Generate board and returned to Generate.
+        var generateApplied = 0;
+        var request = new RulesNavigationRequest { OnSaved = _ => generateApplied++, ReturnPage = typeof(GeneratePage) };
+        var editor = await EditRulesFromProfilesAsync(StoreWithAcmeSales(), request);
+
+        await editor.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, generateApplied);
+        Assert.Equal("Profiles", editor.BreadcrumbRootLabel);
+    }
+
     private static Mock<IProfileService> StoreWithAcmeSales()
     {
         var profiles = new Mock<IProfileService>();

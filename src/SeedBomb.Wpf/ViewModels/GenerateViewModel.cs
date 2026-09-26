@@ -178,13 +178,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <inheritdoc />
-    public override Task OnNavigatedFromAsync()
-    {
-        _profileBridge.CaptureWorkingSetIfNeeded();
-        return Task.CompletedTask;
-    }
-
     // ── State ──────────────────────────────────────────────────────────────────
 
     [ObservableProperty]

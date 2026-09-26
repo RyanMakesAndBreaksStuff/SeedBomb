@@ -453,8 +453,10 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public async Task OnNavigatedFrom_writes_working_set_request()
+    public async Task Leaving_Generate_leaves_the_rules_request_alone()
     {
+        // CR-004: leaving Generate used to stamp its callback and return page on the shared request,
+        // and Edit rules on the Profiles page then inherited them.
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
             Mock.Of<IRunHistoryService>(),
@@ -468,9 +470,9 @@ public sealed class GenerateViewModelStepTests
 
         await viewModel.OnNavigatedFromAsync();
 
-        Assert.NotNull(request.Profile);
-        Assert.Equal(typeof(GeneratePage), request.ReturnPage);
-        Assert.NotNull(request.OnSaved);
+        Assert.Null(request.Profile);
+        Assert.Null(request.OnSaved);
+        Assert.Null(request.ReturnPage);
     }
 
     [Fact]

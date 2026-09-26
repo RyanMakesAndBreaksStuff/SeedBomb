@@ -577,7 +577,10 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             return;
         try
         {
-            _rulesRequest.Profile = await _profiles.LoadAsync(SelectedItem.Name);
+            var profile = await _profiles.LoadAsync(SelectedItem.Name);
+            // CR-004: a whole new payload — never inherit another page's callback or return page.
+            _rulesRequest.Clear();
+            _rulesRequest.Profile = profile;
             _rulesRequest.IsStored = true; // CR-003: rule edits go back to this profile's file
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
