@@ -41,7 +41,6 @@ ScaffoldingReadMe.txt
 *~
 CodeCoverage/
 /.agents
-/.claude
 
 # Visual Studio markup-compile temp projects
 *_wpftmp.csproj
