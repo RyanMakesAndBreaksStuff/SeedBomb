@@ -498,4 +498,45 @@ public sealed class ProfileImportFlowTests : IDisposable
         Assert.Contains(report.NotImported, n =>
             n.Contains("ownerid", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public async Task Import_loads_live_metadata_and_asks_before_replacing_a_dirty_board()
+    {
+        // CR-005: import used to validate against whatever Generate had cached (empty on a fresh
+        // session, so every table read "not available") and skipped the dirty-board prompt.
+        var cache = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase);
+        string? prompt = null;
+        var vm = new ProfilesViewModel(NewService(out _))
+        {
+            GetMetadata = () => cache,
+            EnsureMetadata = (tables, _) =>
+            {
+                foreach (var table in tables)
+                    cache[table] = BuildAccountMetadata();
+                return Task.CompletedTask;
+            },
+            IsBoardDirty = () => true,
+            ConfirmOverwrite = message => { prompt = message; return true; },
+        };
+
+        await vm.ImportFromPathAsync(await WriteSourceAsync(HandTooledProfileJson), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, vm.PendingImport?.AppliedRuleCount);
+        Assert.NotNull(prompt);
+    }
+
+    [Fact]
+    public async Task Import_presents_nothing_when_the_user_keeps_a_dirty_board()
+    {
+        var vm = new ProfilesViewModel(NewService(out _))
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+            IsBoardDirty = () => true,
+            ConfirmOverwrite = _ => false,
+        };
+
+        await vm.ImportFromPathAsync(await WriteSourceAsync(HandTooledProfileJson), TestContext.Current.CancellationToken);
+
+        Assert.Null(vm.PendingImport);
+    }
 }
