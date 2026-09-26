@@ -163,8 +163,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
         try
         {
-            await _profileService.SetLastUsedAsync(profile.Id);
-            var result = await _authService.SignInAsync(ParentHwnd);
+            // CR-002: sign in to this profile explicitly; last-used only moves when that succeeds.
+            var result = await _authService.SignInAsync(profile, ParentHwnd);
 
             if (result.Succeeded)
             {

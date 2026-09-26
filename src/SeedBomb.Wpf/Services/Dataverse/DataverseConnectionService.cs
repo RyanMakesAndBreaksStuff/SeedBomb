@@ -40,8 +40,10 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             if (_cached is { IsReady: true })
                 return _cached;
 
-            var profile = await _profileService.GetLastUsedAsync(ct).ConfigureAwait(false)
-                          ?? throw new InvalidOperationException("No connection profile configured.");
+            // CR-002: connect to the environment the live session signed in to. Re-reading last-used
+            // is what let a failed or cancelled switch aim writes at a different org.
+            var profile = _auth.ActiveProfile
+                          ?? throw new InvalidOperationException("Not signed in. Connect to an environment first.");
             var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
             _cached = new ServiceClient(

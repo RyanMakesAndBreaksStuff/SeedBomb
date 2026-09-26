@@ -36,16 +36,15 @@ public sealed class DataverseConnectionServiceTests
     {
         var gate = new TaskCompletionSource();
         var enteredLock = new TaskCompletionSource();
-        var profiles = new Mock<IConnectionProfileService>();
-        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>()))
-            .Returns(async () =>
-            {
-                enteredLock.TrySetResult();
-                await gate.Task;
-                throw new InvalidOperationException("no live org to reach");
-            });
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(() =>
+        {
+            enteredLock.TrySetResult();
+            gate.Task.Wait();
+            return null; // not signed in: the connect then fails without reaching a live org
+        });
 
-        using var svc = new DataverseConnectionService(Mock.Of<IAuthService>(), profiles.Object);
+        using var svc = new DataverseConnectionService(auth.Object, Mock.Of<IConnectionProfileService>());
 
         // Occupies the semaphore for the whole of the (blocked) connect.
         var connecting = Task.Run(() => svc.GetOrganizationServiceAsync(CancellationToken.None));
@@ -64,5 +63,22 @@ public sealed class DataverseConnectionServiceTests
             try { await connecting; } catch (Exception) { /* no live org to reach */ }
             await resetting;
         }
+    }
+
+    [Fact]
+    public async Task Connects_only_to_the_signed_in_profile_never_to_last_used()
+    {
+        // CR-002: last-used can name an org the session never signed in to. The invalid URL makes
+        // the old code fail fast at new Uri(...) instead of dialling out.
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConnectionProfile { EnvironmentUrl = "not a signed-in org" });
+        using var svc = new DataverseConnectionService(Mock.Of<IAuthService>(), profiles.Object);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.GetOrganizationServiceAsync(TestContext.Current.CancellationToken));
+
+        Assert.StartsWith("Not signed in", ex.Message, StringComparison.Ordinal);
+        profiles.Verify(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

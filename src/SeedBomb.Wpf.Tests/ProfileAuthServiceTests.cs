@@ -93,6 +93,23 @@ public sealed class ProfileAuthServiceTests
         Assert.Null(svc.CurrentUserDisplayName);
     }
 
+    [Fact]
+    public async Task Deleting_the_signed_in_profile_raises_SignedOut()
+    {
+        // CR-002: the session used to be dropped silently, so the header kept saying "connected".
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ConnectionProfile>());
+        var svc = new ProfileAuthService(profiles.Object) { ActiveProfile = MakeOAuthProfile() };
+        var signedOut = new TaskCompletionSource();
+        svc.SignedOut += (_, _) => signedOut.TrySetResult();
+
+        profiles.Raise(p => p.ProfilesChanged += null, EventArgs.Empty);
+
+        await signedOut.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Null(svc.ActiveProfile);
+    }
+
     private static ConnectionProfile MakeCertificateProfile() => new()
     {
         Name = "Cert Profile",
