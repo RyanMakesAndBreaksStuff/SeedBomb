@@ -188,7 +188,7 @@ public sealed class RuleEditorViewModelTests
     {
         var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 1, runId: "r1");
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
-        Assert.Equal("constant", vm.SelectedOp); // type default after column select
+        Assert.Equal("bogus", vm.SelectedOp); // type default after column select
 
         vm.ApplyExistingRule(new PatternRule("ACME-{seq:0000}"));
 
@@ -511,7 +511,7 @@ public sealed class RuleEditorViewModelTests
     {
         var (vm, _, _, _) = await LoadedEditorAsync();
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
-        Assert.Equal("constant", vm.SelectedOp);
+        Assert.Equal("bogus", vm.SelectedOp);
 
         vm.SelectedOp = "pattern";
         vm.Template = "dirty-{seq}";
@@ -519,7 +519,22 @@ public sealed class RuleEditorViewModelTests
         Assert.True(vm.CancelRuleCommand.CanExecute(null));
         vm.CancelRuleCommand.Execute(null);
 
-        Assert.Equal("constant", vm.SelectedOp);
+        Assert.Equal("bogus", vm.SelectedOp);
+    }
+
+    [Fact]
+    public void Switching_column_clears_previous_bogus_selection()
+    {
+        var vm = EditorFor(StringColumn());
+        vm.SelectedBogusApi = "NAME";
+        vm.SelectedBogusEndpoint = "NAME.firstName";
+
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "numberofemployees");
+
+        Assert.Equal("bogus", vm.SelectedOp);
+        Assert.Null(vm.SelectedBogusApi);
+        Assert.Null(vm.SelectedBogusEndpoint);
+        Assert.NotEmpty(vm.BogusInput.BogusApis);
     }
 
     [Fact]

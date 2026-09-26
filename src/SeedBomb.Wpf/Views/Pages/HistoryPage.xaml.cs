@@ -20,15 +20,36 @@ public partial class HistoryPage : Page
         NavigationPageLayout.PinHeightToHost(this);
 
     // ponytail: widths reset on each visit (page is Transient); persist them to settings if users ask.
-    // GridSplitter can't do this: between two pixel columns it always resizes the left one, which
-    // makes a right-anchored boundary stand still while its neighbour grows away from the mouse.
+    // GridSplitter can't do this: between two pixel columns it only resizes the left one and lets the star
+    // Tables column absorb the change, so the dragged boundary stands still. Trading width between the two
+    // neighbours keeps it under the mouse and doesn't depend on Tables having any slack.
     private void OnColumnGripDragDelta(object sender, DragDeltaEventArgs e)
     {
         var grip = (Thumb)sender;
-        var column = HeaderGrid.ColumnDefinitions[Grid.GetColumn(grip)];
-        var delta = grip.HorizontalAlignment == HorizontalAlignment.Left ? -e.HorizontalChange : e.HorizontalChange;
-        // Growth comes out of the star Tables column; stop at its MinWidth rather than overflow the card.
-        delta = Math.Min(delta, Math.Max(0, TablesColumn.ActualWidth - TablesColumn.MinWidth));
-        column.Width = new GridLength(Math.Max(column.MinWidth, column.ActualWidth + delta));
+        // Time's grip is on its right edge; every other grip is on its own column's left edge.
+        var index = Grid.GetColumn(grip) + (grip.HorizontalAlignment == HorizontalAlignment.Right ? 1 : 0);
+        var left = HeaderGrid.ColumnDefinitions[index - 1];
+        var right = HeaderGrid.ColumnDefinitions[index];
+        var delta = Math.Clamp(e.HorizontalChange,
+            Math.Min(0, left.MinWidth - left.ActualWidth),
+            Math.Max(0, right.ActualWidth - right.MinWidth));
+        // The star Tables column resizes itself; only the pixel columns need a new Width.
+        if (left != TablesColumn) left.Width = new GridLength(left.ActualWidth + delta);
+        if (right != TablesColumn) right.Width = new GridLength(right.ActualWidth - delta);
+    }
+
+    // A header wider than the card clips its right-hand columns and pins Tables at MinWidth, where its grips
+    // stop tracking the mouse. Squeeze the pixel columns toward their MinWidth, in proportion, until it fits.
+    private void OnHeaderSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var pixelColumns = HeaderGrid.ColumnDefinitions.Where(c => c != TablesColumn).ToList();
+        var excess = pixelColumns.Sum(c => c.ActualWidth) + TablesColumn.MinWidth
+                     - LayoutInformation.GetLayoutSlot(HeaderGrid).Width;
+        var room = pixelColumns.Sum(c => c.ActualWidth - c.MinWidth);
+        if (excess <= 0 || room <= 0) return;
+
+        var scale = Math.Min(1, excess / room);
+        foreach (var column in pixelColumns)
+            column.Width = new GridLength(column.ActualWidth - (column.ActualWidth - column.MinWidth) * scale);
     }
 }

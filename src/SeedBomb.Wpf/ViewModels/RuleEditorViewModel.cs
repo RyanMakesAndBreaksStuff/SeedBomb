@@ -284,6 +284,9 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
                 _byName.TryGetValue(column.LogicalName, out attr);
 
             LookupInput.Configure(attr as LookupAttributeMetadata);
+            // OnSelectedOpChanged is suppressed below, so the previous column's draft must be wiped here.
+            BogusInput.ClearEditor();
+            ConstantText = Template = MinText = MaxText = StartText = StepText = string.Empty;
             Pick = OneOfPick.Random;
 
             if (attr is EnumAttributeMetadata em)
@@ -302,7 +305,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             OnPropertyChanged(nameof(AvailableOps));
             OnPropertyChanged(nameof(AvailableOpOptions));
             NotifyLookupPresentation();
-            SelectedOp = AvailableOps.FirstOrDefault() ?? string.Empty;
+            // Bogus is the most common choice, so it's the default wherever the column type offers it.
+            SelectedOp = AvailableOps.Contains("bogus") ? "bogus" : AvailableOps.FirstOrDefault() ?? string.Empty;
+            if (SelectedOp == "bogus")
+                BogusInput.RefreshCatalog(TryTargetKind(out var kind) ? kind : null);
             if (column is not null
                 && TryGetProfileColumns(out var cols)
                 && cols.TryGetValue(column.LogicalName, out var existing))
