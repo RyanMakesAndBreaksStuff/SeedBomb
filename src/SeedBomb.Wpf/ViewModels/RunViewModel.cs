@@ -593,14 +593,11 @@ public sealed partial class RunViewModel : ObservableObject
         {
             try
             {
-                var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-                {
-                    Title = "Cancel run",
-                    Content = "Cancel stops further writes. Rows already written are not rolled back.",
-                    PrimaryButtonText = "Cancel run",
-                    CloseButtonText = "Keep running",
-                });
-                confirmed = result == ContentDialogResult.Primary;
+                confirmed = await _dialogs.ConfirmAsync(
+                    "Cancel run",
+                    "Cancel stops further writes. Rows already written are not rolled back.",
+                    "Cancel run",
+                    close: "Keep running");
             }
             catch (Exception)
             {

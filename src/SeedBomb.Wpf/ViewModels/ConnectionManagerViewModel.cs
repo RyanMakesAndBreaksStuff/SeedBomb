@@ -292,19 +292,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
         try
         {
-            if (_dialogs is not null)
-            {
-                var choice = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-                {
-                    Title = "Delete connection",
-                    Content = $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
-                    PrimaryButtonText = "Delete",
-                    CloseButtonText = "Cancel",
-                });
-
-                if (choice != ContentDialogResult.Primary)
-                    return;
-            }
+            if (_dialogs is not null
+                && !await _dialogs.ConfirmAsync(
+                    "Delete connection",
+                    $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
+                    "Delete"))
+                return;
 
             await _profileService.DeleteAsync(profile.Id);
             await LoadAsync();

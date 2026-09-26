@@ -684,14 +684,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         if (_dialogs is null)
             return false;
 
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Delete profile",
-            Content = $"Delete profile '{name}'? This cannot be undone.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary;
+        return await _dialogs.ConfirmAsync("Delete profile", $"Delete profile '{name}'? This cannot be undone.", "Delete");
     }
 
     private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;

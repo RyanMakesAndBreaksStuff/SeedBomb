@@ -953,14 +953,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (_dialogs is null)
             return false;
 
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Delete rule",
-            Content = $"Delete the rule for '{columnDisplayName}'? This cannot be undone.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary;
+        return await _dialogs.ConfirmAsync(
+            "Delete rule", $"Delete the rule for '{columnDisplayName}'? This cannot be undone.", "Delete");
     }
 
     /// <summary>Removes the current column's rule entirely (reverts it to Unmapped), after confirm.</summary>

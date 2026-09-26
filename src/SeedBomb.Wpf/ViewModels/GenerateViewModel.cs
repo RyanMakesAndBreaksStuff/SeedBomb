@@ -788,14 +788,10 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     {
         if (ConfirmReset is not null)
             return await ConfirmReset();
-        var result = await _contentDialogService.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Reset wizard",
-            Content = "Clear selected tables, rules, counts, seed, and the saved draft? This cannot be undone.",
-            PrimaryButtonText = "Reset",
-            CloseButtonText = "Cancel",
-        });
-        return result == Wpf.Ui.Controls.ContentDialogResult.Primary;
+        return await _contentDialogService.ConfirmAsync(
+            "Reset wizard",
+            "Clear selected tables, rules, counts, seed, and the saved draft? This cannot be undone.",
+            "Reset");
     }
 
     [RelayCommand(CanExecute = nameof(CanReset))]
