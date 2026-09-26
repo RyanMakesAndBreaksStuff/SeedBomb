@@ -49,9 +49,8 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 tokenProviderFunction: CreateTokenProvider(scopes),
                 useUniqueInstance: true)
             {
-                // Disable built-in retries — BulkCreator's ThrottlePolicy owns retry logic.
-                MaxRetryCount = 0,
-                RetryPauseTime = TimeSpan.Zero,
+                // CR-001: keep the SDK's own retries — they honour Retry-After on service-protection
+                // faults, which ThrottlePolicy deliberately does not retry.
                 EnableAffinityCookie = false
             };
 

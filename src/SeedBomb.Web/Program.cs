@@ -57,7 +57,6 @@ builder.Services.AddScoped<IServiceClientFactory>(sp => sp.GetRequiredService<Da
 
 // One ServiceClient per Blazor circuit — shared by all services in the scope.
 // Task.Run escapes RendererSynchronizationContext so blocking GetResult cannot deadlock.
-// MaxRetryCount = 0 lets ThrottlePolicy own all retry logic without SDK-level multiplication.
 // This async factory delegate captures a scoped IServiceClientFactory.
 // Invoke only within the Blazor circuit scope — do not hold past circuit teardown.
 builder.Services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsync2>>>(sp =>
@@ -68,10 +67,8 @@ builder.Services.AddScoped<Func<CancellationToken, Task<IOrganizationServiceAsyn
     {
         try
         {
+            // CR-001: keep the SDK's own retries — they honour Retry-After on service-protection faults.
             var client = await factory.CreateAsync(ct).ConfigureAwait(false);
-            const int noRetries = 0; // BulkCreator throttle policy manages retries
-            client.MaxRetryCount = noRetries;
-            client.RetryPauseTime = TimeSpan.Zero; // No backoff — upstream orchestrator controls delays
             var typedClient = client as IOrganizationServiceAsync2
                 ?? throw new InvalidOperationException(
                     "ServiceClient does not implement IOrganizationServiceAsync2. Verify Dataverse SDK version compatibility.");

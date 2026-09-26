@@ -401,7 +401,8 @@ public class BulkCreator : IBulkCreator
                     _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
-                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message, 0, batch.Length)];
+                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message,
+                        (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length)];
                 }
 
                 idBags[batchIndex] = batchIds;
