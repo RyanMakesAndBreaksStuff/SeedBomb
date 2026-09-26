@@ -81,8 +81,7 @@ public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
     private static async Task WriteCoreAsync(List<RunRecord> list, CancellationToken ct)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        await using var stream = File.Open(FilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await JsonSerializer.SerializeAsync(stream, list, JsonOptions, ct).ConfigureAwait(false);
+        await AtomicFile.WriteAllTextAsync(FilePath, JsonSerializer.Serialize(list, JsonOptions), ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

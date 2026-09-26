@@ -164,7 +164,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         _cache = store;
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var json = JsonSerializer.Serialize(store, JsonOpts);
-        await File.WriteAllTextAsync(_storagePath, json, ct).ConfigureAwait(false);
+        await AtomicFile.WriteAllTextAsync(_storagePath, json, ct).ConfigureAwait(false);
     }
 
     private static ProfileDto Encrypt(ConnectionProfile p, ProfileDto? existing) => new()

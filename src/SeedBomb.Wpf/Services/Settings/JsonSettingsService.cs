@@ -47,8 +47,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            await using var stream = File.Open(FilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, ct).ConfigureAwait(false);
+            await AtomicFile.WriteAllTextAsync(FilePath, JsonSerializer.Serialize(settings, JsonOptions), ct).ConfigureAwait(false);
         }
         finally
         {

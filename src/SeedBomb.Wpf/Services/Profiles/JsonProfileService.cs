@@ -101,7 +101,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         // (§08 invariant: "load → save is idempotent").
         var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
         var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
-        await File.WriteAllTextAsync(path, json, ct).ConfigureAwait(false);
+        await AtomicFile.WriteAllTextAsync(path, json, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -223,7 +223,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
             Directory.CreateDirectory(_root);
             var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
             var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
-            await File.WriteAllTextAsync(destPath, json, ct).ConfigureAwait(false);
+            await AtomicFile.WriteAllTextAsync(destPath, json, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -242,7 +242,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
             Directory.CreateDirectory(_root);
             var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
             var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
-            await File.WriteAllTextAsync(DraftPath, json, ct).ConfigureAwait(false);
+            await AtomicFile.WriteAllTextAsync(DraftPath, json, ct).ConfigureAwait(false);
         }
         finally
         {
