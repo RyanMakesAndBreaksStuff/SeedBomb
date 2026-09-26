@@ -22,7 +22,7 @@ namespace SeedBomb.Resources
     ///     elapsed since Loaded. Finish early → the completed state (ring +✓)
     ///     holds until the 3 s mark; finish late → the double takes over and
     ///     the exit follows it (plus a short ✓ hold).
-    ///   • <see cref="SetStatus"/> shows a small console-style line inside the
+    ///   • <see cref="SetStatus"/> shows a small status line inside the
     ///     seal ring. Both methods are dispatcher-safe: call them from any thread.
     ///
     /// The curved title / sub-line / slogan are true vector geometry: each glyph
@@ -54,10 +54,10 @@ namespace SeedBomb.Resources
             Loaded += OnLoaded;
 
             TitleArc.Data = BuildArcGeometry("SEED BOMB",
-                new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
                 25, 4.5, RTitle, top: true);
             SubArc.Data = BuildArcGeometry("FOR MICROSOFT DATAVERSE",
-                new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
                 10, 3, RSub, top: true);
             SloganArc.Data = BuildArcGeometry("Mock Data That Goes Boom! Before You Do",
                 new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
