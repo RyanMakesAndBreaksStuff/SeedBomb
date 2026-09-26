@@ -110,6 +110,23 @@ public sealed class ProfileAuthServiceTests
         Assert.Null(svc.ActiveProfile);
     }
 
+    [Fact]
+    public async Task OAuth_sign_in_never_borrows_another_profiles_cached_account()
+    {
+        // WR-005: every OAuth profile shares msal_user_cache.bin, and FirstOrDefault picked whichever
+        // cached user came first. A profile may only use the account it signed in with itself.
+        var otherUser = Mock.Of<IAccount>(a => a.Username == "someone@tenant-a.com");
+        var pca = new Mock<IPublicClientApplication>();
+        pca.Setup(p => p.GetAccountsAsync()).ReturnsAsync([otherUser]);
+        var svc = new ProfileAuthService(Mock.Of<IConnectionProfileService>()) { CreatePcaOverride = _ => pca.Object };
+
+        var result = await svc.SignInAsync(MakeOAuthProfile(), nint.Zero, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("No cached session. Please sign in.", result.Error);
+        pca.Verify(p => p.AcquireTokenSilent(It.IsAny<IEnumerable<string>>(), It.IsAny<IAccount>()), Times.Never);
+    }
+
     private static ConnectionProfile MakeCertificateProfile() => new()
     {
         Name = "Cert Profile",

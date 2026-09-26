@@ -251,8 +251,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         try
         {
-            var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
-            IAccount? account = accounts.FirstOrDefault();
+            // WR-005: every OAuth profile shares msal_user_cache.bin, so "the first cached account"
+            // can be another profile's user. Use only the account this profile signed in as.
+            var account = profile.HomeAccountId is { } homeAccountId
+                ? await pca.GetAccountAsync(homeAccountId).ConfigureAwait(false)
+                : null;
 
             if (account is not null)
             {
@@ -271,7 +274,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
                 .ExecuteAsync(ct).ConfigureAwait(false);
             account = interactive.Account;
             if (commitSession)
+            {
                 _account = account;
+                await RememberAccountAsync(profile, account, ct).ConfigureAwait(false);
+            }
             return new AuthResult(true, interactive.Account.Username, null);
         }
         catch (MsalUiRequiredException)
@@ -285,7 +291,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
                     .WithParentActivityOrWindow(parentHwnd)
                     .ExecuteAsync(ct).ConfigureAwait(false);
                 if (commitSession)
+                {
                     _account = interactive.Account;
+                    await RememberAccountAsync(profile, interactive.Account, ct).ConfigureAwait(false);
+                }
                 return new AuthResult(true, interactive.Account.Username, null);
             }
             catch (MsalException ex2)
@@ -301,6 +310,25 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             // WAM/broker RPC (0x6BA / 0x71A) when account service is unavailable — treat as no session.
             return new AuthResult(false, null, ex.Message);
+        }
+    }
+
+    // WR-005: record which cached account belongs to this profile so the next silent sign-in asks
+    // for exactly that one. Only a hint for next time: a failed write is logged, not surfaced.
+    private async Task RememberAccountAsync(ConnectionProfile profile, IAccount account, CancellationToken ct)
+    {
+        var homeAccountId = account.HomeAccountId?.Identifier;
+        if (homeAccountId is null || homeAccountId == profile.HomeAccountId)
+            return;
+
+        profile.HomeAccountId = homeAccountId;
+        try
+        {
+            await _profiles.SaveAsync(profile, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger?.LogWarning(ex, "Could not record the signed-in account for {Profile}", profile.Name);
         }
     }
 

@@ -197,6 +197,8 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             ? existing?.EncryptedClientSecret
             : EncryptString(p.ClientSecret),
         CertificateThumbprint = p.CertificateThumbprint,
+        // WR-005: the editor's copy never carries the account; keep the one sign-in recorded.
+        HomeAccountId = p.HomeAccountId ?? existing?.HomeAccountId,
     };
 
     private static ConnectionProfile Decrypt(ProfileDto d) => new()
@@ -212,6 +214,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         // exists at a time; the singleton ConnectionManagerViewModel holds none.
         ClientSecret = null,
         CertificateThumbprint = d.CertificateThumbprint,
+        HomeAccountId = d.HomeAccountId,
     };
 
     /// <summary>
@@ -335,6 +338,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         public string TenantId { get; set; } = string.Empty;
         public string? EncryptedClientSecret { get; set; }
         public string? CertificateThumbprint { get; set; }
+        public string? HomeAccountId { get; set; }
     }
 
     /// <summary>

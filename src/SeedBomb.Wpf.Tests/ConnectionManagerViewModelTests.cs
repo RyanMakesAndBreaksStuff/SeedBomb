@@ -569,6 +569,34 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         Assert.Equal("s3cret", await svc.GetSecretAsync(id, ct));
     }
 
+    [Fact]
+    public async Task SaveAsync_KeepsTheSignedInAccountOfAnEditedProfile()
+    {
+        // WR-005: the account recorded at interactive sign-in must survive a save from the editor,
+        // whose copy of the profile never carries it.
+        var ct = TestContext.Current.CancellationToken;
+        var dir = Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        _tempDirs.Add(dir);
+        var id = Guid.NewGuid();
+        var path = Path.Combine(dir, "connections.json");
+        await File.WriteAllTextAsync(path, $$"""
+            { "Profiles": [{ "Id": "{{id}}", "Name": "Dev", "EnvironmentUrl": "https://dev.crm.dynamics.com",
+              "AuthType": "OAuth", "ClientId": "51f81489-12ee-4a9e-aaae-a2591f45987d", "HomeAccountId": "uid.utid" }] }
+            """, ct);
+        var svc = new JsonConnectionProfileService(dir);
+
+        await svc.SaveAsync(new ConnectionProfile
+        {
+            Id = id,
+            Name = "Dev (renamed)",
+            EnvironmentUrl = "https://dev.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+        }, ct);
+
+        Assert.Contains("\"HomeAccountId\": \"uid.utid\"", await File.ReadAllTextAsync(path, ct), StringComparison.Ordinal);
+    }
+
     private async Task<(JsonConnectionProfileService svc, Guid id)> StoreWithOneSecretProfileAsync()
     {
         var dir = Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"));
