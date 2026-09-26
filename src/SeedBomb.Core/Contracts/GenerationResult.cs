@@ -25,4 +25,10 @@ public record GenerationResult
     /// Gets any errors that occurred during generation.
     /// </summary>
     public IReadOnlyList<BatchError> Errors { get; init; } = [];
+
+    /// <summary>
+    /// Gets whether the run was cancelled before it finished. <see cref="CreatedRecords"/> then holds
+    /// only the rows written before the cancel; they are not rolled back.
+    /// </summary>
+    public bool Cancelled { get; init; }
 }

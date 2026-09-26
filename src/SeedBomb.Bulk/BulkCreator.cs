@@ -69,6 +69,10 @@ public class BulkCreator : IBulkCreator
         ArgumentNullException.ThrowIfNull(graph);
 
         PreparedBogusRun? preparedRun = null;
+        // WR-002: declared outside the try so a cancel can still report what was written.
+        var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
+        var allErrors = new List<BatchError>();
+        var runStart = DateTimeOffset.UtcNow;
         try
         {
             var validatedRules = ValidateConfiguredRules(config, entityMetadata);
@@ -86,10 +90,6 @@ public class BulkCreator : IBulkCreator
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
             await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
-
-            var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
-            var allErrors = new List<BatchError>();
-            var runStart = DateTimeOffset.UtcNow;
 
             // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
             var effectiveDop = config.MaxParallelism ?? 8;
@@ -148,6 +148,9 @@ public class BulkCreator : IBulkCreator
                 }
             }
 
+            // WR-002: a cancel during the last table must not fall through into linking.
+            ct.ThrowIfCancellationRequested();
+
             // Opening Linking snapshot: switches the UI to the link phase even when there is
             // nothing to link, so a run never looks "finished" before phases 2 and 3 have run.
             progress?.Report(new BulkCreationProgress
@@ -184,6 +187,17 @@ public class BulkCreator : IBulkCreator
                 CreatedRecords = allCreatedRecords,
                 Errors = allErrors.AsReadOnly(),
                 Elapsed = elapsed
+            };
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested && allCreatedRecords.Count > 0)
+        {
+            // WR-002: cancel does not roll back — return the rows already written instead of losing their IDs.
+            return new GenerationResult
+            {
+                CreatedRecords = allCreatedRecords,
+                Errors = allErrors.AsReadOnly(),
+                Elapsed = DateTimeOffset.UtcNow - runStart,
+                Cancelled = true,
             };
         }
         finally
@@ -382,7 +396,7 @@ public class BulkCreator : IBulkCreator
         var idBags = new List<Guid>[batches.Length];
         var errorBags = new List<BatchError>[batches.Length];
 
-        await Parallel.ForEachAsync(
+        var submit = Parallel.ForEachAsync(
             Enumerable.Range(0, batches.Length),
             parallelOptions,
             async (batchIndex, innerCt) =>
@@ -422,7 +436,16 @@ public class BulkCreator : IBulkCreator
                     RecordsPerMinute = ratePerMin,
                     ErrorMessage = batchErrors.Count > 0 ? batchErrors[0].ErrorMessage : null
                 });
-            }).ConfigureAwait(false);
+            });
+
+        try
+        {
+            await submit.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // WR-002: keep the IDs of batches that landed before the cancel; CreateAsync reports them.
+        }
 
         foreach (var idBag in idBags)
             if (idBag is not null) allIds.AddRange(idBag);
