@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
@@ -10,12 +11,26 @@ namespace SeedBomb.Services.Settings;
 /// </summary>
 public sealed class JsonSettingsService : ISettingsService, IDisposable
 {
-    private static readonly string FilePath = Path.Combine(AppPaths.Root, "settings.json");
-
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
+    private readonly string _filePath;
+    private readonly ILogger<JsonSettingsService>? _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
+
+    /// <summary>Stores settings in <c>%LOCALAPPDATA%\SeedBomb\settings.json</c>.</summary>
+    /// <param name="logger">Warns when an unreadable settings file is moved aside.</param>
+    public JsonSettingsService(ILogger<JsonSettingsService> logger)
+        : this(AppPaths.Root, logger)
+    {
+    }
+
+    /// <summary>Test seam: stores <c>settings.json</c> in <paramref name="storageDirectory"/>.</summary>
+    internal JsonSettingsService(string storageDirectory, ILogger<JsonSettingsService>? logger = null)
+    {
+        _filePath = Path.Combine(storageDirectory, "settings.json");
+        _logger = logger;
+    }
 
     /// <inheritdoc />
     public async Task<AppSettings> LoadAsync(CancellationToken ct = default)
@@ -23,15 +38,18 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (!File.Exists(FilePath))
+            if (!File.Exists(_filePath))
                 return AppSettings.Default;
 
-            await using var stream = File.OpenRead(FilePath);
+            await using var stream = File.OpenRead(_filePath);
             return await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, ct).ConfigureAwait(false)
                    ?? AppSettings.Default;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // WR-008: keep the unreadable file — the next save would otherwise replace it with defaults.
+            var kept = AtomicFile.Quarantine(_filePath);
+            _logger?.LogWarning(ex, "Settings were unreadable; moved them to {Path} and loaded defaults", kept);
             return AppSettings.Default;
         }
         finally
@@ -46,8 +64,8 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            await AtomicFile.WriteAllTextAsync(FilePath, JsonSerializer.Serialize(settings, JsonOptions), ct).ConfigureAwait(false);
+            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(settings, JsonOptions), ct).ConfigureAwait(false);
         }
         finally
         {

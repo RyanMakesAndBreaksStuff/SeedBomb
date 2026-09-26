@@ -27,4 +27,17 @@ public static class AtomicFile
         else
             File.Move(tmp, path);
     }
+
+    /// <summary>
+    /// Moves an unreadable store file aside as <c>&lt;file&gt;.corrupt</c> (replacing an older one) so
+    /// the store can start empty without its next write destroying the data.
+    /// </summary>
+    /// <param name="path">The unreadable file.</param>
+    /// <returns>Where the file now lives.</returns>
+    public static string Quarantine(string path)
+    {
+        var corrupt = path + ".corrupt";
+        File.Move(path, corrupt, overwrite: true);
+        return corrupt;
+    }
 }
