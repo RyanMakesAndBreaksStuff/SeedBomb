@@ -472,6 +472,23 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public void EditRules_after_deselecting_a_ruled_table_leaves_it_off_the_rules_page()
+    {
+        var request = new RulesNavigationRequest();
+        var viewModel = CreateViewModelWithRulesRequest(request);
+        var account = new EntitySummary("account", "Account", false);
+        viewModel.OnEntitiesChanged([account, new EntitySummary("contact", "Contact", false)]);
+        viewModel.FieldRules.SetRule("contact", "firstname",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Ada\"").RootElement), "First Name", "Ada");
+
+        viewModel.OnEntitiesChanged([account]);
+        viewModel.EditRulesCommand.Execute(null);
+
+        Assert.Equal(["account"], request.Profile!.Tables.Select(t => t.Table));
+        Assert.Equal(0, viewModel.DraftRuleCount);
+    }
+
+    [Fact]
     public async Task Reset_clears_tables_rules_seed_and_draft()
     {
         var profiles = new Mock<IProfileService>();
@@ -668,6 +685,17 @@ public sealed class GenerateViewModelStepTests
         out Mock<IMetadataProvider> metadataMock,
         out Mock<IRunHistoryService> historyMock)
         => CreateViewModel(out generationMock, out metadataMock, out historyMock, out _);
+
+    /// <summary>Wires the Rules-page handoff so <c>EditRulesCommand</c> fills <paramref name="request"/>.</summary>
+    private static GenerateViewModel CreateViewModelWithRulesRequest(RulesNavigationRequest request) =>
+        new(
+            Mock.Of<IRunHistoryService>(),
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
+            Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
+            new RunViewModel(Mock.Of<IWpfGenerationService>()),
+            request,
+            Mock.Of<IAppNavigator>());
 
     /// <summary>Builds a view-model with metadata already loaded and the board attached, ready for SetRule + Review.</summary>
     private static Task<GenerateViewModel> CreateReadyForRulesAsync(

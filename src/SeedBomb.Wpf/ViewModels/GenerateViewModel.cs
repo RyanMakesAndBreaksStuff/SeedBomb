@@ -562,6 +562,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         if (sameSet)
             return;
 
+        _fieldRules?.RetainTables(incoming);
         IsRulesLoaded = false;
         CurrentStep = 0;
         ReviewedRules = null;

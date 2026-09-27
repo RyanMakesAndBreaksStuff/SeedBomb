@@ -149,11 +149,8 @@ internal sealed class GenerateProfileBridge
                     ?? new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
 
         var tables = new List<ProfileTable>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         foreach (var entity in _owner.SelectedEntities)
         {
-            seen.Add(entity.LogicalName);
             Dictionary<string, FieldRule>? cols = null;
             if (rules.TryGetValue(entity.LogicalName, out var r) && r.Count > 0)
                 cols = new Dictionary<string, FieldRule>(r, StringComparer.OrdinalIgnoreCase);
@@ -161,15 +158,6 @@ internal sealed class GenerateProfileBridge
                 entity.LogicalName,
                 counts.GetValueOrDefault(entity.LogicalName, _owner.DefaultRecordCount),
                 cols));
-        }
-
-        foreach (var (table, cols) in rules)
-        {
-            if (seen.Contains(table) || cols.Count == 0) continue;
-            tables.Add(new ProfileTable(
-                table,
-                counts.GetValueOrDefault(table, _owner.DefaultRecordCount),
-                new Dictionary<string, FieldRule>(cols, StringComparer.OrdinalIgnoreCase)));
         }
 
         if (tables.Count == 0)
