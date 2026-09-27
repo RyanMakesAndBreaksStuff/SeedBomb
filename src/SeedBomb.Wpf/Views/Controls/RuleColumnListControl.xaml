@@ -15,7 +15,6 @@
                 <StackPanel>
                     <ui:TextBox Text="{Binding ColumnFilter, UpdateSourceTrigger=PropertyChanged}"
                                 PlaceholderText="Filter columns"
-                                Height="{DynamicResource DG.Size.ControlSmall}"
                                 Icon="{ui:SymbolIcon Search24}" />
                     <ItemsControl ItemsSource="{Binding ColumnFilterModes}" Margin="0,9,0,0">
                         <ItemsControl.ItemsPanel>
