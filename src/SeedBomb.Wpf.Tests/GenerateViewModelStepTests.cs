@@ -506,6 +506,23 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public void Profiles_rules_save_reaches_the_board_only_for_the_loaded_profile()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.OnEntitiesChanged([new EntitySummary("contact", "Contact", false)]);
+        viewModel.ActiveProfileName = "contact-acct";
+        viewModel.FieldRules.SetRule("contact", "address1_freighttermscode",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("1").RootElement), "Freight Terms", "1");
+        var ruleDeleted = new Profile(2, "contact-acct", null, 42, [new ProfileTable("contact", 10, null)]);
+
+        viewModel.ApplySavedProfileIfActive(ruleDeleted with { Name = "g2" });
+        Assert.Equal(1, viewModel.DraftRuleCount);
+
+        viewModel.ApplySavedProfileIfActive(ruleDeleted);
+        Assert.Equal(0, viewModel.DraftRuleCount);
+    }
+
+    [Fact]
     public async Task Reset_clears_tables_rules_seed_and_draft()
     {
         var profiles = new Mock<IProfileService>();

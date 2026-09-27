@@ -245,6 +245,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
 
+    /// <summary>Called when the Rules page saves a profile opened from here; the host syncs its board.</summary>
+    public Action<Profile>? RulesSaved { get; set; }
+
     /// <summary>Raised when the user confirms an import preview. Arg is the validated report.</summary>
     public event EventHandler<ProfileImportReport>? ProfileApplied;
 
@@ -575,9 +578,11 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         if (SelectedItem is null) return;
         if (_rulesRequest is null || _navigator is null)
             return;
+
+        Profile profile;
         try
         {
-            _rulesRequest.Profile = await _profiles.LoadAsync(SelectedItem.Name);
+            profile = await _profiles.LoadAsync(SelectedItem.Name);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -585,6 +590,11 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             return;
         }
 
+        // Generate stamps TableName/OnSaved/ReturnPage every time it navigates away. Replace all of
+        // it, or Back returns to Generate and a save overwrites the board with this profile.
+        _rulesRequest.Clear();
+        _rulesRequest.Profile = profile;
+        _rulesRequest.OnSaved = RulesSaved;
         _navigator.Navigate(typeof(RulesPage));
     }
 

@@ -962,4 +962,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
     public void ApplyImportReport(ProfileImportReport report) => _profileBridge.ApplyImportReport(report);
+
+    /// <summary>A Rules-page save from Profiles reaches the board only when the board holds that profile.</summary>
+    public void ApplySavedProfileIfActive(Profile profile)
+    {
+        if (string.Equals(profile.Name, ActiveProfileName, StringComparison.Ordinal))
+            _profileBridge.ApplySavedRulesProfile(profile);
+    }
 }
