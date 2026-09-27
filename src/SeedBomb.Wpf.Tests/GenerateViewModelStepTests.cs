@@ -489,6 +489,23 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public void Rules_page_save_without_a_table_deselects_it_on_the_board()
+    {
+        var request = new RulesNavigationRequest();
+        var viewModel = CreateViewModelWithRulesRequest(request);
+        viewModel.OnEntitiesChanged(
+        [
+            new EntitySummary("account", "Account", false),
+            new EntitySummary("contact", "Contact", false),
+        ]);
+        viewModel.EditRulesCommand.Execute(null);
+
+        request.OnSaved!(new Profile(2, "working-set", null, 42, [new ProfileTable("account", 10, null)]));
+
+        Assert.Equal(["account"], viewModel.SelectedEntities.Select(e => e.LogicalName));
+    }
+
+    [Fact]
     public async Task Reset_clears_tables_rules_seed_and_draft()
     {
         var profiles = new Mock<IProfileService>();

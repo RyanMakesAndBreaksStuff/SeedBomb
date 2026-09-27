@@ -111,6 +111,16 @@ internal sealed class GenerateProfileBridge
     public void ApplySavedRulesProfile(Profile profile)
     {
         _owner.ActiveProfileName = profile.Name;
+        // The Rules page can remove tables; SelectReportTables only ever adds them.
+        var kept = _owner.SelectedEntities
+            .Where(e => profile.Tables.Any(t => string.Equals(t.Table, e.LogicalName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (kept.Count < _owner.SelectedEntities.Count)
+        {
+            _owner.OnEntitiesChanged(kept);
+            _owner.EntitySelector?.SetSelection(kept);
+        }
+
         if (_owner.LiveEntityMetadata.Count > 0)
         {
             var report = ProfileImport.ValidateAgainstMetadata(profile, _owner.LiveEntityMetadata, _owner.RunId);
