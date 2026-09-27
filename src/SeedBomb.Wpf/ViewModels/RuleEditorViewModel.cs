@@ -754,6 +754,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     partial void OnSelectedTableChanged(RuleTableOption? value)
     {
         CancelPicker();
+        RemoveTableCommand.NotifyCanExecuteChanged();
         if (_suppressTableChange || value is null)
             return;
 
@@ -832,7 +833,21 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         tables[idx] = tables[idx] with { Columns = cols };
         _profile = _profile with { Tables = tables };
 
-        // Generate working-set snapshots are not in the store — callback only, no disk write.
+        if (!await PersistProfileAsync("save the rule", ct))
+            return false;
+
+        RefreshMappedColumn();
+        return true;
+    }
+
+    /// <summary>Writes <see cref="_profile"/> back when it is already a stored profile, then tells the
+    /// opener. Generate working-set snapshots are not in the store — callback only, no disk write.</summary>
+    /// <returns>False when the store write failed.</returns>
+    private async Task<bool> PersistProfileAsync(string action, CancellationToken ct)
+    {
+        if (_profiles is null || _profile is null)
+            return false;
+
         try
         {
             var names = await _profiles.ListAsync(ct);
@@ -841,12 +856,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            FailProfileStore("save", ex);
+            FailProfileStore(action, ex);
             return false;
         }
 
         _onSaved?.Invoke(_profile);
-        RefreshMappedColumn();
         return true;
     }
 
@@ -924,7 +938,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            FailProfileStore("save", ex);
+            FailProfileStore("save the rule", ex);
             return;
         }
 
@@ -979,20 +993,58 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         tables[idx] = tables[idx] with { Columns = cols };
         _profile = _profile with { Tables = tables };
 
-        try
+        if (await PersistProfileAsync("delete the rule", ct))
+            RefreshMappedColumn();
+    }
+
+    // A profile needs at least one table (the store rejects an empty list), so the last one stays.
+    private bool CanRemoveTable() =>
+        _profiles is not null && _profile is { Tables.Count: > 1 } && SelectedTable is not null;
+
+    /// <summary>Test seam for <see cref="ConfirmRemoveTableAsync"/> — bypasses the real dialog.</summary>
+    internal Func<string, Task<bool>>? ConfirmRemoveTable { get; set; }
+
+    private async Task<bool> ConfirmRemoveTableAsync(string table)
+    {
+        if (ConfirmRemoveTable is not null)
+            return await ConfirmRemoveTable(table);
+        if (_dialogs is null)
+            return false;
+
+        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
         {
-            var names = await _profiles.ListAsync(ct);
-            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
-                await _profiles.SaveAsync(_profile, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+            Title = "Remove table",
+            Content = $"Remove '{table}' and its rules from '{ProfileName}'? This cannot be undone.",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+        });
+        return result == ContentDialogResult.Primary;
+    }
+
+    /// <summary>Drops the selected table — its row count and every rule on it — from the profile, after confirm.</summary>
+    [RelayCommand(CanExecute = nameof(CanRemoveTable))]
+    private async Task RemoveTableAsync(CancellationToken ct)
+    {
+        if (_profile is null || SelectedTable is not { } table)
+            return;
+        if (!await ConfirmRemoveTableAsync(table.DisplayName))
+            return;
+
+        var before = _profile;
+        _profile = _profile with
         {
-            FailProfileStore("delete", ex);
+            Tables = _profile.Tables
+                .Where(t => !string.Equals(t.Table, table.LogicalName, StringComparison.OrdinalIgnoreCase))
+                .ToList(),
+        };
+        if (!await PersistProfileAsync("remove the table", ct))
+        {
+            _profile = before; // the switcher still lists the table; keep the two in step
             return;
         }
 
-        _onSaved?.Invoke(_profile);
-        RefreshMappedColumn();
+        SelectedTable = Tables.First(t => t != table);
+        Tables.Remove(table);
     }
 
     private void RefreshMappedColumn()
@@ -1525,8 +1577,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <summary>Routes a profile-store failure to the same banner + snackbar surface as <see cref="FailMetadata"/>.</summary>
     private void FailProfileStore(string action, Exception ex)
     {
-        _logger?.LogError(ex, "Failed to {Action} the rule profile", action);
-        _snackbar?.Show($"Couldn't {action} the rule", ex.Message,
+        _logger?.LogError(ex, "Failed to {Action}", action);
+        _snackbar?.Show($"Couldn't {action}", ex.Message,
             ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         MetadataError = ex.Message;
     }

@@ -634,6 +634,52 @@ public sealed class RuleEditorViewModelTests
     }
 
     [Fact]
+    public async Task RemoveTableCommand_drops_table_and_rules_then_shows_the_next_table()
+    {
+        var contact = new EntityMetadata { LogicalName = "contact" };
+        contact.GetType().GetProperty("Attributes")!.SetValue(contact, new AttributeMetadata[]
+        {
+            new StringAttributeMetadata { LogicalName = "firstname", IsValidForCreate = true, MaxLength = 50 },
+        });
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([BuildEntity(), contact]);
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(["contact-acct"]);
+        profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var saved = new List<Profile>();
+        var request = new RulesNavigationRequest
+        {
+            Profile = new Profile(2, "contact-acct", null, 42,
+            [
+                new ProfileTable("account", 10, new Dictionary<string, FieldRule>
+                {
+                    ["name"] = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("Acme")),
+                }),
+                new ProfileTable("contact", 5, null),
+            ]),
+            TableName = "account",
+            OnSaved = saved.Add,
+        };
+        var vm = new RuleEditorViewModel(metadata.Object, profiles.Object, Mock.Of<IAppNavigator>(), request)
+        {
+            ConfirmRemoveTable = _ => Task.FromResult(true),
+        };
+        await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
+        Assert.True(vm.RemoveTableCommand.CanExecute(null));
+
+        await vm.RemoveTableCommand.ExecuteAsync(null);
+
+        Assert.Equal(["contact"], Assert.Single(saved).Tables.Select(t => t.Table));
+        profiles.Verify(p => p.SaveAsync(saved[0], It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(["contact"], vm.Tables.Select(t => t.LogicalName));
+        Assert.Equal("contact", vm.SelectedTable?.LogicalName);
+        Assert.Equal("firstname", vm.SelectedColumn?.LogicalName);
+        Assert.False(vm.RemoveTableCommand.CanExecute(null)); // the last table stays
+    }
+
+    [Fact]
     public async Task SaveRuleCommand_and_SaveProfileCommand_CanExecute_stay_in_sync()
     {
         var (vm, _, _, _) = await LoadedEditorAsync();

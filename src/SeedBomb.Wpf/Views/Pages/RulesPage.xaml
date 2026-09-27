@@ -24,7 +24,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header: breadcrumb, title, table switcher, save -->
+        <!-- Header: breadcrumb, title, table switcher, remove table, save -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -53,6 +53,11 @@
                       AutomationProperties.Name="Table" />
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                <Button Style="{DynamicResource DG.DangerButton}"
+                        Margin="0,0,8,0"
+                        Command="{Binding RemoveTableCommand}"
+                        Content="Remove table"
+                        ToolTip="Remove the selected table and its rules from this profile" />
                 <Button Style="{DynamicResource DG.Button}"
                         Margin="0,0,8,0"
                         Command="{Binding SaveProfileCommand}"

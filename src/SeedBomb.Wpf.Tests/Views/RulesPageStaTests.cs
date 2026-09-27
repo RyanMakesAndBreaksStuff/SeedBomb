@@ -242,6 +242,18 @@ public sealed class RulesPageStaTests : IDisposable
     }
 
     [StaFact]
+    public void Header_RemoveTableButton_BindsRemoveTableCommand()
+    {
+        var (page, vm) = LoadRulesPageForProfileOnSta();
+
+        var button = FindButtons(page).Single(b => Equals(b.Content, "Remove table"));
+
+        Assert.Same(vm.RemoveTableCommand, button.Command);
+        Assert.False(button.IsEnabled); // one-table profile: the last table can't be removed
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
     public void ConnectionsTestResultBanner_SwapsBrushGlyphAndVisibility()
     {
         var (page, vm) = LoadConnectionsPageOnSta();
