@@ -384,7 +384,7 @@ public sealed class RuleEditorViewModelTests
 
     // Per-rule Save/Cancel/Delete (RulesPage Preview pane + config-panel "More" menu).
     private static async Task<(RuleEditorViewModel Vm, Mock<IAppNavigator> Navigator, Mock<IProfileService> Profiles, List<Profile> Saved)>
-        LoadedEditorAsync(IReadOnlyList<string>? existingProfileNames = null, Type? returnPage = null,
+        LoadedEditorAsync(bool isStored = false, Type? returnPage = null,
             Dictionary<string, FieldRule>? nameColumnRule = null, string profileName = "working-set")
     {
         var navigator = new Mock<IAppNavigator>();
@@ -396,13 +396,12 @@ public sealed class RuleEditorViewModelTests
             TableName = "account",
             ReturnPage = returnPage,
             OnSaved = p => saved.Add(p),
+            IsStored = isStored,
         };
         var metadata = new Mock<IMetadataProvider>();
         metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([BuildEntity()]);
         var profiles = new Mock<IProfileService>();
-        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existingProfileNames ?? Array.Empty<string>());
         profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -415,7 +414,7 @@ public sealed class RuleEditorViewModelTests
     {
         var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
         var (vm, _, profiles, _) = await LoadedEditorAsync(
-            existingProfileNames: ["working-set"],
+            isStored: true,
             nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
         vm.ConfirmDeleteRule = _ => Task.FromResult(true);
@@ -442,7 +441,7 @@ public sealed class RuleEditorViewModelTests
     public async Task SaveProfileCommand_still_navigates_after_commit()
     {
         var (vm, navigator, _, saved) = await LoadedEditorAsync(
-            returnPage: typeof(GeneratePage), existingProfileNames: ["g2"], profileName: "g2");
+            returnPage: typeof(GeneratePage), isStored: true, profileName: "g2");
         // Not a working-set snapshot, so it saves back to its own name without prompting.
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
         vm.SelectedOp = "constant";
@@ -588,7 +587,7 @@ public sealed class RuleEditorViewModelTests
     {
         var existing = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
         var (vm, _, profiles, _) = await LoadedEditorAsync(
-            existingProfileNames: Array.Empty<string>(),
+            isStored: false,
             nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing });
         vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
         vm.ConfirmDeleteRule = _ => Task.FromResult(true);
@@ -598,7 +597,7 @@ public sealed class RuleEditorViewModelTests
 
         var existing2 = new ConstantRule(System.Text.Json.JsonSerializer.SerializeToElement("original"));
         var (vm2, _, profiles2, _) = await LoadedEditorAsync(
-            existingProfileNames: ["working-set"],
+            isStored: true,
             nameColumnRule: new Dictionary<string, FieldRule> { ["name"] = existing2 });
         vm2.SelectedColumn = vm2.SettableColumns.Single(c => c.LogicalName == "name");
         vm2.ConfirmDeleteRule = _ => Task.FromResult(true);
@@ -1322,6 +1321,96 @@ public sealed class RuleEditorViewModelTests
                 callback(state);
             }
         }
+    }
+
+    [Fact]
+    public void Date_constant_is_stored_as_round_trip_utc_text()
+    {
+        // WR-007: store one culture- and zone-free form so every machine reads the same instant.
+        var scheduled = new DateTimeAttributeMetadata { LogicalName = "scheduledon", IsValidForCreate = true };
+        var vm = EditorForExtra(scheduled);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "scheduledon");
+        vm.SelectedOp = "constant";
+
+        vm.ConstantText = "2031-06-15T00:00:00Z";
+
+        var constant = Assert.IsType<ConstantRule>(vm.BuildRule());
+        Assert.Equal("2031-06-15T00:00:00.0000000Z", constant.Value.GetString());
+    }
+
+    [Fact]
+    public void Sequence_text_that_is_not_an_invariant_number_is_an_error()
+    {
+        // WR-007: a typo used to become start 0, and "1,5" read as 15 (en-US) or 1.5 (de-DE).
+        var vm = new RuleEditorViewModel(BuildEntity(), recordCount: 10, seed: 42, runId: "r1");
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "numberofemployees");
+        vm.SelectedOp = "sequence";
+        vm.StepText = "1";
+
+        vm.StartText = "abc";
+        Assert.Null(vm.BuildRule());
+
+        vm.StartText = "1,5";
+        Assert.Null(vm.BuildRule());
+    }
+
+    [Fact]
+    public async Task Rule_saved_on_a_profile_opened_from_Profiles_is_written_to_its_file()
+    {
+        // CR-003: the old check matched the display name against file stems, so "Acme Sales"
+        // (stored as acme-sales.profile.json) never persisted.
+        var profiles = StoreWithAcmeSales();
+        var editor = await EditRulesFromProfilesAsync(profiles, new RulesNavigationRequest());
+
+        await editor.SaveRuleCommand.ExecuteAsync(null);
+
+        profiles.Verify(
+            p => p.SaveAsync(It.Is<Profile>(x => x.Name == "Acme Sales"), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Rules_opened_from_Profiles_never_apply_to_the_Generate_board()
+    {
+        // CR-004: a payload Generate stamped earlier used to survive Edit rules, so saving a rule
+        // replaced the Generate board and returned to Generate.
+        var generateApplied = 0;
+        var request = new RulesNavigationRequest { OnSaved = _ => generateApplied++, ReturnPage = typeof(GeneratePage) };
+        var editor = await EditRulesFromProfilesAsync(StoreWithAcmeSales(), request);
+
+        await editor.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, generateApplied);
+        Assert.Equal("Profiles", editor.BreadcrumbRootLabel);
+    }
+
+    private static Mock<IProfileService> StoreWithAcmeSales()
+    {
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "acme-sales" });
+        profiles.Setup(p => p.LoadAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Profile(1, "Acme Sales", null, 42, [new ProfileTable("account", 10, null)]));
+        return profiles;
+    }
+
+    // Profiles page → Edit rules → Rules page, sharing one request as the DI singleton does.
+    private static async Task<RuleEditorViewModel> EditRulesFromProfilesAsync(
+        Mock<IProfileService> profiles, RulesNavigationRequest request)
+    {
+        var library = new ProfilesViewModel(profiles.Object, request, Mock.Of<IAppNavigator>());
+        await library.RefreshCommand.ExecuteAsync(null);
+        library.SelectedItem = Assert.Single(library.Items);
+        await library.EditRulesCommand.ExecuteAsync(null);
+
+        var metadata = new Mock<IMetadataProvider>();
+        metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([BuildEntity()]);
+        var editor = new RuleEditorViewModel(metadata.Object, profiles.Object, Mock.Of<IAppNavigator>(), request);
+        await editor.LoadForProfileAsync(TestContext.Current.CancellationToken);
+        editor.SelectedColumn = editor.SettableColumns.Single(c => c.LogicalName == "name");
+        editor.SelectedOp = "constant";
+        editor.ConstantText = "fixed";
+        return editor;
     }
 
     private static RuleEditorViewModel EditorForExtra(params AttributeMetadata[] extra)

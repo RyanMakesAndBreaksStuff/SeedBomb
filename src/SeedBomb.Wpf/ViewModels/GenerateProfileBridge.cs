@@ -72,24 +72,6 @@ internal sealed class GenerateProfileBridge
         _rulesRequest?.Clear();
     }
 
-    /// <summary>
-    /// Writes the working-set snapshot onto <see cref="RulesNavigationRequest"/> when the
-    /// wizard is leaving with a selection.
-    /// </summary>
-    public void CaptureWorkingSetIfNeeded()
-    {
-        if (_rulesRequest is null || _owner.SelectedEntities.Count == 0)
-            return;
-
-        _rulesRequest.Profile = BuildProfileSnapshot(
-            string.Equals(_owner.ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
-                ? "working-set"
-                : _owner.ActiveProfileName);
-        _rulesRequest.TableName = _owner.SelectedEntities[0].LogicalName;
-        _rulesRequest.OnSaved = ApplySavedRulesProfile;
-        _rulesRequest.ReturnPage = typeof(GeneratePage);
-    }
-
     /// <summary>Stamps an in-memory working-set snapshot for a Rules-page edit. Does not persist.</summary>
     /// <returns><see langword="false"/> when no rules-navigation payload is wired.</returns>
     public bool TryPrepareRulesEdit()
@@ -97,6 +79,7 @@ internal sealed class GenerateProfileBridge
         if (_rulesRequest is null)
             return false;
 
+        _rulesRequest.Clear(); // CR-004: stamp a whole payload, never add to a stale one
         _rulesRequest.Profile = BuildProfileSnapshot(
             string.Equals(_owner.ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
                 ? "working-set"

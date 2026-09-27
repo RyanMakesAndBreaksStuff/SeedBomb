@@ -6,7 +6,6 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using SeedBomb.Services.Auth;
-using SeedBomb.Services.Connections;
 using SeedBomb.Services.Diagnostics;
 using SeedBomb.Services.Export;
 using SeedBomb.Services.Generation;
@@ -53,7 +52,6 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly ILogger<RunViewModel>? _logger;
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
-    private readonly IConnectionProfileService? _connections;
     private readonly IAuthService? _auth;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
@@ -82,8 +80,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="navigator">Used by <see cref="OpenInHistory"/>.</param>
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
-    /// <param name="connections">Resolves the connected environment host. Null leaves it unknown.</param>
-    /// <param name="auth">Signed-in user for history rows. Null leaves it blank.</param>
+    /// <param name="auth">Signed-in user and target environment for history rows. Null leaves them blank.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
@@ -91,7 +88,6 @@ public sealed partial class RunViewModel : ObservableObject
         IAppNavigator? navigator = null,
         ISnackbarService? snackbar = null,
         ILogger<RunViewModel>? logger = null,
-        IConnectionProfileService? connections = null,
         IAuthService? auth = null)
     {
         _generation = generation;
@@ -100,7 +96,6 @@ public sealed partial class RunViewModel : ObservableObject
         _navigator = navigator;
         _snackbar = snackbar;
         _logger = logger;
-        _connections = connections;
         _auth = auth;
         SummaryView = this;
     }
@@ -116,6 +111,13 @@ public sealed partial class RunViewModel : ObservableObject
 
     /// <summary>Signed-in user for the last run, or "" when unknown.</summary>
     public string UserLabel => _auth?.CurrentUserDisplayName ?? "";
+
+    /// <summary>
+    /// Host of the environment the live session is signed in to — where a run started now writes —
+    /// or "" when signed out. Reads the same owner as the Dataverse connection (CR-002).
+    /// </summary>
+    public string TargetHost =>
+        Uri.TryCreate(_auth?.ActiveProfile?.EnvironmentUrl, UriKind.Absolute, out var uri) ? uri.Host : string.Empty;
 
     /// <summary>Full activity log for the last run, oldest first. Persisted with the history record.</summary>
     public string[] ActivityLines => _activityLog.Select(l => l.Line).ToArray();
@@ -219,9 +221,7 @@ public sealed partial class RunViewModel : ObservableObject
             throw new InvalidOperationException("Generation service is not configured.");
 
         _lastConfig = config with { AllowRiskyBogusValues = false };
-        _environmentHost = string.IsNullOrWhiteSpace(environmentHost)
-            ? await ResolveEnvironmentHostAsync(ct)
-            : environmentHost;
+        _environmentHost = string.IsNullOrWhiteSpace(environmentHost) ? TargetHost : environmentHost;
         _plannedTables = tables;
         _plannedTotal = plannedTotal;
         _seed = config.Seed;
@@ -406,15 +406,16 @@ public sealed partial class RunViewModel : ObservableObject
         RowsWrittenLabel = written.ToString("N0");
         RunDescription = BuildRunDescription(written, planned, environmentHost, seed);
 
-        RunMetaLine = $"Finished {DateTime.Now:d MMM yyyy, HH:mm} · {FormatDuration(result.Elapsed)} · seed {seed}";
+        var ended = result.Cancelled ? "Cancelled" : "Finished"; // WR-002: a partial result is not a finished run
+        RunMetaLine = $"{ended} {DateTime.Now:d MMM yyyy, HH:mm} · {FormatDuration(result.Elapsed)} · seed {seed}";
         ApplyOutcome(written, rejected, result.Elapsed, tableCount: CountTables(result, _plannedTables));
-        StatusHeadline = OutcomeHeadline;
+        StatusHeadline = result.Cancelled ? "Cancelled" : OutcomeHeadline;
 
         ReplaceGroups(result.Errors
             .GroupBy(e => (e.EntityLogicalName, e.ErrorMessage))
             .Select(BuildGroup));
 
-        AppendActivity($"Finished — {written:N0} written, {rejected:N0} rejected");
+        AppendActivity($"{ended} — {written:N0} written, {rejected:N0} rejected");
     }
 
     /// <summary>
@@ -592,14 +593,11 @@ public sealed partial class RunViewModel : ObservableObject
         {
             try
             {
-                var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-                {
-                    Title = "Cancel run",
-                    Content = "Cancel stops further writes. Rows already written are not rolled back.",
-                    PrimaryButtonText = "Cancel run",
-                    CloseButtonText = "Keep running",
-                });
-                confirmed = result == ContentDialogResult.Primary;
+                confirmed = await _dialogs.ConfirmAsync(
+                    "Cancel run",
+                    "Cancel stops further writes. Rows already written are not rolled back.",
+                    "Cancel run",
+                    close: "Keep running");
             }
             catch (Exception)
             {
@@ -876,25 +874,6 @@ public sealed partial class RunViewModel : ObservableObject
         var rules = _lastConfig?.FieldRules?.Sum(t => t.Value.Count) ?? 0;
         var dest = string.IsNullOrWhiteSpace(host) ? "Dataverse" : host;
         return $"{written:N0} of {planned:N0} rows written to {dest} · {rules} rules · seed {seed}";
-    }
-
-    /// <summary>Host of the connected environment, or "" when it cannot be determined.</summary>
-    private async Task<string> ResolveEnvironmentHostAsync(CancellationToken ct)
-    {
-        if (_connections is null)
-            return string.Empty;
-        try
-        {
-            var profile = await _connections.GetLastUsedAsync(ct);
-            return Uri.TryCreate(profile?.EnvironmentUrl, UriKind.Absolute, out var uri)
-                ? uri.Host
-                : string.Empty;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger?.LogDebug(ex, "Could not resolve the environment host for the run description");
-            return string.Empty;
-        }
     }
 
     private static int CountTables(GenerationResult result, IReadOnlyList<string> planned)

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Diagnostics;
 using System.IO;
 using System.Text.Json;
@@ -10,12 +11,26 @@ namespace SeedBomb.Services.History;
 /// </summary>
 public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
 {
-    private static readonly string FilePath = Path.Combine(AppPaths.Root, "history.json");
-
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
+    private readonly string _filePath;
+    private readonly ILogger<JsonRunHistoryService>? _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
+
+    /// <summary>Stores history in <c>%LOCALAPPDATA%\SeedBomb\history.json</c>.</summary>
+    /// <param name="logger">Warns when an unreadable history file is moved aside.</param>
+    public JsonRunHistoryService(ILogger<JsonRunHistoryService> logger)
+        : this(AppPaths.Root, logger)
+    {
+    }
+
+    /// <summary>Test seam: stores <c>history.json</c> in <paramref name="storageDirectory"/>.</summary>
+    internal JsonRunHistoryService(string storageDirectory, ILogger<JsonRunHistoryService>? logger = null)
+    {
+        _filePath = Path.Combine(storageDirectory, "history.json");
+        _logger = logger;
+    }
 
     /// <inheritdoc />
     public async Task AddRunAsync(RunRecord run, CancellationToken ct = default)
@@ -61,28 +76,30 @@ public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
         }
     }
 
-    private static async Task<List<RunRecord>> ReadCoreAsync(CancellationToken ct)
+    private async Task<List<RunRecord>> ReadCoreAsync(CancellationToken ct)
     {
-        if (!File.Exists(FilePath))
+        if (!File.Exists(_filePath))
             return [];
 
         try
         {
-            await using var stream = File.OpenRead(FilePath);
+            await using var stream = File.OpenRead(_filePath);
             return await JsonSerializer.DeserializeAsync<List<RunRecord>>(stream, JsonOptions, ct).ConfigureAwait(false)
                    ?? [];
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // WR-008: keep the unreadable file — the next write would otherwise erase every past run.
+            var kept = AtomicFile.Quarantine(_filePath);
+            _logger?.LogWarning(ex, "Run history was unreadable; moved it to {Path} and started empty", kept);
             return [];
         }
     }
 
-    private static async Task WriteCoreAsync(List<RunRecord> list, CancellationToken ct)
+    private async Task WriteCoreAsync(List<RunRecord> list, CancellationToken ct)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        await using var stream = File.Open(FilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await JsonSerializer.SerializeAsync(stream, list, JsonOptions, ct).ConfigureAwait(false);
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(list, JsonOptions), ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

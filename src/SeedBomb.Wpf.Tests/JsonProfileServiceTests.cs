@@ -452,4 +452,22 @@ public sealed class JsonProfileServiceTests : IDisposable
 
         Assert.True(File.Exists(destPath));
     }
+
+    [Fact]
+    public async Task Save_that_cannot_complete_leaves_the_previous_file_whole()
+    {
+        // WR-008: new content goes to a sibling temp file that is swapped in, so the live file is
+        // never truncated first. A blocked temp path stands in for a crash or a full disk.
+        var svc = NewService(out var root);
+        var ct = TestContext.Current.CancellationToken;
+        await svc.SaveAsync(new Profile(1, "acme", null, 1, [new ProfileTable("account", 1, null)]), ct);
+        var path = Path.Combine(root, "acme.profile.json");
+        var before = await File.ReadAllTextAsync(path, ct);
+        Directory.CreateDirectory(path + ".tmp");
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SaveAsync(new Profile(1, "acme", null, 2, [new ProfileTable("account", 5, null)]), ct));
+
+        Assert.Equal(before, await File.ReadAllTextAsync(path, ct));
+    }
 }

@@ -15,8 +15,7 @@ public sealed class DataverseConnectionServiceTests
         auth.Setup(a => a.GetTokenAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("token");
 
-        var profiles = new Mock<IConnectionProfileService>();
-        using var sut = new DataverseConnectionService(auth.Object, profiles.Object);
+        using var sut = new DataverseConnectionService(auth.Object);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -36,16 +35,15 @@ public sealed class DataverseConnectionServiceTests
     {
         var gate = new TaskCompletionSource();
         var enteredLock = new TaskCompletionSource();
-        var profiles = new Mock<IConnectionProfileService>();
-        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>()))
-            .Returns(async () =>
-            {
-                enteredLock.TrySetResult();
-                await gate.Task;
-                throw new InvalidOperationException("no live org to reach");
-            });
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(() =>
+        {
+            enteredLock.TrySetResult();
+            gate.Task.Wait();
+            return null; // not signed in: the connect then fails without reaching a live org
+        });
 
-        using var svc = new DataverseConnectionService(Mock.Of<IAuthService>(), profiles.Object);
+        using var svc = new DataverseConnectionService(auth.Object);
 
         // Occupies the semaphore for the whole of the (blocked) connect.
         var connecting = Task.Run(() => svc.GetOrganizationServiceAsync(CancellationToken.None));
@@ -64,5 +62,46 @@ public sealed class DataverseConnectionServiceTests
             try { await connecting; } catch (Exception) { /* no live org to reach */ }
             await resetting;
         }
+    }
+
+    [Fact]
+    public async Task Connects_only_to_the_signed_in_profile_never_to_last_used()
+    {
+        // CR-002: the connection comes from the signed-in profile alone (WR-001 removed the
+        // service's access to the profile store).
+        using var svc = new DataverseConnectionService(Mock.Of<IAuthService>());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.GetOrganizationServiceAsync(TestContext.Current.CancellationToken));
+
+        Assert.StartsWith("Not signed in", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ServiceClient_is_built_off_the_calling_thread()
+    {
+        // WR-006: the constructor signs in and connects synchronously. Built inline, it froze the
+        // UI thread on the first Dataverse call after startup or a connection switch.
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile)
+            .Returns(new ConnectionProfile { EnvironmentUrl = "https://org.crm.dynamics.com" });
+        using var svc = new DataverseConnectionService(auth.Object);
+        bool? builtOnPool = null;
+        svc.CreateClientOverride = _ =>
+        {
+            builtOnPool = Thread.CurrentThread.IsThreadPoolThread;
+            throw new InvalidOperationException("stop before dialling out");
+        };
+
+        // A dedicated thread stands in for the dispatcher: it is not a pool thread.
+        var caller = new Thread(() =>
+        {
+            try { svc.GetOrganizationServiceAsync().GetAwaiter().GetResult(); }
+            catch (InvalidOperationException) { }
+        });
+        caller.Start();
+        caller.Join();
+
+        Assert.True(builtOnPool);
     }
 }

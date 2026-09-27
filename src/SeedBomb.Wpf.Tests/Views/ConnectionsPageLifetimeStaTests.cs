@@ -58,6 +58,27 @@ public sealed class ConnectionsPageLifetimeStaTests
         Assert.Null(vm.EditingProfile);
     }
 
+    [StaFact]
+    public async Task NavigatingAway_ClosesTheEditorInsteadOfHalfResettingIt()
+    {
+        // WR-009: only EditingProfile was cleared, so coming back showed an enabled empty form and
+        // a Connect button that did nothing.
+        EnsureApplication();
+        var vm = NewViewModel();
+        var page = new ConnectionsPage(vm);
+        vm.EditingProfile = new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://org.crm.dynamics.com" };
+        vm.IsEditing = true;
+        vm.IsDirty = true;
+        vm.TestResult = "Connected as user@contoso.com";
+
+        await page.OnNavigatedFromAsync();
+
+        Assert.False(vm.IsEditing);
+        Assert.False(vm.IsDirty);
+        Assert.Null(vm.TestResult);
+        Assert.False(vm.ShowConnectButton);
+    }
+
     private static ConnectionManagerViewModel NewViewModel() => new(
         Mock.Of<IConnectionProfileService>(),
         Mock.Of<IAuthService>(),

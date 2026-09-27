@@ -353,4 +353,24 @@ public class RuleValidatorTests
 
         return map;
     }
+
+    [Fact]
+    public void Date_constant_validates_the_same_under_every_machine_culture()
+    {
+        // WR-007: "13/01/2025" parses under en-GB but not under en-US or the invariant culture,
+        // so a shared profile must not validate differently from one machine to the next.
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-GB");
+        try
+        {
+            var attr = new DateTimeAttributeMetadata { LogicalName = "scheduledon" };
+            var result = RuleValidator.Validate(new ConstantRule(J("\"13/01/2025\"")), attr, recordCount: 10, runId: "r");
+
+            Assert.False(result.IsValid);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+        }
+    }
 }

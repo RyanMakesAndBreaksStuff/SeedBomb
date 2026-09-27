@@ -18,22 +18,43 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private readonly IAuthService _authService;
     private readonly IDataverseConnectionService _connectionService;
     private readonly IContentDialogService? _dialogs;
+    private readonly RunViewModel? _run;
 
     /// <summary>Initialises the view-model.</summary>
     /// <param name="profileService">Connection profile store.</param>
     /// <param name="authService">Auth service.</param>
     /// <param name="connectionService">Dataverse connection cache.</param>
     /// <param name="dialogs">Optional dialog host. When null, delete proceeds unconfirmed (tests).</param>
+    /// <param name="run">Optional run sheet. While it is writing, connection changes are blocked.</param>
     public ConnectionManagerViewModel(
         IConnectionProfileService profileService,
         IAuthService authService,
         IDataverseConnectionService connectionService,
-        IContentDialogService? dialogs = null)
+        IContentDialogService? dialogs = null,
+        RunViewModel? run = null)
     {
         _profileService = profileService;
         _authService = authService;
         _connectionService = connectionService;
         _dialogs = dialogs;
+        _run = run;
+        // Both singletons: the subscription lives as long as the app.
+        if (_run is not null)
+            _run.PropertyChanged += OnRunPropertyChanged;
+    }
+
+    // WR-001: save, delete, connect and switch can each dispose the ServiceClient a running
+    // pipeline writes through, so they wait until the run ends.
+    private bool RunIsWriting => _run?.IsRunning == true;
+
+    private void OnRunPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(RunViewModel.IsRunning))
+            return;
+        SaveProfileCommand.NotifyCanExecuteChanged();
+        DeleteProfileCommand.NotifyCanExecuteChanged();
+        ConnectCommand.NotifyCanExecuteChanged();
+        SelectProfileCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Raised after a profile is selected and sign-in succeeds.</summary>
@@ -130,6 +151,10 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                 p.IsLastUsed = lastUsed?.Id == p.Id;
                 Profiles.Add(p);
             }
+
+            // CR-006: say where an unreadable connections.json went instead of showing an empty list.
+            if (_profileService.LoadWarning is { } warning)
+                SwitchError = warning;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -159,8 +184,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
         try
         {
-            await _profileService.SetLastUsedAsync(profile.Id);
-            var result = await _authService.SignInAsync(ParentHwnd);
+            // CR-002: sign in to this profile explicitly; last-used only moves when that succeeds.
+            var result = await _authService.SignInAsync(profile, ParentHwnd);
 
             if (result.Succeeded)
             {
@@ -183,7 +208,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         }
     }
 
-    private bool CanSelectProfile() => !IsSwitchingConnection;
+    private bool CanSelectProfile() => !IsSwitchingConnection && !RunIsWriting;
 
     /// <summary>Starts editing an existing profile, loading its secret on demand.</summary>
     [RelayCommand]
@@ -246,7 +271,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     // thumbprint would otherwise save and then fail sign-in with a confusing error instead of
     // being blocked at save time.
     private bool CanSaveProfile() =>
-        EditingProfile is { } p
+        !RunIsWriting
+        && EditingProfile is { } p
         && !string.IsNullOrWhiteSpace(p.Name)
         && !string.IsNullOrWhiteSpace(p.ClientId)
         && IsValidHttpsUrl(p.EnvironmentUrl)
@@ -258,7 +284,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         };
 
     /// <summary>Deletes a profile after confirmation.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanDeleteProfile))]
     private async Task DeleteProfileAsync(ConnectionProfile? profile)
     {
         if (profile is null) return;
@@ -266,19 +292,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
         try
         {
-            if (_dialogs is not null)
-            {
-                var choice = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-                {
-                    Title = "Delete connection",
-                    Content = $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
-                    PrimaryButtonText = "Delete",
-                    CloseButtonText = "Cancel",
-                });
-
-                if (choice != ContentDialogResult.Primary)
-                    return;
-            }
+            if (_dialogs is not null
+                && !await _dialogs.ConfirmAsync(
+                    "Delete connection",
+                    $"Delete '{profile.Name}'? Saved credentials for this connection are removed.",
+                    "Delete"))
+                return;
 
             await _profileService.DeleteAsync(profile.Id);
             await LoadAsync();
@@ -293,7 +312,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             }
 
             if (ConnectedProfileId == profile.Id)
+            {
                 ConnectedProfileId = null;
+                // WR-001: only deleting the connected profile drops the live connection; saving or
+                // deleting any other profile leaves it alone.
+                await _connectionService.ResetAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -301,6 +325,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             SwitchError = ex.Message;
         }
     }
+
+    private bool CanDeleteProfile() => !RunIsWriting;
 
     /// <summary>Tests the connection for the current editing profile.</summary>
     [RelayCommand]
@@ -361,7 +387,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         ShowConnectedToast = false;
     }
 
-    private bool CanConnect() => ShowConnectButton;
+    private bool CanConnect() => ShowConnectButton && !RunIsWriting;
 
     /// <summary>Writes Microsoft's well-known public client ID into the editing profile.</summary>
     [RelayCommand]

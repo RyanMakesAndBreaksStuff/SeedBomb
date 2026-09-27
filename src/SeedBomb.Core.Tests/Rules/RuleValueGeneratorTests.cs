@@ -64,4 +64,16 @@ public class RuleValueGeneratorTests
         var fresh = RuleValueGenerator.Evaluate(rule, attr, 42, "t", 3, "r");
         Assert.Equal(fresh, outOfOrder);
     }
+
+    [Fact]
+    public void Date_constant_keeps_its_utc_instant_in_every_time_zone()
+    {
+        // WR-007: the value must not pass through the machine's time zone. Red on any machine
+        // whose UTC offset on 2031-06-15 is not +00:00.
+        var attr = new DateTimeAttributeMetadata { LogicalName = "scheduledon" };
+
+        var v = RuleValueGenerator.Evaluate(new ConstantRule(J("\"2031-06-15T00:00:00Z\"")), attr, 42, "account", 0, "r");
+
+        Assert.Equal(new DateTime(2031, 6, 15, 0, 0, 0, DateTimeKind.Utc), Assert.IsType<DateTime>(v));
+    }
 }

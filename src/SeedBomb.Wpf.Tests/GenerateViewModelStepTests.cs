@@ -4,6 +4,8 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
+using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
 using SeedBomb.Services.Generation;
 using SeedBomb.Services.History;
 using SeedBomb.Services.Navigation;
@@ -451,8 +453,10 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public async Task OnNavigatedFrom_writes_working_set_request()
+    public async Task Leaving_Generate_leaves_the_rules_request_alone()
     {
+        // CR-004: leaving Generate used to stamp its callback and return page on the shared request,
+        // and Edit rules on the Profiles page then inherited them.
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
             Mock.Of<IRunHistoryService>(),
@@ -466,9 +470,9 @@ public sealed class GenerateViewModelStepTests
 
         await viewModel.OnNavigatedFromAsync();
 
-        Assert.NotNull(request.Profile);
-        Assert.Equal(typeof(GeneratePage), request.ReturnPage);
-        Assert.NotNull(request.OnSaved);
+        Assert.Null(request.Profile);
+        Assert.Null(request.OnSaved);
+        Assert.Null(request.ReturnPage);
     }
 
     [Fact]
@@ -689,6 +693,80 @@ public sealed class GenerateViewModelStepTests
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Cancelled_run_that_wrote_rows_is_recorded_as_not_succeeded()
+    {
+        // WR-002: rows written before a cancel are not rolled back, so History must list them.
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Cancelled = true,
+            });
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        historyMock.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => !r.Succeeded && r.TotalRecords == 1 && r.EntityNames.Single() == "Account"),
+            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("Cancelled", viewModel.Run.StatusHeadline);
+    }
+
+    [Fact]
+    public async Task Failed_run_is_recorded_as_not_succeeded()
+    {
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new SeedBomb.Core.Exceptions.DataGenerationException("Entity 'account': required lookup 'parentid' (SystemRequired) has no generator — cannot create records."));
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        historyMock.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => !r.Succeeded && r.TotalRecords == 0),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task History_write_failure_is_not_reported_as_a_failed_run()
+    {
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock, out var snackbarMock);
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult());
+        historyMock
+            .Setup(h => h.AddRunAsync(It.IsAny<RunRecord>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("history.json is locked"));
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        snackbarMock.Verify(
+            s => s.Show("Couldn't save run history", "history.json is locked", ControlAppearance.Danger, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+        Assert.Equal("", viewModel.Run.LastFailureMessage);
+    }
+
+    [Fact]
+    public void Step4_confirmation_names_the_environment_the_run_writes_to()
+    {
+        // CR-002: step 4 never said which org the rows would be written to.
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile)
+            .Returns(new ConnectionProfile { EnvironmentUrl = "https://contoso-prod.crm.dynamics.com" });
+        var viewModel = new GenerateViewModel(
+            Mock.Of<IRunHistoryService>(), Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(), Mock.Of<IProfileService>(),
+            Mock.Of<IContentDialogService>(), new RunViewModel(Mock.Of<IWpfGenerationService>(), auth: auth.Object));
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        Assert.Contains("to contoso-prod.crm.dynamics.com", viewModel.RunConfirmationLine, StringComparison.Ordinal);
+    }
 
     private static GenerateViewModel CreateViewModel(
         out Mock<IWpfGenerationService> generationMock,

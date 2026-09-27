@@ -54,7 +54,9 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         // The view-model is a Singleton and this page is Transient, so anything left on it
         // outlives the page - including the decrypted ClientSecret loaded by EditProfileAsync.
         ViewModel.ShowConnectedToast = false;
-        ViewModel.EditingProfile = null;
+        // WR-009: Cancel clears the whole editor (IsEditing, IsDirty, TestResult) — clearing
+        // EditingProfile alone left an enabled empty form and a Connect button that did nothing.
+        ViewModel.CancelCommand.Execute(null);
         return Task.CompletedTask;
     }
 

@@ -1,6 +1,5 @@
 using Microsoft.PowerPlatform.Dataverse.Client;
 using SeedBomb.Services.Auth;
-using SeedBomb.Services.Connections;
 
 namespace SeedBomb.Services.Dataverse;
 
@@ -11,21 +10,23 @@ namespace SeedBomb.Services.Dataverse;
 public sealed class DataverseConnectionService : IDataverseConnectionService, IDisposable
 {
     private readonly IAuthService _auth;
-    private readonly IConnectionProfileService _profileService;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cached;
 
     /// <inheritdoc />
     public event EventHandler? ConnectionReset;
 
+    /// <summary>
+    /// Test seam: given the environment URL, replaces the real client, whose constructor dials the
+    /// org. Null builds the real <see cref="ServiceClient"/>.
+    /// </summary>
+    internal Func<string, ServiceClient>? CreateClientOverride { get; set; }
+
     /// <summary>Initialises the service with required dependencies.</summary>
-    /// <param name="auth">Auth service used to supply bearer tokens.</param>
-    /// <param name="profileService">Profile service supplying the environment URL.</param>
-    public DataverseConnectionService(IAuthService auth, IConnectionProfileService profileService)
+    /// <param name="auth">Auth service: supplies the signed-in profile and its bearer tokens.</param>
+    public DataverseConnectionService(IAuthService auth)
     {
         _auth = auth;
-        _profileService = profileService;
-        _profileService.ProfilesChanged += OnProfilesChanged;
     }
 
     /// <inheritdoc />
@@ -40,20 +41,23 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             if (_cached is { IsReady: true })
                 return _cached;
 
-            var profile = await _profileService.GetLastUsedAsync(ct).ConfigureAwait(false)
-                          ?? throw new InvalidOperationException("No connection profile configured.");
+            // CR-002: connect to the environment the live session signed in to. Re-reading last-used
+            // is what let a failed or cancelled switch aim writes at a different org.
+            var profile = _auth.ActiveProfile
+                          ?? throw new InvalidOperationException("Not signed in. Connect to an environment first.");
             var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
 
-            _cached = new ServiceClient(
+            // WR-006: the constructor signs in and connects synchronously, and the awaits above
+            // usually complete inline — so build it on the pool, never on the dispatcher.
+            _cached = await Task.Run(() => CreateClientOverride?.Invoke(profile.EnvironmentUrl) ?? new ServiceClient(
                 instanceUrl: new Uri(profile.EnvironmentUrl),
                 tokenProviderFunction: CreateTokenProvider(scopes),
                 useUniqueInstance: true)
             {
-                // Disable built-in retries — BulkCreator's ThrottlePolicy owns retry logic.
-                MaxRetryCount = 0,
-                RetryPauseTime = TimeSpan.Zero,
+                // CR-001: keep the SDK's own retries — they honour Retry-After on service-protection
+                // faults, which ThrottlePolicy deliberately does not retry.
                 EnableAffinityCookie = false
-            };
+            }, ct).ConfigureAwait(false);
 
             if (!_cached.IsReady)
                 throw new InvalidOperationException(
@@ -92,12 +96,9 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         ConnectionReset?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnProfilesChanged(object? sender, EventArgs e) => _ = ResetAsync();
-
     /// <inheritdoc />
     public void Dispose()
     {
-        _profileService.ProfilesChanged -= OnProfilesChanged;
         ServiceClient? cached;
         _lock.Wait();
         try

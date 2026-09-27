@@ -64,6 +64,12 @@ public sealed partial class ConnectionProfile : ObservableObject
     /// <summary>Certificate thumbprint in CurrentUser\My. Used by <see cref="AuthType.Certificate"/> only.</summary>
     [ObservableProperty] private string? _certificateThumbprint;
 
+    /// <summary>
+    /// MSAL account (<c>HomeAccountId.Identifier</c>) this profile last signed in as interactively.
+    /// <see cref="AuthType.OAuth"/> only; written by sign-in, never by the editor.
+    /// </summary>
+    [ObservableProperty] private string? _homeAccountId;
+
     /// <summary>Not persisted. Set by the VM to mark the currently active (last-used) profile.</summary>
     public bool IsLastUsed { get; set; }
 }

@@ -63,21 +63,11 @@ public partial class App : Application
 
             // Attempt silent token acquisition before showing any window.
             // Pass nint.Zero to suppress any interactive popup — silent-only path.
-            // MSAL may emit first-chance RPC/COM exceptions (0x6BA/0x71A) against WAM; those
-            // are handled inside SignInAsync and must not crash startup.
+            // SignInAsync never throws (CR-006): MSAL/WAM, store and secret failures all come
+            // back as a failed AuthResult and land on the sign-in overlay.
             splash.SetStatus("Restoring your session...");
             var auth = _host.Services.GetRequiredService<IAuthService>();
-            AuthResult result;
-            try
-            {
-                result = await auth.SignInAsync(nint.Zero);
-            }
-            catch (Exception ex) when (ex is Microsoft.Identity.Client.MsalException
-                                           or System.Runtime.InteropServices.COMException
-                                           or InvalidOperationException)
-            {
-                result = new AuthResult(false, null, ex.Message);
-            }
+            var result = await auth.SignInAsync(nint.Zero);
 
             // Always show MainWindow — its "Sign in to continue" overlay covers a failed
             // silent attempt, and the first-run overlay already covers zero profiles.
