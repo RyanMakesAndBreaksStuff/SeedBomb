@@ -323,61 +323,6 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public void QueueTracksEntitiesAcrossProgressAndErrors()
-    {
-        var viewModel = CreateViewModel(out _, out _, out _);
-        viewModel.OnEntitiesChanged(
-        [
-            new EntitySummary("account", "Account", false),
-            new EntitySummary("contact", "Contact", false),
-        ]);
-
-        Assert.Equal(
-            ["account", "contact"],
-            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
-
-        viewModel.CurrentProgress = new ProgressUpdate(
-            "Generating", "account", 1, 10, 1, 2, 0, TimeSpan.Zero);
-
-        Assert.Equal(
-            ["account", "contact"],
-            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
-
-        viewModel.LastResult = new GenerationResult
-        {
-            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
-            {
-                ["account"] = [Guid.NewGuid()],
-            },
-            Errors = [new BatchError("contact", 0, "failed", null)],
-        };
-
-        Assert.Equal(
-            ["account", "contact"],
-            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
-    }
-
-    [Fact]
-    public void LastRunStatusTextReportsErrorsWhenPresent()
-    {
-        var viewModel = CreateViewModel(out _, out _, out _);
-        viewModel.LastResult = new GenerationResult
-        {
-            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
-            {
-                ["account"] = [Guid.NewGuid()],
-            },
-            Errors =
-            [
-                new BatchError("account", 0, "plugin failed", 123),
-            ],
-        };
-
-        Assert.True(viewModel.LastRunHasErrors);
-        Assert.Contains("plugin failed", viewModel.LastRunStatusText, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task GenerateSnackbarUsesCautionWhenResultHasErrors()
     {
         var viewModel = await CreateReadyForRulesAsync(out _, out var generationMock, out _, out _, out var snackbarMock);
@@ -437,27 +382,6 @@ public sealed class GenerateViewModelStepTests
         profileService.Verify(
             p => p.SaveDraftAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()),
             Times.Once);
-    }
-
-    [Fact]
-    public async Task CancelDiscardsDraftAndNeverCallsGenerate()
-    {
-        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
-
-        // Nothing has been committed yet — draft additions must vanish on Cancel.
-        fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
-        Assert.NotEmpty(fieldRules.Rows);
-
-        viewModel.CancelDraftCommand.Execute(null);
-
-        Assert.Empty(fieldRules.Rows);
-        Assert.Null(viewModel.ReviewedRules);
-        Assert.False(viewModel.IsReviewOpen);
-        Assert.Equal(0, viewModel.CurrentStep);
-        generationMock.Verify(
-            g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()),
-            Times.Never);
     }
 
     [Fact]
@@ -591,10 +515,9 @@ public sealed class GenerateViewModelStepTests
         var fieldRules = new FieldRulesViewModel();
         viewModel.AttachFieldRules(fieldRules);
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        fieldRules.SelectTable("account");
         fieldRules.SetRule("account", "name",
             new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
-        Assert.NotEmpty(fieldRules.Rows);
+        Assert.NotEmpty(fieldRules.GetRules());
         viewModel.Seed = 99;
         viewModel.CurrentStep = 1;
         viewModel.ActiveProfileName = "acme-sales-scenario";
@@ -603,7 +526,7 @@ public sealed class GenerateViewModelStepTests
 
         Assert.Empty(viewModel.SelectedEntities);
         Assert.Equal(0, viewModel.CurrentStep);
-        Assert.Empty(fieldRules.Rows);
+        Assert.Empty(fieldRules.GetRules());
         Assert.Equal(42, viewModel.Seed);
         Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
         profiles.Verify(p => p.ClearDraftAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -712,7 +635,6 @@ public sealed class GenerateViewModelStepTests
 
             var fieldRules = new FieldRulesViewModel();
             vm.AttachFieldRules(fieldRules);
-            fieldRules.SelectTable("account");
             fieldRules.SetRule(
                 "account",
                 "name",
@@ -726,12 +648,10 @@ public sealed class GenerateViewModelStepTests
             Assert.True(File.Exists(draftPath));
 
             await vm.ResetWithoutPromptAsync();
-            fieldRules.DiscardDraft();
             await Task.Delay(800, TestContext.Current.CancellationToken);
 
             Assert.Empty(fieldRules.GetRules());
             Assert.False(fieldRules.IsDirty);
-            Assert.Empty(fieldRules.Rows);
             Assert.False(File.Exists(draftPath));
         }
         finally

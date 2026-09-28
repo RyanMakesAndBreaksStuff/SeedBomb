@@ -175,7 +175,7 @@ public sealed class ProfileImportFlowTests : IDisposable
         {
             ["account"] = report.BoardRules["account"].ToDictionary(
                 kv => kv.Key,
-                kv => new RuleDraftEntry(kv.Value, kv.Key, ""),
+                kv => new RuleDraftEntry(kv.Value),
                 StringComparer.OrdinalIgnoreCase),
         };
         importBoard.ReplaceDraft(draft);

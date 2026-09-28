@@ -13,7 +13,6 @@ using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels.Controls;
 using SeedBomb.Views.Pages;
-using System.Collections.ObjectModel;
 using Wpf.Ui;
 using Wpf.Ui.Extensions;
 
@@ -29,13 +28,6 @@ public record StepEntry(string Glyph, string Label, bool IsDone, bool IsActive, 
 
 /// <summary>One selected table in the step-1 aside.</summary>
 public sealed record SelectedTableRow(string DisplayName, string LogicalName, int Count);
-
-/// <summary>Entity queue status entry. Rendering is the view's concern; this holds no brushes.</summary>
-public sealed class QueuedEntityEntry(EntitySummary entity)
-{
-    /// <summary>Gets the entity summary.</summary>
-    public EntitySummary Entity { get; } = entity;
-}
 
 /// <summary>Review-card preview: first five <see cref="RuleValueGenerator"/> outputs for one ruled column.</summary>
 /// <param name="Table">Owning table logical name.</param>
@@ -206,12 +198,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private bool _isRunning;
 
-    [ObservableProperty] private ProgressUpdate? _currentProgress;
-
     [ObservableProperty]
-    [NotifyPropertyChangedFor(
-        nameof(HasResult), nameof(Steps),
-        nameof(LastRunHasErrors), nameof(LastRunStatusText))]
+    [NotifyPropertyChangedFor(nameof(HasResult), nameof(Steps))]
     private GenerationResult? _lastResult;
 
     [ObservableProperty]
@@ -275,16 +263,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// <summary>Singleton run sheet bound by the overlay.</summary>
     public RunViewModel Run { get; }
 
-    /// <summary>True when the wizard is on Review or Run. Setter maps old two-state paging onto <see cref="CurrentStep"/>.</summary>
-    public bool IsReviewOpen
-    {
-        get => CurrentStep >= 2;
-        set
-        {
-            if (value && CurrentStep < 2) CurrentStep = 2;
-            if (!value && CurrentStep >= 2) CurrentStep = 1;
-        }
-    }
+    /// <summary>True when the wizard is on Review or Run.</summary>
+    public bool IsReviewOpen => CurrentStep >= 2;
 
     /// <summary>Footer primary-button caption.</summary>
     public string NextButtonLabel => CurrentStep == 3 ? "Start run" : "Next";
@@ -370,20 +350,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
-
-    public bool LastRunHasErrors => LastResult is { Errors.Count: > 0 };
-
-    public string LastRunStatusText =>
-        LastResult is null
-            ? string.Empty
-            : LastResult.Errors.Count == 0
-                ? "All entities succeeded"
-                : LastResult.Errors.Count == 1
-                    ? LastResult.Errors[0].ErrorMessage
-                    : $"{LastResult.Errors.Count} batch errors";
-
-    /// <summary>Gets the collection of queued entity status dots.</summary>
-    public ObservableCollection<QueuedEntityEntry> QueuedEntities { get; } = [];
 
     /// <summary>Full live entity metadata for selected entities, loaded when advancing to Rules.</summary>
     public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadataMap => _entityMetadata;
@@ -554,10 +520,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         _fieldOverrides?.SetEntities(entities, DefaultRecordCount);
         OnPropertyChanged(nameof(SelectedTableRows));
 
-        QueuedEntities.Clear();
-        foreach (var e in entities)
-            QueuedEntities.Add(new QueuedEntityEntry(e));
-
         if (sameSet)
             return;
 
@@ -593,7 +555,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
             RunId = $"run-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
             IsRulesLoaded = true;
-            _fieldRules?.SelectTable(SelectedEntities.FirstOrDefault()?.LogicalName ?? string.Empty);
             _profileBridge.TryApplyRestoredDraft();
         }
         catch (OperationCanceledException)
@@ -717,7 +678,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         ReviewHasErrors = hasErrors;
         ReviewedDraftRevision = _fieldRules.Revision;
         ReviewPreviewRows = previewRows;
-        IsReviewOpen = true;
+        if (CurrentStep < 2) CurrentStep = 2;
     }
 
     /// <summary>
@@ -790,17 +751,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         };
     }
 
-    /// <summary>
-    /// Discards the draft and restores the previously committed configuration (S2).
-    /// Never starts generation.
-    /// </summary>
-    [RelayCommand]
-    private void CancelDraft()
-    {
-        _fieldRules?.DiscardDraft();
-        CurrentStep = 0;
-    }
-
     /// <summary>Tests set this to skip the content dialog.</summary>
     internal Func<Task<bool>>? ConfirmReset { get; set; }
 
@@ -831,9 +781,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
         SelectedEntities = [];
         _entitySelector?.ClearSelection();
-        CurrentProgress = null;
         LastResult = null;
-        QueuedEntities.Clear();
         _fieldOverrides?.SetEntities([]);
         OnPropertyChanged(nameof(SelectedTableRows));
 
@@ -879,7 +827,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     private async Task GenerateAsync()
     {
         IsRunning = true;
-        CurrentProgress = null;
         LastResult = null;
         _cts = new CancellationTokenSource();
         _fieldRules?.Commit();
