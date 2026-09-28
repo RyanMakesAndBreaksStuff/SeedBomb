@@ -99,4 +99,27 @@ public sealed class SettingsViewModelTests
         Assert.True(raised);
         Assert.True(vm.SignOutCommand.CanExecute(null));
     }
+
+    [Fact]
+    public async Task LoadAsync_WhenLoadFails_BlocksSaveUntilNextSuccessfulLoad()
+    {
+        // WR-004: a load failure left _loadedSettings at AppSettings.Default. Any later appearance
+        // toggle or a Save click then persisted AppSettings.Default over the user's real record
+        // count, batch size, DOP and KeepRunSheetOpen.
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("locked by antivirus"));
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new SettingsViewModel(
+            settings.Object, Mock.Of<ILogger<SettingsViewModel>>(), snackbar.Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        snackbar.Verify(s => s.Show(
+            It.IsAny<string>(), It.IsAny<string>(),
+            ControlAppearance.Danger, It.IsAny<IconElement?>(), It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
 }

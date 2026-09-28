@@ -38,6 +38,7 @@ public sealed partial class SettingsViewModel(
     private readonly RunViewModel? _run = run;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
+    private bool _loadFailed;
     private CancellationTokenSource? _appearanceSaveCts;
     private CancellationTokenSource? _navCts;
     private Task _appearanceSaveTask = Task.CompletedTask;
@@ -116,6 +117,13 @@ public sealed partial class SettingsViewModel(
             DarkTheme = s.DarkTheme;
             PaletteId = DesignThemeManager.ResolvePaletteId(s.PaletteId);
             KeepRunSheetOpen = s.KeepRunSheetOpen;
+
+            // A retried load after an earlier failure must re-enable Save.
+            if (_loadFailed)
+            {
+                _loadFailed = false;
+                SaveCommand.NotifyCanExecuteChanged();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -123,7 +131,15 @@ public sealed partial class SettingsViewModel(
         }
         catch (Exception ex)
         {
+            // WR-004: _loadedSettings stays at AppSettings.Default here. Without this guard, any
+            // appearance toggle (OnDarkThemeChanged/OnPaletteIdChanged) or Save would persist
+            // AppSettings.Default over the user's real record count, batch size, DOP and
+            // KeepRunSheetOpen.
             _logger.LogError(ex, "Failed to load settings");
+            _loadFailed = true;
+            _snackbar?.Show("Settings not loaded", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
+            SaveCommand.NotifyCanExecuteChanged();
         }
         finally
         {
@@ -131,7 +147,9 @@ public sealed partial class SettingsViewModel(
         }
     }
 
-    [RelayCommand]
+    private bool CanSave() => !_loadFailed;
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
         try
@@ -196,6 +214,9 @@ public sealed partial class SettingsViewModel(
 
     private void QueueAppearanceSave()
     {
+        if (_loadFailed)
+            return;
+
         CancelPendingAppearanceSave();
         _appearanceSaveCts = new CancellationTokenSource();
         _appearanceSaveTask = SaveAppearanceAsync(_appearanceSaveCts.Token);
