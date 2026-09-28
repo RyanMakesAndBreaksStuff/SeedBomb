@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using Microsoft.PowerPlatform.Dataverse.Client;
 using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
@@ -103,5 +106,69 @@ public sealed class DataverseConnectionServiceTests
         caller.Join();
 
         Assert.True(builtOnPool);
+    }
+
+    [Fact]
+    public async Task Dispose_DoesNotBlockWhileAConnectIsInFlight()
+    {
+        // WR-001: Dispose waited on the semaphore the connect holds for the whole ServiceClient
+        // construction, on the UI thread, during App.OnExit.
+        var gate = new TaskCompletionSource();
+        var enteredLock = new TaskCompletionSource();
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(() =>
+        {
+            enteredLock.TrySetResult();
+            gate.Task.Wait();
+            return null; // not signed in: the connect then fails without reaching a live org
+        });
+        var svc = new DataverseConnectionService(auth.Object);
+
+        var connecting = Task.Run(() => svc.GetOrganizationServiceAsync(CancellationToken.None));
+        await enteredLock.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        var disposing = Task.Run(() => svc.Dispose(), TestContext.Current.CancellationToken);
+        var finished = await Task.WhenAny(disposing, Task.Delay(2000, TestContext.Current.CancellationToken));
+
+        gate.SetResult();
+        try { await connecting; } catch (Exception) { /* no live org to reach */ }
+
+        Assert.Same(disposing, finished);
+    }
+
+    [Fact]
+    public async Task Shutdown_during_a_connect_disposes_the_late_client_once_and_never_publishes_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile)
+            .Returns(new ConnectionProfile { EnvironmentUrl = "https://org.crm.dynamics.com" });
+        var svc = new DataverseConnectionService(auth.Object);
+        var building = new TaskCompletionSource();
+        var gate = new TaskCompletionSource();
+        // Only its identity matters, so skip the constructor that dials the org.
+        var late = (ServiceClient)RuntimeHelpers.GetUninitializedObject(typeof(ServiceClient));
+        GC.SuppressFinalize(late);
+        var disposed = new ConcurrentQueue<ServiceClient>();
+        svc.CreateClientOverride = _ =>
+        {
+            building.SetResult();
+            gate.Task.Wait();
+            return late;
+        };
+        svc.DisposeClientOverride = disposed.Enqueue;
+
+        var connecting = svc.GetOrganizationServiceAsync(ct);
+        await building.Task.WaitAsync(ct);
+
+        var shutdown = svc.ShutdownAsync(); // what Dispose starts
+        Assert.False(shutdown.IsCompleted); // queued behind the connect instead of blocking the caller
+
+        gate.SetResult();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => connecting);
+        await shutdown; // no SemaphoreFullException or ObjectDisposedException from the lock
+
+        Assert.Same(late, Assert.Single(disposed));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => svc.GetOrganizationServiceAsync(ct));
     }
 }
