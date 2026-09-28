@@ -443,15 +443,28 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         StatusMessage = null;
         HasError = false;
 
-        var (profile, error) = await _profiles.ImportAsync(sourcePath, ct);
-        if (profile is null && error is { } conflict
-            && conflict.StartsWith("conflict:", StringComparison.Ordinal))
+        Profile? profile;
+        string? error;
+        try
         {
-            // WR-014: importing over a same-name profile is a real overwrite — ask, the same way
-            // Load already asks before replacing a dirty board.
-            var ok = ConfirmOverwrite?.Invoke(conflict["conflict:".Length..].Trim()) ?? false;
-            if (!ok) return;
-            (profile, error) = await _profiles.ImportAsync(sourcePath, ct, allowOverwrite: true);
+            (profile, error) = await _profiles.ImportAsync(sourcePath, ct);
+            if (profile is null && error is { } conflict
+                && conflict.StartsWith("conflict:", StringComparison.Ordinal))
+            {
+                // WR-014: importing over a same-name profile is a real overwrite — ask, the same
+                // way Load already asks before replacing a dirty board.
+                var ok = ConfirmOverwrite?.Invoke(conflict["conflict:".Length..].Trim()) ?? false;
+                if (!ok) return;
+                (profile, error) = await _profiles.ImportAsync(sourcePath, ct, allowOverwrite: true);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // WR-006: a locked or read-only source file must land in the import summary, not the
+            // generic crash box.
+            SchemaErrorMessage = ex.Message;
+            ShowImportSummary = true;
+            return;
         }
 
         if (profile is null)

@@ -564,4 +564,23 @@ public sealed class ProfileImportFlowTests : IDisposable
         Assert.NotEqual(before, after);
         Assert.Contains("\"count\": 5", after, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task ImportFromPathAsync_ShowsImportSummary_WhenTheStoreThrows()
+    {
+        var profiles = new Mock<IProfileService>();
+        // Task 7 added the optional allowOverwrite parameter; expression trees cannot omit it (CS0854).
+        profiles.Setup(p => p.ImportAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ThrowsAsync(new IOException("import.profile.json is locked"));
+
+        var vm = new ProfilesViewModel(profiles.Object)
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+        };
+
+        await vm.ImportFromPathAsync(@"C:\temp\import.profile.json", TestContext.Current.CancellationToken);
+
+        Assert.True(vm.ShowImportSummary);
+        Assert.Equal("import.profile.json is locked", vm.SchemaErrorMessage);
+    }
 }
