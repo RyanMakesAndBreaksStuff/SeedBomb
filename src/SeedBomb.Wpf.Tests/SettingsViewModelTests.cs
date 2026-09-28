@@ -58,6 +58,26 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveAsync_ClampsDefaultDopToMaxDop()
+    {
+        AppSettings? saved = null;
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AppSettings.Default);
+        settings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>(), It.IsAny<CancellationToken>()))
+            .Callback<AppSettings, CancellationToken>((s, _) => saved = s)
+            .Returns(Task.CompletedTask);
+
+        var vm = new SettingsViewModel(settings.Object, Mock.Of<ILogger<SettingsViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.DefaultDop = 64;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(GenerateViewModel.MaxDop, saved?.DefaultDop);
+    }
+
+    [Fact]
     public async Task KeepRunSheetOpen_RoundTripsThroughLoadAndSave()
     {
         AppSettings? saved = null;

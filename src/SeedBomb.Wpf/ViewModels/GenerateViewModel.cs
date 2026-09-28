@@ -55,6 +55,10 @@ public sealed record ReviewPreviewRow(
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 {
+    /// <summary>Upper bound for configured parallelism. Settings and Generate share this cap so a
+    /// value saved in one place can never exceed what the other enforces (WR-008).</summary>
+    public const int MaxDop = 16;
+
     private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
@@ -957,7 +961,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             Seed = Seed,
             Locale = Locale,
             BatchSize = BatchSize,
-            MaxParallelism = MaxParallelism == 0 ? null : MaxParallelism,
+            MaxParallelism = MaxParallelism == 0 ? null : Math.Clamp(MaxParallelism, 1, MaxDop),
             FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
             RunId = RunId,
         };

@@ -176,7 +176,7 @@
                             <StackPanel MinWidth="160" Width="220" Margin="0,0,0,8">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max parallelism" />
                                 <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay}"
-                                              Minimum="0" PlaceholderText="auto"
+                                              Minimum="0" Maximum="16" PlaceholderText="auto"
                                               Height="{DynamicResource DG.Size.Control}" />
                             </StackPanel>
                         </WrapPanel>

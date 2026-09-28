@@ -155,7 +155,7 @@ public sealed partial class SettingsViewModel(
         try
         {
             var settings = new AppSettings(
-                DefaultRecordCount, DefaultBatchSize, DefaultDop,
+                DefaultRecordCount, DefaultBatchSize, Math.Clamp(DefaultDop, 0, GenerateViewModel.MaxDop),
                 DarkTheme, PaletteId, KeepRunSheetOpen);
 
             CancelPendingAppearanceSave();
