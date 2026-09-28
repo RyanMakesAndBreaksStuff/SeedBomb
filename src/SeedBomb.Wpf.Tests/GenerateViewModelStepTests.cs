@@ -239,6 +239,33 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GoToReview_BogusRule_ExceedingMaxLength_SurfacesAsReviewErrorInsteadOfThrowing()
+    {
+        // MaxLength 3 guarantees an overflow: NAME.firstName/row 0/seed 42 deterministically
+        // generates "Kurtis" (6 chars) — see GoToReview_BogusRule_UsesContextAndSessionPreview.
+        var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 3 };
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { name });
+
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.True(viewModel.ReviewHasErrors);
+        Assert.Contains(viewModel.ReviewMessages,
+            m => m.Severity == RuleMessageSeverity.Error && m.Text.Contains("MaxLength", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task OnNavigatedToAppliesSettingsAndNotifiesDefaultRecordCount()
     {
         var settingsMock = new Mock<ISettingsService>();

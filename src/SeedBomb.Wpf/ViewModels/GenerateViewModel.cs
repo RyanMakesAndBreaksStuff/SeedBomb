@@ -658,34 +658,49 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                     hasErrors = true;
                 if (result.IsValid && result.EffectiveRule is not null)
                 {
-                    tableRules[column] = result.EffectiveRule;
-
-                    var values = new List<string>(5);
-                    if (result.EffectiveRule is LookupRandomRule)
+                    try
                     {
-                        values.Add(
-                            $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
-                    }
-                    else
-                    {
-                        var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
-                        using var session = result.EffectiveRule is BogusRule
-                            ? new BogusEvaluatorSession(Locale)
-                            : null;
-                        PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
-                            ? BogusRulePreparer.CompileRule(bogus, attr, eval)
-                            : null;
-                        for (var row = 0; row < 5; row++)
+                        var values = new List<string>(5);
+                        if (result.EffectiveRule is LookupRandomRule)
                         {
-                            var value = prepared is not null && session is not null
-                                ? session.Evaluate(prepared, attr, eval, row)
-                                : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
-                            values.Add(FormatPreview(value));
+                            values.Add(
+                                $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
                         }
-                    }
+                        else
+                        {
+                            var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
+                            using var session = result.EffectiveRule is BogusRule
+                                ? new BogusEvaluatorSession(Locale)
+                                : null;
+                            PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
+                                ? BogusRulePreparer.CompileRule(bogus, attr, eval)
+                                : null;
+                            for (var row = 0; row < 5; row++)
+                            {
+                                var value = prepared is not null && session is not null
+                                    ? session.Evaluate(prepared, attr, eval, row)
+                                    : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
+                                values.Add(FormatPreview(value));
+                            }
+                        }
 
-                    var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
-                    previewRows.Add(new ReviewPreviewRow(table, column, displayName, values));
+                        tableRules[column] = result.EffectiveRule;
+                        var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
+                        previewRows.Add(new ReviewPreviewRow(table, column, displayName, values));
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // WR-003: a rule that passed RuleValidator.Validate can still fail here —
+                        // Validate only catches known/fixed-length Bogus outputs (BogusLengthPolicy
+                        // .Fixed); a variable-length endpoint (e.g. NAME.firstName) can still
+                        // overflow MaxLength once actually generated, and generated text can still
+                        // fail the transport-safety check. Both are the only InvalidOperationException
+                        // BogusEvaluatorSession throws from this path (CoerceText / EnsureTransportSafe)
+                        // — surface it as a Review error instead of crashing the wizard.
+                        messages.Add(new RuleMessage(RuleMessageSeverity.Error,
+                            $"'{table}.{column}': {ex.Message}"));
+                        hasErrors = true;
+                    }
                 }
             }
 
