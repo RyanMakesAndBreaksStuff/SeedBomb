@@ -34,6 +34,13 @@ public interface IAuthService
     /// <summary>Removes the cached account token.</summary>
     Task SignOutAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Removes the cached MSAL account for <paramref name="profile"/> from the on-disk token
+    /// cache. No-op for non-OAuth profiles or a profile that never recorded a signed-in account.
+    /// Never throws.
+    /// </summary>
+    Task ForgetProfileAsync(ConnectionProfile profile, CancellationToken ct = default);
+
     /// <summary>Raised after <see cref="SignOutAsync"/> completes.</summary>
     event EventHandler? SignedOut;
 

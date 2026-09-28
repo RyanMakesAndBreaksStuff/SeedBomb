@@ -299,6 +299,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                     "Delete"))
                 return;
 
+            // WR-015: purge the cached MSAL refresh token before the profile record itself
+            // disappears — the delete confirmation promises credential removal.
+            await _authService.ForgetProfileAsync(profile);
             await _profileService.DeleteAsync(profile.Id);
             await LoadAsync();
 

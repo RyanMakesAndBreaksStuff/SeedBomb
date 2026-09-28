@@ -243,6 +243,29 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public event EventHandler? SignedOut;
 
+    /// <inheritdoc />
+    public async Task ForgetProfileAsync(ConnectionProfile profile, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (profile.AuthType != AuthType.OAuth || profile.HomeAccountId is not { } homeAccountId)
+            return;
+
+        try
+        {
+            // Reuses the same client-building path as sign-in (GetOrCreatePca); commitSession:
+            // false builds a throwaway client (like TestConnectionAsync) instead of touching
+            // _clients, since the profile is about to be deleted.
+            var pca = await GetOrCreatePca(profile, commitSession: false).ConfigureAwait(false);
+            var account = await pca.GetAccountAsync(homeAccountId).ConfigureAwait(false);
+            if (account is not null)
+                await pca.RemoveAsync(account).ConfigureAwait(false);
+        }
+        catch (MsalException ex)
+        {
+            _logger?.LogWarning(ex, "Could not remove the cached account for deleted profile {Profile}", profile.Name);
+        }
+    }
+
     private async Task<AuthResult> SignInOAuthAsync(
         ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)
     {
