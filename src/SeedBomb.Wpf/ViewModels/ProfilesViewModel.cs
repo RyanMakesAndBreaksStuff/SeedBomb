@@ -48,7 +48,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private readonly IContentDialogService? _dialogs;
     private readonly Dictionary<string, Profile> _profilesByName = new(StringComparer.OrdinalIgnoreCase);
 
-    private List<ProfileListItem> _allItems = [];
     private int _sortMode;
     private CancellationTokenSource? _loadCts;
 
@@ -206,9 +205,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Pending import waiting for Open in board / Discard.</summary>
     public ProfileImportReport? PendingImport { get; private set; }
 
-    /// <summary>True when the caller applied the pending import to the board.</summary>
-    public bool AppliedToBoard { get; private set; }
-
     // ── Host callbacks (wired by GenerateViewModel before ShowAsync) ──────────
 
     /// <summary>Snapshots the current wizard state as a profile (Save current).</summary>
@@ -238,9 +234,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     /// <summary>File picker: export destination, or null if cancelled.</summary>
     public Func<string, string?>? PickExportPath { get; set; }
-
-    /// <summary>Prompt for a new profile name (Save / Duplicate); null = cancel.</summary>
-    public Func<string, string?>? PromptName { get; set; }
 
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
@@ -285,12 +278,13 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         };
 
         var selectedName = SelectedItem?.Name;
-        _allItems = ordered.ToList();
+        var allItems = ordered.ToList();
         Items.Clear();
-        foreach (var item in _allItems)
+        foreach (var item in allItems)
             Items.Add(item);
 
-        ApplySearchFilter();
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(CountLabel));
         SelectedItem = null;
         SelectedItem = Items.FirstOrDefault(i =>
             string.Equals(i.Name, selectedName, StringComparison.OrdinalIgnoreCase));
@@ -375,9 +369,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         string? newName;
         var suggested = $"{SelectedItem.Name}-copy";
-        if (PromptName is not null)
-            newName = PromptName(suggested) ?? suggested;
-        else if (_dialogs is not null)
+        if (_dialogs is not null)
         {
             newName = await AskNameAsync(suggested);
             if (string.IsNullOrWhiteSpace(newName)) return;
@@ -518,7 +510,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         var report = ProfileImport.ValidateAgainstMetadata(profile, metadata, runId);
         PendingImport = report;
-        AppliedToBoard = false;
         SchemaErrorMessage = null;
         ShowImportSummary = true;
 
@@ -552,7 +543,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private void OpenInBoard()
     {
         if (PendingImport is null) return;
-        AppliedToBoard = true;
         ProfileApplied?.Invoke(this, PendingImport);
         ShowImportSummary = false;
     }
@@ -562,7 +552,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private void DiscardImport()
     {
         PendingImport = null;
-        AppliedToBoard = false;
         ShowImportSummary = false;
         ImportAppliedMessage = null;
         ImportAdjustedMessage = null;
@@ -650,12 +639,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     partial void OnSelectedItemChanged(ProfileListItem? value) => RebuildSelectedDetail();
 
-    private void ApplySearchFilter()
-    {
-        OnPropertyChanged(nameof(VisibleItems));
-        OnPropertyChanged(nameof(CountLabel));
-    }
-
     private void RebuildSelectedDetail()
     {
         SelectedProfileRules.Clear();
@@ -689,12 +672,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedProfileRuleSummary));
     }
 
-    private async Task<string?> AskNameAsync(string suggested)
-    {
-        if (PromptName is not null)
-            return PromptName(suggested);
-        return _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
-    }
+    private async Task<string?> AskNameAsync(string suggested) =>
+        _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
 
     private async Task<bool> ConfirmDeleteAsync(string name)
     {

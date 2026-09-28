@@ -27,9 +27,12 @@ public sealed class HistoryViewModelTests
         var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
         await vm.LoadCommand.ExecuteAsync(null);
 
-        Assert.Equal(2, vm.DayGroups.Count);
-        Assert.Equal(2, vm.DayGroups[0].Runs.Count);
-        Assert.Single(vm.DayGroups[1].Runs);
+        Assert.Collection(vm.FlatItems,
+            item => Assert.IsType<HistoryDayHeader>(item),
+            item => Assert.IsType<RunRecord>(item),
+            item => Assert.IsType<RunRecord>(item),
+            item => Assert.IsType<HistoryDayHeader>(item),
+            item => Assert.IsType<RunRecord>(item));
     }
 
     [Fact]
@@ -51,9 +54,9 @@ public sealed class HistoryViewModelTests
 
         vm.SearchText = "contoso";
 
-        Assert.Single(vm.DayGroups);
-        Assert.Single(vm.DayGroups[0].Runs);
-        Assert.Equal("contoso.crm.dynamics.com", vm.DayGroups[0].Runs[0].Environment);
+        Assert.IsType<HistoryDayHeader>(vm.FlatItems[0]);
+        var run = Assert.IsType<RunRecord>(Assert.Single(vm.FlatItems.Skip(1)));
+        Assert.Equal("contoso.crm.dynamics.com", run.Environment);
     }
 
     [Fact]

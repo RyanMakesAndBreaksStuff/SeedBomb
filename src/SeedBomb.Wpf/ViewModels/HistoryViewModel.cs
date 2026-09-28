@@ -63,9 +63,6 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <summary>All loaded run records.</summary>
     public ObservableCollection<RunRecord> Runs { get; } = [];
 
-    /// <summary>Runs grouped by local calendar day, newest day first.</summary>
-    public ObservableCollection<HistoryDayGroup> DayGroups { get; } = [];
-
     /// <summary>Flattened day headers and run rows for the virtualized History list.</summary>
     public ObservableCollection<object> FlatItems { get; } = [];
 
@@ -243,11 +240,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
                 FormatDayLabel(g.Key),
                 g.OrderByDescending(r => r.Timestamp).ToList()));
 
-        DayGroups.Clear();
         FlatItems.Clear();
         foreach (var group in groups)
         {
-            DayGroups.Add(group);
             FlatItems.Add(new HistoryDayHeader(group.DayLabel));
             foreach (var run in group.Runs)
                 FlatItems.Add(run);

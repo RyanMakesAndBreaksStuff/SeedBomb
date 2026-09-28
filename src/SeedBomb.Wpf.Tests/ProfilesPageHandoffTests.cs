@@ -111,7 +111,6 @@ public sealed class ProfilesPageHandoffTests
 
         Assert.NotNull(applied);
         Assert.Same(vm.PendingImport, applied);
-        Assert.True(vm.AppliedToBoard);
     }
 
     // ── T1: cold-start profile metadata (no prior Rules visit) ────────────────
