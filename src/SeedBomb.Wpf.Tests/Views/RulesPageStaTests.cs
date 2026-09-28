@@ -246,9 +246,12 @@ public sealed class RulesPageStaTests : IDisposable
     {
         var (page, vm) = LoadRulesPageForProfileOnSta();
 
-        var button = FindButtons(page).Single(b => Equals(b.Content, "Remove table"));
+        var buttons = FindButtons(page).ToList();
+        var button = buttons.Single(b => Equals(b.Content, "Remove table"));
 
         Assert.Same(vm.RemoveTableCommand, button.Command);
+        // Right of "Save profile as", away from the table switcher.
+        Assert.True(buttons.IndexOf(button) > buttons.FindIndex(b => Equals(b.Content, "Save profile as")));
         Assert.False(button.IsEnabled); // one-table profile: the last table can't be removed
         Assert.Empty(CapturedBindingErrors);
     }

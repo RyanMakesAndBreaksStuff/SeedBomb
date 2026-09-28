@@ -60,6 +60,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     private Profile? _profile;
     private Action<Profile>? _onSaved;
     private Type? _returnPage;
+    private bool _isStored;
 
     private IReadOnlyList<RuleMessage> _messages = [];
     private FieldRule? _effectiveRule;
@@ -581,6 +582,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         _onSaved = _request?.OnSaved;
         _returnPage = _request?.ReturnPage;
+        _isStored = _request?.IsStored ?? false;
         OnPropertyChanged(nameof(BreadcrumbRootLabel));
         var profile = _request?.Profile;
         var tableName = _request?.TableName;
@@ -850,8 +852,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         try
         {
-            var names = await _profiles.ListAsync(ct);
-            if (names.Any(n => string.Equals(n, _profile.Name, StringComparison.OrdinalIgnoreCase)))
+            // CR-003: opened from Profiles, it's always written back. Opened from Generate, only when the
+            // loaded profile has a file ("working-set" never does). ListAsync returns file stems, so
+            // match the stem this name saves to, not the raw name.
+            var stem = JsonProfileService.Sanitize(_profile.Name);
+            if (_isStored || (await _profiles.ListAsync(ct)).Any(n => string.Equals(n, stem, StringComparison.OrdinalIgnoreCase)))
                 await _profiles.SaveAsync(_profile, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -892,18 +897,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         if (PromptProfileName is not null)
             return await PromptProfileName(suggested);
-        if (_dialogs is null)
-            return null;
-
-        var box = new System.Windows.Controls.TextBox { Text = suggested };
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Profile name",
-            Content = box,
-            PrimaryButtonText = "Save",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary ? box.Text : null;
+        return _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
     }
 
     /// <summary>Prompts for a name and saves the current draft as a new profile, leaving the
@@ -915,7 +909,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             return;
 
         var name = await AskProfileNameAsync(IsWorkingSet ? "" : ProfileName);
-        if (string.IsNullOrWhiteSpace(name))
+        if (name is null || !JsonProfileService.IsValidName(name))
             return;
 
         var tables = _profile.Tables.ToList();
@@ -943,6 +937,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         }
 
         _profile = newProfile;
+        _isStored = true; // CR-003: it now has a file, so later rule edits persist
         ProfileName = newProfile.Name;
         _onSaved?.Invoke(newProfile);
         RefreshMappedColumn();
@@ -964,14 +959,8 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (_dialogs is null)
             return false;
 
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Delete rule",
-            Content = $"Delete the rule for '{columnDisplayName}'? This cannot be undone.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary;
+        return await _dialogs.ConfirmAsync(
+            "Delete rule", $"Delete the rule for '{columnDisplayName}'? This cannot be undone.", "Delete");
     }
 
     /// <summary>Removes the current column's rule entirely (reverts it to Unmapped), after confirm.</summary>
@@ -1011,14 +1000,10 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (_dialogs is null)
             return false;
 
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Remove table",
-            Content = $"Remove '{table}' and its rules from '{ProfileName}'? This cannot be undone.",
-            PrimaryButtonText = "Remove",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary;
+        return await _dialogs.ConfirmAsync(
+            "Remove table?",
+            $"Are you sure you want to remove '{table}' and all of its rules from '{ProfileName}'? This cannot be undone.",
+            "Remove");
     }
 
     /// <summary>Drops the selected table — its row count and every rule on it — from the profile, after confirm.</summary>
@@ -1208,11 +1193,18 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             : null;
     }
 
-    private FieldRule TrySequence()
+    private FieldRule? TrySequence() =>
+        TryInvariantNumber(StartText, 0m, out var start) && TryInvariantNumber(StepText, 1m, out var step)
+            ? new SequenceRule(start, step)
+            : null;
+
+    // WR-007: invariant, like the restore path (ApplyScalarRule) and RuleValidator's numbers.
+    // Blank keeps the default; anything else that doesn't parse is a validation error.
+    private static bool TryInvariantNumber(string? text, decimal fallback, out decimal value)
     {
-        _ = decimal.TryParse(StartText, out var start);
-        var step = decimal.TryParse(StepText, out var s) ? s : 1;
-        return new SequenceRule(start, step);
+        value = fallback;
+        return string.IsNullOrWhiteSpace(text)
+               || decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
     }
 
     private static bool TryConstantValue(AttributeMetadata attr, string? text, out JsonElement value)
@@ -1223,8 +1215,11 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         {
             var json = attr switch
             {
-                StringAttributeMetadata or MemoAttributeMetadata or DateTimeAttributeMetadata
-                    => JsonSerializer.Serialize(text),
+                StringAttributeMetadata or MemoAttributeMetadata => JsonSerializer.Serialize(text),
+                // WR-007: typed in the user's culture, stored as round-trip UTC text that Core reads invariantly.
+                DateTimeAttributeMetadata => JsonSerializer.Serialize(DateTime.Parse(
+                        text, CultureInfo.CurrentCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal)
+                    .ToString("o", CultureInfo.InvariantCulture)),
                 BooleanAttributeMetadata => bool.Parse(text) ? "true" : "false",
                 _ => text.Trim(),
             };

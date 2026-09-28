@@ -402,6 +402,7 @@ public sealed class RuleEditorViewModelTests
         metadata.Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([BuildEntity()]);
         var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
         profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -471,6 +472,36 @@ public sealed class RuleEditorViewModelTests
         Assert.True(saved[0].Tables.Single(t => t.Table == "account").Columns!.ContainsKey("name"));
         Assert.Equal("new-profile", vm.ProfileName);
         navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveRuleCommand_writes_a_stored_profile_whose_name_is_not_its_file_stem()
+    {
+        // "Contact Acct" lives in contact-acct.profile.json; ListAsync reports the stem.
+        var (vm, _, profiles, _) = await LoadedEditorAsync(profileName: "Contact Acct");
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(["contact-acct"]);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+
+        profiles.Verify(p => p.SaveAsync(It.Is<Profile>(s => s.Name == "Contact Acct"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveProfileAsCommand_rejects_a_name_that_is_not_its_own_file_name()
+    {
+        var (vm, _, profiles, saved) = await LoadedEditorAsync(returnPage: typeof(GeneratePage));
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+        vm.PromptProfileName = _ => Task.FromResult<string?>("Contact Acct");
+
+        await vm.SaveProfileAsCommand.ExecuteAsync(null);
+
+        Assert.Empty(saved);
+        profiles.Verify(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -663,11 +694,16 @@ public sealed class RuleEditorViewModelTests
         };
         var vm = new RuleEditorViewModel(metadata.Object, profiles.Object, Mock.Of<IAppNavigator>(), request)
         {
-            ConfirmRemoveTable = _ => Task.FromResult(true),
+            ConfirmRemoveTable = _ => Task.FromResult(false),
         };
         await vm.LoadForProfileAsync(TestContext.Current.CancellationToken);
         Assert.True(vm.RemoveTableCommand.CanExecute(null));
 
+        await vm.RemoveTableCommand.ExecuteAsync(null); // "Cancel" on the are-you-sure dialog
+        Assert.Empty(saved);
+        Assert.Equal(["account", "contact"], vm.Tables.Select(t => t.LogicalName));
+
+        vm.ConfirmRemoveTable = _ => Task.FromResult(true);
         await vm.RemoveTableCommand.ExecuteAsync(null);
 
         Assert.Equal(["contact"], Assert.Single(saved).Tables.Select(t => t.Table));

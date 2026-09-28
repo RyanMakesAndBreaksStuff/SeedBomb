@@ -340,6 +340,22 @@ public sealed class JsonProfileServiceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, "acme-sales-scenario.profile.json")));
     }
 
+    // 10b. Name prompts only accept names that are already their own file stem.
+    [Theory]
+    [InlineData("contact-acct", true)]
+    [InlineData("g2", true)]
+    [InlineData("Contact Acct", false)]
+    [InlineData("contact acct", false)]
+    [InlineData("contact-acct ", false)]
+    [InlineData("Contact-Acct", false)]
+    [InlineData("contact--acct", false)]
+    [InlineData("-contact", false)]
+    [InlineData("contact_acct", false)]
+    [InlineData("draft", false)]
+    [InlineData("", false)]
+    public void IsValidName_accepts_only_names_equal_to_their_file_stem(string name, bool expected) =>
+        Assert.Equal(expected, JsonProfileService.IsValidName(name));
+
     // 11. Saving under a name whose slug collides with a different existing profile's file is
     // rejected instead of silently overwriting it; the original file is left untouched.
     [Fact]

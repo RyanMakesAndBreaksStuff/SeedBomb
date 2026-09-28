@@ -309,32 +309,43 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             SelectedItem = item;
         if (SelectedItem is null) return;
 
-        if (IsBoardDirty?.Invoke() == true)
-        {
-            var ok = ConfirmOverwrite?.Invoke(
-                "The rules board has unsaved changes. Load this profile and overwrite the draft?") ?? true;
-            if (!ok) return;
-        }
-
         try
         {
             var profile = await _profiles.LoadAsync(SelectedItem.Name);
-            if (EnsureMetadata is not null)
-                await EnsureMetadata([.. profile.Tables.Select(t => t.Table)], CancellationToken.None);
-            if (GetMetadata is null)
-            {
-                // A host that cannot supply metadata cannot validate the profile against the
-                // org, so there is nothing to apply. Surface it rather than faking success.
-                SetError("Cannot open this profile — no table metadata is available. Connect first.");
-                return;
-            }
-
-            PresentImport(profile, sourceLabel: SelectedItem.Name);
+            await PresentWithMetadataAsync(profile, sourceLabel: SelectedItem.Name, CancellationToken.None);
         }
         catch (Exception ex)
         {
             SetError(ex.Message);
         }
+    }
+
+    /// <summary>
+    /// CR-005: the one way a profile reaches the pending-import slot, for Load and Import alike —
+    /// ask before replacing a dirty board, then validate against live metadata for its tables.
+    /// </summary>
+    /// <returns><see langword="false"/> when the user kept the board or no metadata host is wired.</returns>
+    private async Task<bool> PresentWithMetadataAsync(Profile profile, string sourceLabel, CancellationToken ct)
+    {
+        if (IsBoardDirty?.Invoke() == true)
+        {
+            var ok = ConfirmOverwrite?.Invoke(
+                "The rules board has unsaved changes. Load this profile and overwrite the draft?") ?? true;
+            if (!ok) return false;
+        }
+
+        if (EnsureMetadata is not null)
+            await EnsureMetadata([.. profile.Tables.Select(t => t.Table)], ct);
+        if (GetMetadata is null)
+        {
+            // A host that cannot supply metadata cannot validate the profile against the
+            // org, so there is nothing to apply. Surface it rather than faking success.
+            SetError("Cannot open this profile — no table metadata is available. Connect first.");
+            return false;
+        }
+
+        PresentImport(profile, sourceLabel);
+        return true;
     }
 
     /// <summary>Exports the selected profile to a user-chosen path.</summary>
@@ -363,7 +374,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         if (SelectedItem is null) return;
 
         string? newName;
-        var suggested = $"{SelectedItem.Name} copy";
+        var suggested = $"{SelectedItem.Name}-copy";
         if (PromptName is not null)
             newName = PromptName(suggested) ?? suggested;
         else if (_dialogs is not null)
@@ -374,7 +385,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         else
             newName = suggested;
 
-        if (string.IsNullOrWhiteSpace(newName)) return;
+        if (newName is null || !JsonProfileService.IsValidName(newName)) return;
 
         try
         {
@@ -461,7 +472,16 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             return;
         }
 
-        PresentImport(profile, sourceLabel: Path.GetFileName(sourcePath));
+        try
+        {
+            // CR-005: the same path as Load — live metadata for its tables and the dirty-board prompt.
+            if (!await PresentWithMetadataAsync(profile, Path.GetFileName(sourcePath), ct))
+                SetStatus($"Imported “{profile.Name}”.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SetError(ex.Message);
+        }
     }
 
     /// <summary>
@@ -555,7 +575,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         }
 
         var name = await AskNameAsync("new-profile");
-        if (string.IsNullOrWhiteSpace(name)) return;
+        if (name is null || !JsonProfileService.IsValidName(name)) return;
 
         try
         {
@@ -594,6 +614,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         // it, or Back returns to Generate and a save overwrites the board with this profile.
         _rulesRequest.Clear();
         _rulesRequest.Profile = profile;
+        _rulesRequest.IsStored = true; // CR-003: rule edits go back to this profile's file
         _rulesRequest.OnSaved = RulesSaved;
         _navigator.Navigate(typeof(RulesPage));
     }
@@ -649,18 +670,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     {
         if (PromptName is not null)
             return PromptName(suggested);
-        if (_dialogs is null)
-            return null;
-
-        var box = new System.Windows.Controls.TextBox { Text = suggested };
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Profile name",
-            Content = box,
-            PrimaryButtonText = "Save",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary ? box.Text : null;
+        return _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
     }
 
     private async Task<bool> ConfirmDeleteAsync(string name)
@@ -670,14 +680,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         if (_dialogs is null)
             return false;
 
-        var result = await _dialogs.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Delete profile",
-            Content = $"Delete profile '{name}'? This cannot be undone.",
-            PrimaryButtonText = "Delete",
-            CloseButtonText = "Cancel",
-        });
-        return result == ContentDialogResult.Primary;
+        return await _dialogs.ConfirmAsync("Delete profile", $"Delete profile '{name}'? This cannot be undone.", "Delete");
     }
 
     private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;
