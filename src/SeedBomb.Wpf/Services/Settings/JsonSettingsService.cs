@@ -18,6 +18,9 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
     private readonly ILogger<JsonSettingsService>? _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    /// <inheritdoc />
+    public string? LoadWarning { get; private set; }
+
     /// <summary>Stores settings in <c>%LOCALAPPDATA%\SeedBomb\settings.json</c>.</summary>
     /// <param name="logger">Warns when an unreadable settings file is moved aside.</param>
     public JsonSettingsService(ILogger<JsonSettingsService> logger)
@@ -49,6 +52,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         {
             // WR-008: keep the unreadable file — the next save would otherwise replace it with defaults.
             var kept = AtomicFile.Quarantine(_filePath);
+            LoadWarning = $"Settings could not be read, so SeedBomb started with defaults. The file was kept at {kept}.";
             _logger?.LogWarning(ex, "Settings were unreadable; moved them to {Path} and loaded defaults", kept);
             return AppSettings.Default;
         }
@@ -66,6 +70,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
             await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(settings, JsonOptions), ct).ConfigureAwait(false);
+            LoadWarning = null;
         }
         finally
         {

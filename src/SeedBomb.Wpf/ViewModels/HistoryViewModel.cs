@@ -117,6 +117,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
             RebuildDayGroups();
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(HistorySummary));
+
+            if (_historyService.LoadWarning is { } warning)
+                _snackbar?.Show("Run history", warning, ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
         }
         catch (OperationCanceledException)
         {

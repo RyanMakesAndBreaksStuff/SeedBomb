@@ -130,6 +130,14 @@ public partial class App : Application
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         Current.MainWindow = mainWindow;
+        // WR-012: the snackbar presenter is set in MainWindow.OnWindowLoaded, which MainWindow's
+        // constructor subscribed first, so this later Loaded handler always runs after it.
+        if (_host.Services.GetRequiredService<ISettingsService>().LoadWarning is { } settingsWarning)
+        {
+            var snackbar = _host.Services.GetRequiredService<ISnackbarService>();
+            mainWindow.Loaded += (_, _) => snackbar.Show(
+                "Settings", settingsWarning, Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
+        }
         mainWindow.Show();
     }
 

@@ -76,6 +76,25 @@ public sealed class HistoryViewModelTests
     }
 
     [Fact]
+    public async Task LoadAsync_ShowsCautionSnackbar_WhenHistoryWasQuarantined()
+    {
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        history.SetupGet(h => h.LoadWarning)
+            .Returns("Run history could not be read, so SeedBomb started without it.");
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        snackbar.Verify(s => s.Show(
+            "Run history", "Run history could not be read, so SeedBomb started without it.",
+            ControlAppearance.Caution, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task ClearAll_never_clears_without_a_confirmation()
     {
         // WR-010: one misclick used to erase the only record of what was written where.
