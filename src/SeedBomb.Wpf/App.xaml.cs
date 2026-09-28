@@ -81,7 +81,9 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            splash?.Close();
+            // WR-002: never close the splash here. It is the only window, so closing it starts
+            // WPF's own Shutdown() with exit code 0, and Shutdown(1) cannot override a shutdown
+            // already under way. Shutdown(1) closes the splash itself.
             CrashLog.Write(ex);
             MessageBox.Show($"Startup failed: {ex}", "SeedBomb",
                 MessageBoxButton.OK, MessageBoxImage.Error);
