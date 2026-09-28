@@ -21,6 +21,28 @@ public sealed class ConnectionStoreRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Failed_write_does_not_corrupt_the_in_memory_cache()
+    {
+        // WR-007: PersistAsync used to assign `_cache = store` — the SAME object SaveAsync had
+        // already mutated in place — before the disk write ran, so a failed write left the cache
+        // showing the unsaved change forever, disagreeing with the file on disk.
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new JsonConnectionProfileService(_dir);
+        var profile = new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://dev.crm.dynamics.com" };
+        await svc.SaveAsync(profile, ct);
+
+        // Force the next write to fail: replace the storage directory with a plain file, so
+        // PersistAsync's Directory.CreateDirectory(...) throws before anything is written.
+        Directory.Delete(_dir, recursive: true);
+        await File.WriteAllTextAsync(_dir, "blocker", ct);
+
+        profile.Name = "Dev (renamed)";
+        await Assert.ThrowsAnyAsync<IOException>(() => svc.SaveAsync(profile, ct));
+
+        var all = await svc.GetAllAsync(ct);
+        Assert.Equal("Dev", Assert.Single(all).Name);
+    }
+    [Fact]
     public async Task SignIn_reports_a_store_failure_instead_of_throwing()
     {
         var profiles = new Mock<IConnectionProfileService>();
