@@ -934,6 +934,97 @@ public sealed class GenerateViewModelStepTests
         Assert.Equal($"account · {id:D}", viewModel.ReviewPreviewRows.Single().Values[0]);
     }
 
+    [Fact]
+    public async Task GenerateAsync_RecordsTheProfileNameCapturedBeforeTheRunStarted()
+    {
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock);
+        viewModel.ActiveProfileName = "before-run";
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        var tcs = new TaskCompletionSource<GenerationResult>();
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(tcs.Task);
+
+        var runTask = viewModel.GenerateCommand.ExecuteAsync(null);
+        viewModel.ActiveProfileName = "loaded-mid-run";
+        tcs.SetResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+        });
+        await runTask;
+
+        historyMock.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => r.Profile == "before-run"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void ApplyImportReport_NoOp_WhileGenerateIsRunning()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        viewModel.IsRunning = true;
+
+        var report = new ProfileImportReport(
+            new Dictionary<string, Dictionary<string, FieldRule>>(),
+            new Dictionary<string, int>(),
+            null, 0, [], [], [], "imported-profile");
+
+        viewModel.ApplyImportReport(report);
+
+        Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
+    }
+
+    [Fact]
+    public async Task Rules_saves_during_a_run_leave_the_board_alone_until_it_ends_on_both_routes()
+    {
+        // WR-009: Generate's Rules page (request.OnSaved) and the Profiles page's Rules save
+        // (ApplySavedProfileIfActive) both renamed the profile and dropped tables under a live run.
+        var result = new TaskCompletionSource<GenerationResult>();
+        var generation = new Mock<IWpfGenerationService>();
+        generation
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(result.Task);
+        var history = new Mock<IRunHistoryService>();
+        var request = new RulesNavigationRequest();
+        var viewModel = new GenerateViewModel(
+            history.Object,
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
+            Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
+            new RunViewModel(generation.Object),
+            request,
+            Mock.Of<IAppNavigator>());
+        viewModel.OnEntitiesChanged(
+        [
+            new EntitySummary("account", "Account", false),
+            new EntitySummary("contact", "Contact", false),
+        ]);
+        viewModel.ActiveProfileName = "contact-acct";
+        viewModel.EditRulesCommand.Execute(null); // wires request.OnSaved, Generate's route
+        var step = viewModel.CurrentStep;
+        var saved = new Profile(2, "contact-acct", null, 42, [new ProfileTable("account", 10, null)]);
+
+        var run = viewModel.GenerateCommand.ExecuteAsync(null);
+        request.OnSaved!(saved);                     // Generate's Rules page
+        viewModel.ApplySavedProfileIfActive(saved);  // Profiles' Rules page, same loaded profile
+
+        Assert.Equal(["account", "contact"], viewModel.SelectedEntities.Select(e => e.LogicalName));
+        Assert.Equal("contact-acct", viewModel.ActiveProfileName);
+        Assert.Equal(step, viewModel.CurrentStep);
+
+        result.SetResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+        });
+        await run;
+
+        Assert.Equal(["account"], viewModel.SelectedEntities.Select(e => e.LogicalName)); // applied at the end
+        history.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => r.Profile == "contact-acct" && r.EntityNames.Length == 2),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
     // RuleEditorViewModelTests / SeedBomb.Bulk.Tests/RuledGenerationTests.
     private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)

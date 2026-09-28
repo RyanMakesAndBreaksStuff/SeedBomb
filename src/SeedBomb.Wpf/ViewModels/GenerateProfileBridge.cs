@@ -90,9 +90,28 @@ internal sealed class GenerateProfileBridge
         return true;
     }
 
+    private Profile? _savedDuringRun;
+
+    /// <summary>Applies the last Rules save held back while Generate was running (WR-009).</summary>
+    public void ApplyRulesSavedDuringRun()
+    {
+        if (_savedDuringRun is not { } profile)
+            return;
+        _savedDuringRun = null;
+        ApplySavedRulesProfile(profile);
+    }
+
     /// <summary>Applies a profile returned from the Rules page onto the wizard board.</summary>
     public void ApplySavedRulesProfile(Profile profile)
     {
+        // WR-009: both Rules-save routes land here. While Generate runs, hold the save instead of
+        // renaming the profile and dropping tables under the run; GenerateAsync applies it after.
+        if (_owner.IsRunning)
+        {
+            _savedDuringRun = profile;
+            return;
+        }
+
         _owner.ActiveProfileName = profile.Name;
         // The Rules page can remove tables; SelectReportTables only ever adds them.
         var kept = _owner.SelectedEntities

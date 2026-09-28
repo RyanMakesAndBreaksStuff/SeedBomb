@@ -884,6 +884,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         var config = BuildConfig();
         // WR-002: captured before the run — the History row must not depend on later wizard state.
         var tableNames = SelectedEntities.Select(e => e.DisplayName).ToArray();
+        // WR-009: same reasoning — a profile loaded mid-run must not relabel this run's row.
+        var profileName = ActiveProfileName;
         Exception? failure = null;
         try
         {
@@ -908,13 +910,16 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             _cts = null;
         }
 
+        // WR-009: a Rules save held back during the run lands on the board now.
+        _profileBridge.ApplyRulesSavedDuringRun();
+
         // WR-002: one History write for every run that returned a result or failed. A cancel
         // that throws (including a declined risky-value prompt) wrote nothing, so it has no row.
         if (LastResult is not null || failure is not (null or OperationCanceledException))
-            await RecordRunAsync(tableNames, LastResult);
+            await RecordRunAsync(tableNames, profileName, LastResult);
     }
 
-    private async Task RecordRunAsync(string[] tableNames, GenerationResult? result)
+    private async Task RecordRunAsync(string[] tableNames, string profileName, GenerationResult? result)
     {
         try
         {
@@ -928,7 +933,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 result?.Errors.Sum(e => e.RowCount) ?? 0,
                 Run.EnvironmentLabel,
                 Run.UserLabel,
-                ActiveProfileName,
+                profileName,
                 Run.ActivityLines));
         }
         catch (Exception ex)
@@ -998,7 +1003,12 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     public Profile BuildProfileSnapshot(string name) => _profileBridge.BuildProfileSnapshot(name);
 
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
-    public void ApplyImportReport(ProfileImportReport report) => _profileBridge.ApplyImportReport(report);
+    public void ApplyImportReport(ProfileImportReport report)
+    {
+        // WR-009: "Open in board" while Generate runs must not reset the wizard under the run.
+        if (IsRunning) return;
+        _profileBridge.ApplyImportReport(report);
+    }
 
     /// <summary>A Rules-page save from Profiles reaches the board only when the board holds that profile.</summary>
     public void ApplySavedProfileIfActive(Profile profile)
