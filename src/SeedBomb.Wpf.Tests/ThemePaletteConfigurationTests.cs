@@ -1,5 +1,7 @@
 using SeedBomb.Services.Theme;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Media;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -170,6 +172,38 @@ public sealed class ThemePaletteConfigurationTests
         ];
         foreach (var line in expected)
             Assert.Contains(line, manager, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HighContrastMapsEveryTokenToSystemColors()
+    {
+        // WR-017: DG.* brushes are bound explicitly, so a WPF-UI theme switch alone left brand
+        // colors on screen under High Contrast.
+        var resources = new ResourceDictionary();
+        DesignThemeManager.PublishTokens(resources, isDark: true, "kiln", highContrast: false);
+        Color Solid(object key) => ((SolidColorBrush)resources[key]).Color;
+        var ordinaryBg = Solid("DG.Bg");
+
+        DesignThemeManager.PublishTokens(resources, isDark: true, "kiln", highContrast: true);
+
+        var window = SystemColors.WindowColor;
+        Color[] system =
+        [
+            window, SystemColors.WindowTextColor, SystemColors.HighlightColor,
+            SystemColors.HighlightTextColor, SystemColors.GrayTextColor, SystemColors.HotTrackColor,
+            Color.FromArgb(0xCC, window.R, window.G, window.B),
+        ];
+        Assert.All(
+            resources.Keys.Cast<object>().Where(k => resources[k] is SolidColorBrush),
+            k => Assert.Contains(Solid(k), system));
+        Assert.Equal(window, Solid("DG.Bg"));
+        Assert.Equal(SystemColors.WindowTextColor, Solid("TextFillColorPrimaryBrush"));
+        Assert.Equal(SystemColors.GrayTextColor, Solid("TextFillColorDisabledBrush"));
+        Assert.Equal(SystemColors.HighlightColor, Solid("KeyboardFocusBorderColorBrush"));
+        Assert.Equal(SystemColors.HighlightColor, Solid("NavigationViewSelectionIndicatorForeground"));
+
+        DesignThemeManager.PublishTokens(resources, isDark: true, "kiln", highContrast: false);
+        Assert.Equal(ordinaryBg, Solid("DG.Bg"));
     }
 
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")

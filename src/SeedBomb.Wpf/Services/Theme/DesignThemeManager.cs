@@ -51,12 +51,20 @@ public static class DesignThemeManager
         return new ThemePaletteOption(id, displayName, light, dark);
     }
 
+    // Last Apply arguments, replayed when Windows High Contrast is toggled.
+    private static bool _highContrastSubscribed;
+    private static bool _lastIsDark;
+    private static string _lastPaletteId = DefaultPaletteId;
+
     /// <summary>Applies the selected light or dark visual theme for the given palette.</summary>
     /// <param name="isDark">True to apply dark theme resources; false for light.</param>
     /// <param name="paletteId">One of <see cref="AvailablePalettes"/>; unknown IDs fall back to <see cref="DefaultPaletteId"/>.</param>
     public static void Apply(bool isDark, string paletteId)
     {
         paletteId = ResolvePaletteId(paletteId);
+        _lastIsDark = isDark;
+        _lastPaletteId = paletteId;
+        EnsureHighContrastSubscription();
         // Test host may have a leftover Application from an STA fixture; production always calls this on the UI thread.
         if (Application.Current is not { } app || !app.Dispatcher.CheckAccess())
             return;
@@ -65,135 +73,142 @@ public static class DesignThemeManager
             ? "pack://application:,,,/Resources/logo-dark.png"
             : "pack://application:,,,/Resources/logo-light.png");
 
+        var highContrast = SystemParameters.HighContrast;
         // None matches MainWindow. The default (Mica) re-enables the DWM backdrop and clears the
         // window background on every switch, under an opaque palette that would hide it anyway.
         ApplicationThemeManager.Apply(
-            isDark ? ApplicationTheme.Dark : ApplicationTheme.Light,
+            highContrast ? ApplicationTheme.HighContrast : isDark ? ApplicationTheme.Dark : ApplicationTheme.Light,
             Wpf.Ui.Controls.WindowBackdropType.None);
-
-        var variants = Palettes[paletteId];
-        var p = isDark ? variants.Dark : variants.Light;
-
-        // --- Surfaces ---------------------------------------------------
-        Set("DG.Bg", p.Bg);
-        Set("DG.TitleBar", p.TitleBar);
-        Set("DG.Surface1", p.Surface1);
-        Set("DG.Surface2", p.Surface2);
-        Set("DG.Card", p.Card);
-        Set("DG.CardSunken", p.CardSunken);
-        Set("DG.CodeSurface", p.CodeSurface);
-
-        // --- Lines ------------------------------------------------------
-        Set("DG.Border", p.Border);
-        Set("DG.BorderStrong", p.BorderStrong);
-        Set("DG.Divider", p.Divider);
-        Set("DG.Focus", p.Focus);
-
-        // --- Controls ---------------------------------------------------
-        Set("DG.ControlFill", p.ControlFill);
-        Set("DG.ControlBorder", p.ControlBorder);
-        Set("DG.ControlHover", p.ControlHover);
-        Set("DG.ItemSelected", p.ItemSelected);
-        Set("DG.RowSelected", p.RowSelected);
-        Set("DG.TrackFill", p.TrackFill);
-        Set("DG.Scrim", p.Scrim);
-
-        // --- Text -------------------------------------------------------
-        Set("DG.Text1", p.Text1);
-        Set("DG.TextBody", p.TextBody);
-        Set("DG.TextNav", p.TextNav);
-        Set("DG.Text2", p.Text2);
-        Set("DG.Text3", p.Text3);
-        Set("DG.TextDisabled", p.TextDisabled);
-
-        // --- Accent -----------------------------------------------------
-        Set("DG.Accent", p.Accent);
-        Set("DG.AccentHover", p.AccentHover);
-        Set("DG.AccentLight", p.AccentHover);
-        Set("DG.AccentPressed", p.AccentPressed);
-        Set("DG.OnAccent", p.OnAccent);
-        Set("DG.AccentText", p.AccentText);
-        Set("DG.AccentSoft", p.AccentSoft);
-        Set("DG.AccentSoftBorder", p.AccentSoftBorder);
-        Set("DG.AccentChip", p.AccentChip);
-        Set("DG.AccentChipBorder", p.AccentChipBorder);
-        Set("DG.SelectionIndicator", p.SelectionIndicator);
-
-        // --- Status -----------------------------------------------------
-        Set("DG.Success", p.Success);
-        Set("DG.SuccessSoft", p.SuccessSoft);
-        Set("DG.Warning", p.Warning);
-        Set("DG.WarningSoft", p.WarningSoft);
-        Set("DG.WarningBorder", p.WarningBorder);
-        Set("DG.WarningText", p.WarningText);
-        Set("DG.Error", p.Error);
-        Set("DG.ErrorSoft", p.ErrorSoft);
-        Set("DG.ErrorBorder", p.ErrorBorder);
-        Set("DG.Info", p.Info);
-        Set("DG.InfoSoft", p.InfoSoft);
-
-        // --- Energy & series --------------------------------------------
-        Set("DG.Energy", p.Energy);
-        Set("DG.Series1", p.Series1);
-        Set("DG.Series2", p.Series2);
-        Set("DG.Series3", p.Series3);
-        Set("DG.Series4", p.Series4);
-        Set("DG.Series5", p.Series5);
-        SetSweep("DG.RunSweep", p.Accent, p.Energy);
-
-        // --- Legacy key retained for existing references -----------------
-        Set("AccentBrush", p.Accent);
-
-        // --- WPF-UI chrome ----------------------------------------------
-        Set("ApplicationBackgroundBrush", p.Bg);
-        Set("LayerFillColorDefaultBrush", p.Surface1);
-        Set("CardBackgroundFillColorDefaultBrush", p.Card);
-        Set("CardBackgroundFillColorSecondaryBrush", p.CardSunken);
-        Set("ControlFillColorDefaultBrush", p.ControlFill);
-        Set("ControlStrokeColorDefaultBrush", p.ControlBorder);
-        Set("KeyboardFocusBorderColorBrush", p.Focus);
-        Set("DividerStrokeColorDefaultBrush", p.Border);
-        Set("NavigationViewContentBackground", p.Surface1);
-        Set("NavigationViewContentGridBorderBrush", p.Border);
-        // WPF-UI builds these from Color keys via StaticResource, so the Brush overrides above
-        // never reach the nav pane. Background (rest) stays WPF-UI's transparent.
-        Set("NavigationViewItemForeground", p.TextNav);
-        Set("NavigationViewItemForegroundPointerOver", p.Text1);
-        Set("NavigationViewItemForegroundPressed", p.Text2);
-        Set("NavigationViewItemBackgroundPointerOver", p.ControlHover);
-        Set("NavigationViewItemBackgroundSelected", p.ItemSelected);
-        Set("NavigationViewItemBackgroundPressed", p.ControlHover);
-        // Otherwise the pill takes SystemAccentColorPrimary, i.e. the Windows accent color.
-        Set("NavigationViewSelectionIndicatorForeground", p.SelectionIndicator);
-        Set("NavigationViewItemSeparatorForeground", p.Divider);
-        Set("LeftNavigationViewSeparatorBrush", p.Divider);
-        Set("TextFillColorPrimaryBrush", p.Text1);
-        Set("TextFillColorSecondaryBrush", p.Text2);
-        Set("TextFillColorTertiaryBrush", p.Text3);
-        Set("TextFillColorDisabledBrush", p.TextDisabled);
-        Set("AccentFillColorDefaultBrush", p.Accent);
-        Set("AccentFillColorSecondaryBrush", p.AccentHover);
-        Set("AccentFillColorTertiaryBrush", p.AccentPressed);
-        Set("AccentTextFillColorPrimaryBrush", p.AccentText);
-        Set("TextOnAccentFillColorPrimaryBrush", p.OnAccent);
-        Set("SystemAccentColorBrush", p.Accent);
-        Set("SystemAccentColorPrimaryBrush", p.Accent);
-        Set("SystemAccentColor3Brush", p.AccentChip);
-        Set("SystemFillColorSuccessBrush", p.Success);
-        Set("SystemFillColorCautionBrush", p.Warning);
-        Set("SystemFillColorCriticalBrush", p.Error);
-        Set("SystemFillColorSuccessBackgroundBrush", p.SuccessSoft);
-        Set("SystemFillColorCautionBackgroundBrush", p.WarningSoft);
-        Set("SystemFillColorCriticalBackgroundBrush", p.ErrorSoft);
+        PublishTokens(app.Resources, isDark, paletteId, highContrast);
     }
 
-    private static void Set(string key, Color color)
+    /// <summary>
+    /// Writes every design token and WPF-UI override into <paramref name="r"/>. Under High Contrast
+    /// each one maps to a Windows system color (WR-017), overwriting any palette value written before.
+    /// </summary>
+    internal static void PublishTokens(ResourceDictionary r, bool isDark, string paletteId, bool highContrast)
     {
-        if (Application.Current is not { } app)
-            return;
+        var variants = Palettes[ResolvePaletteId(paletteId)];
+        var p = highContrast ? HighContrastPalette() : isDark ? variants.Dark : variants.Light;
+
+        // --- Surfaces ---------------------------------------------------
+        r.Set("DG.Bg", p.Bg);
+        r.Set("DG.TitleBar", p.TitleBar);
+        r.Set("DG.Surface1", p.Surface1);
+        r.Set("DG.Surface2", p.Surface2);
+        r.Set("DG.Card", p.Card);
+        r.Set("DG.CardSunken", p.CardSunken);
+        r.Set("DG.CodeSurface", p.CodeSurface);
+
+        // --- Lines ------------------------------------------------------
+        r.Set("DG.Border", p.Border);
+        r.Set("DG.BorderStrong", p.BorderStrong);
+        r.Set("DG.Divider", p.Divider);
+        r.Set("DG.Focus", p.Focus);
+
+        // --- Controls ---------------------------------------------------
+        r.Set("DG.ControlFill", p.ControlFill);
+        r.Set("DG.ControlBorder", p.ControlBorder);
+        r.Set("DG.ControlHover", p.ControlHover);
+        r.Set("DG.ItemSelected", p.ItemSelected);
+        r.Set("DG.RowSelected", p.RowSelected);
+        r.Set("DG.TrackFill", p.TrackFill);
+        r.Set("DG.Scrim", p.Scrim);
+
+        // --- Text -------------------------------------------------------
+        r.Set("DG.Text1", p.Text1);
+        r.Set("DG.TextBody", p.TextBody);
+        r.Set("DG.TextNav", p.TextNav);
+        r.Set("DG.Text2", p.Text2);
+        r.Set("DG.Text3", p.Text3);
+        r.Set("DG.TextDisabled", p.TextDisabled);
+
+        // --- Accent -----------------------------------------------------
+        r.Set("DG.Accent", p.Accent);
+        r.Set("DG.AccentHover", p.AccentHover);
+        r.Set("DG.AccentLight", p.AccentHover);
+        r.Set("DG.AccentPressed", p.AccentPressed);
+        r.Set("DG.OnAccent", p.OnAccent);
+        r.Set("DG.AccentText", p.AccentText);
+        r.Set("DG.AccentSoft", p.AccentSoft);
+        r.Set("DG.AccentSoftBorder", p.AccentSoftBorder);
+        r.Set("DG.AccentChip", p.AccentChip);
+        r.Set("DG.AccentChipBorder", p.AccentChipBorder);
+        r.Set("DG.SelectionIndicator", p.SelectionIndicator);
+
+        // --- Status -----------------------------------------------------
+        r.Set("DG.Success", p.Success);
+        r.Set("DG.SuccessSoft", p.SuccessSoft);
+        r.Set("DG.Warning", p.Warning);
+        r.Set("DG.WarningSoft", p.WarningSoft);
+        r.Set("DG.WarningBorder", p.WarningBorder);
+        r.Set("DG.WarningText", p.WarningText);
+        r.Set("DG.Error", p.Error);
+        r.Set("DG.ErrorSoft", p.ErrorSoft);
+        r.Set("DG.ErrorBorder", p.ErrorBorder);
+        r.Set("DG.Info", p.Info);
+        r.Set("DG.InfoSoft", p.InfoSoft);
+
+        // --- Energy & series --------------------------------------------
+        r.Set("DG.Energy", p.Energy);
+        r.Set("DG.Series1", p.Series1);
+        r.Set("DG.Series2", p.Series2);
+        r.Set("DG.Series3", p.Series3);
+        r.Set("DG.Series4", p.Series4);
+        r.Set("DG.Series5", p.Series5);
+        r.SetSweep("DG.RunSweep", p.Accent, p.Energy);
+
+        // --- Legacy key retained for existing references -----------------
+        r.Set("AccentBrush", p.Accent);
+
+        // --- WPF-UI chrome ----------------------------------------------
+        r.Set("ApplicationBackgroundBrush", p.Bg);
+        r.Set("LayerFillColorDefaultBrush", p.Surface1);
+        r.Set("CardBackgroundFillColorDefaultBrush", p.Card);
+        r.Set("CardBackgroundFillColorSecondaryBrush", p.CardSunken);
+        r.Set("ControlFillColorDefaultBrush", p.ControlFill);
+        r.Set("ControlStrokeColorDefaultBrush", p.ControlBorder);
+        r.Set("KeyboardFocusBorderColorBrush", p.Focus);
+        r.Set("DividerStrokeColorDefaultBrush", p.Border);
+        r.Set("NavigationViewContentBackground", p.Surface1);
+        r.Set("NavigationViewContentGridBorderBrush", p.Border);
+        // WPF-UI builds these from Color keys via StaticResource, so the Brush overrides above
+        // never reach the nav pane. Background (rest) stays WPF-UI's transparent.
+        r.Set("NavigationViewItemForeground", p.TextNav);
+        r.Set("NavigationViewItemForegroundPointerOver", p.Text1);
+        r.Set("NavigationViewItemForegroundPressed", p.Text2);
+        r.Set("NavigationViewItemBackgroundPointerOver", p.ControlHover);
+        r.Set("NavigationViewItemBackgroundSelected", p.ItemSelected);
+        r.Set("NavigationViewItemBackgroundPressed", p.ControlHover);
+        // Otherwise the pill takes SystemAccentColorPrimary, i.e. the Windows accent color.
+        r.Set("NavigationViewSelectionIndicatorForeground", p.SelectionIndicator);
+        r.Set("NavigationViewItemSeparatorForeground", p.Divider);
+        r.Set("LeftNavigationViewSeparatorBrush", p.Divider);
+        r.Set("TextFillColorPrimaryBrush", p.Text1);
+        r.Set("TextFillColorSecondaryBrush", p.Text2);
+        r.Set("TextFillColorTertiaryBrush", p.Text3);
+        r.Set("TextFillColorDisabledBrush", p.TextDisabled);
+        r.Set("AccentFillColorDefaultBrush", p.Accent);
+        r.Set("AccentFillColorSecondaryBrush", p.AccentHover);
+        r.Set("AccentFillColorTertiaryBrush", p.AccentPressed);
+        r.Set("AccentTextFillColorPrimaryBrush", p.AccentText);
+        r.Set("TextOnAccentFillColorPrimaryBrush", p.OnAccent);
+        r.Set("SystemAccentColorBrush", p.Accent);
+        r.Set("SystemAccentColorPrimaryBrush", p.Accent);
+        r.Set("SystemAccentColor3Brush", p.AccentChip);
+        r.Set("SystemFillColorSuccessBrush", p.Success);
+        r.Set("SystemFillColorCautionBrush", p.Warning);
+        r.Set("SystemFillColorCriticalBrush", p.Error);
+        r.Set("SystemFillColorSuccessBackgroundBrush", p.SuccessSoft);
+        r.Set("SystemFillColorCautionBackgroundBrush", p.WarningSoft);
+        r.Set("SystemFillColorCriticalBackgroundBrush", p.ErrorSoft);
+    }
+
+    private static void Set(this ResourceDictionary r, string key, Color color)
+    {
         var brush = new SolidColorBrush(color);
         brush.Freeze();
-        app.Resources[key] = brush;
+        r[key] = brush;
     }
 
     private static void SetImage(string key, string packUri)
@@ -207,13 +222,52 @@ public static class DesignThemeManager
 
     // ponytail: WPF has no conic gradient, so the "run heats up" sweep is a 45° linear
     // Accent → Energy ramp. Upgrade to an ArcSegment ring control if that reads wrong.
-    private static void SetSweep(string key, Color from, Color to)
+    private static void SetSweep(this ResourceDictionary r, string key, Color from, Color to)
     {
-        if (Application.Current is not { } app)
-            return;
         var brush = new LinearGradientBrush(from, to, 45d);
         brush.Freeze();
-        app.Resources[key] = brush;
+        r[key] = brush;
+    }
+
+    /// <summary>Re-applies the last palette when Windows High Contrast is toggled at runtime.</summary>
+    private static void EnsureHighContrastSubscription()
+    {
+        if (_highContrastSubscribed) return;
+        _highContrastSubscribed = true;
+        SystemParameters.StaticPropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SystemParameters.HighContrast))
+                Apply(_lastIsDark, _lastPaletteId);
+        };
+    }
+
+    // WR-017: High Contrast gives every token a Windows system color. Status hues collapse to text:
+    // contrast themes carry meaning through text and icons, not hue. Selection keeps the window
+    // background so text on it stays readable; the indicator and focus take the highlight.
+    private static Palette HighContrastPalette()
+    {
+        var window = SystemColors.WindowColor;
+        var text = SystemColors.WindowTextColor;
+        var highlight = SystemColors.HighlightColor;
+        return new Palette(
+            Bg: window, TitleBar: window, Surface1: window, Surface2: window,
+            Card: window, CardSunken: window, CodeSurface: window,
+            Border: text, BorderStrong: text, Divider: text, Focus: highlight,
+            ControlFill: window, ControlBorder: text, ControlHover: window,
+            ItemSelected: window, RowSelected: window, TrackFill: window,
+            Scrim: Color.FromArgb(0xCC, window.R, window.G, window.B),
+            Text1: text, TextBody: text, TextNav: text, Text2: text, Text3: text,
+            TextDisabled: SystemColors.GrayTextColor,
+            Accent: highlight, AccentHover: highlight, AccentPressed: highlight,
+            OnAccent: SystemColors.HighlightTextColor, AccentText: SystemColors.HotTrackColor,
+            AccentSoft: window, AccentSoftBorder: text, AccentChip: window, AccentChipBorder: text,
+            SelectionIndicator: highlight,
+            Success: text, SuccessSoft: window, Warning: text, WarningSoft: window,
+            WarningBorder: text, WarningText: text,
+            Error: text, ErrorSoft: window, ErrorBorder: text,
+            Info: text, InfoSoft: window,
+            Energy: highlight,
+            Series1: text, Series2: text, Series3: text, Series4: text, Series5: text);
     }
 
     private static Color FromRgb(uint rgb) =>
