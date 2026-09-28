@@ -37,6 +37,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += LogUnhandledException;
+        TaskScheduler.UnobservedTaskException += LogUnobservedTaskException;
         SplashWindow? splash = null;
         try
         {
@@ -106,6 +108,28 @@ public partial class App : Application
             $"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to the crash log.",
             "SeedBomb", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
+    }
+
+    // IN-001: DispatcherUnhandledException only covers the UI dispatcher thread. A failure in a
+    // fire-and-forget async void or an unawaited Task (e.g. ProfileAuthService.cs:517,
+    // GenerateViewModel.cs:134, ConnectionManagerViewModel.cs:419) reached neither handler and
+    // went unrecorded. Static and internal so tests can call them directly without constructing
+    // a second System.Windows.Application in-process (only one is allowed per process).
+    // https://learn.microsoft.com/dotnet/api/system.appdomain.unhandledexception
+    internal static void LogUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+            CrashLog.Write(ex);
+    }
+
+    // https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.unobservedtaskexception
+    internal static void LogUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        CrashLog.Write(e.Exception);
+        // Logged, not swallowed: SetObserved only stops the finalizer thread from re-throwing.
+        // .NET does not crash the process on an unobserved task exception by default; this keeps
+        // that existing behavior unchanged.
+        e.SetObserved();
     }
 
     /// <summary>Shows the main window and populates header user info.</summary>

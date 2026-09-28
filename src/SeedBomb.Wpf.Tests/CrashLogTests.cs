@@ -1,3 +1,4 @@
+using SeedBomb;
 using SeedBomb.Services.Diagnostics;
 using Xunit;
 
@@ -32,5 +33,30 @@ public sealed class CrashLogTests : IDisposable
         File.WriteAllText(blocker, "");
 
         Assert.Null(CrashLog.Write(new InvalidOperationException("x"), blocker));
+    }
+
+    [Fact]
+    public void LogUnhandledException_WritesToCrashLog()
+    {
+        var path = Path.Combine(AppPaths.Root, CrashLog.FileName);
+
+        App.LogUnhandledException(this, new UnhandledExceptionEventArgs(
+            new InvalidOperationException("in-001-unhandled-marker"), isTerminating: true));
+
+        Assert.True(File.Exists(path));
+        Assert.Contains("in-001-unhandled-marker", File.ReadAllText(path), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LogUnobservedTaskException_WritesToCrashLogAndMarksObserved()
+    {
+        var path = Path.Combine(AppPaths.Root, CrashLog.FileName);
+        var args = new UnobservedTaskExceptionEventArgs(
+            new AggregateException(new InvalidOperationException("in-001-unobserved-marker")));
+
+        App.LogUnobservedTaskException(null, args);
+
+        Assert.True(args.Observed);
+        Assert.Contains("in-001-unobserved-marker", File.ReadAllText(path), StringComparison.Ordinal);
     }
 }
