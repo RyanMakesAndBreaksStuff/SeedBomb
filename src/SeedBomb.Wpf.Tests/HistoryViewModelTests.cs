@@ -110,6 +110,36 @@ public sealed class HistoryViewModelTests
     }
 
     [Fact]
+    public async Task ExportCsvAsync_EscapesLeadingFormulaCharacterInProfileName()
+    {
+        // WR-013: an imported profile's name flows into RunRecord.Profile unescaped — a name like
+        // "=HYPERLINK(...)" must not become a live formula when the CSV is opened in a spreadsheet.
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["Account"], 10,
+                TimeSpan.FromMinutes(1), true, 0, Profile: "=HYPERLINK(\"http://evil\",\"click\")"),
+        ]);
+
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        var exportDir = Directory.CreateTempSubdirectory("seedbomb-history-export-test-");
+        vm.ExportDirectoryOverride = exportDir.FullName;
+        try
+        {
+            await vm.ExportCsvCommand.ExecuteAsync(null);
+
+            var lines = await File.ReadAllLinesAsync(
+                Directory.GetFiles(exportDir.FullName).Single(), TestContext.Current.CancellationToken);
+            Assert.Contains("'=HYPERLINK", lines[1], StringComparison.Ordinal);
+        }
+        finally
+        {
+            exportDir.Delete(recursive: true);
+        }
+    }
+    [Fact]
     public async Task ExportCsvAsync_ShowsSuccessSnackbar_WhenWriteSucceeds()
     {
         var history = new Mock<IRunHistoryService>();

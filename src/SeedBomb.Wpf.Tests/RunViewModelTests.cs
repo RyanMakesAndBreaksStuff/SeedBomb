@@ -242,6 +242,31 @@ public sealed class RunViewModelTests
     }
 
     [Fact]
+    public void ExportRejectedCsv_EscapesLeadingFormulaCharacterInCause()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dg-rejected", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var vm = new RunViewModel { ExportDirectoryOverride = root };
+            vm.ApplyResult(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "=cmd|'/c calc'!A1", null)],
+            }, seed: 1, environmentHost: "contoso-dev");
+
+            vm.ExportRejectedCsvCommand.Execute(null);
+
+            var written = Assert.Single(Directory.GetFiles(root, "seedbomb-rejected-*.csv"));
+            var line = File.ReadAllLines(written)[1];
+            Assert.Contains("'=cmd", line, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+    [Fact]
     public void ExportRejectedCsv_WhenDirectoryIsUnusable_DoesNotThrow()
     {
         var root = Path.Combine(Path.GetTempPath(), "dg-rejected", Guid.NewGuid().ToString("N"));

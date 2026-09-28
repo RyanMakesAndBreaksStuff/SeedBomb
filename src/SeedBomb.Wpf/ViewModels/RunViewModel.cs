@@ -634,10 +634,10 @@ public sealed partial class RunViewModel : ObservableObject
             sb.AppendLine("Table,Cause,Rows,Disposition,Retryable");
             foreach (var group in _allRejectionGroups)
             {
-                sb.Append(Csv(group.TableName)).Append(',');
-                sb.Append(Csv(group.CauseText)).Append(',');
+                sb.Append(CsvField.Escape(group.TableName)).Append(',');
+                sb.Append(CsvField.Escape(group.CauseText)).Append(',');
                 sb.Append(group.RowCount).Append(',');
-                sb.Append(Csv(group.DispositionLabel)).Append(',');
+                sb.Append(CsvField.Escape(group.DispositionLabel)).Append(',');
                 sb.AppendLine(group.IsRetryable ? "true" : "false");
             }
 
@@ -899,12 +899,5 @@ public sealed partial class RunViewModel : ObservableObject
         if (t.TotalMinutes >= 1)
             return $"{(int)t.TotalMinutes}m {t.Seconds}s";
         return $"{Math.Max(0, (int)t.TotalSeconds)}s";
-    }
-
-    private static string Csv(string value)
-    {
-        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
-            return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
-        return value;
     }
 }

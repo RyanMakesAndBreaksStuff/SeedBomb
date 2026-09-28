@@ -184,15 +184,15 @@ public sealed partial class HistoryViewModel : ViewModelBase
                 var duration = $"{(int)run.Duration.TotalMinutes:00}:{run.Duration.Seconds:00}";
                 var status = run.Succeeded ? "Success" : "Failed";
                 lines.Add(string.Join(",",
-                    EscapeCsv(run.Timestamp.ToString("O")),
-                    EscapeCsv(entities),
-                    EscapeCsv(run.TotalRecords.ToString()),
-                    EscapeCsv(duration),
-                    EscapeCsv(status),
-                    EscapeCsv(run.ErrorCount.ToString()),
-                    EscapeCsv(run.Environment),
-                    EscapeCsv(run.User),
-                    EscapeCsv(run.Profile)));
+                    CsvField.Escape(run.Timestamp.ToString("O")),
+                    CsvField.Escape(entities),
+                    CsvField.Escape(run.TotalRecords.ToString()),
+                    CsvField.Escape(duration),
+                    CsvField.Escape(status),
+                    CsvField.Escape(run.ErrorCount.ToString()),
+                    CsvField.Escape(run.Environment),
+                    CsvField.Escape(run.User),
+                    CsvField.Escape(run.Profile)));
             }
 
             await System.IO.File.WriteAllLinesAsync(path, lines);
@@ -259,13 +259,5 @@ public sealed partial class HistoryViewModel : ViewModelBase
         if (date == today.AddDays(-1))
             return "Yesterday";
         return date.ToString("ddd d MMM yyyy");
-    }
-
-    private static string EscapeCsv(string value)
-    {
-        if (!value.Contains(',') && !value.Contains('\"') && !value.Contains('\r') && !value.Contains('\n'))
-            return value;
-
-        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }
