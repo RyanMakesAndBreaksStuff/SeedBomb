@@ -1294,7 +1294,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
         if (attr is EnumAttributeMetadata)
             return ops;
-        if (TryMapKind(attr, out var kind) && BogusCatalogQuery.HasAny(kind))
+        if (RuleValidator.TryMapValueKind(attr, out var kind) && BogusCatalogQuery.HasAny(kind))
             return [.. ops, "bogus"];
         return ops;
     }
@@ -1304,44 +1304,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         kind = default;
         return SelectedColumn is not null
                && _byName.TryGetValue(SelectedColumn.LogicalName, out var attr)
-               && TryMapKind(attr, out kind);
-    }
-
-    private static bool TryMapKind(AttributeMetadata attr, out DataverseValueKind kind)
-    {
-        switch (attr)
-        {
-            case StringAttributeMetadata:
-                kind = DataverseValueKind.String;
-                return true;
-            case MemoAttributeMetadata:
-                kind = DataverseValueKind.Memo;
-                return true;
-            case BooleanAttributeMetadata:
-                kind = DataverseValueKind.Boolean;
-                return true;
-            case IntegerAttributeMetadata:
-                kind = DataverseValueKind.Integer;
-                return true;
-            case BigIntAttributeMetadata:
-                kind = DataverseValueKind.BigInt;
-                return true;
-            case DecimalAttributeMetadata:
-                kind = DataverseValueKind.Decimal;
-                return true;
-            case DoubleAttributeMetadata:
-                kind = DataverseValueKind.Double;
-                return true;
-            case MoneyAttributeMetadata:
-                kind = DataverseValueKind.Money;
-                return true;
-            case DateTimeAttributeMetadata:
-                kind = DataverseValueKind.DateTime;
-                return true;
-            default:
-                kind = default;
-                return false;
-        }
+               && RuleValidator.TryMapValueKind(attr, out kind);
     }
 
     private void RestoreBogus(BogusRule rule)

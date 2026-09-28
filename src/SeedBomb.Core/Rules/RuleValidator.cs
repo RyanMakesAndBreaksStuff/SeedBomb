@@ -679,7 +679,8 @@ public static class RuleValidator
         return true;
     }
 
-    private static bool TryMapValueKind(AttributeMetadata attr, out DataverseValueKind kind)
+    /// <summary>Maps an attribute's metadata type to the value kind that Bogus rules can target; false when unsupported.</summary>
+    public static bool TryMapValueKind(AttributeMetadata attr, out DataverseValueKind kind)
     {
         switch (attr)
         {
@@ -806,7 +807,7 @@ public static class RuleValidator
         a is IntegerAttributeMetadata or BigIntAttributeMetadata or DecimalAttributeMetadata
             or DoubleAttributeMetadata or MoneyAttributeMetadata;
 
-    private static (decimal Min, decimal Max) MetadataBounds(AttributeMetadata a) => a switch
+    internal static (decimal Min, decimal Max) MetadataBounds(AttributeMetadata a) => a switch
     {
         IntegerAttributeMetadata i => (i.MinValue ?? int.MinValue, i.MaxValue ?? int.MaxValue),
         BigIntAttributeMetadata b => (b.MinValue ?? long.MinValue, b.MaxValue ?? long.MaxValue),
