@@ -444,6 +444,16 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         HasError = false;
 
         var (profile, error) = await _profiles.ImportAsync(sourcePath, ct);
+        if (profile is null && error is { } conflict
+            && conflict.StartsWith("conflict:", StringComparison.Ordinal))
+        {
+            // WR-014: importing over a same-name profile is a real overwrite — ask, the same way
+            // Load already asks before replacing a dirty board.
+            var ok = ConfirmOverwrite?.Invoke(conflict["conflict:".Length..].Trim()) ?? false;
+            if (!ok) return;
+            (profile, error) = await _profiles.ImportAsync(sourcePath, ct, allowOverwrite: true);
+        }
+
         if (profile is null)
         {
             SchemaErrorMessage = error ?? "not a valid profile";

@@ -539,4 +539,29 @@ public sealed class ProfileImportFlowTests : IDisposable
 
         Assert.Null(vm.PendingImport);
     }
+
+    [Fact]
+    public async Task Import_of_a_same_name_profile_confirms_before_overwriting()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = NewService(out var root);
+        await svc.SaveAsync(new Profile(1, "acme-sales", null, null, [new ProfileTable("account", 1, null)]), ct);
+        var path = Path.Combine(root, "acme-sales.profile.json");
+        var before = await File.ReadAllTextAsync(path, ct);
+
+        string? prompt = null;
+        var vm = new ProfilesViewModel(svc)
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+            ConfirmOverwrite = message => { prompt = message; return true; },
+        };
+
+        var json = """{"profileVersion":1,"name":"acme-sales","tables":[{"table":"account","count":5}]}""";
+        await vm.ImportFromPathAsync(await WriteSourceAsync(json), ct);
+
+        Assert.NotNull(prompt);
+        var after = await File.ReadAllTextAsync(path, ct);
+        Assert.NotEqual(before, after);
+        Assert.Contains("\"count\": 5", after, StringComparison.Ordinal);
+    }
 }

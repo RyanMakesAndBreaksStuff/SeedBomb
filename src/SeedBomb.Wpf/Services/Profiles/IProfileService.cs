@@ -32,7 +32,13 @@ public interface IProfileService
     /// ("not a valid profile: …") and leaves the store untouched on failure. Never runs metadata
     /// validation — that is Task 11's job, against the connected environment.
     /// </summary>
-    Task<(Profile? Profile, string? Error)> ImportAsync(string sourcePath, CancellationToken ct = default);
+    /// <param name="allowOverwrite">
+    /// When <see langword="false"/> (default) and a profile already exists under the incoming
+    /// name's file slot, the import is refused with an error starting <c>"conflict:"</c> instead
+    /// of silently replacing it; the caller re-invokes with <see langword="true"/> to proceed.
+    /// </param>
+    Task<(Profile? Profile, string? Error)> ImportAsync(
+        string sourcePath, CancellationToken ct = default, bool allowOverwrite = false);
 
     /// <summary>Autosaves the working draft to the fixed <c>draft.profile.json</c> slot.</summary>
     Task SaveDraftAsync(Profile profile, CancellationToken ct = default);

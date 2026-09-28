@@ -486,4 +486,19 @@ public sealed class JsonProfileServiceTests : IDisposable
 
         Assert.Equal(before, await File.ReadAllTextAsync(path, ct));
     }
+
+    [Fact]
+    public async Task Import_rejects_a_table_count_above_the_max_record_count()
+    {
+        var svc = NewService(out _);
+        var json = """
+        {"profileVersion":1,"name":"x","tables":[{"table":"account","count":2000000000}]}
+        """;
+
+        var (profile, error) = await ImportRawAsync(svc, json);
+
+        Assert.Null(profile);
+        Assert.NotNull(error);
+        Assert.Contains("count must be at most", error, StringComparison.OrdinalIgnoreCase);
+    }
 }

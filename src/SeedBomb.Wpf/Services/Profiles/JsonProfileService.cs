@@ -20,6 +20,10 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     private const string FileSuffix = ".profile.json";
     private const int MaxProfileBytes = 1024 * 1024; // §08: read at most 1 MiB per file.
 
+    /// <summary>Upper bound on one table's record count — guards a crafted or corrupt profile
+    /// from queuing an unbounded write against the connected environment (WR-014).</summary>
+    public const int MaxRecordCount = 100_000;
+
     private static readonly string DefaultRoot = Path.Combine(AppPaths.Root, "profiles");
 
     // Property names never allowed anywhere in a profile document (D2 — no secrets by schema).
@@ -187,7 +191,8 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<(Profile? Profile, string? Error)> ImportAsync(string sourcePath, CancellationToken ct = default)
+    public async Task<(Profile? Profile, string? Error)> ImportAsync(
+        string sourcePath, CancellationToken ct = default, bool allowOverwrite = false)
     {
         var (bytes, boundsError) = await ReadBoundedAsync(sourcePath, ct).ConfigureAwait(false);
         if (bytes is null)
@@ -219,6 +224,13 @@ public sealed class JsonProfileService : IProfileService, IDisposable
             var collision = await FindSlugCollisionAsync(destPath, profile.Name, ct).ConfigureAwait(false);
             if (collision is not null)
                 return (null, $"not a valid profile: {collision}");
+
+            // WR-014: a same-name file already on disk is a real profile this import is about to
+            // replace — unlike Save (a deliberate overwrite from the editor), the caller has not
+            // confirmed that yet. Safe to check under the lock: only DeleteAsync (also lock-held)
+            // removes profile files.
+            if (!allowOverwrite && File.Exists(destPath))
+                return (null, $"conflict: a profile named \"{profile.Name}\" already exists. Overwrite it?");
 
             Directory.CreateDirectory(_root);
             var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
@@ -430,6 +442,9 @@ public sealed class JsonProfileService : IProfileService, IDisposable
                 return (null, "not a valid profile: table name is required");
             if (table.Count < 1)
                 return (null, $"not a valid profile: table \"{table.Table}\" count must be at least 1");
+            if (table.Count > MaxRecordCount)
+                return (null,
+                    $"not a valid profile: table \"{table.Table}\" count must be at most {MaxRecordCount:N0}");
             if (!tableNames.Add(table.Table))
                 return (null, $"not a valid profile: duplicate table \"{table.Table}\"");
 
