@@ -502,7 +502,6 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             var h when h.EndsWith(".crm.microsoftdynamics.us", StringComparison.OrdinalIgnoreCase)
                        || h.EndsWith(".crm.appsplatform.us", StringComparison.OrdinalIgnoreCase)
-                       || h.EndsWith(".crm.microsoftdynamics.de", StringComparison.OrdinalIgnoreCase)
                 => AzureCloudInstance.AzureUsGovernment,
             var h when h.EndsWith(".crm.dynamics.cn", StringComparison.OrdinalIgnoreCase)
                 => AzureCloudInstance.AzureChina,
