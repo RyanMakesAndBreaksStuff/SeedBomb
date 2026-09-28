@@ -61,7 +61,7 @@ public class DataverseMetadataProvider(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to retrieve metadata for entity {EntityName}", logicalName);
-            throw new SchemaException($"Failed to retrieve metadata for entity '{logicalName}'.", ex);
+            throw new SchemaException($"Failed to retrieve metadata for entity '{logicalName}': {ex.Message}", ex);
         }
     }
 
@@ -134,7 +134,7 @@ public class DataverseMetadataProvider(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to retrieve user entity list");
-            throw new SchemaException("Failed to retrieve user entity list.", ex);
+            throw new SchemaException($"Failed to retrieve user entity list: {ex.Message}", ex);
         }
     }
 }
