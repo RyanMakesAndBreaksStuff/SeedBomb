@@ -247,7 +247,7 @@ public class BulkCreator : IBulkCreator
                 {
                     var validation = _edgeCaseValidator.Validate(attr, meta);
                     if (validation.Action == FieldAction.SpecialHandling
-                        && validation.HandlingCategory == "OwnerLookup")
+                        && validation.HandlingCategory == SpecialHandlingCategory.OwnerLookup)
                     {
                         // ownerid is SystemRequired on every Dataverse table; omit it and let
                         // Dataverse default to the calling user on insert.
@@ -585,7 +585,7 @@ public class BulkCreator : IBulkCreator
             {
                 var result = _edgeCaseValidator.Validate(a, meta);
                 return result.Action == FieldAction.SpecialHandling
-                       && result.HandlingCategory == "AlternateKeyUniqueness";
+                       && result.HandlingCategory == SpecialHandlingCategory.AlternateKeyUniqueness;
             })
             .ToArray();
     }
@@ -600,11 +600,12 @@ public class BulkCreator : IBulkCreator
             {
                 var result = _edgeCaseValidator.Validate(a, meta);
                 if (result.Action != FieldAction.SpecialHandling) return false;
-                var cat = result.HandlingCategory ?? string.Empty;
+                var cat = result.HandlingCategory;
                 // OwnerLookup is intentionally excluded — ownerid is omitted from the Create
                 // payload and Dataverse defaults it to the calling user.
-                return cat is "MultiSelect" or "PolymorphicLookup" or "RichText" or "CurrencyValidation"
-                       || cat.StartsWith("DateTime_", StringComparison.OrdinalIgnoreCase);
+                return cat is SpecialHandlingCategory.MultiSelect or SpecialHandlingCategory.PolymorphicLookup
+                    or SpecialHandlingCategory.RichText or SpecialHandlingCategory.CurrencyValidation
+                    or SpecialHandlingCategory.DateTime;
             })
             .ToArray();
     }
@@ -742,7 +743,7 @@ public class BulkCreator : IBulkCreator
                         $"Entity '{entityName}': field rule targets unknown attribute '{logicalName}'.");
 
                 var handling = _edgeCaseValidator.Validate(ruleAttr, meta);
-                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == "AlternateKeyUniqueness")
+                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == SpecialHandlingCategory.AlternateKeyUniqueness)
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
 

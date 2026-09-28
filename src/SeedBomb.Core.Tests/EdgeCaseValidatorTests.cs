@@ -156,7 +156,7 @@ public class EdgeCaseValidatorTests
         };
         var result = _validator.Validate(attr, EmptyEntity());
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("MultiSelect", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.MultiSelect, result.HandlingCategory);
     }
 
     // 9. Currency (Money)
@@ -166,7 +166,7 @@ public class EdgeCaseValidatorTests
         var attr = new MoneyAttributeMetadata { LogicalName = "budget" };
         var result = _validator.Validate(attr, EmptyEntity());
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("CurrencyValidation", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.CurrencyValidation, result.HandlingCategory);
     }
 
     // 10. DateTime
@@ -180,7 +180,8 @@ public class EdgeCaseValidatorTests
         };
         var result = _validator.Validate(attr, EmptyEntity());
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.StartsWith("DateTime_", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.DateTime, result.HandlingCategory);
+        Assert.Equal(DateTimeBehavior.DateOnly, result.DateTimeBehavior);
     }
 
     // 11. Alternate key field
@@ -191,7 +192,7 @@ public class EdgeCaseValidatorTests
         var attr = new StringAttributeMetadata { LogicalName = "accountnumber" };
         var result = _validator.Validate(attr, entity);
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("AlternateKeyUniqueness", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.AlternateKeyUniqueness, result.HandlingCategory);
     }
 
     // 12. Rich text memo
@@ -205,7 +206,7 @@ public class EdgeCaseValidatorTests
         };
         var result = _validator.Validate(attr, EmptyEntity());
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("RichText", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.RichText, result.HandlingCategory);
     }
 
     // 13. Polymorphic lookup (multiple targets)
@@ -219,7 +220,7 @@ public class EdgeCaseValidatorTests
         };
         var result = _validator.Validate(attr, EmptyEntity());
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("PolymorphicLookup", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.PolymorphicLookup, result.HandlingCategory);
     }
 
     // 13b. Owner lookup
@@ -233,7 +234,7 @@ public class EdgeCaseValidatorTests
         };
         var result = _validator.Validate(attr, EmptyEntity());
         Assert.Equal(FieldAction.SpecialHandling, result.Action);
-        Assert.Equal("OwnerLookup", result.HandlingCategory);
+        Assert.Equal(SpecialHandlingCategory.OwnerLookup, result.HandlingCategory);
     }
 
     // Normal field → Generate
