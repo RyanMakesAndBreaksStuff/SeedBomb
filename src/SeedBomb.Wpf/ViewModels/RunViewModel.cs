@@ -227,6 +227,9 @@ public sealed partial class RunViewModel : ObservableObject
         _seed = config.Seed;
         CurrentRunId = Guid.NewGuid();
 
+        // WR-001: a close confirmed during preparation must not raise the risky-values prompt.
+        ct.ThrowIfCancellationRequested();
+
         if (!config.AllowRiskyBogusValues && ContainsRiskyBogus(config))
         {
             if (!await ConfirmRiskyBogusAsync())
@@ -611,6 +614,12 @@ public sealed partial class RunViewModel : ObservableObject
         StatusHeadline = "Cancelling…";
         _runCts?.Cancel();
     }
+
+    /// <summary>
+    /// Cancels the run's token with no prompt. <see cref="RunCloseGuard"/> has already asked;
+    /// <see cref="CancelCommand"/> would show a second, differently worded confirm.
+    /// </summary>
+    internal void CancelForClose() => _runCts?.Cancel();
 
     [RelayCommand]
     private void ExportRejectedCsv()

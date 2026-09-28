@@ -850,6 +850,12 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Cancels an in-flight <see cref="GenerateCommand"/> with no prompt; <see cref="RunCloseGuard"/>
+    /// has already asked. This token is linked into the run's, so it also covers preparation.
+    /// </summary>
+    internal void CancelForClose() => _cts?.Cancel();
+
     [RelayCommand(CanExecute = nameof(CanStartGenerate))]
     private async Task GenerateAsync()
     {
