@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Auth;
@@ -40,6 +41,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         _profileService.ProfilesChanged += OnProfilesChanged;
         _connectionManager.ConnectionSwitched += HandleConnectionSwitched;
+        _connectionManager.PropertyChanged += OnConnectionManagerPropertyChanged;
+    }
+
+    private void OnConnectionManagerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ConnectionManagerViewModel.IsSwitchingConnection))
+            SignInCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Raised when the header's connection display is clicked.</summary>
@@ -60,9 +68,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         OpenConnectionManagerRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Retries sign-in for the last-used profile.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSignIn))]
     private void SignIn() =>
         SignInRequested?.Invoke(this, EventArgs.Empty);
+
+    private bool CanSignIn() => _connectionManager is not { IsSwitchingConnection: true };
 
     /// <summary>Handoff alias for <see cref="OrgHost"/>.</summary>
     public string EnvironmentHost => OrgHost;
@@ -165,7 +175,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         if (_profileService is not null)
             _profileService.ProfilesChanged -= OnProfilesChanged;
         if (_connectionManager is not null)
+        {
             _connectionManager.ConnectionSwitched -= HandleConnectionSwitched;
+            _connectionManager.PropertyChanged -= OnConnectionManagerPropertyChanged;
+        }
     }
 
     // T4: react to saves/deletes (fired by the profile store) instead of ObservableCollection's

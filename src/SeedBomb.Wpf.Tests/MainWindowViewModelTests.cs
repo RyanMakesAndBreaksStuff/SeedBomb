@@ -68,6 +68,27 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(1, reloads);
     }
 
+    [Fact]
+    public void SignInCommand_CannotExecute_WhileSwitchingConnection()
+    {
+        // WR-005: SignInCommand had no CanExecute, so a double-click could run two interactive
+        // sign-ins whose results raced to set SwitchError/IsSwitchingConnection.
+        var connectionManager = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(), Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>())
+        {
+            IsSwitchingConnection = true,
+        };
+        var vm = new MainWindowViewModel(Mock.Of<IConnectionProfileService>(), connectionManager);
+
+        Assert.False(vm.SignInCommand.CanExecute(null));
+
+        var raised = false;
+        vm.SignInCommand.CanExecuteChanged += (_, _) => raised = true;
+        connectionManager.IsSwitchingConnection = false;
+
+        Assert.True(raised);
+        Assert.True(vm.SignInCommand.CanExecute(null));
+    }
     private static async Task<(MainWindowViewModel vm, FakeConnectionProfileStore store)>
         MainWindowViewModelWithProfilesAsync(int count)
     {

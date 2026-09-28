@@ -122,7 +122,7 @@ public partial class MainWindow : FluentWindow
         try
         {
             var last = await _profileService.GetLastUsedAsync();
-            if (last is not null)
+            if (last is not null && _connectionManagerViewModel.SelectProfileCommand.CanExecute(last))
                 await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
         }
         catch (Exception ex)
