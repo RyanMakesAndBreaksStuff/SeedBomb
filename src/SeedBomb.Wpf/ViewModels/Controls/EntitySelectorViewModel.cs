@@ -14,6 +14,7 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
     private readonly IMetadataProvider _metadata;
     private readonly ILogger<EntitySelectorViewModel> _logger;
     private CancellationTokenSource? _loadCts;
+    private int _generation;
     private bool _suppressSelectionEvents;
 
     /// <summary>Initialises the view-model.</summary>
@@ -82,6 +83,7 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
+        var generation = Interlocked.Increment(ref _generation);
 
         IsLoading = true;
         ErrorMessage = null;
@@ -91,6 +93,9 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         try
         {
             var list = await _metadata.ListUserEntitiesAsync(ct);
+            if (generation != _generation)
+                return;
+
             foreach (var entity in list.OrderBy(e => e.DisplayName))
             {
                 Entities.Add(entity);
@@ -106,12 +111,15 @@ public sealed partial class EntitySelectorViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            if (generation != _generation)
+                return;
             _logger.LogError(ex, "Failed to load entity list");
             ErrorMessage = $"Failed to load entities: {ex.Message}";
         }
         finally
         {
-            IsLoading = false;
+            if (generation == _generation)
+                IsLoading = false;
         }
     }
 
