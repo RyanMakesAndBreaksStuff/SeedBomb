@@ -27,6 +27,17 @@ public sealed class SplashWindowAssetTests
         Assert.DoesNotContain("Source=\"Assets/", splash, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AboutPageUsesThemeKeyedLogo()
+    {
+        var about = ReadRepoFile("src/SeedBomb.Wpf/Views/Pages/AboutPage.xaml");
+        var manager = ReadRepoFile("src/SeedBomb.Wpf/Services/Theme/DesignThemeManager.cs");
+        Assert.DoesNotContain("logo-256.png", about, StringComparison.Ordinal);
+        Assert.Contains("Source=\"{DynamicResource DG.Logo}\"", about, StringComparison.Ordinal);
+        Assert.Contains("Resources/logo-light.png", manager, StringComparison.Ordinal);
+        Assert.Contains("Resources/logo-dark.png", manager, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);

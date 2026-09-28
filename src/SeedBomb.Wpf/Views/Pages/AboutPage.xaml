@@ -33,7 +33,7 @@
                         </Grid.ColumnDefinitions>
                         <Image Grid.Column="0" Width="48" Height="48" Margin="0,0,16,0"
                                VerticalAlignment="Top"
-                               Source="pack://application:,,,/Resources/logo-256.png"
+                               Source="{DynamicResource DG.Logo}"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                AutomationProperties.Name="SeedBomb logo" />
                         <StackPanel Grid.Column="1">

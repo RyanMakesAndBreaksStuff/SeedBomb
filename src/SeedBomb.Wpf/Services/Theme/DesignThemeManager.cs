@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Wpf.Ui.Appearance;
 
 namespace SeedBomb.Services.Theme;
@@ -59,6 +60,10 @@ public static class DesignThemeManager
         // Test host may have a leftover Application from an STA fixture; production always calls this on the UI thread.
         if (Application.Current is not { } app || !app.Dispatcher.CheckAccess())
             return;
+
+        SetImage("DG.Logo", isDark
+            ? "pack://application:,,,/Resources/logo-dark.png"
+            : "pack://application:,,,/Resources/logo-light.png");
 
         // None matches MainWindow. The default (Mica) re-enables the DWM backdrop and clears the
         // window background on every switch, under an opaque palette that would hide it anyway.
@@ -189,6 +194,15 @@ public static class DesignThemeManager
         var brush = new SolidColorBrush(color);
         brush.Freeze();
         app.Resources[key] = brush;
+    }
+
+    private static void SetImage(string key, string packUri)
+    {
+        if (Application.Current is not { } app)
+            return;
+        var image = new BitmapImage(new Uri(packUri, UriKind.Absolute));
+        image.Freeze();
+        app.Resources[key] = image;
     }
 
     // ponytail: WPF has no conic gradient, so the "run heats up" sweep is a 45° linear
