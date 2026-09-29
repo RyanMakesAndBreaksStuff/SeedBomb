@@ -235,7 +235,10 @@ public class BulkCreatorPipelineTests
         Assert.Equal("contact", callOrder[1]);
     }
 
-    /// <summary>Synchronous IProgress implementation to avoid SynchronizationContext timing issues in tests.</summary>
+    /// <summary>
+    /// Synchronous IProgress implementation to avoid SynchronizationContext timing issues in tests.
+    /// Report runs on the caller's thread, so a callback fed by parallel batches must be thread-safe.
+    /// </summary>
     private sealed class SyncProgress<T>(Action<T> callback) : IProgress<T>
     {
         public void Report(T value) => callback(value);
@@ -261,8 +264,10 @@ public class BulkCreatorPipelineTests
             Seed = 42
         };
 
-        var progressReports = new List<BulkCreationProgress>();
-        var progress = new SyncProgress<BulkCreationProgress>(p => progressReports.Add(p));
+        // BulkCreator reports from concurrent Parallel.ForEachAsync batch bodies (default DOP 8), so
+        // the collector must be thread-safe; a plain List.Add can drop a report under contention.
+        var progressReports = new System.Collections.Concurrent.ConcurrentQueue<BulkCreationProgress>();
+        var progress = new SyncProgress<BulkCreationProgress>(progressReports.Enqueue);
 
         await creator.CreateAsync(config,
             new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["new_widget"] = meta },
