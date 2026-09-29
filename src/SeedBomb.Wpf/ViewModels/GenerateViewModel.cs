@@ -7,7 +7,6 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using SeedBomb.Services.Generation;
-using SeedBomb.Services.History;
 using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
@@ -51,7 +50,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// value saved in one place can never exceed what the other enforces (WR-008).</summary>
     public const int MaxDop = 16;
 
-    private readonly IRunHistoryService _historyService;
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
     private readonly IMetadataProvider _metadataProvider;
@@ -75,7 +73,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
-    /// <param name="historyService">Run history persistence service.</param>
     /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
     /// <param name="snackbar">Snackbar notification service.</param>
     /// <param name="logger">Logger.</param>
@@ -85,7 +82,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// <param name="navigator">Optional shell navigator.</param>
     /// <param name="mainWindow">Shell view-model; when provided, Generate reloads on connection switch.</param>
     public GenerateViewModel(
-        IRunHistoryService historyService,
         ISettingsService settingsService,
         ISnackbarService snackbar,
         ILogger<GenerateViewModel> logger,
@@ -98,7 +94,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         MainWindowViewModel? mainWindow = null)
     {
         ArgumentNullException.ThrowIfNull(run);
-        _historyService = historyService;
         _settingsService = settingsService;
         _snackbar = snackbar;
         _logger = logger;
@@ -821,14 +816,15 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         await _draftAutosave.PersistAsync();
         var config = BuildConfig();
         // WR-002: captured before the run — the History row must not depend on later wizard state.
-        var tableNames = SelectedEntities.Select(e => e.DisplayName).ToArray();
+        var tableLabels = SelectedEntities.ToDictionary(
+            e => e.LogicalName, e => e.DisplayName, StringComparer.OrdinalIgnoreCase);
         // WR-009: same reasoning — a profile loaded mid-run must not relabel this run's row.
         var profileName = ActiveProfileName;
-        Exception? failure = null;
         try
         {
             var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
-            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token);
+            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token,
+                tableLabels, profileName);
             if (LastResult.Cancelled)
                 Run.ReportRunFailure(new OperationCanceledException());
             else
@@ -838,7 +834,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            failure = ex;
             Run.ReportRunFailure(ex);
         }
         finally
@@ -850,37 +845,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
         // WR-009: a Rules save held back during the run lands on the board now.
         _profileBridge.ApplyRulesSavedDuringRun();
-
-        // WR-002: one History write for every run that returned a result or failed. A cancel
-        // that throws (including a declined risky-value prompt) wrote nothing, so it has no row.
-        if (LastResult is not null || failure is not (null or OperationCanceledException))
-            await RecordRunAsync(tableNames, profileName, LastResult);
-    }
-
-    private async Task RecordRunAsync(string[] tableNames, string profileName, GenerationResult? result)
-    {
-        try
-        {
-            await _historyService.AddRunAsync(new RunRecord(
-                Run.CurrentRunId,
-                DateTimeOffset.Now,
-                tableNames,
-                result?.TotalRecords ?? 0,
-                result?.Elapsed ?? TimeSpan.Zero,
-                result is { Cancelled: false, Errors.Count: 0 },
-                result?.Errors.Sum(e => e.RowCount) ?? 0,
-                Run.EnvironmentLabel,
-                Run.UserLabel,
-                profileName,
-                Run.ActivityLines));
-        }
-        catch (Exception ex)
-        {
-            // A History failure is not a generation failure — report it on its own.
-            _logger.LogError(ex, "Failed to record the run in history");
-            _snackbar.Show("Couldn't save run history", ex.Message,
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
-        }
     }
 
     private GenerationConfig BuildConfig()

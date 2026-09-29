@@ -476,4 +476,76 @@ public sealed class RunViewModelTests
         Assert.Same(vm, vm.SummaryView);
         Assert.Contains(nameof(RunViewModel.SummaryView), raised);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenHistoricalRunIsOpenedDuringGeneration_ShowsLiveRunOnCompletion()
+    {
+        var completed = new TaskCompletionSource<GenerationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var generation = new Mock<IWpfGenerationService>();
+        generation.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => completed.Task);
+        var vm = new RunViewModel(generation: generation.Object) { KeepWindowOpen = false };
+
+        var running = vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+                Seed = 42,
+            },
+            "contoso-dev", ["account"], 1, TestContext.Current.CancellationToken);
+        vm.ShowHistorical(new SeedBomb.Services.History.RunRecord(Guid.NewGuid(), DateTimeOffset.Now,
+            ["contact"], 3, TimeSpan.FromSeconds(2), true, 0));
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        completed.SetResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+        });
+        await running;
+
+        Assert.False(vm.IsSheetVisible); // Keep Window Open is off.
+        Assert.Same(vm, vm.SummaryView);
+        Assert.Contains(nameof(RunViewModel.SummaryView), raised);
+    }
+
+    [Fact]
+    public async Task RetrySelected_AddsAHistoryRow_WithTheFirstRunsLabels()
+    {
+        // IN-009: retries wrote to Dataverse but never reached GenerateViewModel's History write.
+        var gen = new Mock<IWpfGenerationService>();
+        gen.SetupSequence(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "request throttled", -2147015902, 2)],
+            })
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid(), Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+            });
+        var history = new Mock<IRunHistoryService>();
+        var vm = new RunViewModel(generation: gen.Object, history: history.Object);
+        await vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 2 },
+            },
+            "contoso-dev", ["account"], 2, TestContext.Current.CancellationToken,
+            tableLabels: new Dictionary<string, string> { ["account"] = "Account" }, profileName: "sales");
+
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+
+        history.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => r.Id == vm.CurrentRunId && r.Succeeded && r.TotalRecords == 2
+                && r.EntityNames.Single() == "Account" && r.Profile == "sales"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

@@ -310,7 +310,6 @@ public sealed class GenerateViewModelStepTests
                 DefaultDop: 4));
 
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             settingsMock.Object,
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),
@@ -403,7 +402,6 @@ public sealed class GenerateViewModelStepTests
         settingsMock.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AppSettings(10, 250, 4));
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             settingsMock.Object, Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -443,7 +441,6 @@ public sealed class GenerateViewModelStepTests
         // and Edit rules on the Profiles page then inherited them.
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -515,7 +512,6 @@ public sealed class GenerateViewModelStepTests
     {
         var profiles = new Mock<IProfileService>();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             profiles.Object, Mock.Of<IContentDialogService>(),
@@ -636,7 +632,6 @@ public sealed class GenerateViewModelStepTests
             using var profiles = new JsonProfileService(root);
             var generationMock = new Mock<IWpfGenerationService>();
             var vm = new GenerateViewModel(
-                Mock.Of<IRunHistoryService>(),
                 Mock.Of<ISettingsService>(),
                 Mock.Of<ISnackbarService>(),
                 Mock.Of<ILogger<GenerateViewModel>>(),
@@ -740,7 +735,7 @@ public sealed class GenerateViewModelStepTests
         auth.SetupGet(a => a.ActiveProfile)
             .Returns(new ConnectionProfile { EnvironmentUrl = "https://contoso-prod.crm.dynamics.com" });
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(), Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(), Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(), new RunViewModel(Mock.Of<IWpfGenerationService>(), auth: auth.Object));
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
@@ -762,14 +757,13 @@ public sealed class GenerateViewModelStepTests
         snackbarMock = new Mock<ISnackbarService>();
 
         return new GenerateViewModel(
-            historyMock.Object,
             Mock.Of<ISettingsService>(),
             snackbarMock.Object,
             logger ?? Mock.Of<ILogger<GenerateViewModel>>(),
             metadataMock.Object,
             profileService ?? Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(),
-            new RunViewModel(generationMock.Object));
+            new RunViewModel(generationMock.Object, snackbar: snackbarMock.Object, history: historyMock.Object));
     }
 
     private static GenerateViewModel CreateViewModel(
@@ -781,7 +775,6 @@ public sealed class GenerateViewModelStepTests
     /// <summary>Wires the Rules-page handoff so <c>EditRulesCommand</c> fills <paramref name="request"/>.</summary>
     private static GenerateViewModel CreateViewModelWithRulesRequest(RulesNavigationRequest request) =>
         new(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -942,11 +935,10 @@ public sealed class GenerateViewModelStepTests
         var history = new Mock<IRunHistoryService>();
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
-            history.Object,
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
-            new RunViewModel(generation.Object),
+            new RunViewModel(generation.Object, history: history.Object),
             request,
             Mock.Of<IAppNavigator>());
         viewModel.OnEntitiesChanged(

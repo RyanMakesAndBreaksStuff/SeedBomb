@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Generation;
-using SeedBomb.Services.History;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
@@ -280,7 +279,6 @@ public sealed class ProfileImportFlowTests : IDisposable
             .ReturnsAsync(metadata);
 
         var vm = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(),
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),

@@ -17,8 +17,8 @@ public sealed class RunCloseGuardTests
     [Fact]
     public async Task Close_waits_for_the_history_row_of_a_run_cancelled_by_closing()
     {
-        // WR-001: closing mid-run tore the host down under the write, and GenerateAsync's History
-        // write runs after both IsRunning flags have cleared. A cancel after rows were written
+        // WR-001: closing mid-run tore the host down under the write, and the run's History write
+        // runs after RunViewModel.IsRunning has cleared. A cancel after rows were written
         // returns them (Cancelled = true), so that run must still get its History row.
         var ct = TestContext.Current.CancellationToken;
         var writing = new TaskCompletionSource();
@@ -155,14 +155,13 @@ public sealed class RunCloseGuardTests
         Mock<IWpfGenerationService> generation, Mock<IRunHistoryService> history)
     {
         var generate = new GenerateViewModel(
-            history.Object,
             Mock.Of<ISettingsService>(),
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),
             Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(),
-            new RunViewModel(generation.Object));
+            new RunViewModel(generation.Object, history: history.Object));
         generate.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         return generate;
     }

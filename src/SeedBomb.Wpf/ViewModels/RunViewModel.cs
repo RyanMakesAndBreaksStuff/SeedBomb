@@ -53,6 +53,7 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
     private readonly IAuthService? _auth;
+    private readonly IRunHistoryService? _history;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
@@ -66,6 +67,8 @@ public sealed partial class RunViewModel : ObservableObject
     private int _plannedTotal;
     private int _seed;
     private string _environmentHost = "";
+    private IReadOnlyDictionary<string, string> _tableLabels = new Dictionary<string, string>();
+    private string _profileName = "";
     private RunViewModel _summaryView;
 
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
@@ -82,6 +85,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
     /// <param name="auth">Signed-in user and target environment for history rows. Null leaves them blank.</param>
+    /// <param name="history">History store; each run and retry adds one row. Null skips it.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
@@ -89,7 +93,8 @@ public sealed partial class RunViewModel : ObservableObject
         IAppNavigator? navigator = null,
         ISnackbarService? snackbar = null,
         ILogger<RunViewModel>? logger = null,
-        IAuthService? auth = null)
+        IAuthService? auth = null,
+        IRunHistoryService? history = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
@@ -98,6 +103,7 @@ public sealed partial class RunViewModel : ObservableObject
         _snackbar = snackbar;
         _logger = logger;
         _auth = auth;
+        _history = history;
         _summaryView = this;
     }
 
@@ -218,12 +224,18 @@ public sealed partial class RunViewModel : ObservableObject
         string environmentHost,
         IReadOnlyList<string> tables,
         int plannedTotal,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlyDictionary<string, string>? tableLabels = null,
+        string? profileName = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(tables);
         if (_generation is null)
             throw new InvalidOperationException("Generation service is not configured.");
+
+        // History-row labels (logical → display name, profile). A retry passes null and reuses the first run's.
+        _tableLabels = tableLabels ?? _tableLabels;
+        _profileName = profileName ?? _profileName;
 
         _lastConfig = config with { AllowRiskyBogusValues = false };
         _environmentHost = string.IsNullOrWhiteSpace(environmentHost) ? TargetHost : environmentHost;
@@ -249,15 +261,18 @@ public sealed partial class RunViewModel : ObservableObject
         _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var progress = new Progress<ProgressUpdate>(u => AcceptProgress(u, tables, plannedTotal));
 
+        var cancelled = false;
+        GenerationResult? result = null;
         try
         {
-            var result = await _generation.GenerateAsync(config, progress, _runCts.Token);
+            result = await _generation.GenerateAsync(config, progress, _runCts.Token);
             ApplyResult(result, config.Seed, _environmentHost, config);
             return result;
         }
         catch (OperationCanceledException)
         {
             StatusHeadline = "Cancelled";
+            cancelled = true;
             throw;
         }
         finally
@@ -265,10 +280,48 @@ public sealed partial class RunViewModel : ObservableObject
             IsRunning = false;
             _runClock.Stop();
             _clockTimer?.Stop();
+
             // Hold the completed sheet up until manual Close when the user asked to keep it open.
             IsSheetVisible = KeepWindowOpen;
             _runCts?.Dispose();
             _runCts = null;
+
+            // WR-002/IN-009: one History row for every run or retry that returned a result or
+            // failed. A cancel that throws wrote nothing, so it has no row.
+            if (!cancelled)
+                await RecordRunAsync(result);
+
+            // IN-008: History can replace the summary while a run is active or finishing; restore the live result before returning.
+            ShowLive();
+        }
+    }
+
+    private async Task RecordRunAsync(GenerationResult? result)
+    {
+        if (_history is null)
+            return;
+
+        try
+        {
+            await _history.AddRunAsync(new RunRecord(
+                CurrentRunId,
+                DateTimeOffset.Now,
+                [.. _plannedTables.Select(t => _tableLabels.GetValueOrDefault(t, t))],
+                result?.TotalRecords ?? 0,
+                result?.Elapsed ?? TimeSpan.Zero,
+                result is { Cancelled: false, Errors.Count: 0 },
+                result?.Errors.Sum(e => e.RowCount) ?? 0,
+                EnvironmentLabel,
+                UserLabel,
+                _profileName,
+                ActivityLines));
+        }
+        catch (Exception ex)
+        {
+            // A History failure is not a generation failure — report it on its own.
+            _logger?.LogError(ex, "Failed to record the run in history");
+            _snackbar?.Show("Couldn't save run history", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
