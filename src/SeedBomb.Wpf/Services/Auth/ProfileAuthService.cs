@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
@@ -22,7 +23,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private sealed record CachedClient(object Client, string Fingerprint);
 
     private readonly IConnectionProfileService _profiles;
-    private readonly Dictionary<Guid, CachedClient> _clients = [];
+    // IN-003: written after ConfigureAwait(false) continuations and cleared from pool threads.
+    private readonly ConcurrentDictionary<Guid, CachedClient> _clients = new();
     private IAccount? _account;
     private MsalCacheHelper? _userCacheHelper;
     private MsalCacheHelper? _appCacheHelper;
