@@ -602,9 +602,11 @@ public sealed partial class RunViewModel : ObservableObject
                     "Cancel run",
                     close: "Keep running");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return;
+                // IN-007: the user already clicked Cancel; a broken dialog host must not swallow it.
+                _logger?.LogWarning(ex, "Cancel confirmation dialog failed; cancelling without it");
+                confirmed = true;
             }
         }
 
@@ -674,9 +676,9 @@ public sealed partial class RunViewModel : ObservableObject
         {
             await _dialogs.ShowAlertAsync("Activity log", body, "Close");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Dialog host missing.
+            _logger?.LogWarning(ex, "Could not show the activity log dialog");
         }
     }
 
@@ -694,9 +696,9 @@ public sealed partial class RunViewModel : ObservableObject
             var loaded = await _settings.LoadAsync();
             KeepWindowOpen = loaded.KeepRunSheetOpen;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Keep default.
+            _logger?.LogWarning(ex, "Could not read KeepRunSheetOpen; keeping the default");
         }
     }
 

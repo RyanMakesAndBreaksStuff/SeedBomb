@@ -552,8 +552,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             if (!ShouldDropSession(active, remaining.Select(p => p.Id)))
                 return;
         }
-        catch
+        catch (Exception ex)
         {
+            // Keep the session when the store can't be read, but record why.
+            _logger?.LogWarning(ex, "Could not re-read connection profiles; keeping the current session");
             return;
         }
 

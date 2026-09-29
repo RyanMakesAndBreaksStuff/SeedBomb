@@ -3,7 +3,10 @@ using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
 using SeedBomb.ViewModels;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -441,5 +444,19 @@ public sealed class RunViewModelTests
 
         vm.ShowHistorical(run with { ActivityLog = null });
         Assert.Empty(vm.SummaryView.ActivityLines);
+    }
+
+    [Fact]
+    public async Task Cancel_WhenTheDialogHostFails_StillCancelsTheRun()
+    {
+        // IN-007: the catch returned silently, so Cancel did nothing at all.
+        var dialogs = new Mock<IContentDialogService>();
+        dialogs.Setup(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("No dialog host"));
+        var vm = new RunViewModel(contentDialogService: dialogs.Object) { IsRunning = true };
+
+        await vm.CancelCommand.ExecuteAsync(null);
+
+        Assert.Equal("Cancelling…", vm.StatusHeadline);
     }
 }
