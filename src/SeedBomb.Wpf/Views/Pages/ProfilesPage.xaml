@@ -79,6 +79,7 @@
                                 <ui:TextBox Grid.Column="0"
                                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                             PlaceholderText="Search profiles"
+                                            Padding="10,4,10,4" 
                                             Height="{DynamicResource DG.Size.ControlSmall}"
                                             Icon="{ui:SymbolIcon Search24}" />
                                 <Button Grid.Column="1" Style="{DynamicResource DG.Button}"

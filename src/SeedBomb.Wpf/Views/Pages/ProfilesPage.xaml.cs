@@ -42,6 +42,7 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
         viewModel.GetRunId ??= () => generate.RunId;
         viewModel.CaptureCurrent ??= generate.BuildProfileSnapshot;
         viewModel.IsBoardDirty ??= generate.IsBoardDirty;
+        viewModel.RulesSaved ??= generate.ApplySavedProfileIfActive;
         viewModel.ConfirmOverwrite ??= msg => MessageBox.Show(
             msg, "Load profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
         viewModel.ConfirmDelete ??= name => MessageBox.Show(

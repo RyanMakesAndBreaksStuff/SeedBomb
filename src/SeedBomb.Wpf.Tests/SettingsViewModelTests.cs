@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Moq;
+using SeedBomb.Services.Auth;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
 using Wpf.Ui;
@@ -76,5 +77,26 @@ public sealed class SettingsViewModelTests
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.True(saved?.KeepRunSheetOpen);
+    }
+
+    [Fact]
+    public async Task SignOut_is_blocked_while_a_run_is_writing()
+    {
+        // WR-001: sign-out disposes the ServiceClient the running pipeline writes through.
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(AppSettings.Default);
+        var run = new RunViewModel { IsRunning = true };
+        var vm = new SettingsViewModel(
+            settings.Object, Mock.Of<ILogger<SettingsViewModel>>(), auth: Mock.Of<IAuthService>(), run: run);
+        await vm.OnNavigatedToAsync();
+
+        Assert.False(vm.SignOutCommand.CanExecute(null));
+
+        var raised = false;
+        vm.SignOutCommand.CanExecuteChanged += (_, _) => raised = true;
+        run.IsRunning = false;
+
+        Assert.True(raised);
+        Assert.True(vm.SignOutCommand.CanExecute(null));
     }
 }

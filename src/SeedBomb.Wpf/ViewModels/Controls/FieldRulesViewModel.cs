@@ -72,6 +72,19 @@ public sealed partial class FieldRulesViewModel : ObservableObject
         RebuildRows();
     }
 
+    /// <summary>Drops every table's rules except <paramref name="tables"/> — a deselected table leaves the board.</summary>
+    public void RetainTables(IEnumerable<string> tables)
+    {
+        var keep = tables.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var dropped = _draft.Keys.Where(t => !keep.Contains(t)).ToList();
+        if (dropped.Count == 0)
+            return;
+        foreach (var table in dropped)
+            _draft.Remove(table);
+        MarkChanged();
+        RebuildRows();
+    }
+
     /// <summary>Draft rules in <c>GenerationConfig.FieldRules</c> shape. Empty map ⇒ pass null to config.</summary>
     public IReadOnlyDictionary<string, Dictionary<string, FieldRule>> GetRules() =>
         _draft.ToDictionary(

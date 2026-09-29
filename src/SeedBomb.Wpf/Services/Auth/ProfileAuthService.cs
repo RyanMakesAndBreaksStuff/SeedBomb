@@ -24,7 +24,6 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private readonly IConnectionProfileService _profiles;
     private readonly Dictionary<Guid, CachedClient> _clients = [];
     private IAccount? _account;
-    private Guid? _activeProfileId;
     private MsalCacheHelper? _userCacheHelper;
     private MsalCacheHelper? _appCacheHelper;
     private readonly ILogger<ProfileAuthService>? _logger;
@@ -56,6 +55,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     /// <inheritdoc />
     public string? CurrentUserDisplayName => _account?.Username;
+
+    /// <inheritdoc />
+    /// <remarks>The internal setter is a test seam: MSAL's token builders cannot be faked.</remarks>
+    public ConnectionProfile? ActiveProfile { get; internal set; }
 
     /// <summary>True when no MSAL client applications are cached. Exposed for tests.</summary>
     internal bool HasNoCachedClients => _clients.Count == 0;
@@ -135,18 +138,31 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public async Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default)
     {
-        var profile = await _profiles.GetLastUsedAsync(ct).ConfigureAwait(false);
-        if (profile is null)
-            return new AuthResult(false, null,
-                "No connection profile configured. Open Connection Manager to create one.");
+        // CR-006: never throws — startup has no other handler, so a store or credential failure
+        // must come back as a result the sign-in overlay can show.
+        try
+        {
+            var profile = await _profiles.GetLastUsedAsync(ct).ConfigureAwait(false);
+            return profile is null
+                ? new AuthResult(false, null, "No connection profile configured. Open Connection Manager to create one.")
+                : await SignInAsync(profile, parentHwnd, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new AuthResult(false, null, ex.Message);
+        }
+    }
 
+    /// <inheritdoc />
+    public async Task<AuthResult> SignInAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
         try
         {
             ValidateProfile(profile);
-            await _profiles.SetLastUsedAsync(profile.Id, ct).ConfigureAwait(false);
             return await AuthenticateCoreAsync(profile, parentHwnd, commitSession: true, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new AuthResult(false, null, ex.Message);
         }
@@ -164,7 +180,19 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         };
 
         if (result.Succeeded && commitSession)
-            _activeProfileId = profile.Id;
+        {
+            ActiveProfile = profile;
+            // CR-002: last-used moves only after a successful sign-in. It just picks what the next
+            // launch tries, so a failed write is logged rather than failing a session that is live.
+            try
+            {
+                await _profiles.SetLastUsedAsync(profile.Id, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger?.LogWarning(ex, "Could not record {Profile} as the last-used connection", profile.Name);
+            }
+        }
 
         return result;
     }
@@ -172,7 +200,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// <inheritdoc />
     public async Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default)
     {
-        if (_activeProfileId is null || !_clients.TryGetValue(_activeProfileId.Value, out var cached))
+        if (ActiveProfile is null || !_clients.TryGetValue(ActiveProfile.Id, out var cached))
             throw new InvalidOperationException("Not signed in.");
 
         AuthenticationResult result;
@@ -208,7 +236,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         _clients.Clear();
         _account = null;
-        _activeProfileId = null;
+        ActiveProfile = null;
         SignedOut?.Invoke(this, EventArgs.Empty);
     }
 
@@ -223,8 +251,11 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         try
         {
-            var accounts = await pca.GetAccountsAsync().ConfigureAwait(false);
-            IAccount? account = accounts.FirstOrDefault();
+            // WR-005: every OAuth profile shares msal_user_cache.bin, so "the first cached account"
+            // can be another profile's user. Use only the account this profile signed in as.
+            var account = profile.HomeAccountId is { } homeAccountId
+                ? await pca.GetAccountAsync(homeAccountId).ConfigureAwait(false)
+                : null;
 
             if (account is not null)
             {
@@ -243,7 +274,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
                 .ExecuteAsync(ct).ConfigureAwait(false);
             account = interactive.Account;
             if (commitSession)
+            {
                 _account = account;
+                await RememberAccountAsync(profile, account, ct).ConfigureAwait(false);
+            }
             return new AuthResult(true, interactive.Account.Username, null);
         }
         catch (MsalUiRequiredException)
@@ -257,7 +291,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
                     .WithParentActivityOrWindow(parentHwnd)
                     .ExecuteAsync(ct).ConfigureAwait(false);
                 if (commitSession)
+                {
                     _account = interactive.Account;
+                    await RememberAccountAsync(profile, interactive.Account, ct).ConfigureAwait(false);
+                }
                 return new AuthResult(true, interactive.Account.Username, null);
             }
             catch (MsalException ex2)
@@ -276,6 +313,25 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
+    // WR-005: record which cached account belongs to this profile so the next silent sign-in asks
+    // for exactly that one. Only a hint for next time: a failed write is logged, not surfaced.
+    private async Task RememberAccountAsync(ConnectionProfile profile, IAccount account, CancellationToken ct)
+    {
+        var homeAccountId = account.HomeAccountId?.Identifier;
+        if (homeAccountId is null || homeAccountId == profile.HomeAccountId)
+            return;
+
+        profile.HomeAccountId = homeAccountId;
+        try
+        {
+            await _profiles.SaveAsync(profile, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger?.LogWarning(ex, "Could not record the signed-in account for {Profile}", profile.Name);
+        }
+    }
+
     private async Task<AuthResult> SignInAppOnlyAsync(
         ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
@@ -289,7 +345,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             clientSecret ??= await _profiles.GetSecretAsync(profile.Id, ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(clientSecret))
-                return new AuthResult(false, null, "Client Secret is not configured for this profile.");
+                return new AuthResult(false, null,
+                    "Re-enter the client secret for this connection — none is saved, or the saved one can't be decrypted for this Windows user.");
         }
 
         var cca = await GetOrCreateCca(profile, commitSession, clientSecret).ConfigureAwait(false);
@@ -461,7 +518,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     private async Task ReconcileSessionAsync()
     {
-        var active = _activeProfileId;
+        var active = ActiveProfile?.Id;
         if (active is null)
             return;
 
@@ -478,7 +535,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         _clients.Clear();
         _account = null;
-        _activeProfileId = null;
+        ActiveProfile = null;
+        // CR-002: say so — the shell still showed the deleted profile as connected.
+        SignedOut?.Invoke(this, EventArgs.Empty);
     }
 
     /// <inheritdoc />

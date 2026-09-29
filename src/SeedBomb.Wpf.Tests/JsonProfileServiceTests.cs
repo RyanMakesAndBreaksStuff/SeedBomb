@@ -340,6 +340,22 @@ public sealed class JsonProfileServiceTests : IDisposable
         Assert.True(File.Exists(Path.Combine(root, "acme-sales-scenario.profile.json")));
     }
 
+    // 10b. Name prompts only accept names that are already their own file stem.
+    [Theory]
+    [InlineData("contact-acct", true)]
+    [InlineData("g2", true)]
+    [InlineData("Contact Acct", false)]
+    [InlineData("contact acct", false)]
+    [InlineData("contact-acct ", false)]
+    [InlineData("Contact-Acct", false)]
+    [InlineData("contact--acct", false)]
+    [InlineData("-contact", false)]
+    [InlineData("contact_acct", false)]
+    [InlineData("draft", false)]
+    [InlineData("", false)]
+    public void IsValidName_accepts_only_names_equal_to_their_file_stem(string name, bool expected) =>
+        Assert.Equal(expected, JsonProfileService.IsValidName(name));
+
     // 11. Saving under a name whose slug collides with a different existing profile's file is
     // rejected instead of silently overwriting it; the original file is left untouched.
     [Fact]
@@ -451,5 +467,23 @@ public sealed class JsonProfileServiceTests : IDisposable
         await svc.ExportAsync("export-me", destPath, ct);
 
         Assert.True(File.Exists(destPath));
+    }
+
+    [Fact]
+    public async Task Save_that_cannot_complete_leaves_the_previous_file_whole()
+    {
+        // WR-008: new content goes to a sibling temp file that is swapped in, so the live file is
+        // never truncated first. A blocked temp path stands in for a crash or a full disk.
+        var svc = NewService(out var root);
+        var ct = TestContext.Current.CancellationToken;
+        await svc.SaveAsync(new Profile(1, "acme", null, 1, [new ProfileTable("account", 1, null)]), ct);
+        var path = Path.Combine(root, "acme.profile.json");
+        var before = await File.ReadAllTextAsync(path, ct);
+        Directory.CreateDirectory(path + ".tmp");
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SaveAsync(new Profile(1, "acme", null, 2, [new ProfileTable("account", 5, null)]), ct));
+
+        Assert.Equal(before, await File.ReadAllTextAsync(path, ct));
     }
 }

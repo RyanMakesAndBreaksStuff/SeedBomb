@@ -34,6 +34,7 @@ using ContentDialogButton = Wpf.Ui.Controls.ContentDialogButton;
 using ContentDialogHost = Wpf.Ui.Controls.ContentDialogHost;
 using SymbolIcon = Wpf.Ui.Controls.SymbolIcon;
 using SymbolRegular = Wpf.Ui.Controls.SymbolRegular;
+using UiTextBox = Wpf.Ui.Controls.TextBox;
 
 namespace SeedBomb.Wpf.Tests.Views;
 
@@ -221,6 +222,37 @@ public sealed class RulesPageStaTests : IDisposable
         Flush();
         Assert.False(GroupHeader(page, "Disabled").IsChecked);
         Assert.True(GroupHeader(page, "Unmapped").IsChecked);
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void ColumnFilterBox_ShowsTypedTextUnclipped()
+    {
+        var (page, vm) = LoadRulesPageForProfileOnSta();
+        var box = FindVisualChildren<UiTextBox>(page).Single(t => t.PlaceholderText == "Filter columns");
+
+        vm.ColumnFilter = "naren";
+        page.UpdateLayout();
+        Flush();
+
+        var host = Assert.IsAssignableFrom<ScrollViewer>(box.Template.FindName("PART_ContentHost", box));
+        Assert.True(host.ExtentHeight <= host.ViewportHeight + 0.5,
+            $"Filter text is clipped: needs {host.ExtentHeight:F1}px, gets {host.ViewportHeight:F1}px.");
+        Assert.Empty(CapturedBindingErrors);
+    }
+
+    [StaFact]
+    public void Header_RemoveTableButton_BindsRemoveTableCommand()
+    {
+        var (page, vm) = LoadRulesPageForProfileOnSta();
+
+        var buttons = FindButtons(page).ToList();
+        var button = buttons.Single(b => Equals(b.Content, "Remove table"));
+
+        Assert.Same(vm.RemoveTableCommand, button.Command);
+        // Right of "Save profile as", away from the table switcher.
+        Assert.True(buttons.IndexOf(button) > buttons.FindIndex(b => Equals(b.Content, "Save profile as")));
+        Assert.False(button.IsEnabled); // one-table profile: the last table can't be removed
         Assert.Empty(CapturedBindingErrors);
     }
 

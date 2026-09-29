@@ -24,7 +24,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Header: breadcrumb, title, table switcher, save -->
+        <!-- Header: breadcrumb, title, table switcher, remove table, save -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -61,6 +61,12 @@
                 <Button Style="{DynamicResource DG.PrimaryButton}"
                         Command="{Binding SaveProfileAsCommand}"
                         Content="Save profile as" />
+                <!-- Far end, away from the table switcher; the command confirms before removing. -->
+                <Button Style="{DynamicResource DG.DangerButton}"
+                        Margin="16,0,0,0"
+                        Command="{Binding RemoveTableCommand}"
+                        Content="Remove table"
+                        ToolTip="Remove the selected table and its rules from this profile" />
             </StackPanel>
         </Grid>
 

@@ -96,8 +96,8 @@ public static class RuleValueGenerator
         var u = UniformDouble(seed, table, attr.LogicalName!, rowIndex);
         if (attr is DateTimeAttributeMetadata)
         {
-            var min = DateTime.Parse(r.Min.GetString()!, null, System.Globalization.DateTimeStyles.AdjustToUniversal);
-            var max = DateTime.Parse(r.Max.GetString()!, null, System.Globalization.DateTimeStyles.AdjustToUniversal);
+            var min = RuleDate.Parse(r.Min.GetString()!);
+            var max = RuleDate.Parse(r.Max.GetString()!);
             return DateTime.SpecifyKind(min + TimeSpan.FromTicks((long)((max - min).Ticks * u)), DateTimeKind.Utc);
         }
         var lo = r.Min.GetDecimal();
@@ -112,7 +112,7 @@ public static class RuleValueGenerator
         EnumAttributeMetadata => new OptionSetValue(value.GetInt32()),   // includes Status (statuscode) and Two-Options picklists
         BooleanAttributeMetadata => value.GetBoolean(),
         MoneyAttributeMetadata => new Money(value.GetDecimal()),
-        DateTimeAttributeMetadata => DateTime.SpecifyKind(DateTime.Parse(value.GetString()!), DateTimeKind.Utc),
+        DateTimeAttributeMetadata => RuleDate.Parse(value.GetString()!),
         IntegerAttributeMetadata => value.GetInt32(),
         BigIntAttributeMetadata => value.GetInt64(),
         DecimalAttributeMetadata => value.GetDecimal(),

@@ -72,24 +72,6 @@ internal sealed class GenerateProfileBridge
         _rulesRequest?.Clear();
     }
 
-    /// <summary>
-    /// Writes the working-set snapshot onto <see cref="RulesNavigationRequest"/> when the
-    /// wizard is leaving with a selection.
-    /// </summary>
-    public void CaptureWorkingSetIfNeeded()
-    {
-        if (_rulesRequest is null || _owner.SelectedEntities.Count == 0)
-            return;
-
-        _rulesRequest.Profile = BuildProfileSnapshot(
-            string.Equals(_owner.ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
-                ? "working-set"
-                : _owner.ActiveProfileName);
-        _rulesRequest.TableName = _owner.SelectedEntities[0].LogicalName;
-        _rulesRequest.OnSaved = ApplySavedRulesProfile;
-        _rulesRequest.ReturnPage = typeof(GeneratePage);
-    }
-
     /// <summary>Stamps an in-memory working-set snapshot for a Rules-page edit. Does not persist.</summary>
     /// <returns><see langword="false"/> when no rules-navigation payload is wired.</returns>
     public bool TryPrepareRulesEdit()
@@ -97,6 +79,7 @@ internal sealed class GenerateProfileBridge
         if (_rulesRequest is null)
             return false;
 
+        _rulesRequest.Clear(); // CR-004: stamp a whole payload, never add to a stale one
         _rulesRequest.Profile = BuildProfileSnapshot(
             string.Equals(_owner.ActiveProfileName, "No profile loaded", StringComparison.Ordinal)
                 ? "working-set"
@@ -111,6 +94,16 @@ internal sealed class GenerateProfileBridge
     public void ApplySavedRulesProfile(Profile profile)
     {
         _owner.ActiveProfileName = profile.Name;
+        // The Rules page can remove tables; SelectReportTables only ever adds them.
+        var kept = _owner.SelectedEntities
+            .Where(e => profile.Tables.Any(t => string.Equals(t.Table, e.LogicalName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (kept.Count < _owner.SelectedEntities.Count)
+        {
+            _owner.OnEntitiesChanged(kept);
+            _owner.EntitySelector?.SetSelection(kept);
+        }
+
         if (_owner.LiveEntityMetadata.Count > 0)
         {
             var report = ProfileImport.ValidateAgainstMetadata(profile, _owner.LiveEntityMetadata, _owner.RunId);
@@ -149,11 +142,8 @@ internal sealed class GenerateProfileBridge
                     ?? new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
 
         var tables = new List<ProfileTable>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
         foreach (var entity in _owner.SelectedEntities)
         {
-            seen.Add(entity.LogicalName);
             Dictionary<string, FieldRule>? cols = null;
             if (rules.TryGetValue(entity.LogicalName, out var r) && r.Count > 0)
                 cols = new Dictionary<string, FieldRule>(r, StringComparer.OrdinalIgnoreCase);
@@ -161,15 +151,6 @@ internal sealed class GenerateProfileBridge
                 entity.LogicalName,
                 counts.GetValueOrDefault(entity.LogicalName, _owner.DefaultRecordCount),
                 cols));
-        }
-
-        foreach (var (table, cols) in rules)
-        {
-            if (seen.Contains(table) || cols.Count == 0) continue;
-            tables.Add(new ProfileTable(
-                table,
-                counts.GetValueOrDefault(table, _owner.DefaultRecordCount),
-                new Dictionary<string, FieldRule>(cols, StringComparer.OrdinalIgnoreCase)));
         }
 
         if (tables.Count == 0)

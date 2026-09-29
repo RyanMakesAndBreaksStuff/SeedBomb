@@ -2,6 +2,7 @@ using Moq;
 using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.ViewModels;
+using SeedBomb.Views.Pages;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -114,7 +115,30 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         Assert.Contains("profile exceeds 1 MiB", vm.StatusMessage!, StringComparison.Ordinal);
     }
 
-    private static async Task<(ProfilesViewModel Vm, Mock<IProfileService> Profiles)> ProfilesViewModelWithOneProfileAsync()
+    [Fact]
+    public async Task EditRules_replaces_the_generate_handoff_and_routes_saves_to_the_host()
+    {
+        // Generate stamps these whenever it navigates away with tables selected.
+        var request = new RulesNavigationRequest
+        {
+            TableName = "email",
+            ReturnPage = typeof(GeneratePage),
+            OnSaved = _ => { },
+        };
+        var (vm, _) = await ProfilesViewModelWithOneProfileAsync(request);
+        Action<Profile> rulesSaved = _ => { };
+        vm.RulesSaved = rulesSaved;
+
+        await vm.EditRulesCommand.ExecuteAsync(null);
+
+        Assert.Equal("Acme", request.Profile?.Name);
+        Assert.Null(request.TableName);
+        Assert.Null(request.ReturnPage);
+        Assert.Same(rulesSaved, request.OnSaved);
+    }
+
+    private static async Task<(ProfilesViewModel Vm, Mock<IProfileService> Profiles)> ProfilesViewModelWithOneProfileAsync(
+        RulesNavigationRequest? rulesRequest = null)
     {
         var profiles = new Mock<IProfileService>();
         profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
@@ -124,7 +148,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
 
         var vm = new ProfilesViewModel(
             profiles.Object,
-            rulesRequest: new RulesNavigationRequest(),
+            rulesRequest: rulesRequest ?? new RulesNavigationRequest(),
             navigator: Mock.Of<IAppNavigator>());
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = Assert.Single(vm.Items);

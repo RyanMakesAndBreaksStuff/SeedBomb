@@ -386,4 +386,82 @@ public class BulkCreatorTests
         var error = Assert.Single(result.Errors);
         Assert.Equal(10, error.RowCount);
     }
+
+    [Fact]
+    public async Task CreateAsync_WholeBatchFault_KeepsTheDataverseFaultCode()
+    {
+        // CR-001: RejectionClassifier reads FaultCode to tell service-protection throttling apart.
+        var (sut, serviceMock) = BuildSut();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+            {
+                ErrorCode = -2147015902,
+                Message = "Number of requests exceeded the limit of 6000 over time window of 300 seconds.",
+            }));
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(-2147015902, Assert.Single(result.Errors).FaultCode);
+    }
+
+    [Fact]
+    public async Task CreateAsync_CancelledMidEntity_ReturnsRowsAlreadyWritten()
+    {
+        // WR-002: cancel does not roll back, so the rows already written must come back with their IDs.
+        var (sut, serviceMock) = BuildSut();
+        using var cts = new CancellationTokenSource();
+        var calls = 0;
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest req, CancellationToken token) =>
+            {
+                if (++calls > 1)
+                {
+                    cts.Cancel();
+                    token.ThrowIfCancellationRequested();
+                }
+
+                var cmr = (CreateMultipleRequest)req;
+                return new CreateMultipleResponse { Results = { ["Ids"] = cmr.Targets.Entities.Select(e => Guid.NewGuid()).ToArray() } };
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 20 },
+            BatchSize = 10,
+            MaxParallelism = 1,
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph, ct: cts.Token);
+
+        Assert.True(result.Cancelled);
+        Assert.Equal(10, result.CreatedRecords["account"].Count);
+    }
 }

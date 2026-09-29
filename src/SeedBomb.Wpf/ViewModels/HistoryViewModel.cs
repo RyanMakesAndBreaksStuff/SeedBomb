@@ -28,10 +28,14 @@ public sealed partial class HistoryViewModel : ViewModelBase
     private readonly RunViewModel? _run;
     private readonly IAppNavigator? _navigator;
     private readonly ISnackbarService? _snackbar;
+    private readonly IContentDialogService? _dialogs;
     private CancellationTokenSource? _navCts;
 
     /// <summary>Test seam: overrides the export destination folder. Null uses the real Downloads folder.</summary>
     internal string? ExportDirectoryOverride { get; set; }
+
+    /// <summary>Test seam: answers the Clear all confirmation without the content dialog.</summary>
+    internal Func<Task<bool>>? ConfirmClear { get; set; }
 
     /// <summary>Initialises the view-model.</summary>
     /// <param name="historyService">Run history service.</param>
@@ -39,18 +43,21 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <param name="run">Optional live run. Tests keep the 2-arg ctor.</param>
     /// <param name="navigator">Optional navigator to <see cref="RunSummaryPage"/>.</param>
     /// <param name="snackbar">Optional snackbar for I/O failures. Appended last so existing 2-arg tests compile.</param>
+    /// <param name="dialogs">Optional dialog host for the Clear all confirmation. Without it nothing is cleared.</param>
     public HistoryViewModel(
         IRunHistoryService historyService,
         ILogger<HistoryViewModel> logger,
         RunViewModel? run = null,
         IAppNavigator? navigator = null,
-        ISnackbarService? snackbar = null)
+        ISnackbarService? snackbar = null,
+        IContentDialogService? dialogs = null)
     {
         _historyService = historyService;
         _logger = logger;
         _run = run;
         _navigator = navigator;
         _snackbar = snackbar;
+        _dialogs = dialogs;
     }
 
     /// <summary>All loaded run records.</summary>
@@ -125,6 +132,11 @@ public sealed partial class HistoryViewModel : ViewModelBase
     [RelayCommand]
     private async Task ClearHistoryAsync()
     {
+        // WR-010: History is the only record of what was written where — confirm first, like
+        // every other destructive action.
+        if (!await ConfirmClearAsync())
+            return;
+
         try
         {
             await _historyService.ClearAsync();
@@ -139,6 +151,16 @@ public sealed partial class HistoryViewModel : ViewModelBase
             _snackbar?.Show("Couldn't clear history", ex.Message,
                 ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
+    }
+
+    private async Task<bool> ConfirmClearAsync()
+    {
+        if (ConfirmClear is not null)
+            return await ConfirmClear();
+        return _dialogs is not null && await _dialogs.ConfirmAsync(
+            "Clear history",
+            "Delete every run from History? It is the only record of what was written to which environment. This cannot be undone.",
+            "Clear all");
     }
 
     [RelayCommand]

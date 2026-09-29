@@ -184,7 +184,7 @@ public static class RuleValidator
             => Invalid($"Option {c.Value} is not in '{attr.LogicalName}' — valid values are {OptionList(e)}."),
         BooleanAttributeMetadata when c.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
             => Invalid($"'{attr.LogicalName}' expects true or false."),
-        DateTimeAttributeMetadata when c.Value.ValueKind != JsonValueKind.String || !DateTime.TryParse(c.Value.GetString(), out _)
+        DateTimeAttributeMetadata when c.Value.ValueKind != JsonValueKind.String || !RuleDate.TryParse(c.Value.GetString(), out _)
             => Invalid($"'{attr.LogicalName}' expects an ISO-8601 date."),
         _ when IsNumeric(attr) && c.Value.ValueKind != JsonValueKind.Number
             => Invalid($"'{attr.LogicalName}' expects a number."),
@@ -232,7 +232,7 @@ public static class RuleValidator
         var (metaMin, metaMax) = MetadataBounds(attr);
         if (attr is DateTimeAttributeMetadata)
         {
-            if (!DateTime.TryParse(r.Min.GetString(), out var dMin) || !DateTime.TryParse(r.Max.GetString(), out var dMax))
+            if (!RuleDate.TryParse(r.Min.GetString(), out var dMin) || !RuleDate.TryParse(r.Max.GetString(), out var dMax))
                 return Invalid($"'{attr.LogicalName}' range needs ISO-8601 dates.");
             return dMin > dMax ? Invalid("Min must be ≤ Max.") : Valid(r);
         }

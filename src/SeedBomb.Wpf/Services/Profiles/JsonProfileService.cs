@@ -101,7 +101,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         // (§08 invariant: "load → save is idempotent").
         var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
         var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
-        await File.WriteAllTextAsync(path, json, ct).ConfigureAwait(false);
+        await AtomicFile.WriteAllTextAsync(path, json, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -223,7 +223,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
             Directory.CreateDirectory(_root);
             var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
             var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
-            await File.WriteAllTextAsync(destPath, json, ct).ConfigureAwait(false);
+            await AtomicFile.WriteAllTextAsync(destPath, json, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -242,7 +242,7 @@ public sealed class JsonProfileService : IProfileService, IDisposable
             Directory.CreateDirectory(_root);
             var canonical = profile with { ProfileVersion = Profile.CurrentProfileVersion };
             var json = JsonSerializer.Serialize(canonical, FieldRule.JsonOptions);
-            await File.WriteAllTextAsync(DraftPath, json, ct).ConfigureAwait(false);
+            await AtomicFile.WriteAllTextAsync(DraftPath, json, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -337,8 +337,13 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         return fullPath;
     }
 
+    /// <summary>True when <paramref name="name"/> is its own file stem (already lower-kebab), so the
+    /// profile's name and file name can never drift apart. "draft" is the reserved autosave slot.</summary>
+    internal static bool IsValidName(string name) =>
+        name.Length > 0 && Sanitize(name) == name && name != "draft";
+
     /// <summary>Lower-kebab sanitizer: "Acme Sales Scenario" → "acme-sales-scenario".</summary>
-    private static string Sanitize(string name)
+    internal static string Sanitize(string name)
     {
         var lowered = name.Trim().ToLowerInvariant();
         var sb = new System.Text.StringBuilder(lowered.Length);

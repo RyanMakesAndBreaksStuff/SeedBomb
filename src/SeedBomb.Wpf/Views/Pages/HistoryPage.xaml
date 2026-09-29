@@ -37,6 +37,7 @@
                             Width="180"
                             Height="{DynamicResource DG.Size.ControlSmall}"
                             Margin="0,0,8,0"
+                            Padding="10,4,10,4"
                             Icon="{ui:SymbolIcon Search24}" />
                 <Button Style="{DynamicResource DG.Button}"
                         Command="{Binding ExportCsvCommand}"

@@ -178,13 +178,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <inheritdoc />
-    public override Task OnNavigatedFromAsync()
-    {
-        _profileBridge.CaptureWorkingSetIfNeeded();
-        return Task.CompletedTask;
-    }
-
     // ── State ──────────────────────────────────────────────────────────────────
 
     [ObservableProperty]
@@ -355,9 +348,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>Step 4 confirmation sentence.</summary>
+    /// <summary>Step 4 confirmation sentence, naming the environment the run writes to (CR-002).</summary>
     public string RunConfirmationLine =>
-        $"Write {PlannedTotal:N0} rows across {SelectedEntities.Count} table(s) using seed {Seed}. Nothing is written until you start.";
+        $"Write {PlannedTotal:N0} rows across {SelectedEntities.Count} table(s) to "
+        + $"{(Run.TargetHost is { Length: > 0 } host ? host : "the connected environment")} "
+        + $"using seed {Seed}. Nothing is written until you start.";
 
     /// <summary>Step 4 stat tiles.</summary>
     public IReadOnlyList<RunValueRow> RunPlanStats =>
@@ -562,6 +557,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         if (sameSet)
             return;
 
+        _fieldRules?.RetainTables(incoming);
         IsRulesLoaded = false;
         CurrentStep = 0;
         ReviewedRules = null;
@@ -793,14 +789,10 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     {
         if (ConfirmReset is not null)
             return await ConfirmReset();
-        var result = await _contentDialogService.ShowSimpleDialogAsync(new SimpleContentDialogCreateOptions
-        {
-            Title = "Reset wizard",
-            Content = "Clear selected tables, rules, counts, seed, and the saved draft? This cannot be undone.",
-            PrimaryButtonText = "Reset",
-            CloseButtonText = "Cancel",
-        });
-        return result == Wpf.Ui.Controls.ContentDialogResult.Primary;
+        return await _contentDialogService.ConfirmAsync(
+            "Reset wizard",
+            "Clear selected tables, rules, counts, seed, and the saved draft? This cannot be undone.",
+            "Reset");
     }
 
     [RelayCommand(CanExecute = nameof(CanReset))]
@@ -869,29 +861,23 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         // §07: Start promotes draft (Commit) and persists the promoted snapshot.
         await _draftAutosave.PersistAsync();
         var config = BuildConfig();
+        // WR-002: captured before the run — the History row must not depend on later wizard state.
+        var tableNames = SelectedEntities.Select(e => e.DisplayName).ToArray();
+        Exception? failure = null;
         try
         {
             var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
             LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token);
-            var result = LastResult!;
-            await _historyService.AddRunAsync(new RunRecord(
-                Run.CurrentRunId,
-                DateTimeOffset.Now,
-                SelectedEntities.Select(e => e.DisplayName).ToArray(),
-                result.TotalRecords,
-                result.Elapsed,
-                result.Errors.Count == 0,
-                result.Errors.Sum(e => e.RowCount),
-                Run.EnvironmentLabel,
-                Run.UserLabel,
-                ActiveProfileName,
-                Run.ActivityLines));
-            ReportOutcome(result);
+            if (LastResult.Cancelled)
+                Run.ReportRunFailure(new OperationCanceledException());
+            else
+                ReportOutcome(LastResult);
             if (!Run.KeepWindowOpen)
                 _navigator?.Navigate(typeof(RunSummaryPage));
         }
         catch (Exception ex)
         {
+            failure = ex;
             Run.ReportRunFailure(ex);
         }
         finally
@@ -899,6 +885,37 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             IsRunning = false;
             _cts?.Dispose();
             _cts = null;
+        }
+
+        // WR-002: one History write for every run that returned a result or failed. A cancel
+        // that throws (including a declined risky-value prompt) wrote nothing, so it has no row.
+        if (LastResult is not null || failure is not (null or OperationCanceledException))
+            await RecordRunAsync(tableNames, LastResult);
+    }
+
+    private async Task RecordRunAsync(string[] tableNames, GenerationResult? result)
+    {
+        try
+        {
+            await _historyService.AddRunAsync(new RunRecord(
+                Run.CurrentRunId,
+                DateTimeOffset.Now,
+                tableNames,
+                result?.TotalRecords ?? 0,
+                result?.Elapsed ?? TimeSpan.Zero,
+                result is { Cancelled: false, Errors.Count: 0 },
+                result?.Errors.Sum(e => e.RowCount) ?? 0,
+                Run.EnvironmentLabel,
+                Run.UserLabel,
+                ActiveProfileName,
+                Run.ActivityLines));
+        }
+        catch (Exception ex)
+        {
+            // A History failure is not a generation failure — report it on its own.
+            _logger.LogError(ex, "Failed to record the run in history");
+            _snackbar.Show("Couldn't save run history", ex.Message,
+                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
@@ -961,4 +978,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
     public void ApplyImportReport(ProfileImportReport report) => _profileBridge.ApplyImportReport(report);
+
+    /// <summary>A Rules-page save from Profiles reaches the board only when the board holds that profile.</summary>
+    public void ApplySavedProfileIfActive(Profile profile)
+    {
+        if (string.Equals(profile.Name, ActiveProfileName, StringComparison.Ordinal))
+            _profileBridge.ApplySavedRulesProfile(profile);
+    }
 }

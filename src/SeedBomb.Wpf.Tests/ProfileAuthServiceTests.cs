@@ -93,6 +93,40 @@ public sealed class ProfileAuthServiceTests
         Assert.Null(svc.CurrentUserDisplayName);
     }
 
+    [Fact]
+    public async Task Deleting_the_signed_in_profile_raises_SignedOut()
+    {
+        // CR-002: the session used to be dropped silently, so the header kept saying "connected".
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ConnectionProfile>());
+        var svc = new ProfileAuthService(profiles.Object) { ActiveProfile = MakeOAuthProfile() };
+        var signedOut = new TaskCompletionSource();
+        svc.SignedOut += (_, _) => signedOut.TrySetResult();
+
+        profiles.Raise(p => p.ProfilesChanged += null, EventArgs.Empty);
+
+        await signedOut.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Null(svc.ActiveProfile);
+    }
+
+    [Fact]
+    public async Task OAuth_sign_in_never_borrows_another_profiles_cached_account()
+    {
+        // WR-005: every OAuth profile shares msal_user_cache.bin, and FirstOrDefault picked whichever
+        // cached user came first. A profile may only use the account it signed in with itself.
+        var otherUser = Mock.Of<IAccount>(a => a.Username == "someone@tenant-a.com");
+        var pca = new Mock<IPublicClientApplication>();
+        pca.Setup(p => p.GetAccountsAsync()).ReturnsAsync([otherUser]);
+        var svc = new ProfileAuthService(Mock.Of<IConnectionProfileService>()) { CreatePcaOverride = _ => pca.Object };
+
+        var result = await svc.SignInAsync(MakeOAuthProfile(), nint.Zero, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("No cached session. Please sign in.", result.Error);
+        pca.Verify(p => p.AcquireTokenSilent(It.IsAny<IEnumerable<string>>(), It.IsAny<IAccount>()), Times.Never);
+    }
+
     private static ConnectionProfile MakeCertificateProfile() => new()
     {
         Name = "Cert Profile",

@@ -41,7 +41,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         auth.Verify(
             a => a.TryConnectAsync(vm.EditingProfile!, 42, It.IsAny<CancellationToken>()),
             Times.Once);
-        auth.Verify(a => a.SignInAsync(It.IsAny<nint>(), It.IsAny<CancellationToken>()), Times.Never);
+        auth.Verify(a => a.SignInAsync(It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(profile);
 
         var auth = new Mock<IAuthService>();
-        auth.Setup(a => a.SignInAsync(It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+        auth.Setup(a => a.SignInAsync(It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AuthResult(true, "user@contoso.com", null));
 
         var connection = new Mock<IDataverseConnectionService>();
@@ -114,7 +114,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
 
         Assert.True(switched);
         connection.Verify(c => c.ResetAsync(), Times.Once);
-        profiles.Verify(p => p.SetLastUsedAsync(profile.Id, It.IsAny<CancellationToken>()), Times.Once);
+        auth.Verify(a => a.SignInAsync(profile, It.IsAny<nint>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(profile.Id, vm.ConnectedProfileId);
     }
 
@@ -127,7 +127,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(profile);
 
         var auth = new Mock<IAuthService>();
-        auth.Setup(a => a.SignInAsync(It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+        auth.Setup(a => a.SignInAsync(It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AuthResult(false, null, "bad credentials"));
 
         var vm = new ConnectionManagerViewModel(
@@ -438,7 +438,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         Assert.False(vm.ShowSaveButton);
         Assert.True(vm.ShowConnectButton);
         profiles.Verify(p => p.SetLastUsedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
-        auth.Verify(a => a.SignInAsync(It.IsAny<nint>(), It.IsAny<CancellationToken>()), Times.Never);
+        auth.Verify(a => a.SignInAsync(It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -470,7 +470,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(profile);
 
         var auth = new Mock<IAuthService>();
-        auth.Setup(a => a.SignInAsync(It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+        auth.Setup(a => a.SignInAsync(It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AuthResult(true, "user@contoso.com", null));
 
         var vm = new ConnectionManagerViewModel(profiles.Object, auth.Object, Mock.Of<IDataverseConnectionService>())
@@ -569,6 +569,34 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         Assert.Equal("s3cret", await svc.GetSecretAsync(id, ct));
     }
 
+    [Fact]
+    public async Task SaveAsync_KeepsTheSignedInAccountOfAnEditedProfile()
+    {
+        // WR-005: the account recorded at interactive sign-in must survive a save from the editor,
+        // whose copy of the profile never carries it.
+        var ct = TestContext.Current.CancellationToken;
+        var dir = Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        _tempDirs.Add(dir);
+        var id = Guid.NewGuid();
+        var path = Path.Combine(dir, "connections.json");
+        await File.WriteAllTextAsync(path, $$"""
+            { "Profiles": [{ "Id": "{{id}}", "Name": "Dev", "EnvironmentUrl": "https://dev.crm.dynamics.com",
+              "AuthType": "OAuth", "ClientId": "51f81489-12ee-4a9e-aaae-a2591f45987d", "HomeAccountId": "uid.utid" }] }
+            """, ct);
+        var svc = new JsonConnectionProfileService(dir);
+
+        await svc.SaveAsync(new ConnectionProfile
+        {
+            Id = id,
+            Name = "Dev (renamed)",
+            EnvironmentUrl = "https://dev.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+        }, ct);
+
+        Assert.Contains("\"HomeAccountId\": \"uid.utid\"", await File.ReadAllTextAsync(path, ct), StringComparison.Ordinal);
+    }
+
     private async Task<(JsonConnectionProfileService svc, Guid id)> StoreWithOneSecretProfileAsync()
     {
         var dir = Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"));
@@ -609,6 +637,80 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
 
         Assert.Contains("Key not valid", vm.SwitchError, StringComparison.Ordinal);
         Assert.False(vm.IsEditing);
+    }
+
+    [Fact]
+    public async Task Failed_switch_leaves_last_used_and_the_live_connection_alone()
+    {
+        // CR-002: last-used used to be written before sign-in, so a cancelled switch aimed the next
+        // connection at the new org while the header still showed the old one.
+        var prod = new ConnectionProfile { Name = "PROD", EnvironmentUrl = "https://prod.crm.dynamics.com" };
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([prod]);
+        var auth = new Mock<IAuthService>();
+        auth.Setup(a => a.SignInAsync(prod, It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AuthResult(false, null, "User canceled authentication."));
+        var connection = new Mock<IDataverseConnectionService>();
+        var vm = new ConnectionManagerViewModel(profiles.Object, auth.Object, connection.Object);
+
+        await vm.SelectProfileCommand.ExecuteAsync(prod);
+
+        profiles.Verify(p => p.SetLastUsedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        connection.Verify(c => c.ResetAsync(), Times.Never);
+        Assert.Equal("User canceled authentication.", vm.SwitchError);
+    }
+
+    [Fact]
+    public void Connection_changes_are_blocked_while_a_run_is_writing()
+    {
+        // WR-001: each of these can dispose the ServiceClient the running pipeline writes through.
+        var profile = new ConnectionProfile
+        {
+            Name = "Dev",
+            EnvironmentUrl = "https://contoso.crm.dynamics.com",
+            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+        };
+        var run = new RunViewModel { IsRunning = true };
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(), Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>(),
+            run: run)
+        {
+            EditingProfile = profile,
+        };
+
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+        Assert.False(vm.DeleteProfileCommand.CanExecute(profile));
+        Assert.False(vm.SelectProfileCommand.CanExecute(profile));
+
+        var raised = false;
+        vm.SaveProfileCommand.CanExecuteChanged += (_, _) => raised = true;
+        run.IsRunning = false;
+
+        Assert.True(raised);
+        Assert.True(vm.SaveProfileCommand.CanExecute(null));
+        Assert.True(vm.DeleteProfileCommand.CanExecute(profile));
+        Assert.True(vm.SelectProfileCommand.CanExecute(profile));
+    }
+
+    [Fact]
+    public async Task Only_deleting_the_connected_profile_resets_the_connection()
+    {
+        // WR-001: saves and deletes of other profiles used to drop the live connection too.
+        var connected = new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://dev.crm.dynamics.com" };
+        var other = new ConnectionProfile { Name = "Test", EnvironmentUrl = "https://test.crm.dynamics.com" };
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([connected, other]);
+        var connection = new Mock<IDataverseConnectionService>();
+        var vm = new ConnectionManagerViewModel(profiles.Object, Mock.Of<IAuthService>(), connection.Object)
+        {
+            ConnectedProfileId = connected.Id,
+        };
+
+        await vm.DeleteProfileCommand.ExecuteAsync(other);
+        connection.Verify(c => c.ResetAsync(), Times.Never);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(connected);
+        connection.Verify(c => c.ResetAsync(), Times.Once);
     }
 
     public void Dispose()

@@ -8,10 +8,22 @@ namespace SeedBomb.Services.Auth;
 public interface IAuthService
 {
     /// <summary>
-    /// Attempts silent sign-in first; falls back to interactive if needed.
-    /// Pass <c>nint.Zero</c> for silent-only (no interactive popup).
+    /// Signs in to the last-used profile: silent first, interactive if needed.
+    /// Pass <c>nint.Zero</c> for silent-only (no interactive popup). Never throws.
     /// </summary>
     Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default);
+
+    /// <summary>
+    /// Signs in to <paramref name="profile"/>. On success it becomes the live session and the
+    /// last-used profile; on failure both stay as they were. Never throws.
+    /// </summary>
+    Task<AuthResult> SignInAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default);
+
+    /// <summary>
+    /// Profile the live session signed in with, or <see langword="null"/> when signed out. The one
+    /// owner of which environment is connected: the Dataverse connection and run history read it.
+    /// </summary>
+    ConnectionProfile? ActiveProfile { get; }
 
     /// <summary>
     /// Authenticates <paramref name="profile"/> without persisting last-used and without
