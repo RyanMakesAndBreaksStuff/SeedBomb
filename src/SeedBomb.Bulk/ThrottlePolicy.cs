@@ -52,11 +52,13 @@ public class ThrottlePolicy
             {
                 return await operation().ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 throw;
             }
-            catch (TimeoutException) when (attempt < maxRetries)
+            // IN-004: any other cancel is a transport timeout (TaskCanceledException from HttpClient):
+            // retry it like a timeout; on the last attempt it falls through to DataGenerationException.
+            catch (Exception ex) when (ex is TimeoutException or OperationCanceledException && attempt < maxRetries)
             {
                 var delay = ComputeDelay(attempt);
                 _logger.LogWarning(
