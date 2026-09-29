@@ -74,12 +74,17 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 throw new ObjectDisposedException(nameof(DataverseConnectionService));
             }
 
-            _cached = client;
-            if (!_cached.IsReady)
-                throw new InvalidOperationException(
-                    $"ServiceClient failed to connect: {_cached.LastError}");
+            // IN-006: never publish a client that failed to connect. Nothing else would dispose it,
+            // and the next attempt would overwrite it.
+            if (!client.IsReady)
+            {
+                var error = client.LastError;
+                DisposeClient(client);
+                throw new InvalidOperationException($"ServiceClient failed to connect: {error}");
+            }
 
-            return _cached;
+            _cached = client;
+            return client;
         }
         finally
         {

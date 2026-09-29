@@ -171,4 +171,32 @@ public sealed class DataverseConnectionServiceTests
         Assert.Same(late, Assert.Single(disposed));
         await Assert.ThrowsAsync<ObjectDisposedException>(() => svc.GetOrganizationServiceAsync(ct));
     }
+
+    [Fact]
+    public async Task A_client_that_fails_to_connect_is_disposed_and_never_cached()
+    {
+        // IN-006: the not-ready client was published to _cached, then silently replaced on retry.
+        var ct = TestContext.Current.CancellationToken;
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile)
+            .Returns(new ConnectionProfile { EnvironmentUrl = "https://org.crm.dynamics.com" });
+        using var svc = new DataverseConnectionService(auth.Object);
+        var built = new List<ServiceClient>();
+        var disposed = new ConcurrentQueue<ServiceClient>();
+        svc.CreateClientOverride = _ =>
+        {
+            // Uninitialised: IsReady is false, like a client whose sign-in or connect failed.
+            var client = (ServiceClient)RuntimeHelpers.GetUninitializedObject(typeof(ServiceClient));
+            GC.SuppressFinalize(client);
+            built.Add(client);
+            return client;
+        };
+        svc.DisposeClientOverride = disposed.Enqueue;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.GetOrganizationServiceAsync(ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.GetOrganizationServiceAsync(ct));
+
+        Assert.Equal(2, built.Count);
+        Assert.Equal(built, disposed);
+    }
 }
