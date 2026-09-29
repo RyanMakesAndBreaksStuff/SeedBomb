@@ -112,9 +112,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Gets whether the last connection switch failed.</summary>
     public bool HasSwitchError => SwitchError is not null;
 
-    /// <summary>Handoff alias for <see cref="CancelCommand"/>.</summary>
-    public IRelayCommand CancelEditCommand => CancelCommand;
-
     private bool IsNewProfile => EditingProfile is { } p && Profiles.All(x => x.Id != p.Id);
 
     /// <summary>Gets whether the Save button should show: a never-saved profile, or unsaved edits.</summary>

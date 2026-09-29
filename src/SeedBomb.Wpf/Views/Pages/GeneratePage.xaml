@@ -186,7 +186,7 @@
                                        Text="{Binding ProfileSummaryLine}" Margin="0,2,0,12" />
                             <StackPanel Orientation="Horizontal">
                                 <Button Style="{DynamicResource DG.Button}"
-                                        Command="{Binding ChangeProfileCommand}"
+                                        Command="{Binding OpenProfilesCommand}"
                                         Content="Change profile" Margin="0,0,8,0" />
                                 <Button Style="{DynamicResource DG.Button}"
                                         Command="{Binding EditRulesCommand}"

@@ -74,12 +74,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private bool CanSignIn() => _connectionManager is not { IsSwitchingConnection: true };
 
-    /// <summary>Handoff alias for <see cref="OrgHost"/>.</summary>
-    public string EnvironmentHost => OrgHost;
-
-    /// <summary>Handoff alias that navigates to Connections rather than opening a drawer.</summary>
-    public IRelayCommand OpenConnectionsCommand => OpenConnectionManagerCommand;
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowSignInOverlay))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
@@ -111,10 +105,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UserInitials))]
     [NotifyPropertyChangedFor(nameof(OrgHost))]
-    [NotifyPropertyChangedFor(nameof(EnvironmentHost))]
     private string _userDisplayName = "User";
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OrgHost))] [NotifyPropertyChangedFor(nameof(EnvironmentHost))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(OrgHost))]
     private string _orgUrl = string.Empty;
 
     /// <summary>Gets initials for the signed-in user avatar.</summary>

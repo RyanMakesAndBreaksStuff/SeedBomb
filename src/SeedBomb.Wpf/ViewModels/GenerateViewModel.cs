@@ -316,9 +316,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// </summary>
     public int DraftRuleCount => _fieldRules?.GetRules().Sum(t => t.Value.Count) ?? 0;
 
-    /// <summary>Handoff alias used by the mock Change profile button.</summary>
-    public IRelayCommand ChangeProfileCommand => OpenProfilesCommand;
-
     /// <summary>Sum of per-table record counts.</summary>
     public int PlannedTotal
     {

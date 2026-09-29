@@ -13,7 +13,7 @@
             <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
                     BorderThickness="0,0,0,1" Padding="12">
                 <StackPanel>
-                    <ui:TextBox Text="{Binding ColumnFilter, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                 PlaceholderText="Filter columns"
                                 Icon="{ui:SymbolIcon Search24}" />
                     <ItemsControl ItemsSource="{Binding ColumnFilterModes}" Margin="0,9,0,0">

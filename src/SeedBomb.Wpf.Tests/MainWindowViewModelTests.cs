@@ -18,29 +18,6 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void EnvironmentHostIsOrgHostAlias()
-    {
-        var vm = new MainWindowViewModel();
-        string? last = null;
-        vm.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(vm.EnvironmentHost))
-                last = vm.EnvironmentHost;
-        };
-        vm.OrgUrl = "https://contoso-dev.crm.dynamics.com/";
-        Assert.Equal("contoso-dev.crm.dynamics.com", vm.OrgHost);
-        Assert.Equal(vm.OrgHost, vm.EnvironmentHost);
-        Assert.Equal(vm.OrgHost, last);
-    }
-
-    [Fact]
-    public void OpenConnectionsCommandIsOpenConnectionManagerCommand()
-    {
-        var vm = new MainWindowViewModel();
-        Assert.Same(vm.OpenConnectionManagerCommand, vm.OpenConnectionsCommand);
-    }
-
-    [Fact]
     public async Task HasConnection_FollowsTheProfileCount()
     {
         var (vm, store) = await MainWindowViewModelWithProfilesAsync(count: 1);

@@ -56,7 +56,7 @@
                        Style="{DynamicResource DG.Secondary}"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"
-                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisible}}" />
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}" />
 
             <Border Style="{DynamicResource DG.CardBorder}"
                     Visibility="{Binding IsEmpty, Converter={StaticResource InverseBoolToVisible}}">

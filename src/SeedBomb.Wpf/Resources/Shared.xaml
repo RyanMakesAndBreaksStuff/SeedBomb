@@ -4,8 +4,7 @@
                     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                     xmlns:converters="clr-namespace:SeedBomb.Converters">
 
-    <!-- Value converters. Dual keys: existing views + handoff views. -->
-    <BooleanToVisibilityConverter x:Key="BoolToVisible" />
+    <!-- Value converters. -->
     <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisible" />
     <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />

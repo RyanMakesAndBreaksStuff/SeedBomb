@@ -147,32 +147,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _preview.Changed += OnPreviewChanged;
     }
 
-    // ── Handoff aliases (lock 22) ────────────────────────────────────────────
-
-    /// <summary>Handoff alias for <see cref="SearchText"/>.</summary>
-    public string ColumnFilter
-    {
-        get => SearchText;
-        set => SearchText = value;
-    }
-
-    /// <summary>Handoff alias for <see cref="SelectedOp"/>.</summary>
-    public string SelectedOperation
-    {
-        get => SelectedOp;
-        set => SelectedOp = value;
-    }
-
-    /// <summary>Handoff alias for <see cref="Template"/>.</summary>
-    public string TemplateExpression
-    {
-        get => Template;
-        set => Template = value;
-    }
-
-    /// <summary>True when the selected op is <c>pattern</c> — shows the template block.</summary>
-    public bool IsTemplateOperation => SelectedOp == "pattern";
-
     /// <summary>True when the selected column is a lookup or customer attribute.</summary>
     public bool IsLookupColumn =>
         SelectedColumn is not null
@@ -182,10 +156,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     /// <summary>True when constant/one-of identity editing is shown for a lookup column.</summary>
     public bool IsLookupValueOperation =>
         IsLookupColumn && SelectedOp is "constant" or "oneOf";
-
-    /// <summary>True when the lookup-random explanation is shown.</summary>
-    public bool IsLookupRandomOperation =>
-        IsLookupColumn && SelectedOp == "lookupRandom";
 
     /// <summary>Run-time-only copy for lookupRandom preview. Interpolates the shared candidate bound.</summary>
     public string LookupRandomExplanation =>
@@ -250,7 +220,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     partial void OnSearchTextChanged(string value)
     {
-        OnPropertyChanged(nameof(ColumnFilter));
         OnPropertyChanged(nameof(SettableColumns));
         OnPropertyChanged(nameof(ExcludedColumns));
         ColumnsView?.Refresh();
@@ -347,8 +316,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     partial void OnSelectedOpChanged(string value)
     {
         CancelPicker();
-        OnPropertyChanged(nameof(SelectedOperation));
-        OnPropertyChanged(nameof(IsTemplateOperation));
         NotifyLookupPresentation();
         if (_suppressDraftLoad)
             return;
@@ -432,11 +399,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
 
     [ObservableProperty] private string _template = string.Empty;
 
-    partial void OnTemplateChanged(string value)
-    {
-        OnPropertyChanged(nameof(TemplateExpression));
-        Revalidate();
-    }
+    partial void OnTemplateChanged(string value) => Revalidate();
 
     [ObservableProperty] private string _minText = string.Empty;
     partial void OnMinTextChanged(string value) => Revalidate();
@@ -1483,7 +1446,6 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     {
         OnPropertyChanged(nameof(IsLookupColumn));
         OnPropertyChanged(nameof(IsLookupValueOperation));
-        OnPropertyChanged(nameof(IsLookupRandomOperation));
         PickLookupRecordsCommand.NotifyCanExecuteChanged();
     }
 

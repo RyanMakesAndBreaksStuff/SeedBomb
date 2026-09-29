@@ -117,9 +117,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     public string SchemaValidationCaption =>
         $"Validated against schema v{Profile.CurrentProfileVersion} and this environment's live metadata. Results are applied visually — nothing here is editable text.";
 
-    /// <summary>Alias for <see cref="ImportFromFileCommand"/> (page header binding).</summary>
-    public IRelayCommand ImportCommand => ImportFromFileCommand;
-
     /// <summary>Flattened rules of the selected profile.</summary>
     public ObservableCollection<ProfileRuleRow> SelectedProfileRules { get; } = [];
 

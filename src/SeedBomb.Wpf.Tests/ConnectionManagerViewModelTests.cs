@@ -219,16 +219,6 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
     }
 
     [Fact]
-    public void CancelEditCommandIsCancelCommand()
-    {
-        var vm = new ConnectionManagerViewModel(
-            Mock.Of<IConnectionProfileService>(),
-            Mock.Of<IAuthService>(),
-            Mock.Of<IDataverseConnectionService>());
-        Assert.Same(vm.CancelCommand, vm.CancelEditCommand);
-    }
-
-    [Fact]
     public async Task DeleteProfileAsync_LeavesProfilesEmpty_WhenLastProfileRemoved()
     {
         var stored = new List<ConnectionProfile>

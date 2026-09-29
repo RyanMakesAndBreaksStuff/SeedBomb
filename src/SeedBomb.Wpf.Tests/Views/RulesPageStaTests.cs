@@ -231,7 +231,7 @@ public sealed class RulesPageStaTests : IDisposable
         var (page, vm) = LoadRulesPageForProfileOnSta();
         var box = FindVisualChildren<UiTextBox>(page).Single(t => t.PlaceholderText == "Filter columns");
 
-        vm.ColumnFilter = "naren";
+        vm.SearchText = "naren";
         page.UpdateLayout();
         Flush();
 

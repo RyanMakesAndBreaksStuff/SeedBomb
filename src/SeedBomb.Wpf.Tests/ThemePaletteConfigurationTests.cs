@@ -50,7 +50,7 @@ public sealed class ThemePaletteConfigurationTests
         "DG.SuccessSoft", "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
         "DG.Pad.RowTall", "DG.Size.NavPane", "DG.PrimaryButton", "DG.Cell", "DG.CheckBox",
         "DG.ComboBox", "DG.ComboBoxItem", "DG.ToggleButton",
-        "BoolToVisible", "BoolToVisibilityConverter",
+        "BoolToVisibilityConverter",
         "DG.Energy", "DG.Focus", "DG.SelectionIndicator",
         "DG.Series1", "DG.Series2", "DG.Series3", "DG.Series4", "DG.Series5",
         "DG.RunSweep",
@@ -114,6 +114,7 @@ public sealed class ThemePaletteConfigurationTests
         Assert.DoesNotContain("#A79CF1", shared, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("x:Key=\"InverseBoolToVisible\"", shared, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"EqualityToBoolConverter\"", shared, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Key=\"BoolToVisible\"", shared, StringComparison.Ordinal);
         foreach (var key in RequiredSharedKeys)
             Assert.Contains($"x:Key=\"{key}\"", shared, StringComparison.Ordinal);
         Assert.DoesNotContain("#3E6FA8", shared, StringComparison.OrdinalIgnoreCase);
