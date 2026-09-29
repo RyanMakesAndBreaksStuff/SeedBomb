@@ -66,6 +66,7 @@ public sealed partial class RunViewModel : ObservableObject
     private int _plannedTotal;
     private int _seed;
     private string _environmentHost = "";
+    private RunViewModel _summaryView;
 
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
     internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
@@ -97,14 +98,18 @@ public sealed partial class RunViewModel : ObservableObject
         _snackbar = snackbar;
         _logger = logger;
         _auth = auth;
-        SummaryView = this;
+        _summaryView = this;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
 
     /// <summary>What <see cref="RunSummaryPage"/> shows: this live run, or a detached copy of a historical run.</summary>
-    public RunViewModel SummaryView { get; private set; }
+    public RunViewModel SummaryView
+    {
+        get => _summaryView;
+        private set => SetProperty(ref _summaryView, value);
+    }
 
     /// <summary>Host of the environment the last run targeted, e.g. <c>contoso.crm.dynamics.com</c>.</summary>
     public string EnvironmentLabel => _environmentHost;

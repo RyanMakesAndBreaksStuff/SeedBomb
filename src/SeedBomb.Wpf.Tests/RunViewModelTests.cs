@@ -459,4 +459,21 @@ public sealed class RunViewModelTests
 
         Assert.Equal("Cancelling…", vm.StatusHeadline);
     }
+
+    [Fact]
+    public void StartRun_AfterViewingAHistoricalRun_NotifiesSummaryView()
+    {
+        // IN-008: re-navigating to the summary page already on screen is a no-op in WPF-UI, so
+        // the page must learn about the swap back to the live run from this notification.
+        var vm = new RunViewModel();
+        vm.ShowHistorical(new RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["contact"], 3,
+            TimeSpan.FromSeconds(2), true, 0));
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.StartRun("contoso-dev", 42, 1, ["account"]);
+
+        Assert.Same(vm, vm.SummaryView);
+        Assert.Contains(nameof(RunViewModel.SummaryView), raised);
+    }
 }
