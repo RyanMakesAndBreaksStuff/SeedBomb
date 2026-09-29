@@ -320,8 +320,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     {
         if (IsBoardDirty?.Invoke() == true)
         {
-            var ok = ConfirmOverwrite?.Invoke(
-                "The rules board has unsaved changes. Load this profile and overwrite the draft?") ?? true;
+            var ok = await ConfirmOverwriteAsync(
+                "The rules board has unsaved changes. Load this profile and overwrite the draft?");
             if (!ok) return false;
         }
 
@@ -442,7 +442,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             {
                 // WR-014: importing over a same-name profile is a real overwrite — ask, the same
                 // way Load already asks before replacing a dirty board.
-                var ok = ConfirmOverwrite?.Invoke(conflict["conflict:".Length..].Trim()) ?? false;
+                var ok = await ConfirmOverwriteAsync(conflict["conflict:".Length..].Trim());
                 if (!ok) return;
                 (profile, error) = await _profiles.ImportAsync(sourcePath, ct, allowOverwrite: true);
             }
@@ -671,6 +671,15 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     private async Task<string?> AskNameAsync(string suggested) =>
         _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
+
+    // WR-020: the themed dialog is the production path; the seam stays for tests.
+    private async Task<bool> ConfirmOverwriteAsync(string message)
+    {
+        if (ConfirmOverwrite is not null)
+            return ConfirmOverwrite(message);
+        return _dialogs is not null
+            && await _dialogs.ConfirmAsync("Load profile", message, "Overwrite");
+    }
 
     private async Task<bool> ConfirmDeleteAsync(string name)
     {

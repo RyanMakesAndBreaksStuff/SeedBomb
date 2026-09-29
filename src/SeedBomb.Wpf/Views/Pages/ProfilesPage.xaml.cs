@@ -43,11 +43,6 @@ public partial class ProfilesPage : Page, INavigableView<ProfilesViewModel>
         viewModel.CaptureCurrent ??= generate.BuildProfileSnapshot;
         viewModel.IsBoardDirty ??= generate.IsBoardDirty;
         viewModel.RulesSaved ??= generate.ApplySavedProfileIfActive;
-        viewModel.ConfirmOverwrite ??= msg => MessageBox.Show(
-            msg, "Load profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
-        viewModel.ConfirmDelete ??= name => MessageBox.Show(
-            $"Delete profile '{name}'? This cannot be undone.",
-            "Delete profile", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
         viewModel.ProfileApplied += OnProfileApplied;
         Unloaded += (_, _) => viewModel.ProfileApplied -= OnProfileApplied;

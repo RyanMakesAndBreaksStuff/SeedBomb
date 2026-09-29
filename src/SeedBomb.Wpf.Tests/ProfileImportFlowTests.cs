@@ -10,8 +10,11 @@ using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
 using SeedBomb.ViewModels.Controls;
+using SeedBomb.Wpf.Tests.Views;
 using System.Text.Json;
+using System.Windows.Threading;
 using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -538,6 +541,51 @@ public sealed class ProfileImportFlowTests : IDisposable
         await vm.ImportFromPathAsync(await WriteSourceAsync(HandTooledProfileJson), TestContext.Current.CancellationToken);
 
         Assert.Null(vm.PendingImport);
+    }
+
+    [StaFact]
+    public void Dirty_board_import_asks_through_the_themed_dialog()
+    {
+        // WR-020: with ProfilesPage's MessageBox override gone and no seam wired, a dirty board
+        // must still be confirmed, not overwritten silently.
+        // ConfirmAsync builds a ContentDialog after the import's file awaits. StaFact starts on
+        // an STA thread but does not pump one, so keep those continuations here.
+        if (SynchronizationContext.Current is null)
+            SynchronizationContext.SetSynchronizationContext(
+                new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+
+        var dialogs = new Mock<IContentDialogService>();
+        dialogs.Setup(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ContentDialogResult.None);
+        var vm = new ProfilesViewModel(NewService(out _), dialogs: dialogs.Object)
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+            IsBoardDirty = () => true,
+        };
+
+        var write = WriteSourceAsync(HandTooledProfileJson);
+        Wait(write);
+        var import = vm.ImportFromPathAsync(write.GetAwaiter().GetResult(), TestContext.Current.CancellationToken);
+        Wait(import);
+
+        dialogs.Verify(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Null(vm.PendingImport);
+
+        static void Wait(Task task)
+        {
+            if (!task.IsCompleted)
+            {
+                var frame = new DispatcherFrame();
+                task.ContinueWith(
+                    _ => frame.Continue = false,
+                    CancellationToken.None,
+                    TaskContinuationOptions.None,
+                    TaskScheduler.FromCurrentSynchronizationContext());
+                Dispatcher.PushFrame(frame);
+            }
+
+            task.GetAwaiter().GetResult();
+        }
     }
 
     [Fact]
