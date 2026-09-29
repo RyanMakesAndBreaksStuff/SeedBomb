@@ -216,6 +216,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         // Secrets are fetched per-profile via GetSecretAsync so at most one plaintext copy
         // exists at a time; the singleton ConnectionManagerViewModel holds none.
         ClientSecret = null,
+        HasSavedSecret = !string.IsNullOrEmpty(d.EncryptedClientSecret),
         CertificateThumbprint = d.CertificateThumbprint,
         HomeAccountId = d.HomeAccountId,
     };

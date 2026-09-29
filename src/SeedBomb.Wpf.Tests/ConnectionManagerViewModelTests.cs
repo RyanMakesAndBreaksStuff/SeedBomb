@@ -149,31 +149,30 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task EditProfile_ClonesCertificateThumbprintAndClientSecret()
+    public void EditProfile_ClonesFieldsButLeavesTheSavedSecretEncrypted()
     {
         var stored = new ConnectionProfile
         {
-            Name = "cert",
+            Name = "app",
             EnvironmentUrl = "https://c.crm.dynamics.com",
             ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
-            AuthType = AuthType.Certificate,
+            AuthType = AuthType.ClientSecret,
             CertificateThumbprint = "ABC123",
-            ClientSecret = "s3cret",
+            HasSavedSecret = true,
         };
         var profiles = new Mock<IConnectionProfileService>();
-        profiles.Setup(p => p.GetSecretAsync(stored.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync("s3cret");
         var vm = new ConnectionManagerViewModel(
             profiles.Object,
             Mock.Of<IAuthService>(),
             Mock.Of<IDataverseConnectionService>());
 
-        await vm.EditProfileCommand.ExecuteAsync(stored);
+        vm.EditProfileCommand.Execute(stored);
 
         Assert.NotSame(stored, vm.EditingProfile);
-        Assert.Equal(AuthType.Certificate, vm.EditingProfile!.AuthType);
-        Assert.Equal("ABC123", vm.EditingProfile.CertificateThumbprint);
-        Assert.Equal("s3cret", vm.EditingProfile.ClientSecret);
+        Assert.Equal("ABC123", vm.EditingProfile!.CertificateThumbprint);
+        Assert.Null(vm.EditingProfile.ClientSecret);
+        Assert.True(vm.SaveProfileCommand.CanExecute(null)); // the saved secret satisfies the check
+        profiles.Verify(p => p.GetSecretAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -542,7 +541,9 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
 
         var all = await svc.GetAllAsync(ct);
 
-        Assert.Null(Assert.Single(all).ClientSecret);
+        var listed = Assert.Single(all);
+        Assert.Null(listed.ClientSecret);
+        Assert.True(listed.HasSavedSecret);
         Assert.Equal("s3cret", await svc.GetSecretAsync(id, ct));
     }
 
@@ -604,29 +605,6 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         };
         await svc.SaveAsync(profile, TestContext.Current.CancellationToken);
         return (svc, profile.Id);
-    }
-
-    [Fact]
-    public async Task EditProfileAsync_ReportsSwitchError_WhenSecretCannotBeDecrypted()
-    {
-        var profiles = new Mock<IConnectionProfileService>();
-        profiles.Setup(p => p.GetSecretAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new System.Security.Cryptography.CryptographicException("Key not valid for use in specified state."));
-
-        var vm = new ConnectionManagerViewModel(
-            profiles.Object, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
-
-        var profile = new ConnectionProfile
-        {
-            Name = "Dev",
-            EnvironmentUrl = "https://org.crm.dynamics.com",
-            AuthType = AuthType.ClientSecret,
-        };
-
-        await vm.EditProfileCommand.ExecuteAsync(profile);
-
-        Assert.Contains("Key not valid", vm.SwitchError, StringComparison.Ordinal);
-        Assert.False(vm.IsEditing);
     }
 
     [Fact]
