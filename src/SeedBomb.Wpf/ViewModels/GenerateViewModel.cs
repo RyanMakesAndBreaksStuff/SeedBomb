@@ -233,14 +233,14 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private Dictionary<string, Dictionary<string, FieldRule>>? _reviewedRules;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ReviewErrorSummary))]
-    private IReadOnlyList<RuleMessage> _reviewMessages = [];
-
-    [ObservableProperty]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ReviewErrorSummary), nameof(ReviewHasErrors))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
-    private bool _reviewHasErrors;
+    private IReadOnlyList<RuleMessage> _reviewMessages = [];
+
+    /// <summary>Computed from <see cref="ReviewMessages"/> — true when any reviewed message is Error-severity.</summary>
+    public bool ReviewHasErrors => ReviewMessages.Any(m => m.Severity == RuleMessageSeverity.Error);
 
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     private long? _reviewedDraftRevision;
@@ -496,7 +496,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     {
         ReviewedRules = null;
         ReviewMessages = [];
-        ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
         OnPropertyChanged(nameof(DraftRuleCount));
@@ -525,7 +524,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         CurrentStep = 0;
         ReviewedRules = null;
         ReviewMessages = [];
-        ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
     }
@@ -586,7 +584,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         var reviewed = new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
         var messages = new List<RuleMessage>();
         var previewRows = new List<ReviewPreviewRow>();
-        var hasErrors = false;
 
         foreach (var (table, columns) in draft)
         {
@@ -594,7 +591,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             {
                 messages.Add(new RuleMessage(RuleMessageSeverity.Error,
                     $"Metadata for '{table}' is unavailable — its rules were not reviewed."));
-                hasErrors = true;
                 continue;
             }
 
@@ -609,15 +605,12 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 {
                     messages.Add(new RuleMessage(RuleMessageSeverity.Error,
                         $"Column '{column}' was not found on '{table}'."));
-                    hasErrors = true;
                     continue;
                 }
 
                 var result = RuleValidator.Validate(
                     rule, attr, new RuleValidationContext(table, recordCount, RunId));
                 messages.AddRange(result.Messages);
-                if (result.Messages.Any(m => m.Severity == RuleMessageSeverity.Error))
-                    hasErrors = true;
                 if (result.IsValid && result.EffectiveRule is not null)
                 {
                     try
@@ -661,7 +654,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                         // — surface it as a Review error instead of crashing the wizard.
                         messages.Add(new RuleMessage(RuleMessageSeverity.Error,
                             $"'{table}.{column}': {ex.Message}"));
-                        hasErrors = true;
                     }
                 }
             }
@@ -672,7 +664,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
         ReviewedRules = reviewed;
         ReviewMessages = messages;
-        ReviewHasErrors = hasErrors;
         ReviewedDraftRevision = _fieldRules.Revision;
         ReviewPreviewRows = previewRows;
         if (CurrentStep < 2) CurrentStep = 2;
@@ -788,7 +779,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         CurrentStep = 0;
         ReviewedRules = null;
         ReviewMessages = [];
-        ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
         RunId = "";

@@ -146,6 +146,18 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public void ReviewHasErrors_FollowsReviewMessages()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+
+        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Error, "boom")];
+        Assert.True(viewModel.ReviewHasErrors);
+
+        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Warning, "heads up")];
+        Assert.False(viewModel.ReviewHasErrors);
+    }
+
+    [Fact]
     public async Task PreflightErrorsBlockStart()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
