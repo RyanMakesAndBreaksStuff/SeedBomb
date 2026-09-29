@@ -209,9 +209,10 @@ public partial class App : Application
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
         sc.AddSingleton<SeedBomb.Bulk.ThrottlePolicy>();
         sc.AddTransient<ILookupRecordSource, LookupRecordSource>();
-        sc.AddTransient<LookupRecordPickerViewModel>();
+        // IN-005: ActivatorUtilities instances are not tracked by the (root) provider, so the
+        // picker's `using` is their only owner instead of the container pinning each until exit.
         sc.AddTransient<Func<LookupRecordPickerViewModel>>(sp =>
-            () => sp.GetRequiredService<LookupRecordPickerViewModel>());
+            () => ActivatorUtilities.CreateInstance<LookupRecordPickerViewModel>(sp));
         sc.AddTransient<ILookupRecordPicker, LookupRecordPickerService>();
         sc.AddSingleton<GenerationPipeline>();
         sc.AddSingleton<IRunHistoryService, JsonRunHistoryService>();
