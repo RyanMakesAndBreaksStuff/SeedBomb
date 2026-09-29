@@ -32,27 +32,25 @@ public sealed class ThemePaletteConfigurationTests
     private static readonly string[] RequiredApplyKeys =
     [
         "DG.Bg", "DG.TitleBar", "DG.Surface1", "DG.Card", "DG.CodeSurface",
-        "DG.Accent", "DG.AccentHover", "DG.AccentLight", "DG.OnAccent",
-        "DG.Success", "DG.Warning", "DG.Error", "DG.Info",
-        "DG.SuccessSoft", "DG.WarningSoft", "DG.ErrorSoft", "DG.InfoSoft",
+        "DG.Accent", "DG.AccentHover", "DG.OnAccent",
+        "DG.Success", "DG.Warning", "DG.Error",
+        "DG.WarningSoft", "DG.ErrorSoft",
         "AccentBrush",
         "AccentFillColorDefaultBrush",
         "SystemAccentColorBrush",
         "SystemFillColorSuccessBackgroundBrush",
-        "DG.Energy", "DG.Focus", "DG.SelectionIndicator",
-        "DG.Series1", "DG.Series2", "DG.Series3", "DG.Series4", "DG.Series5",
+        "DG.SelectionIndicator",
         "DG.RunSweep",
     ];
 
     private static readonly string[] RequiredSharedKeys =
     [
-        "DG.TitleBar", "DG.OnAccent", "DG.AccentLight", "DG.Info", "DG.InfoSoft",
-        "DG.SuccessSoft", "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
+        "DG.TitleBar", "DG.OnAccent",
+        "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
         "DG.Pad.RowTall", "DG.Size.NavPane", "DG.PrimaryButton", "DG.Cell", "DG.CheckBox",
         "DG.ComboBox", "DG.ComboBoxItem", "DG.ToggleButton",
         "BoolToVisibilityConverter",
-        "DG.Energy", "DG.Focus", "DG.SelectionIndicator",
-        "DG.Series1", "DG.Series2", "DG.Series3", "DG.Series4", "DG.Series5",
+        "DG.SelectionIndicator",
         "DG.RunSweep",
     ];
 
@@ -78,12 +76,8 @@ public sealed class ThemePaletteConfigurationTests
         Assert.Contains("kiln", manager, StringComparison.Ordinal);
         Assert.Contains("0xBADD52", manager, StringComparison.OrdinalIgnoreCase);   // Kiln dark accent
         Assert.Contains("0x262420", manager, StringComparison.OrdinalIgnoreCase);   // Kiln light accent
-        Assert.Contains("DG.Energy", manager, StringComparison.Ordinal);
         Assert.Contains("DG.SelectionIndicator", manager, StringComparison.Ordinal);
-        Assert.Contains("DG.Series1", manager, StringComparison.Ordinal);
-        Assert.Contains("DG.Focus", manager, StringComparison.Ordinal);
         Assert.Contains("DG.RunSweep", manager, StringComparison.Ordinal);
-        Assert.Contains("DG.AccentLight", manager, StringComparison.Ordinal);
 
         foreach (var id in RetiredPaletteIds)
             Assert.DoesNotContain($"[\"{id}\"]", manager, StringComparison.Ordinal);

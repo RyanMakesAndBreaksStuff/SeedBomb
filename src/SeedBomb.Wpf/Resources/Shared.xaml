@@ -28,7 +28,6 @@
     <SolidColorBrush x:Key="DG.Border" Color="#2E2C28" />
     <SolidColorBrush x:Key="DG.BorderStrong" Color="#57534A" />
     <SolidColorBrush x:Key="DG.Divider" Color="#262421" />
-    <SolidColorBrush x:Key="DG.Focus" Color="#BADD52" />
     <SolidColorBrush x:Key="DG.ControlFill" Color="#2A2825" />
     <SolidColorBrush x:Key="DG.ControlBorder" Color="#3D3A34" />
     <SolidColorBrush x:Key="DG.ControlHover" Color="#35322D" />
@@ -53,11 +52,9 @@
     <SolidColorBrush x:Key="DG.AccentSoftBorder" Color="#3E4A18" />
     <SolidColorBrush x:Key="DG.AccentChip" Color="#48541F" />
     <SolidColorBrush x:Key="DG.AccentChipBorder" Color="#637629" />
-    <SolidColorBrush x:Key="DG.AccentLight" Color="#C9E76F" />
     <SolidColorBrush x:Key="DG.SelectionIndicator" Color="#BADD52" />
 
     <SolidColorBrush x:Key="DG.Success" Color="#5BD08D" />
-    <SolidColorBrush x:Key="DG.SuccessSoft" Color="#14251C" />
     <SolidColorBrush x:Key="DG.Warning" Color="#E8B04B" />
     <SolidColorBrush x:Key="DG.WarningSoft" Color="#2C2313" />
     <SolidColorBrush x:Key="DG.WarningBorder" Color="#59E8B04B" />
@@ -65,16 +62,6 @@
     <SolidColorBrush x:Key="DG.Error" Color="#FF8E80" />
     <SolidColorBrush x:Key="DG.ErrorSoft" Color="#2E1815" />
     <SolidColorBrush x:Key="DG.ErrorBorder" Color="#63302A" />
-    <SolidColorBrush x:Key="DG.Info" Color="#BADD52" />
-    <SolidColorBrush x:Key="DG.InfoSoft" Color="#24290F" />
-
-    <!-- Energy & series. Series brushes are published for future per-table charts. -->
-    <SolidColorBrush x:Key="DG.Energy" Color="#9DCB1F" />
-    <SolidColorBrush x:Key="DG.Series1" Color="#D8D3C8" />
-    <SolidColorBrush x:Key="DG.Series2" Color="#BADD52" />
-    <SolidColorBrush x:Key="DG.Series3" Color="#E0965A" />
-    <SolidColorBrush x:Key="DG.Series4" Color="#6FB4D6" />
-    <SolidColorBrush x:Key="DG.Series5" Color="#D291C4" />
 
     <!-- Signature run sweep: Accent → Energy. Rebuilt per palette in DesignThemeManager.Apply. -->
     <LinearGradientBrush x:Key="DG.RunSweep" StartPoint="0,0" EndPoint="1,1">
@@ -232,18 +219,6 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="{DynamicResource DG.Radius.Card}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
-    </Style>
-
-    <Style TargetType="{x:Type ui:Card}">
-        <Setter Property="Background" Value="{DynamicResource DG.Card}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource DG.Border}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="{DynamicResource DG.Pad.Card}" />
-    </Style>
-
-    <Style TargetType="Page">
-        <Setter Property="Background" Value="{DynamicResource DG.Bg}" />
-        <Setter Property="FontFamily" Value="{DynamicResource DG.Font}" />
     </Style>
 
     <!-- Primary (accent) button — one per screen, maximum. -->

@@ -124,10 +124,6 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- Selection anchor for the swatch comparison above. -->
-                        <TextBlock x:Name="PaletteSelection" Text="{Binding PaletteId}"
-                                   Visibility="Collapsed" />
-
                         <Border BorderBrush="{DynamicResource DG.Divider}" BorderThickness="0,1,0,0"
                                 Margin="0,18,0,0" Padding="0,16,0,0">
                             <StackPanel>

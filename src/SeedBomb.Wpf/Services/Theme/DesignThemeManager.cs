@@ -104,7 +104,6 @@ public static class DesignThemeManager
         r.Set("DG.Border", p.Border);
         r.Set("DG.BorderStrong", p.BorderStrong);
         r.Set("DG.Divider", p.Divider);
-        r.Set("DG.Focus", p.Focus);
 
         // --- Controls ---------------------------------------------------
         r.Set("DG.ControlFill", p.ControlFill);
@@ -126,7 +125,6 @@ public static class DesignThemeManager
         // --- Accent -----------------------------------------------------
         r.Set("DG.Accent", p.Accent);
         r.Set("DG.AccentHover", p.AccentHover);
-        r.Set("DG.AccentLight", p.AccentHover);
         r.Set("DG.AccentPressed", p.AccentPressed);
         r.Set("DG.OnAccent", p.OnAccent);
         r.Set("DG.AccentText", p.AccentText);
@@ -138,7 +136,6 @@ public static class DesignThemeManager
 
         // --- Status -----------------------------------------------------
         r.Set("DG.Success", p.Success);
-        r.Set("DG.SuccessSoft", p.SuccessSoft);
         r.Set("DG.Warning", p.Warning);
         r.Set("DG.WarningSoft", p.WarningSoft);
         r.Set("DG.WarningBorder", p.WarningBorder);
@@ -146,16 +143,8 @@ public static class DesignThemeManager
         r.Set("DG.Error", p.Error);
         r.Set("DG.ErrorSoft", p.ErrorSoft);
         r.Set("DG.ErrorBorder", p.ErrorBorder);
-        r.Set("DG.Info", p.Info);
-        r.Set("DG.InfoSoft", p.InfoSoft);
 
         // --- Energy & series --------------------------------------------
-        r.Set("DG.Energy", p.Energy);
-        r.Set("DG.Series1", p.Series1);
-        r.Set("DG.Series2", p.Series2);
-        r.Set("DG.Series3", p.Series3);
-        r.Set("DG.Series4", p.Series4);
-        r.Set("DG.Series5", p.Series5);
         r.SetSweep("DG.RunSweep", p.Accent, p.Energy);
 
         // --- Legacy key retained for existing references -----------------
@@ -265,9 +254,7 @@ public static class DesignThemeManager
             Success: text, SuccessSoft: window, Warning: text, WarningSoft: window,
             WarningBorder: text, WarningText: text,
             Error: text, ErrorSoft: window, ErrorBorder: text,
-            Info: text, InfoSoft: window,
-            Energy: highlight,
-            Series1: text, Series2: text, Series3: text, Series4: text, Series5: text);
+            Energy: highlight);
     }
 
     private static Color FromRgb(uint rgb) =>
@@ -305,8 +292,7 @@ public static class DesignThemeManager
         uint successText, uint successTint,
         uint dangerText, uint dangerTint, uint dangerStroke,
         uint warningText, uint warningTint,
-        uint energyFill, uint progressTrack,
-        uint s1, uint s2, uint s3, uint s4, uint s5)
+        uint energyFill, uint progressTrack)
     {
         var white = Color.FromRgb(0xFF, 0xFF, 0xFF);
         var black = Color.FromRgb(0x00, 0x00, 0x00);
@@ -367,12 +353,7 @@ public static class DesignThemeManager
             Error: FromRgb(dangerText),
             ErrorSoft: FromRgb(dangerTint),
             ErrorBorder: FromRgb(dangerStroke),
-            // Neither sheet ships an info hue — both draw the info banner in accent tint.
-            Info: accentC,
-            InfoSoft: tintC,
-            Energy: FromRgb(energyFill),
-            Series1: FromRgb(s1), Series2: FromRgb(s2), Series3: FromRgb(s3),
-            Series4: FromRgb(s4), Series5: FromRgb(s5));
+            Energy: FromRgb(energyFill));
     }
 
     private static readonly IReadOnlyDictionary<string, (Palette Light, Palette Dark)> Palettes =
@@ -395,8 +376,7 @@ public static class DesignThemeManager
                     successText: 0x1F7A4D, successTint: 0xE4F4EA,
                     dangerText: 0xB3261E, dangerTint: 0xFBEAE7, dangerStroke: 0xEFC0B8,
                     warningText: 0x92610A, warningTint: 0xFBF0D8,
-                    energyFill: 0x5F7F0B, progressTrack: 0xE7E4DA,
-                    s1: 0x262420, s2: 0x5F7F0B, s3: 0xA85C1E, s4: 0x2B5F7A, s5: 0x7A3D6B),
+                    energyFill: 0x5F7F0B, progressTrack: 0xE7E4DA),
                 BuildPalette(true,
                     canvasBg: 0x121110, pageBg: 0x191816, cardBg: 0x201F1C, subtleBg: 0x2A2825,
                     insetBg: 0x0E0D0C, scrimBg: 0x99000000,
@@ -410,8 +390,7 @@ public static class DesignThemeManager
                     successText: 0x5BD08D, successTint: 0x14251C,
                     dangerText: 0xFF8E80, dangerTint: 0x2E1815, dangerStroke: 0x63302A,
                     warningText: 0xE8B04B, warningTint: 0x2C2313,
-                    energyFill: 0x9DCB1F, progressTrack: 0x33302B,
-                    s1: 0xD8D3C8, s2: 0xBADD52, s3: 0xE0965A, s4: 0x6FB4D6, s5: 0xD291C4)),
+                    energyFill: 0x9DCB1F, progressTrack: 0x33302B)),
 
             // Indigo-and-orange. Same token structure, cooler chrome; the alternate for
             // anyone who does not want the charcoal sheet.
@@ -429,8 +408,7 @@ public static class DesignThemeManager
                     successText: 0x0F7A4A, successTint: 0xE3F6EC,
                     dangerText: 0xC4302A, dangerTint: 0xFDECEA, dangerStroke: 0xF3B7B2,
                     warningText: 0x8A5B00, warningTint: 0xFDF3DF,
-                    energyFill: 0xEF6A12, progressTrack: 0xDFE3EF,
-                    s1: 0x4B5BE0, s2: 0xEF6A12, s3: 0x0E8A8A, s4: 0x8B47D6, s5: 0xC79100),
+                    energyFill: 0xEF6A12, progressTrack: 0xDFE3EF),
                 BuildPalette(true,
                     canvasBg: 0x121419, pageBg: 0x171A21, cardBg: 0x1E212A, subtleBg: 0x262A35,
                     insetBg: 0x101217, scrimBg: 0x99000000,
@@ -444,8 +422,7 @@ public static class DesignThemeManager
                     successText: 0x4FCF90, successTint: 0x13281F,
                     dangerText: 0xFF9A90, dangerTint: 0x331A19, dangerStroke: 0x6E2B27,
                     warningText: 0xE9B45A, warningTint: 0x2E2415,
-                    energyFill: 0xFF9351, progressTrack: 0x2E3340,
-                    s1: 0x8E9BFF, s2: 0xFF9351, s3: 0x3FC7C7, s4: 0xBE8CF5, s5: 0xE8B84B)),
+                    energyFill: 0xFF9351, progressTrack: 0x2E3340)),
         };
 
     private sealed record Palette(
@@ -492,12 +469,5 @@ public static class DesignThemeManager
         Color Error,
         Color ErrorSoft,
         Color ErrorBorder,
-        Color Info,
-        Color InfoSoft,
-        Color Energy,
-        Color Series1,
-        Color Series2,
-        Color Series3,
-        Color Series4,
-        Color Series5);
+        Color Energy);
 }
