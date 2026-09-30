@@ -1,0 +1,33 @@
+@inherits LayoutComponentBase
+@using SeedBomb.Web.Theme
+
+<MudThemeProvider Theme="@AppTheme.Aurora" IsDarkMode="true" />
+<MudLayout>
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+
+    <MudAppBar Elevation="0" Style="background: #030C0A !important; border-bottom: 1px solid #181E2E; height: 52px;">
+        <div class="appbar-left">
+            <div class="appbar-square"></div>
+            <span class="appbar-brand">DATAVERSE DATA SEEDER</span>
+        </div>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <span class="appbar-user">@context.User.Identity?.Name</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                               Href="/MicrosoftIdentity/Account/SignOut?post_logout_redirect_uri=/"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               Style="color: #3A7848;" />
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+
+    <MudMainContent Style="background: #030C0A; min-height: calc(100vh - 52px);">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
