@@ -10,9 +10,6 @@
     <Project Path="src/SeedBomb.Core/SeedBomb.Core.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/SeedBomb.Web/SeedBomb.Web.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
     <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
@@ -22,9 +19,6 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/SeedBomb.Core.Tests/SeedBomb.Core.Tests.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
-    <Project Path="src/SeedBomb.Web.Tests/SeedBomb.Web.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj">
