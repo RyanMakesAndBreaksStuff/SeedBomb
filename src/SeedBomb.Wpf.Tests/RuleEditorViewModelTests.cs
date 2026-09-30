@@ -232,7 +232,11 @@ public sealed class RuleEditorViewModelTests
 
         Assert.Equal("bogus", vm.SelectedOp);
         Assert.True(vm.CanSave);
-        await Task.Delay(200, TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+        await Task.Run(async () =>
+        {
+            while (vm.PreviewValues.Count == 0) await Task.Delay(10, ct);
+        }, ct).WaitAsync(TimeSpan.FromSeconds(10), ct);
         Assert.Equal("Kurtis", vm.PreviewValues[0]);
         Assert.DoesNotContain(vm.Messages, m => m.Code == RuleMessageCode.ContextRequired);
     }
