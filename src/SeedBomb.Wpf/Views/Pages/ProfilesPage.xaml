@@ -17,7 +17,7 @@
 
     <Grid Margin="{DynamicResource DG.Pad.Page}">
         <!-- Manager pane (list + detail). Hidden while the import preview is up. -->
-        <Grid Visibility="{Binding ShowManager, Converter={StaticResource BoolToVisible}}">
+        <Grid Visibility="{Binding ShowManager, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -48,7 +48,7 @@
                 </Button>
 
                 <Button Grid.Column="2" Style="{DynamicResource DG.Button}"
-                        Command="{Binding ImportCommand}"
+                        Command="{Binding ImportFromFileCommand}"
                         Content="Import…" VerticalAlignment="Bottom" />
             </Grid>
 
@@ -353,7 +353,7 @@
         </Grid>
 
         <!-- Import summary pane — same chrome as ProfilesDialog (Mock F5 right). -->
-        <ScrollViewer Visibility="{Binding ShowImportSummary, Converter={StaticResource BoolToVisible}}"
+        <ScrollViewer Visibility="{Binding ShowImportSummary, Converter={StaticResource BoolToVisibilityConverter}}"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <TextBlock TextWrapping="Wrap"

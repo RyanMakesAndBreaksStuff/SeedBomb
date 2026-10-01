@@ -13,4 +13,10 @@ public interface IRunHistoryService
 
     /// <summary>Removes all stored run records.</summary>
     Task ClearAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Set when the stored file could not be read and was moved aside, so history started empty;
+    /// cleared by the next successful write. Null when there is nothing to report.
+    /// </summary>
+    string? LoadWarning => null;
 }

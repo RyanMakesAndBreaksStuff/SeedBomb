@@ -90,9 +90,28 @@ internal sealed class GenerateProfileBridge
         return true;
     }
 
+    private Profile? _savedDuringRun;
+
+    /// <summary>Applies the last Rules save held back while Generate was running (WR-009).</summary>
+    public void ApplyRulesSavedDuringRun()
+    {
+        if (_savedDuringRun is not { } profile)
+            return;
+        _savedDuringRun = null;
+        ApplySavedRulesProfile(profile);
+    }
+
     /// <summary>Applies a profile returned from the Rules page onto the wizard board.</summary>
     public void ApplySavedRulesProfile(Profile profile)
     {
+        // WR-009: both Rules-save routes land here. While Generate runs, hold the save instead of
+        // renaming the profile and dropping tables under the run; GenerateAsync applies it after.
+        if (_owner.IsRunning)
+        {
+            _savedDuringRun = profile;
+            return;
+        }
+
         _owner.ActiveProfileName = profile.Name;
         // The Rules page can remove tables; SelectReportTables only ever adds them.
         var kept = _owner.SelectedEntities
@@ -125,13 +144,11 @@ internal sealed class GenerateProfileBridge
 
             var cols = new Dictionary<string, RuleDraftEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var (column, rule) in table.Columns)
-                cols[column] = new RuleDraftEntry(rule, column, "");
+                cols[column] = new RuleDraftEntry(rule);
             draft[table.Table] = cols;
         }
 
         _owner.FieldRules.ReplaceDraft(draft);
-        if (_owner.SelectedEntities.Count > 0)
-            _owner.FieldRules.SelectTable(_owner.SelectedEntities[0].LogicalName);
     }
 
     /// <summary>Builds a profile snapshot of the current wizard selection, counts, rules, and seed.</summary>
@@ -222,27 +239,15 @@ internal sealed class GenerateProfileBridge
         var draft = new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase);
         foreach (var (table, columns) in report.BoardRules)
         {
-            _owner.LiveEntityMetadata.TryGetValue(table, out var meta);
-            var attrs = (meta?.Attributes ?? [])
-                .Where(a => a.LogicalName is not null)
-                .ToDictionary(a => a.LogicalName!, StringComparer.OrdinalIgnoreCase);
-
             var tableDraft = new Dictionary<string, RuleDraftEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var (column, rule) in columns)
-            {
-                var display = column;
-                if (attrs.TryGetValue(column, out var attr))
-                    display = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
-                tableDraft[column] = new RuleDraftEntry(rule, display, "");
-            }
+                tableDraft[column] = new RuleDraftEntry(rule);
 
             if (tableDraft.Count > 0)
                 draft[table] = tableDraft;
         }
 
         _owner.FieldRules.ReplaceDraft(draft);
-        if (_owner.SelectedEntities.Count > 0)
-            _owner.FieldRules.SelectTable(_owner.SelectedEntities[0].LogicalName);
     }
 
     /// <summary>Applies a draft restored at navigation time once live metadata is loaded.</summary>

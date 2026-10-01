@@ -2,8 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
-    <Border Style="{DynamicResource DG.CardBorder}"
-            Width="{DynamicResource DG.Size.ColumnPane}">
+    <Border Style="{DynamicResource DG.CardBorder}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -13,7 +12,7 @@
             <Border Grid.Row="0" BorderBrush="{DynamicResource DG.Border}"
                     BorderThickness="0,0,0,1" Padding="12">
                 <StackPanel>
-                    <ui:TextBox Text="{Binding ColumnFilter, UpdateSourceTrigger=PropertyChanged}"
+                    <ui:TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                 PlaceholderText="Filter columns"
                                 Icon="{ui:SymbolIcon Search24}" />
                     <ItemsControl ItemsSource="{Binding ColumnFilterModes}" Margin="0,9,0,0">

@@ -9,15 +9,15 @@
         <ui:ProgressRing IsIndeterminate="True"
                          Width="36" Height="36"
                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisible}}" />
+                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-        <StackPanel Visibility="{Binding HasError, Converter={StaticResource BoolToVisible}}">
+        <StackPanel Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}">
             <ui:InfoBar IsOpen="True" Severity="Error" Message="{Binding ErrorMessage}" />
             <ui:Button Content="Retry" Margin="0,8,0,0" Command="{Binding LoadEntitiesCommand}" />
         </StackPanel>
 
         <Grid MinHeight="0"
-              Visibility="{Binding ShowContent, Converter={StaticResource BoolToVisible}}">
+              Visibility="{Binding ShowContent, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />

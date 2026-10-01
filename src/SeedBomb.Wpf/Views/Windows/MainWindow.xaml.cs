@@ -22,9 +22,11 @@ public partial class MainWindow : FluentWindow
     private readonly ISnackbarService _snackbarService;
     private readonly IContentDialogService _contentDialogService;
     private readonly NavigationViewNavigator _navigator;
+    private readonly RunCloseGuard _closeGuard;
     private object? _currentPageContent;
 
     /// <summary>Initialises the window, sets DataContext, and wires NavigationView to DI.</summary>
+    /// <param name="generate">Generate wizard whose in-flight Generate/Retry the close guard awaits.</param>
     public MainWindow(
         MainWindowViewModel viewModel,
         ConnectionManagerViewModel connectionManagerViewModel,
@@ -33,7 +35,8 @@ public partial class MainWindow : FluentWindow
         IServiceProvider serviceProvider,
         ISnackbarService snackbarService,
         IContentDialogService contentDialogService,
-        IAppNavigator navigator)
+        IAppNavigator navigator,
+        GenerateViewModel generate)
     {
         _vm = viewModel;
         _connectionManagerViewModel = connectionManagerViewModel;
@@ -42,6 +45,14 @@ public partial class MainWindow : FluentWindow
         _snackbarService = snackbarService;
         _contentDialogService = contentDialogService;
         _navigator = (NavigationViewNavigator)navigator;
+        _closeGuard = new RunCloseGuard(
+            generate,
+            () => _contentDialogService.ConfirmAsync(
+                "Generation is still running",
+                "Closing cancels the run. Rows already written are not rolled back.",
+                "Close and cancel",
+                close: "Keep running"),
+            Close);
 
         DataContext = viewModel;
         InitializeComponent();
@@ -88,6 +99,8 @@ public partial class MainWindow : FluentWindow
         Loaded += OnWindowLoaded;
         SourceInitialized += OnSourceInitialized;
         Closed += OnWindowClosed;
+        // WR-001: cancel synchronously; the guard confirms, cancels the run and re-closes once done.
+        Closing += (_, e) => e.Cancel = !_closeGuard.AllowClose();
 
         // Same shared ConnectionManagerViewModel instance ConnectionsPage's identical
         // SwitchError banner reads — a failed retry here is visible there too. Bound with an
@@ -109,7 +122,7 @@ public partial class MainWindow : FluentWindow
         try
         {
             var last = await _profileService.GetLastUsedAsync();
-            if (last is not null)
+            if (last is not null && _connectionManagerViewModel.SelectProfileCommand.CanExecute(last))
                 await _connectionManagerViewModel.SelectProfileCommand.ExecuteAsync(last);
         }
         catch (Exception ex)

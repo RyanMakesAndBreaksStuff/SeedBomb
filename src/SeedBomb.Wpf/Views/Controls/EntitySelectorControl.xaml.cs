@@ -42,10 +42,4 @@ public partial class EntitySelectorControl : UserControl
         ViewModel.SelectedEntitiesChanged += (_, entities) => SelectedEntitiesChanged?.Invoke(this, entities);
         ViewModel.LoadEntitiesCommand.Execute(null);
     }
-
-    /// <summary>Clears the visible selection and view-model selection.</summary>
-    public void ClearSelection()
-    {
-        ViewModel?.ClearSelection();
-    }
 }

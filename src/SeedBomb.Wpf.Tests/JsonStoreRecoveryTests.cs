@@ -23,10 +23,14 @@ public sealed class JsonStoreRecoveryTests : IDisposable
         await File.WriteAllTextAsync(path, "{ not json", ct);
         using var svc = new JsonRunHistoryService(_dir);
 
+        Assert.Empty(await svc.GetRunsAsync(ct));
+        Assert.Contains("could not be read", svc.LoadWarning, StringComparison.Ordinal);
+
         await svc.AddRunAsync(new RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["Account"], 1, TimeSpan.FromSeconds(1), true, 0), ct);
 
         Assert.Equal("{ not json", await File.ReadAllTextAsync(path + ".corrupt", ct));
         Assert.Single(await svc.GetRunsAsync(ct));
+        Assert.Null(svc.LoadWarning);
     }
 
     [Fact]
@@ -39,5 +43,9 @@ public sealed class JsonStoreRecoveryTests : IDisposable
 
         Assert.Equal(AppSettings.Default, await svc.LoadAsync(ct));
         Assert.Equal("{ not json", await File.ReadAllTextAsync(path + ".corrupt", ct));
+        Assert.Contains("could not be read", svc.LoadWarning, StringComparison.Ordinal);
+
+        await svc.SaveAsync(AppSettings.Default, ct);
+        Assert.Null(svc.LoadWarning);
     }
 }

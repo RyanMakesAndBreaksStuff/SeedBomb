@@ -7,13 +7,11 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
 using SeedBomb.Services.Generation;
-using SeedBomb.Services.History;
 using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels.Controls;
 using SeedBomb.Views.Pages;
-using System.Collections.ObjectModel;
 using Wpf.Ui;
 using Wpf.Ui.Extensions;
 
@@ -29,13 +27,6 @@ public record StepEntry(string Glyph, string Label, bool IsDone, bool IsActive, 
 
 /// <summary>One selected table in the step-1 aside.</summary>
 public sealed record SelectedTableRow(string DisplayName, string LogicalName, int Count);
-
-/// <summary>Entity queue status entry. Rendering is the view's concern; this holds no brushes.</summary>
-public sealed class QueuedEntityEntry(EntitySummary entity)
-{
-    /// <summary>Gets the entity summary.</summary>
-    public EntitySummary Entity { get; } = entity;
-}
 
 /// <summary>Review-card preview: first five <see cref="RuleValueGenerator"/> outputs for one ruled column.</summary>
 /// <param name="Table">Owning table logical name.</param>
@@ -55,7 +46,10 @@ public sealed record ReviewPreviewRow(
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 {
-    private readonly IRunHistoryService _historyService;
+    /// <summary>Upper bound for configured parallelism. Settings and Generate share this cap so a
+    /// value saved in one place can never exceed what the other enforces (WR-008).</summary>
+    public const int MaxDop = 16;
+
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
     private readonly IMetadataProvider _metadataProvider;
@@ -79,7 +73,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     private int _defaultRecordCount = 10;
 
     /// <summary>Initialises the view-model.</summary>
-    /// <param name="historyService">Run history persistence service.</param>
     /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
     /// <param name="snackbar">Snackbar notification service.</param>
     /// <param name="logger">Logger.</param>
@@ -89,7 +82,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// <param name="navigator">Optional shell navigator.</param>
     /// <param name="mainWindow">Shell view-model; when provided, Generate reloads on connection switch.</param>
     public GenerateViewModel(
-        IRunHistoryService historyService,
         ISettingsService settingsService,
         ISnackbarService snackbar,
         ILogger<GenerateViewModel> logger,
@@ -102,7 +94,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         MainWindowViewModel? mainWindow = null)
     {
         ArgumentNullException.ThrowIfNull(run);
-        _historyService = historyService;
         _settingsService = settingsService;
         _snackbar = snackbar;
         _logger = logger;
@@ -202,12 +193,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private bool _isRunning;
 
-    [ObservableProperty] private ProgressUpdate? _currentProgress;
-
     [ObservableProperty]
-    [NotifyPropertyChangedFor(
-        nameof(HasResult), nameof(Steps),
-        nameof(LastRunHasErrors), nameof(LastRunStatusText))]
+    [NotifyPropertyChangedFor(nameof(HasResult), nameof(Steps))]
     private GenerationResult? _lastResult;
 
     [ObservableProperty]
@@ -241,14 +228,14 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private Dictionary<string, Dictionary<string, FieldRule>>? _reviewedRules;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ReviewErrorSummary))]
-    private IReadOnlyList<RuleMessage> _reviewMessages = [];
-
-    [ObservableProperty]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ReviewErrorSummary), nameof(ReviewHasErrors))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
-    private bool _reviewHasErrors;
+    private IReadOnlyList<RuleMessage> _reviewMessages = [];
+
+    /// <summary>Computed from <see cref="ReviewMessages"/> — true when any reviewed message is Error-severity.</summary>
+    public bool ReviewHasErrors => ReviewMessages.Any(m => m.Severity == RuleMessageSeverity.Error);
 
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     private long? _reviewedDraftRevision;
@@ -271,16 +258,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// <summary>Singleton run sheet bound by the overlay.</summary>
     public RunViewModel Run { get; }
 
-    /// <summary>True when the wizard is on Review or Run. Setter maps old two-state paging onto <see cref="CurrentStep"/>.</summary>
-    public bool IsReviewOpen
-    {
-        get => CurrentStep >= 2;
-        set
-        {
-            if (value && CurrentStep < 2) CurrentStep = 2;
-            if (!value && CurrentStep >= 2) CurrentStep = 1;
-        }
-    }
+    /// <summary>True when the wizard is on Review or Run.</summary>
+    public bool IsReviewOpen => CurrentStep >= 2;
 
     /// <summary>Footer primary-button caption.</summary>
     public string NextButtonLabel => CurrentStep == 3 ? "Start run" : "Next";
@@ -332,9 +311,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// </summary>
     public int DraftRuleCount => _fieldRules?.GetRules().Sum(t => t.Value.Count) ?? 0;
 
-    /// <summary>Handoff alias used by the mock Change profile button.</summary>
-    public IRelayCommand ChangeProfileCommand => OpenProfilesCommand;
-
     /// <summary>Sum of per-table record counts.</summary>
     public int PlannedTotal
     {
@@ -366,20 +342,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
     /// <summary>Gets a value indicating whether a result is available to display.</summary>
     public bool HasResult => LastResult is not null;
-
-    public bool LastRunHasErrors => LastResult is { Errors.Count: > 0 };
-
-    public string LastRunStatusText =>
-        LastResult is null
-            ? string.Empty
-            : LastResult.Errors.Count == 0
-                ? "All entities succeeded"
-                : LastResult.Errors.Count == 1
-                    ? LastResult.Errors[0].ErrorMessage
-                    : $"{LastResult.Errors.Count} batch errors";
-
-    /// <summary>Gets the collection of queued entity status dots.</summary>
-    public ObservableCollection<QueuedEntityEntry> QueuedEntities { get; } = [];
 
     /// <summary>Full live entity metadata for selected entities, loaded when advancing to Rules.</summary>
     public IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> EntityMetadataMap => _entityMetadata;
@@ -529,7 +491,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     {
         ReviewedRules = null;
         ReviewMessages = [];
-        ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
         OnPropertyChanged(nameof(DraftRuleCount));
@@ -550,10 +511,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         _fieldOverrides?.SetEntities(entities, DefaultRecordCount);
         OnPropertyChanged(nameof(SelectedTableRows));
 
-        QueuedEntities.Clear();
-        foreach (var e in entities)
-            QueuedEntities.Add(new QueuedEntityEntry(e));
-
         if (sameSet)
             return;
 
@@ -562,7 +519,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         CurrentStep = 0;
         ReviewedRules = null;
         ReviewMessages = [];
-        ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
     }
@@ -589,7 +545,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
             RunId = $"run-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
             IsRulesLoaded = true;
-            _fieldRules?.SelectTable(SelectedEntities.FirstOrDefault()?.LogicalName ?? string.Empty);
             _profileBridge.TryApplyRestoredDraft();
         }
         catch (OperationCanceledException)
@@ -624,7 +579,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         var reviewed = new Dictionary<string, Dictionary<string, FieldRule>>(StringComparer.OrdinalIgnoreCase);
         var messages = new List<RuleMessage>();
         var previewRows = new List<ReviewPreviewRow>();
-        var hasErrors = false;
 
         foreach (var (table, columns) in draft)
         {
@@ -632,7 +586,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             {
                 messages.Add(new RuleMessage(RuleMessageSeverity.Error,
                     $"Metadata for '{table}' is unavailable — its rules were not reviewed."));
-                hasErrors = true;
                 continue;
             }
 
@@ -647,45 +600,56 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 {
                     messages.Add(new RuleMessage(RuleMessageSeverity.Error,
                         $"Column '{column}' was not found on '{table}'."));
-                    hasErrors = true;
                     continue;
                 }
 
                 var result = RuleValidator.Validate(
                     rule, attr, new RuleValidationContext(table, recordCount, RunId));
                 messages.AddRange(result.Messages);
-                if (result.Messages.Any(m => m.Severity == RuleMessageSeverity.Error))
-                    hasErrors = true;
                 if (result.IsValid && result.EffectiveRule is not null)
                 {
-                    tableRules[column] = result.EffectiveRule;
-
-                    var values = new List<string>(5);
-                    if (result.EffectiveRule is LookupRandomRule)
+                    try
                     {
-                        values.Add(
-                            $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
-                    }
-                    else
-                    {
-                        var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
-                        using var session = result.EffectiveRule is BogusRule
-                            ? new BogusEvaluatorSession(Locale)
-                            : null;
-                        PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
-                            ? BogusRulePreparer.CompileRule(bogus, attr, eval)
-                            : null;
-                        for (var row = 0; row < 5; row++)
+                        var values = new List<string>(5);
+                        if (result.EffectiveRule is LookupRandomRule)
                         {
-                            var value = prepared is not null && session is not null
-                                ? session.Evaluate(prepared, attr, eval, row)
-                                : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
-                            values.Add(FormatPreview(value));
+                            values.Add(
+                                $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
                         }
-                    }
+                        else
+                        {
+                            var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
+                            using var session = result.EffectiveRule is BogusRule
+                                ? new BogusEvaluatorSession(Locale)
+                                : null;
+                            PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
+                                ? BogusRulePreparer.CompileRule(bogus, attr, eval)
+                                : null;
+                            for (var row = 0; row < 5; row++)
+                            {
+                                var value = prepared is not null && session is not null
+                                    ? session.Evaluate(prepared, attr, eval, row)
+                                    : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
+                                values.Add(FormatPreview(value));
+                            }
+                        }
 
-                    var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
-                    previewRows.Add(new ReviewPreviewRow(table, column, displayName, values));
+                        tableRules[column] = result.EffectiveRule;
+                        var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
+                        previewRows.Add(new ReviewPreviewRow(table, column, displayName, values));
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // WR-003: a rule that passed RuleValidator.Validate can still fail here —
+                        // Validate only catches known/fixed-length Bogus outputs (BogusLengthPolicy
+                        // .Fixed); a variable-length endpoint (e.g. NAME.firstName) can still
+                        // overflow MaxLength once actually generated, and generated text can still
+                        // fail the transport-safety check. Both are the only InvalidOperationException
+                        // BogusEvaluatorSession throws from this path (CoerceText / EnsureTransportSafe)
+                        // — surface it as a Review error instead of crashing the wizard.
+                        messages.Add(new RuleMessage(RuleMessageSeverity.Error,
+                            $"'{table}.{column}': {ex.Message}"));
+                    }
                 }
             }
 
@@ -695,10 +659,9 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
         ReviewedRules = reviewed;
         ReviewMessages = messages;
-        ReviewHasErrors = hasErrors;
         ReviewedDraftRevision = _fieldRules.Revision;
         ReviewPreviewRows = previewRows;
-        IsReviewOpen = true;
+        if (CurrentStep < 2) CurrentStep = 2;
     }
 
     /// <summary>
@@ -771,17 +734,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         };
     }
 
-    /// <summary>
-    /// Discards the draft and restores the previously committed configuration (S2).
-    /// Never starts generation.
-    /// </summary>
-    [RelayCommand]
-    private void CancelDraft()
-    {
-        _fieldRules?.DiscardDraft();
-        CurrentStep = 0;
-    }
-
     /// <summary>Tests set this to skip the content dialog.</summary>
     internal Func<Task<bool>>? ConfirmReset { get; set; }
 
@@ -812,9 +764,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 
         SelectedEntities = [];
         _entitySelector?.ClearSelection();
-        CurrentProgress = null;
         LastResult = null;
-        QueuedEntities.Clear();
         _fieldOverrides?.SetEntities([]);
         OnPropertyChanged(nameof(SelectedTableRows));
 
@@ -824,7 +774,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         CurrentStep = 0;
         ReviewedRules = null;
         ReviewMessages = [];
-        ReviewHasErrors = false;
         ReviewedDraftRevision = null;
         ReviewPreviewRows = [];
         RunId = "";
@@ -850,11 +799,16 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Cancels an in-flight <see cref="GenerateCommand"/> with no prompt; <see cref="RunCloseGuard"/>
+    /// has already asked. This token is linked into the run's, so it also covers preparation.
+    /// </summary>
+    internal void CancelForClose() => _cts?.Cancel();
+
     [RelayCommand(CanExecute = nameof(CanStartGenerate))]
     private async Task GenerateAsync()
     {
         IsRunning = true;
-        CurrentProgress = null;
         LastResult = null;
         _cts = new CancellationTokenSource();
         _fieldRules?.Commit();
@@ -862,12 +816,15 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         await _draftAutosave.PersistAsync();
         var config = BuildConfig();
         // WR-002: captured before the run — the History row must not depend on later wizard state.
-        var tableNames = SelectedEntities.Select(e => e.DisplayName).ToArray();
-        Exception? failure = null;
+        var tableLabels = SelectedEntities.ToDictionary(
+            e => e.LogicalName, e => e.DisplayName, StringComparer.OrdinalIgnoreCase);
+        // WR-009: same reasoning — a profile loaded mid-run must not relabel this run's row.
+        var profileName = ActiveProfileName;
         try
         {
             var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
-            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token);
+            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token,
+                tableLabels, profileName);
             if (LastResult.Cancelled)
                 Run.ReportRunFailure(new OperationCanceledException());
             else
@@ -877,7 +834,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            failure = ex;
             Run.ReportRunFailure(ex);
         }
         finally
@@ -887,36 +843,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             _cts = null;
         }
 
-        // WR-002: one History write for every run that returned a result or failed. A cancel
-        // that throws (including a declined risky-value prompt) wrote nothing, so it has no row.
-        if (LastResult is not null || failure is not (null or OperationCanceledException))
-            await RecordRunAsync(tableNames, LastResult);
-    }
-
-    private async Task RecordRunAsync(string[] tableNames, GenerationResult? result)
-    {
-        try
-        {
-            await _historyService.AddRunAsync(new RunRecord(
-                Run.CurrentRunId,
-                DateTimeOffset.Now,
-                tableNames,
-                result?.TotalRecords ?? 0,
-                result?.Elapsed ?? TimeSpan.Zero,
-                result is { Cancelled: false, Errors.Count: 0 },
-                result?.Errors.Sum(e => e.RowCount) ?? 0,
-                Run.EnvironmentLabel,
-                Run.UserLabel,
-                ActiveProfileName,
-                Run.ActivityLines));
-        }
-        catch (Exception ex)
-        {
-            // A History failure is not a generation failure — report it on its own.
-            _logger.LogError(ex, "Failed to record the run in history");
-            _snackbar.Show("Couldn't save run history", ex.Message,
-                Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
-        }
+        // WR-009: a Rules save held back during the run lands on the board now.
+        _profileBridge.ApplyRulesSavedDuringRun();
     }
 
     private GenerationConfig BuildConfig()
@@ -931,7 +859,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             Seed = Seed,
             Locale = Locale,
             BatchSize = BatchSize,
-            MaxParallelism = MaxParallelism == 0 ? null : MaxParallelism,
+            MaxParallelism = MaxParallelism == 0 ? null : Math.Clamp(MaxParallelism, 1, MaxDop),
             FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
             RunId = RunId,
         };
@@ -977,7 +905,12 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     public Profile BuildProfileSnapshot(string name) => _profileBridge.BuildProfileSnapshot(name);
 
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
-    public void ApplyImportReport(ProfileImportReport report) => _profileBridge.ApplyImportReport(report);
+    public void ApplyImportReport(ProfileImportReport report)
+    {
+        // WR-009: "Open in board" while Generate runs must not reset the wizard under the run.
+        if (IsRunning) return;
+        _profileBridge.ApplyImportReport(report);
+    }
 
     /// <summary>A Rules-page save from Profiles reaches the board only when the board holds that profile.</summary>
     public void ApplySavedProfileIfActive(Profile profile)

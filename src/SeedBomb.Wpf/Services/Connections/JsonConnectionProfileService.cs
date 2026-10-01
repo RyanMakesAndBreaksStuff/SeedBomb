@@ -58,12 +58,13 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         try
         {
             var store = await LoadLockedAsync(ct).ConfigureAwait(false);
-            var idx = store.Profiles.FindIndex(p => p.Id == profile.Id);
-            var existing = idx >= 0 ? store.Profiles[idx] : null;
+            var clone = Clone(store);
+            var idx = clone.Profiles.FindIndex(p => p.Id == profile.Id);
+            var existing = idx >= 0 ? clone.Profiles[idx] : null;
             var dto = Encrypt(profile, existing);
-            if (idx >= 0) store.Profiles[idx] = dto;
-            else store.Profiles.Add(dto);
-            await PersistAsync(store, ct).ConfigureAwait(false);
+            if (idx >= 0) clone.Profiles[idx] = dto;
+            else clone.Profiles.Add(dto);
+            await PersistAsync(clone, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -80,9 +81,10 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         try
         {
             var store = await LoadLockedAsync(ct).ConfigureAwait(false);
-            store.Profiles.RemoveAll(p => p.Id == id);
-            if (store.LastUsedId == id) store.LastUsedId = null;
-            await PersistAsync(store, ct).ConfigureAwait(false);
+            var clone = Clone(store);
+            clone.Profiles.RemoveAll(p => p.Id == id);
+            if (clone.LastUsedId == id) clone.LastUsedId = null;
+            await PersistAsync(clone, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -116,8 +118,9 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         try
         {
             var store = await LoadLockedAsync(ct).ConfigureAwait(false);
-            store.LastUsedId = id;
-            await PersistAsync(store, ct).ConfigureAwait(false);
+            var clone = Clone(store);
+            clone.LastUsedId = id;
+            await PersistAsync(clone, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -175,10 +178,10 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
 
     private async Task PersistAsync(StoreDto store, CancellationToken ct)
     {
-        _cache = store;
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var json = JsonSerializer.Serialize(store, JsonOpts);
         await AtomicFile.WriteAllTextAsync(_storagePath, json, ct).ConfigureAwait(false);
+        _cache = store;
         LoadWarning = null;
     }
 
@@ -213,8 +216,15 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         // Secrets are fetched per-profile via GetSecretAsync so at most one plaintext copy
         // exists at a time; the singleton ConnectionManagerViewModel holds none.
         ClientSecret = null,
+        HasSavedSecret = !string.IsNullOrEmpty(d.EncryptedClientSecret),
         CertificateThumbprint = d.CertificateThumbprint,
         HomeAccountId = d.HomeAccountId,
+    };
+
+    private static StoreDto Clone(StoreDto store) => new()
+    {
+        LastUsedId = store.LastUsedId,
+        Profiles = [.. store.Profiles],
     };
 
     /// <summary>

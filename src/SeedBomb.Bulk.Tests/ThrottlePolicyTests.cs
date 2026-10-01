@@ -83,6 +83,39 @@ public class ThrottlePolicyTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TransportTimeoutCancellation_IsRetried()
+    {
+        // IN-004: HttpClient reports its own timeout as TaskCanceledException while the caller's
+        // token is untouched. That is a transient fault, not a user cancel.
+        var callCount = 0;
+
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1) throw new TaskCanceledException("HttpClient.Timeout elapsed");
+                return Task.FromResult("success");
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TransportTimeoutOnLastAttempt_IsAFailureNotACancel()
+    {
+        await Assert.ThrowsAsync<DataGenerationException>(() =>
+            _policy.ExecuteAsync<int>(
+                () => throw new TaskCanceledException("HttpClient.Timeout elapsed"),
+                "account",
+                maxRetries: 0,
+                CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ThrowsOnNullOperation()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() =>

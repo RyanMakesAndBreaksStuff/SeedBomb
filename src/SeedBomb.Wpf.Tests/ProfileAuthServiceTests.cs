@@ -127,6 +127,41 @@ public sealed class ProfileAuthServiceTests
         pca.Verify(p => p.AcquireTokenSilent(It.IsAny<IEnumerable<string>>(), It.IsAny<IAccount>()), Times.Never);
     }
 
+    [Fact]
+    public async Task ForgetProfileAsync_RemovesTheCachedAccount_ForAnOAuthProfileWithAHomeAccountId()
+    {
+        // WR-015: deleting an OAuth connection must not leave its refresh token in msal_user_cache.bin.
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+
+        var account = Mock.Of<IAccount>(a => a.Username == "user@contoso.com");
+        var pca = new Mock<IPublicClientApplication>();
+        pca.Setup(p => p.GetAccountAsync("uid.utid")).ReturnsAsync(account);
+        pca.Setup(p => p.RemoveAsync(account)).Returns(Task.CompletedTask);
+        svc.CreatePcaOverride = _ => pca.Object;
+
+        var profile = MakeOAuthProfile();
+        profile.HomeAccountId = "uid.utid";
+
+        await svc.ForgetProfileAsync(profile, TestContext.Current.CancellationToken);
+
+        pca.Verify(p => p.RemoveAsync(account), Times.Once);
+    }
+
+    [Fact]
+    public async Task ForgetProfileAsync_DoesNothing_WhenTheProfileNeverSignedIn()
+    {
+        var profiles = new Mock<IConnectionProfileService>();
+        var svc = new ProfileAuthService(profiles.Object);
+        var pca = new Mock<IPublicClientApplication>();
+        svc.CreatePcaOverride = _ => pca.Object;
+
+        await svc.ForgetProfileAsync(MakeOAuthProfile(), TestContext.Current.CancellationToken);
+
+        pca.Verify(p => p.GetAccountAsync(It.IsAny<string>()), Times.Never);
+        pca.Verify(p => p.RemoveAsync(It.IsAny<IAccount>()), Times.Never);
+    }
+
     private static ConnectionProfile MakeCertificateProfile() => new()
     {
         Name = "Cert Profile",

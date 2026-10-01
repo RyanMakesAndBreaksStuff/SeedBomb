@@ -90,14 +90,14 @@ public class EdgeCaseValidator
         {
             return msMeta.OptionSet?.Options?.Count is null or 0
                 ? new FieldValidationResult(name, FieldAction.Fail, "Multi-select picklist has no valid options")
-                : new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "MultiSelect");
+                : new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: SpecialHandlingCategory.MultiSelect);
         }
 
         // 8. Currency fields — transactioncurrencyid is silently required for Money fields
         if (attr is MoneyAttributeMetadata)
         {
             _logger.LogDebug("Special handling for {Field}: currency field", attr.LogicalName);
-            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "CurrencyValidation");
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: SpecialHandlingCategory.CurrencyValidation);
         }
 
         // 9. DateTime behavior — affects how values are stored and displayed
@@ -105,14 +105,15 @@ public class EdgeCaseValidator
         {
             var behavior = dtMeta.DateTimeBehavior?.Value ?? "Unknown";
             _logger.LogDebug("Special handling for {Field}: datetime behavior {Behavior}", attr.LogicalName, behavior);
-            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: $"DateTime_{behavior}");
+            return new FieldValidationResult(name, FieldAction.SpecialHandling,
+                HandlingCategory: SpecialHandlingCategory.DateTime, DateTimeBehavior: dtMeta.DateTimeBehavior);
         }
 
         // 10. Alternate keys — need uniqueness guarantees
         if (entity.Keys?.Any(k => k.KeyAttributes?.Contains(attr.LogicalName) == true) == true)
         {
             _logger.LogDebug("Special handling for {Field}: part of alternate key", attr.LogicalName);
-            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "AlternateKeyUniqueness");
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: SpecialHandlingCategory.AlternateKeyUniqueness);
         }
 
         // 11. Rich text fields — require HTML formatting
@@ -120,7 +121,7 @@ public class EdgeCaseValidator
             string.Equals(memoMeta.FormatName?.Value, "RichText", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogDebug("Special handling for {Field}: rich text memo", attr.LogicalName);
-            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "RichText");
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: SpecialHandlingCategory.RichText);
         }
 
         // 12. UTC offset integers — Format metadata may be null but Dataverse validates against timezonedefinition; skip
@@ -138,14 +139,14 @@ public class EdgeCaseValidator
             string.Equals(lookupMeta.LogicalName, "ownerid", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogDebug("Special handling for {Field}: owner lookup", attr.LogicalName);
-            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "OwnerLookup");
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: SpecialHandlingCategory.OwnerLookup);
         }
 
         // 14. Polymorphic lookups — multiple possible target entities
         if (attr is LookupAttributeMetadata { Targets.Length: > 1 })
         {
             _logger.LogDebug("Special handling for {Field}: polymorphic lookup", attr.LogicalName);
-            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: "PolymorphicLookup");
+            return new FieldValidationResult(name, FieldAction.SpecialHandling, HandlingCategory: SpecialHandlingCategory.PolymorphicLookup);
         }
 
         // Default: field is OK for normal generation

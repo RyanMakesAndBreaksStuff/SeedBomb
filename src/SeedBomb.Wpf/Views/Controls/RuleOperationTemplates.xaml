@@ -82,7 +82,7 @@
         <StackPanel Margin="0,0,0,16">
             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Template" />
             <Border Style="{DynamicResource DG.CodeBox}">
-                <TextBox Text="{Binding TemplateExpression, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}"
                          Background="Transparent" BorderThickness="0"
                          FontFamily="{DynamicResource DG.Font.Mono}"
                          FontSize="{DynamicResource DG.Type.Body}"

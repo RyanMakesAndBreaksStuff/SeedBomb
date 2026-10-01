@@ -27,9 +27,12 @@ public sealed class HistoryViewModelTests
         var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
         await vm.LoadCommand.ExecuteAsync(null);
 
-        Assert.Equal(2, vm.DayGroups.Count);
-        Assert.Equal(2, vm.DayGroups[0].Runs.Count);
-        Assert.Single(vm.DayGroups[1].Runs);
+        Assert.Collection(vm.FlatItems,
+            item => Assert.IsType<HistoryDayHeader>(item),
+            item => Assert.IsType<RunRecord>(item),
+            item => Assert.IsType<RunRecord>(item),
+            item => Assert.IsType<HistoryDayHeader>(item),
+            item => Assert.IsType<RunRecord>(item));
     }
 
     [Fact]
@@ -51,9 +54,9 @@ public sealed class HistoryViewModelTests
 
         vm.SearchText = "contoso";
 
-        Assert.Single(vm.DayGroups);
-        Assert.Single(vm.DayGroups[0].Runs);
-        Assert.Equal("contoso.crm.dynamics.com", vm.DayGroups[0].Runs[0].Environment);
+        Assert.IsType<HistoryDayHeader>(vm.FlatItems[0]);
+        var run = Assert.IsType<RunRecord>(Assert.Single(vm.FlatItems.Skip(1)));
+        Assert.Equal("contoso.crm.dynamics.com", run.Environment);
     }
 
     [Fact]
@@ -72,6 +75,25 @@ public sealed class HistoryViewModelTests
         snackbar.Verify(s => s.Show(
             "Couldn't load run history", "history corrupt",
             ControlAppearance.Danger, null, It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ShowsCautionSnackbar_WhenHistoryWasQuarantined()
+    {
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        history.SetupGet(h => h.LoadWarning)
+            .Returns("Run history could not be read, so SeedBomb started without it.");
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>(), snackbar: snackbar.Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        snackbar.Verify(s => s.Show(
+            "Run history", "Run history could not be read, so SeedBomb started without it.",
+            ControlAppearance.Caution, null, It.IsAny<TimeSpan>()),
             Times.Once);
     }
 
@@ -109,6 +131,36 @@ public sealed class HistoryViewModelTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task ExportCsvAsync_EscapesLeadingFormulaCharacterInProfileName()
+    {
+        // WR-013: an imported profile's name flows into RunRecord.Profile unescaped — a name like
+        // "=HYPERLINK(...)" must not become a live formula when the CSV is opened in a spreadsheet.
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["Account"], 10,
+                TimeSpan.FromMinutes(1), true, 0, Profile: "=HYPERLINK(\"http://evil\",\"click\")"),
+        ]);
+
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        var exportDir = Directory.CreateTempSubdirectory("seedbomb-history-export-test-");
+        vm.ExportDirectoryOverride = exportDir.FullName;
+        try
+        {
+            await vm.ExportCsvCommand.ExecuteAsync(null);
+
+            var lines = await File.ReadAllLinesAsync(
+                Directory.GetFiles(exportDir.FullName).Single(), TestContext.Current.CancellationToken);
+            Assert.Contains("'=HYPERLINK", lines[1], StringComparison.Ordinal);
+        }
+        finally
+        {
+            exportDir.Delete(recursive: true);
+        }
+    }
     [Fact]
     public async Task ExportCsvAsync_ShowsSuccessSnackbar_WhenWriteSucceeds()
     {

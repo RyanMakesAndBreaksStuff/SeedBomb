@@ -52,7 +52,7 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
         // still-showing toast would otherwise reappear on a fresh page instance if the user
         // navigates away and back while it's up.
         // The view-model is a Singleton and this page is Transient, so anything left on it
-        // outlives the page - including the decrypted ClientSecret loaded by EditProfileAsync.
+        // outlives the page - including any client secret the user typed.
         ViewModel.ShowConnectedToast = false;
         // WR-009: Cancel clears the whole editor (IsEditing, IsDirty, TestResult) — clearing
         // EditingProfile alone left an enabled empty form and a Connect button that did nothing.
@@ -79,6 +79,8 @@ public partial class ConnectionsPage : Page, INavigableView<ConnectionManagerVie
     private void OnClientSecretChanged(object sender, RoutedEventArgs e)
     {
         if (ViewModel.EditingProfile is { } profile && sender is PasswordBox box)
-            profile.ClientSecret = box.Password;
+            // IN-014: an empty box means "keep the saved secret". "" would overwrite it on save,
+            // and the box is cleared programmatically whenever another profile is opened.
+            profile.ClientSecret = box.Password.Length == 0 ? null : box.Password;
     }
 }

@@ -153,7 +153,7 @@ public static class BogusRulePreparer
 
                     min = contract.DefaultMin;
                     max = contract.DefaultMax;
-                    var (metaMin, metaMax) = MetadataBounds(attr);
+                    var (metaMin, metaMax) = RuleValidator.MetadataBounds(attr);
                     min = decimal.Max(min, metaMin);
                     max = decimal.Min(max, metaMax);
                     return new NumericRangeArgs(min, max, scale);
@@ -178,27 +178,6 @@ public static class BogusRulePreparer
             default:
                 return NormalizedBogusArgs.None;
         }
-    }
-
-    private static (decimal Min, decimal Max) MetadataBounds(AttributeMetadata a) => a switch
-    {
-        IntegerAttributeMetadata i => (i.MinValue ?? int.MinValue, i.MaxValue ?? int.MaxValue),
-        BigIntAttributeMetadata b => (b.MinValue ?? long.MinValue, b.MaxValue ?? long.MaxValue),
-        DecimalAttributeMetadata d => (d.MinValue ?? decimal.MinValue, d.MaxValue ?? decimal.MaxValue),
-        DoubleAttributeMetadata f => (ToApplicationBound(f.MinValue, decimal.MinValue),
-                                      ToApplicationBound(f.MaxValue, decimal.MaxValue)),
-        MoneyAttributeMetadata m => (ToApplicationBound(m.MinValue, decimal.MinValue),
-                                     ToApplicationBound(m.MaxValue, decimal.MaxValue)),
-        _ => (decimal.MinValue, decimal.MaxValue),
-    };
-
-    private static decimal ToApplicationBound(double? sdkBound, decimal fallback)
-    {
-        if (sdkBound is not { } v || double.IsNaN(v) || double.IsInfinity(v))
-            return fallback;
-        if (v <= (double)decimal.MinValue) return decimal.MinValue;
-        if (v >= (double)decimal.MaxValue) return decimal.MaxValue;
-        return (decimal)v;
     }
 
     private const long MaxRulePreparationBytes = 64L * 1024 * 1024;

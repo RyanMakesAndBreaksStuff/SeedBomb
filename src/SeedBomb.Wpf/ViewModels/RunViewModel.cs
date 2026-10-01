@@ -53,6 +53,7 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly ISettingsService? _settings;
     private readonly IAppNavigator? _navigator;
     private readonly IAuthService? _auth;
+    private readonly IRunHistoryService? _history;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
@@ -66,6 +67,9 @@ public sealed partial class RunViewModel : ObservableObject
     private int _plannedTotal;
     private int _seed;
     private string _environmentHost = "";
+    private IReadOnlyDictionary<string, string> _tableLabels = new Dictionary<string, string>();
+    private string _profileName = "";
+    private RunViewModel _summaryView;
 
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
     internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
@@ -81,6 +85,7 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="snackbar">Failure toasts for first run and retry. Null suppresses them.</param>
     /// <param name="logger">Failure logging. Null suppresses it.</param>
     /// <param name="auth">Signed-in user and target environment for history rows. Null leaves them blank.</param>
+    /// <param name="history">History store; each run and retry adds one row. Null skips it.</param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
@@ -88,7 +93,8 @@ public sealed partial class RunViewModel : ObservableObject
         IAppNavigator? navigator = null,
         ISnackbarService? snackbar = null,
         ILogger<RunViewModel>? logger = null,
-        IAuthService? auth = null)
+        IAuthService? auth = null,
+        IRunHistoryService? history = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
@@ -97,14 +103,19 @@ public sealed partial class RunViewModel : ObservableObject
         _snackbar = snackbar;
         _logger = logger;
         _auth = auth;
-        SummaryView = this;
+        _history = history;
+        _summaryView = this;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
     public Guid CurrentRunId { get; private set; }
 
     /// <summary>What <see cref="RunSummaryPage"/> shows: this live run, or a detached copy of a historical run.</summary>
-    public RunViewModel SummaryView { get; private set; }
+    public RunViewModel SummaryView
+    {
+        get => _summaryView;
+        private set => SetProperty(ref _summaryView, value);
+    }
 
     /// <summary>Host of the environment the last run targeted, e.g. <c>contoso.crm.dynamics.com</c>.</summary>
     public string EnvironmentLabel => _environmentHost;
@@ -213,12 +224,18 @@ public sealed partial class RunViewModel : ObservableObject
         string environmentHost,
         IReadOnlyList<string> tables,
         int plannedTotal,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IReadOnlyDictionary<string, string>? tableLabels = null,
+        string? profileName = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(tables);
         if (_generation is null)
             throw new InvalidOperationException("Generation service is not configured.");
+
+        // History-row labels (logical → display name, profile). A retry passes null and reuses the first run's.
+        _tableLabels = tableLabels ?? _tableLabels;
+        _profileName = profileName ?? _profileName;
 
         _lastConfig = config with { AllowRiskyBogusValues = false };
         _environmentHost = string.IsNullOrWhiteSpace(environmentHost) ? TargetHost : environmentHost;
@@ -226,6 +243,9 @@ public sealed partial class RunViewModel : ObservableObject
         _plannedTotal = plannedTotal;
         _seed = config.Seed;
         CurrentRunId = Guid.NewGuid();
+
+        // WR-001: a close confirmed during preparation must not raise the risky-values prompt.
+        ct.ThrowIfCancellationRequested();
 
         if (!config.AllowRiskyBogusValues && ContainsRiskyBogus(config))
         {
@@ -241,15 +261,18 @@ public sealed partial class RunViewModel : ObservableObject
         _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var progress = new Progress<ProgressUpdate>(u => AcceptProgress(u, tables, plannedTotal));
 
+        var cancelled = false;
+        GenerationResult? result = null;
         try
         {
-            var result = await _generation.GenerateAsync(config, progress, _runCts.Token);
+            result = await _generation.GenerateAsync(config, progress, _runCts.Token);
             ApplyResult(result, config.Seed, _environmentHost, config);
             return result;
         }
         catch (OperationCanceledException)
         {
             StatusHeadline = "Cancelled";
+            cancelled = true;
             throw;
         }
         finally
@@ -257,10 +280,48 @@ public sealed partial class RunViewModel : ObservableObject
             IsRunning = false;
             _runClock.Stop();
             _clockTimer?.Stop();
+
             // Hold the completed sheet up until manual Close when the user asked to keep it open.
             IsSheetVisible = KeepWindowOpen;
             _runCts?.Dispose();
             _runCts = null;
+
+            // WR-002/IN-009: one History row for every run or retry that returned a result or
+            // failed. A cancel that throws wrote nothing, so it has no row.
+            if (!cancelled)
+                await RecordRunAsync(result);
+
+            // IN-008: History can replace the summary while a run is active or finishing; restore the live result before returning.
+            ShowLive();
+        }
+    }
+
+    private async Task RecordRunAsync(GenerationResult? result)
+    {
+        if (_history is null)
+            return;
+
+        try
+        {
+            await _history.AddRunAsync(new RunRecord(
+                CurrentRunId,
+                DateTimeOffset.Now,
+                [.. _plannedTables.Select(t => _tableLabels.GetValueOrDefault(t, t))],
+                result?.TotalRecords ?? 0,
+                result?.Elapsed ?? TimeSpan.Zero,
+                result is { Cancelled: false, Errors.Count: 0 },
+                result?.Errors.Sum(e => e.RowCount) ?? 0,
+                EnvironmentLabel,
+                UserLabel,
+                _profileName,
+                ActivityLines));
+        }
+        catch (Exception ex)
+        {
+            // A History failure is not a generation failure — report it on its own.
+            _logger?.LogError(ex, "Failed to record the run in history");
+            _snackbar?.Show("Couldn't save run history", ex.Message,
+                ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
         }
     }
 
@@ -599,9 +660,11 @@ public sealed partial class RunViewModel : ObservableObject
                     "Cancel run",
                     close: "Keep running");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return;
+                // IN-007: the user already clicked Cancel; a broken dialog host must not swallow it.
+                _logger?.LogWarning(ex, "Cancel confirmation dialog failed; cancelling without it");
+                confirmed = true;
             }
         }
 
@@ -611,6 +674,12 @@ public sealed partial class RunViewModel : ObservableObject
         StatusHeadline = "Cancelling…";
         _runCts?.Cancel();
     }
+
+    /// <summary>
+    /// Cancels the run's token with no prompt. <see cref="RunCloseGuard"/> has already asked;
+    /// <see cref="CancelCommand"/> would show a second, differently worded confirm.
+    /// </summary>
+    internal void CancelForClose() => _runCts?.Cancel();
 
     [RelayCommand]
     private void ExportRejectedCsv()
@@ -625,10 +694,10 @@ public sealed partial class RunViewModel : ObservableObject
             sb.AppendLine("Table,Cause,Rows,Disposition,Retryable");
             foreach (var group in _allRejectionGroups)
             {
-                sb.Append(Csv(group.TableName)).Append(',');
-                sb.Append(Csv(group.CauseText)).Append(',');
+                sb.Append(CsvField.Escape(group.TableName)).Append(',');
+                sb.Append(CsvField.Escape(group.CauseText)).Append(',');
                 sb.Append(group.RowCount).Append(',');
-                sb.Append(Csv(group.DispositionLabel)).Append(',');
+                sb.Append(CsvField.Escape(group.DispositionLabel)).Append(',');
                 sb.AppendLine(group.IsRetryable ? "true" : "false");
             }
 
@@ -665,9 +734,9 @@ public sealed partial class RunViewModel : ObservableObject
         {
             await _dialogs.ShowAlertAsync("Activity log", body, "Close");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Dialog host missing.
+            _logger?.LogWarning(ex, "Could not show the activity log dialog");
         }
     }
 
@@ -685,9 +754,9 @@ public sealed partial class RunViewModel : ObservableObject
             var loaded = await _settings.LoadAsync();
             KeepWindowOpen = loaded.KeepRunSheetOpen;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Keep default.
+            _logger?.LogWarning(ex, "Could not read KeepRunSheetOpen; keeping the default");
         }
     }
 
@@ -890,12 +959,5 @@ public sealed partial class RunViewModel : ObservableObject
         if (t.TotalMinutes >= 1)
             return $"{(int)t.TotalMinutes}m {t.Seconds}s";
         return $"{Math.Max(0, (int)t.TotalSeconds)}s";
-    }
-
-    private static string Csv(string value)
-    {
-        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
-            return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
-        return value;
     }
 }

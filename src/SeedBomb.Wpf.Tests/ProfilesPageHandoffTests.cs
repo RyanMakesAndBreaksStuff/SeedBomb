@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Generation;
-using SeedBomb.Services.History;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
@@ -27,7 +26,6 @@ public sealed class ProfilesPageHandoffTests
     {
         metadataMock = new Mock<IMetadataProvider>();
         return new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(),
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),
@@ -111,7 +109,6 @@ public sealed class ProfilesPageHandoffTests
 
         Assert.NotNull(applied);
         Assert.Same(vm.PendingImport, applied);
-        Assert.True(vm.AppliedToBoard);
     }
 
     // ── T1: cold-start profile metadata (no prior Rules visit) ────────────────

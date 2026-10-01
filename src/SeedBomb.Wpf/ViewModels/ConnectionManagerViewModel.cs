@@ -112,9 +112,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Gets whether the last connection switch failed.</summary>
     public bool HasSwitchError => SwitchError is not null;
 
-    /// <summary>Handoff alias for <see cref="CancelCommand"/>.</summary>
-    public IRelayCommand CancelEditCommand => CancelCommand;
-
     private bool IsNewProfile => EditingProfile is { } p && Profiles.All(x => x.Id != p.Id);
 
     /// <summary>Gets whether the Save button should show: a never-saved profile, or unsaved edits.</summary>
@@ -210,35 +207,27 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
 
     private bool CanSelectProfile() => !IsSwitchingConnection && !RunIsWriting;
 
-    /// <summary>Starts editing an existing profile, loading its secret on demand.</summary>
+    /// <summary>Starts editing an existing profile. Its saved secret stays encrypted.</summary>
     [RelayCommand]
-    private async Task EditProfileAsync(ConnectionProfile profile)
+    private void EditProfile(ConnectionProfile profile)
     {
         SwitchError = null;
-        try
+        // IN-014: browsing connections must not decrypt secrets. A null ClientSecret saves as
+        // "keep the stored one", and SignInAppOnlyAsync reads the stored one when it needs it.
+        EditingProfile = new ConnectionProfile
         {
-            EditingProfile = new ConnectionProfile
-            {
-                Id = profile.Id,
-                Name = profile.Name,
-                EnvironmentUrl = profile.EnvironmentUrl,
-                EnvironmentType = profile.EnvironmentType,
-                AuthType = profile.AuthType,
-                ClientId = profile.ClientId,
-                TenantId = profile.TenantId,
-                ClientSecret = await _profileService.GetSecretAsync(profile.Id),
-                CertificateThumbprint = profile.CertificateThumbprint,
-            };
-            IsEditing = true;
-            IsDirty = false;
-        }
-        catch (Exception ex)
-        {
-            // A profile copied from another machine or account cannot be DPAPI-decrypted here
-            // (CurrentUser scope). Surface it in the existing banner instead of killing the app
-            // via the fire-and-forget call in OnSelectedProfileChanged.
-            SwitchError = ex.Message;
-        }
+            Id = profile.Id,
+            Name = profile.Name,
+            EnvironmentUrl = profile.EnvironmentUrl,
+            EnvironmentType = profile.EnvironmentType,
+            AuthType = profile.AuthType,
+            ClientId = profile.ClientId,
+            TenantId = profile.TenantId,
+            HasSavedSecret = profile.HasSavedSecret,
+            CertificateThumbprint = profile.CertificateThumbprint,
+        };
+        IsEditing = true;
+        IsDirty = false;
     }
 
     /// <summary>Persists the editing profile. Connecting is a separate, explicit step (<see cref="ConnectAsync"/>).</summary>
@@ -278,7 +267,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         && IsValidHttpsUrl(p.EnvironmentUrl)
         && p.AuthType switch
         {
-            AuthType.ClientSecret => !string.IsNullOrWhiteSpace(p.ClientSecret),
+            AuthType.ClientSecret => p.HasSavedSecret || !string.IsNullOrWhiteSpace(p.ClientSecret),
             AuthType.Certificate => !string.IsNullOrWhiteSpace(p.CertificateThumbprint),
             _ => true,
         };
@@ -299,6 +288,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                     "Delete"))
                 return;
 
+            // WR-015: purge the cached MSAL refresh token before the profile record itself
+            // disappears — the delete confirmation promises credential removal.
+            await _authService.ForgetProfileAsync(profile);
             await _profileService.DeleteAsync(profile.Id);
             await LoadAsync();
 
@@ -416,6 +408,6 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     partial void OnSelectedProfileChanged(ConnectionProfile? value)
     {
         if (value is not null)
-            _ = EditProfileAsync(value);
+            EditProfile(value);
     }
 }

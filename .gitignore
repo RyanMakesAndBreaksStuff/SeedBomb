@@ -58,16 +58,12 @@ TestResult.xml
 nunit-*.xml
 /.vs
 .agent/*
-/src/SeedBomb.Web/appsettings.json
 /supervisor
 /teamplan.md
 /.claude/settings.local.json
 /.claude/settings.json
-/src/SeedBomb.Web/appsettings.json
-/src/SeedBomb.Web/Properties/serviceDependencies.local.json
 /Docs/imgs
 /tasks/todo.md
-/src/SeedBomb.Web/appsettings.Development.json
 *.csv
 /Docs/5-18-26_plan_to_cleanup_data_generated.md
 /Docs
@@ -78,7 +74,6 @@ nunit-*.xml
 AGENTS.md
 /AGENTS.md.lean-ctx.bak
 /displayissue.png
-/src/SeedBomb.Web/wwwroot/appsettings.json
 mocks/mock-1-mica-light.html
 mocks/mock-2-dark-slate.html
 mocks/mock-3-centered-modal.html

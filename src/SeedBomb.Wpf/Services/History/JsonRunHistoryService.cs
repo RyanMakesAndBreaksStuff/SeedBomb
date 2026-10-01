@@ -18,6 +18,9 @@ public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
     private readonly ILogger<JsonRunHistoryService>? _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    /// <inheritdoc />
+    public string? LoadWarning { get; private set; }
+
     /// <summary>Stores history in <c>%LOCALAPPDATA%\SeedBomb\history.json</c>.</summary>
     /// <param name="logger">Warns when an unreadable history file is moved aside.</param>
     public JsonRunHistoryService(ILogger<JsonRunHistoryService> logger)
@@ -91,6 +94,7 @@ public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
         {
             // WR-008: keep the unreadable file — the next write would otherwise erase every past run.
             var kept = AtomicFile.Quarantine(_filePath);
+            LoadWarning = $"Run history could not be read, so SeedBomb started without it. The file was kept at {kept}.";
             _logger?.LogWarning(ex, "Run history was unreadable; moved it to {Path} and started empty", kept);
             return [];
         }
@@ -100,6 +104,7 @@ public sealed class JsonRunHistoryService : IRunHistoryService, IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
         await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(list, JsonOptions), ct).ConfigureAwait(false);
+        LoadWarning = null;
     }
 
     /// <inheritdoc />

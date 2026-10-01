@@ -271,6 +271,13 @@
                                 <TextBlock Style="{DynamicResource DG.Secondary}"
                                            TextWrapping="Wrap"
                                            Margin="0,7,0,0"
+                                           Text="A secret is saved. Leave this blank to keep it, or type a new one to replace it."
+                                           Visibility="{Binding EditingProfile.HasSavedSecret,
+                                                       Converter={StaticResource BoolToVisibilityConverter},
+                                                       FallbackValue=Collapsed}" />
+                                <TextBlock Style="{DynamicResource DG.Secondary}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,7,0,0"
                                            Text="Advanced: requires your own Entra app registration. The secret is encrypted at rest with DPAPI but is recoverable by anyone signed in as you — prefer a certificate." />
                             </StackPanel>
 
@@ -372,7 +379,7 @@
                                 </Button>
 
                                 <Button Style="{DynamicResource DG.Button}"
-                                        Command="{Binding CancelEditCommand}"
+                                        Command="{Binding CancelCommand}"
                                         Content="Cancel" Margin="0,4,10,4" />
 
                                 <!-- Save and Connect are mutually exclusive: Save while unsaved/dirty,

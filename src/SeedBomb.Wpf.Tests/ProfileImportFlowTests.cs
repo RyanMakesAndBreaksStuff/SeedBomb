@@ -5,13 +5,15 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Generation;
-using SeedBomb.Services.History;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
 using SeedBomb.ViewModels.Controls;
+using SeedBomb.Wpf.Tests.Views;
 using System.Text.Json;
+using System.Windows.Threading;
 using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -175,7 +177,7 @@ public sealed class ProfileImportFlowTests : IDisposable
         {
             ["account"] = report.BoardRules["account"].ToDictionary(
                 kv => kv.Key,
-                kv => new RuleDraftEntry(kv.Value, kv.Key, ""),
+                kv => new RuleDraftEntry(kv.Value),
                 StringComparer.OrdinalIgnoreCase),
         };
         importBoard.ReplaceDraft(draft);
@@ -277,7 +279,6 @@ public sealed class ProfileImportFlowTests : IDisposable
             .ReturnsAsync(metadata);
 
         var vm = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(),
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),
@@ -538,5 +539,94 @@ public sealed class ProfileImportFlowTests : IDisposable
         await vm.ImportFromPathAsync(await WriteSourceAsync(HandTooledProfileJson), TestContext.Current.CancellationToken);
 
         Assert.Null(vm.PendingImport);
+    }
+
+    [StaFact]
+    public void Dirty_board_import_asks_through_the_themed_dialog()
+    {
+        // WR-020: with ProfilesPage's MessageBox override gone and no seam wired, a dirty board
+        // must still be confirmed, not overwritten silently.
+        // ConfirmAsync builds a ContentDialog after the import's file awaits. StaFact starts on
+        // an STA thread but does not pump one, so keep those continuations here.
+        if (SynchronizationContext.Current is null)
+            SynchronizationContext.SetSynchronizationContext(
+                new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+
+        var dialogs = new Mock<IContentDialogService>();
+        dialogs.Setup(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ContentDialogResult.None);
+        var vm = new ProfilesViewModel(NewService(out _), dialogs: dialogs.Object)
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+            IsBoardDirty = () => true,
+        };
+
+        var write = WriteSourceAsync(HandTooledProfileJson);
+        Wait(write);
+        var import = vm.ImportFromPathAsync(write.GetAwaiter().GetResult(), TestContext.Current.CancellationToken);
+        Wait(import);
+
+        dialogs.Verify(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Null(vm.PendingImport);
+
+        static void Wait(Task task)
+        {
+            if (!task.IsCompleted)
+            {
+                var frame = new DispatcherFrame();
+                task.ContinueWith(
+                    _ => frame.Continue = false,
+                    CancellationToken.None,
+                    TaskContinuationOptions.None,
+                    TaskScheduler.FromCurrentSynchronizationContext());
+                Dispatcher.PushFrame(frame);
+            }
+
+            task.GetAwaiter().GetResult();
+        }
+    }
+
+    [Fact]
+    public async Task Import_of_a_same_name_profile_confirms_before_overwriting()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var svc = NewService(out var root);
+        await svc.SaveAsync(new Profile(1, "acme-sales", null, null, [new ProfileTable("account", 1, null)]), ct);
+        var path = Path.Combine(root, "acme-sales.profile.json");
+        var before = await File.ReadAllTextAsync(path, ct);
+
+        string? prompt = null;
+        var vm = new ProfilesViewModel(svc)
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+            ConfirmOverwrite = message => { prompt = message; return true; },
+        };
+
+        var json = """{"profileVersion":1,"name":"acme-sales","tables":[{"table":"account","count":5}]}""";
+        await vm.ImportFromPathAsync(await WriteSourceAsync(json), ct);
+
+        Assert.NotNull(prompt);
+        var after = await File.ReadAllTextAsync(path, ct);
+        Assert.NotEqual(before, after);
+        Assert.Contains("\"count\": 5", after, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportFromPathAsync_ShowsImportSummary_WhenTheStoreThrows()
+    {
+        var profiles = new Mock<IProfileService>();
+        // Task 7 added the optional allowOverwrite parameter; expression trees cannot omit it (CS0854).
+        profiles.Setup(p => p.ImportAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ThrowsAsync(new IOException("import.profile.json is locked"));
+
+        var vm = new ProfilesViewModel(profiles.Object)
+        {
+            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
+        };
+
+        await vm.ImportFromPathAsync(@"C:\temp\import.profile.json", TestContext.Current.CancellationToken);
+
+        Assert.True(vm.ShowImportSummary);
+        Assert.Equal("import.profile.json is locked", vm.SchemaErrorMessage);
     }
 }

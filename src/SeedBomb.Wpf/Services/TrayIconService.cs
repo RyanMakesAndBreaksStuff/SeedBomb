@@ -83,7 +83,22 @@ public sealed class TrayIconService : IDisposable
     private static ContextMenu BuildContextMenu()
     {
         var exit = new MenuItem { Header = "Exit" };
-        exit.Click += (_, _) => Application.Current?.Shutdown();
+        // WR-001: Shutdown() skipped MainWindow's Closing guard, and with it the run's cancel and
+        // History write. Close() takes the same path as the title-bar button.
+        exit.Click += (_, _) =>
+        {
+            if (Application.Current?.MainWindow is not { } window)
+            {
+                Application.Current?.Shutdown();
+                return;
+            }
+
+            // The close confirm is a dialog inside the window, so it must be visible to answer.
+            if (window.WindowState == WindowState.Minimized)
+                window.WindowState = WindowState.Normal;
+            window.Activate();
+            window.Close();
+        };
 
         var menu = new ContextMenu();
         menu.Items.Add(exit);

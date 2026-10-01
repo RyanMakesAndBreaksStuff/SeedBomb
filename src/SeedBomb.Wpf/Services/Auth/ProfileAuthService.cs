@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
@@ -22,7 +23,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private sealed record CachedClient(object Client, string Fingerprint);
 
     private readonly IConnectionProfileService _profiles;
-    private readonly Dictionary<Guid, CachedClient> _clients = [];
+    // IN-003: written after ConfigureAwait(false) continuations and cleared from pool threads.
+    private readonly ConcurrentDictionary<Guid, CachedClient> _clients = new();
     private IAccount? _account;
     private MsalCacheHelper? _userCacheHelper;
     private MsalCacheHelper? _appCacheHelper;
@@ -242,6 +244,29 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     /// <inheritdoc />
     public event EventHandler? SignedOut;
+
+    /// <inheritdoc />
+    public async Task ForgetProfileAsync(ConnectionProfile profile, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (profile.AuthType != AuthType.OAuth || profile.HomeAccountId is not { } homeAccountId)
+            return;
+
+        try
+        {
+            // Reuses the same client-building path as sign-in (GetOrCreatePca); commitSession:
+            // false builds a throwaway client (like TestConnectionAsync) instead of touching
+            // _clients, since the profile is about to be deleted.
+            var pca = await GetOrCreatePca(profile, commitSession: false).ConfigureAwait(false);
+            var account = await pca.GetAccountAsync(homeAccountId).ConfigureAwait(false);
+            if (account is not null)
+                await pca.RemoveAsync(account).ConfigureAwait(false);
+        }
+        catch (MsalException ex)
+        {
+            _logger?.LogWarning(ex, "Could not remove the cached account for deleted profile {Profile}", profile.Name);
+        }
+    }
 
     private async Task<AuthResult> SignInOAuthAsync(
         ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)
@@ -479,7 +504,6 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             var h when h.EndsWith(".crm.microsoftdynamics.us", StringComparison.OrdinalIgnoreCase)
                        || h.EndsWith(".crm.appsplatform.us", StringComparison.OrdinalIgnoreCase)
-                       || h.EndsWith(".crm.microsoftdynamics.de", StringComparison.OrdinalIgnoreCase)
                 => AzureCloudInstance.AzureUsGovernment,
             var h when h.EndsWith(".crm.dynamics.cn", StringComparison.OrdinalIgnoreCase)
                 => AzureCloudInstance.AzureChina,
@@ -528,8 +552,10 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             if (!ShouldDropSession(active, remaining.Select(p => p.Id)))
                 return;
         }
-        catch
+        catch (Exception ex)
         {
+            // Keep the session when the store can't be read, but record why.
+            _logger?.LogWarning(ex, "Could not re-read connection profiles; keeping the current session");
             return;
         }
 

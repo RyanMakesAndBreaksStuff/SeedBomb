@@ -33,7 +33,7 @@
                         </Grid.ColumnDefinitions>
                         <Image Grid.Column="0" Width="48" Height="48" Margin="0,0,16,0"
                                VerticalAlignment="Top"
-                               Source="pack://application:,,,/Resources/logo-256.png"
+                               Source="{DynamicResource DG.Logo}"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                AutomationProperties.Name="SeedBomb logo" />
                         <StackPanel Grid.Column="1">
@@ -105,7 +105,7 @@
                         <TextBlock Style="{DynamicResource DG.CardTitle}" Text="Open-source software" />
                         <TextBlock Style="{DynamicResource DG.Tertiary}" Margin="0,4,0,0"
                                    Text="{Binding NoticeError}" TextWrapping="Wrap"
-                                   Visibility="{Binding HasNoticeError, Converter={StaticResource BoolToVisible}}" />
+                                   Visibility="{Binding HasNoticeError, Converter={StaticResource BoolToVisibilityConverter}}" />
                         <ItemsControl ItemsSource="{Binding Featured}" Margin="0,12,0,0">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>

@@ -100,18 +100,20 @@
                         <TextBox Style="{DynamicResource DG.TextBox}"
                                  Text="{Binding LookupInput.GuidText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  AutomationProperties.Name="Comma-separated record GUIDs" />
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <!-- Wraps so "Clear selected" drops to a new line instead of clipping in a narrow pane. -->
+                        <WrapPanel Margin="0,8,0,0">
                             <Button Style="{DynamicResource DG.Button}"
-                                    Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}" />
+                                    Content="Add GUIDs" Command="{Binding LookupInput.AppendManualCommand}"
+                                    Margin="0,0,8,8" />
                             <Button Style="{DynamicResource DG.Button}"
                                     Content="Choose records…" Command="{Binding PickLookupRecordsCommand}"
-                                    Margin="8,0,0,0" />
+                                    Margin="0,0,8,8" />
                             <Button Style="{DynamicResource DG.Button}"
                                     Content="Clear selected" Command="{Binding LookupInput.ClearCommand}"
-                                    Margin="8,0,0,0" />
-                        </StackPanel>
+                                    Margin="0,0,8,8" />
+                        </WrapPanel>
                         <ListBox Style="{DynamicResource DG.ListBox}"
-                                 ItemsSource="{Binding LookupInput.Records}" Height="120" Margin="0,8,0,0"
+                                 ItemsSource="{Binding LookupInput.Records}" Height="120"
                                  ScrollViewer.CanContentScroll="True" VirtualizingPanel.IsVirtualizing="True"
                                  VirtualizingPanel.VirtualizationMode="Recycling">
                             <ListBox.ItemTemplate>

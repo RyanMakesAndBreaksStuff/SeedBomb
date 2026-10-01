@@ -58,6 +58,26 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveAsync_ClampsDefaultDopToMaxDop()
+    {
+        AppSettings? saved = null;
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AppSettings.Default);
+        settings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>(), It.IsAny<CancellationToken>()))
+            .Callback<AppSettings, CancellationToken>((s, _) => saved = s)
+            .Returns(Task.CompletedTask);
+
+        var vm = new SettingsViewModel(settings.Object, Mock.Of<ILogger<SettingsViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.DefaultDop = 64;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(GenerateViewModel.MaxDop, saved?.DefaultDop);
+    }
+
+    [Fact]
     public async Task KeepRunSheetOpen_RoundTripsThroughLoadAndSave()
     {
         AppSettings? saved = null;
@@ -98,5 +118,28 @@ public sealed class SettingsViewModelTests
 
         Assert.True(raised);
         Assert.True(vm.SignOutCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenLoadFails_BlocksSaveUntilNextSuccessfulLoad()
+    {
+        // WR-004: a load failure left _loadedSettings at AppSettings.Default. Any later appearance
+        // toggle or a Save click then persisted AppSettings.Default over the user's real record
+        // count, batch size, DOP and KeepRunSheetOpen.
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("locked by antivirus"));
+
+        var snackbar = new Mock<ISnackbarService>();
+        var vm = new SettingsViewModel(
+            settings.Object, Mock.Of<ILogger<SettingsViewModel>>(), snackbar.Object);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        snackbar.Verify(s => s.Show(
+            It.IsAny<string>(), It.IsAny<string>(),
+            ControlAppearance.Danger, It.IsAny<IconElement?>(), It.IsAny<TimeSpan>()),
+            Times.Once);
     }
 }

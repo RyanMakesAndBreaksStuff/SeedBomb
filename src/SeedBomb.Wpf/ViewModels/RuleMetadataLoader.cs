@@ -115,11 +115,11 @@ public sealed class RuleMetadataLoader
     /// <summary>Maps a live-fetch exception to the banner/snackbar copy.</summary>
     public static string DescribeFailure(Exception ex) => ex switch
     {
-        SchemaException schema => schema.Message,
         InvalidOperationException invalid => invalid.Message,
-        FaultException<OrganizationServiceFault> fault =>
+        SchemaException { InnerException: FaultException<OrganizationServiceFault> fault } =>
             $"Dataverse error {fault.Detail.ErrorCode}: {fault.Detail.Message}",
-        FaultException fault => fault.Message,
+        SchemaException { InnerException: FaultException fault } => fault.Message,
+        SchemaException schema => schema.Message,
         _ => ex.Message,
     };
 

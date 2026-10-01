@@ -3,7 +3,10 @@ using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Generation;
+using SeedBomb.Services.History;
 using SeedBomb.ViewModels;
+using Wpf.Ui;
+using Wpf.Ui.Controls;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -242,6 +245,31 @@ public sealed class RunViewModelTests
     }
 
     [Fact]
+    public void ExportRejectedCsv_EscapesLeadingFormulaCharacterInCause()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dg-rejected", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var vm = new RunViewModel { ExportDirectoryOverride = root };
+            vm.ApplyResult(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "=cmd|'/c calc'!A1", null)],
+            }, seed: 1, environmentHost: "contoso-dev");
+
+            vm.ExportRejectedCsvCommand.Execute(null);
+
+            var written = Assert.Single(Directory.GetFiles(root, "seedbomb-rejected-*.csv"));
+            var line = File.ReadAllLines(written)[1];
+            Assert.Contains("'=cmd", line, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+    [Fact]
     public void ExportRejectedCsv_WhenDirectoryIsUnusable_DoesNotThrow()
     {
         var root = Path.Combine(Path.GetTempPath(), "dg-rejected", Guid.NewGuid().ToString("N"));
@@ -416,5 +444,108 @@ public sealed class RunViewModelTests
 
         vm.ShowHistorical(run with { ActivityLog = null });
         Assert.Empty(vm.SummaryView.ActivityLines);
+    }
+
+    [Fact]
+    public async Task Cancel_WhenTheDialogHostFails_StillCancelsTheRun()
+    {
+        // IN-007: the catch returned silently, so Cancel did nothing at all.
+        var dialogs = new Mock<IContentDialogService>();
+        dialogs.Setup(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("No dialog host"));
+        var vm = new RunViewModel(contentDialogService: dialogs.Object) { IsRunning = true };
+
+        await vm.CancelCommand.ExecuteAsync(null);
+
+        Assert.Equal("Cancelling…", vm.StatusHeadline);
+    }
+
+    [Fact]
+    public void StartRun_AfterViewingAHistoricalRun_NotifiesSummaryView()
+    {
+        // IN-008: re-navigating to the summary page already on screen is a no-op in WPF-UI, so
+        // the page must learn about the swap back to the live run from this notification.
+        var vm = new RunViewModel();
+        vm.ShowHistorical(new RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["contact"], 3,
+            TimeSpan.FromSeconds(2), true, 0));
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.StartRun("contoso-dev", 42, 1, ["account"]);
+
+        Assert.Same(vm, vm.SummaryView);
+        Assert.Contains(nameof(RunViewModel.SummaryView), raised);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenHistoricalRunIsOpenedDuringGeneration_ShowsLiveRunOnCompletion()
+    {
+        var completed = new TaskCompletionSource<GenerationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var generation = new Mock<IWpfGenerationService>();
+        generation.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => completed.Task);
+        var vm = new RunViewModel(generation: generation.Object) { KeepWindowOpen = false };
+
+        var running = vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+                Seed = 42,
+            },
+            "contoso-dev", ["account"], 1, TestContext.Current.CancellationToken);
+        vm.ShowHistorical(new SeedBomb.Services.History.RunRecord(Guid.NewGuid(), DateTimeOffset.Now,
+            ["contact"], 3, TimeSpan.FromSeconds(2), true, 0));
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        completed.SetResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+        });
+        await running;
+
+        Assert.False(vm.IsSheetVisible); // Keep Window Open is off.
+        Assert.Same(vm, vm.SummaryView);
+        Assert.Contains(nameof(RunViewModel.SummaryView), raised);
+    }
+
+    [Fact]
+    public async Task RetrySelected_AddsAHistoryRow_WithTheFirstRunsLabels()
+    {
+        // IN-009: retries wrote to Dataverse but never reached GenerateViewModel's History write.
+        var gen = new Mock<IWpfGenerationService>();
+        gen.SetupSequence(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
+                Elapsed = TimeSpan.FromSeconds(1),
+                Errors = [new BatchError("account", 0, "request throttled", -2147015902, 2)],
+            })
+            .ReturnsAsync(new GenerationResult
+            {
+                CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid(), Guid.NewGuid()] },
+                Elapsed = TimeSpan.FromSeconds(1),
+            });
+        var history = new Mock<IRunHistoryService>();
+        var vm = new RunViewModel(generation: gen.Object, history: history.Object);
+        await vm.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 2 },
+            },
+            "contoso-dev", ["account"], 2, TestContext.Current.CancellationToken,
+            tableLabels: new Dictionary<string, string> { ["account"] = "Account" }, profileName: "sales");
+
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+
+        history.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => r.Id == vm.CurrentRunId && r.Succeeded && r.TotalRecords == 2
+                && r.EntityNames.Single() == "Account" && r.Profile == "sales"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

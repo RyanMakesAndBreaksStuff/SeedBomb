@@ -146,6 +146,18 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public void ReviewHasErrors_FollowsReviewMessages()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+
+        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Error, "boom")];
+        Assert.True(viewModel.ReviewHasErrors);
+
+        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Warning, "heads up")];
+        Assert.False(viewModel.ReviewHasErrors);
+    }
+
+    [Fact]
     public async Task PreflightErrorsBlockStart()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
@@ -224,6 +236,27 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GenerateAsync_ClampsMaxParallelismToMaxDop()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
+        fieldRules.SetRule("account", "name",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+        viewModel.GoToReviewCommand.Execute(null);
+        viewModel.MaxParallelism = 64;
+
+        GenerationConfig? captured = null;
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Callback<GenerationConfig, IProgress<ProgressUpdate>, CancellationToken>((cfg, _, _) => captured = cfg)
+            .ReturnsAsync(new GenerationResult());
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.NotNull(captured);
+        Assert.Equal(GenerateViewModel.MaxDop, captured!.MaxParallelism);
+    }
+
+    [Fact]
     public async Task GoToReview_BogusRule_UsesContextAndSessionPreview()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
@@ -239,6 +272,33 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GoToReview_BogusRule_ExceedingMaxLength_SurfacesAsReviewErrorInsteadOfThrowing()
+    {
+        // MaxLength 3 guarantees an overflow: NAME.firstName/row 0/seed 42 deterministically
+        // generates "Kurtis" (6 chars) — see GoToReview_BogusRule_UsesContextAndSessionPreview.
+        var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 3 };
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { name });
+
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[meta]);
+        var fieldRules = new FieldRulesViewModel();
+        viewModel.AttachFieldRules(fieldRules);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.True(viewModel.ReviewHasErrors);
+        Assert.Contains(viewModel.ReviewMessages,
+            m => m.Severity == RuleMessageSeverity.Error && m.Text.Contains("MaxLength", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task OnNavigatedToAppliesSettingsAndNotifiesDefaultRecordCount()
     {
         var settingsMock = new Mock<ISettingsService>();
@@ -250,7 +310,6 @@ public sealed class GenerateViewModelStepTests
                 DefaultDop: 4));
 
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             settingsMock.Object,
             Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(),
@@ -272,61 +331,6 @@ public sealed class GenerateViewModelStepTests
         Assert.Equal(250, viewModel.BatchSize);
         Assert.Equal(4, viewModel.MaxParallelism);
         Assert.Contains(nameof(GenerateViewModel.DefaultRecordCount), notified);
-    }
-
-    [Fact]
-    public void QueueTracksEntitiesAcrossProgressAndErrors()
-    {
-        var viewModel = CreateViewModel(out _, out _, out _);
-        viewModel.OnEntitiesChanged(
-        [
-            new EntitySummary("account", "Account", false),
-            new EntitySummary("contact", "Contact", false),
-        ]);
-
-        Assert.Equal(
-            ["account", "contact"],
-            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
-
-        viewModel.CurrentProgress = new ProgressUpdate(
-            "Generating", "account", 1, 10, 1, 2, 0, TimeSpan.Zero);
-
-        Assert.Equal(
-            ["account", "contact"],
-            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
-
-        viewModel.LastResult = new GenerationResult
-        {
-            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
-            {
-                ["account"] = [Guid.NewGuid()],
-            },
-            Errors = [new BatchError("contact", 0, "failed", null)],
-        };
-
-        Assert.Equal(
-            ["account", "contact"],
-            viewModel.QueuedEntities.Select(e => e.Entity.LogicalName).ToArray());
-    }
-
-    [Fact]
-    public void LastRunStatusTextReportsErrorsWhenPresent()
-    {
-        var viewModel = CreateViewModel(out _, out _, out _);
-        viewModel.LastResult = new GenerationResult
-        {
-            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
-            {
-                ["account"] = [Guid.NewGuid()],
-            },
-            Errors =
-            [
-                new BatchError("account", 0, "plugin failed", 123),
-            ],
-        };
-
-        Assert.True(viewModel.LastRunHasErrors);
-        Assert.Contains("plugin failed", viewModel.LastRunStatusText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -392,34 +396,12 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public async Task CancelDiscardsDraftAndNeverCallsGenerate()
-    {
-        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
-
-        // Nothing has been committed yet — draft additions must vanish on Cancel.
-        fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
-        Assert.NotEmpty(fieldRules.Rows);
-
-        viewModel.CancelDraftCommand.Execute(null);
-
-        Assert.Empty(fieldRules.Rows);
-        Assert.Null(viewModel.ReviewedRules);
-        Assert.False(viewModel.IsReviewOpen);
-        Assert.Equal(0, viewModel.CurrentStep);
-        generationMock.Verify(
-            g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()),
-            Times.Never);
-    }
-
-    [Fact]
     public async Task OnNavigatedTo_does_not_overwrite_batch_when_tables_already_selected()
     {
         var settingsMock = new Mock<ISettingsService>();
         settingsMock.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AppSettings(10, 250, 4));
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             settingsMock.Object, Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -459,7 +441,6 @@ public sealed class GenerateViewModelStepTests
         // and Edit rules on the Profiles page then inherited them.
         var request = new RulesNavigationRequest();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -531,7 +512,6 @@ public sealed class GenerateViewModelStepTests
     {
         var profiles = new Mock<IProfileService>();
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             profiles.Object, Mock.Of<IContentDialogService>(),
@@ -543,10 +523,9 @@ public sealed class GenerateViewModelStepTests
         var fieldRules = new FieldRulesViewModel();
         viewModel.AttachFieldRules(fieldRules);
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        fieldRules.SelectTable("account");
         fieldRules.SetRule("account", "name",
             new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
-        Assert.NotEmpty(fieldRules.Rows);
+        Assert.NotEmpty(fieldRules.GetRules());
         viewModel.Seed = 99;
         viewModel.CurrentStep = 1;
         viewModel.ActiveProfileName = "acme-sales-scenario";
@@ -555,7 +534,7 @@ public sealed class GenerateViewModelStepTests
 
         Assert.Empty(viewModel.SelectedEntities);
         Assert.Equal(0, viewModel.CurrentStep);
-        Assert.Empty(fieldRules.Rows);
+        Assert.Empty(fieldRules.GetRules());
         Assert.Equal(42, viewModel.Seed);
         Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
         profiles.Verify(p => p.ClearDraftAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -653,7 +632,6 @@ public sealed class GenerateViewModelStepTests
             using var profiles = new JsonProfileService(root);
             var generationMock = new Mock<IWpfGenerationService>();
             var vm = new GenerateViewModel(
-                Mock.Of<IRunHistoryService>(),
                 Mock.Of<ISettingsService>(),
                 Mock.Of<ISnackbarService>(),
                 Mock.Of<ILogger<GenerateViewModel>>(),
@@ -664,7 +642,6 @@ public sealed class GenerateViewModelStepTests
 
             var fieldRules = new FieldRulesViewModel();
             vm.AttachFieldRules(fieldRules);
-            fieldRules.SelectTable("account");
             fieldRules.SetRule(
                 "account",
                 "name",
@@ -678,12 +655,10 @@ public sealed class GenerateViewModelStepTests
             Assert.True(File.Exists(draftPath));
 
             await vm.ResetWithoutPromptAsync();
-            fieldRules.DiscardDraft();
             await Task.Delay(800, TestContext.Current.CancellationToken);
 
             Assert.Empty(fieldRules.GetRules());
             Assert.False(fieldRules.IsDirty);
-            Assert.Empty(fieldRules.Rows);
             Assert.False(File.Exists(draftPath));
         }
         finally
@@ -760,7 +735,7 @@ public sealed class GenerateViewModelStepTests
         auth.SetupGet(a => a.ActiveProfile)
             .Returns(new ConnectionProfile { EnvironmentUrl = "https://contoso-prod.crm.dynamics.com" });
         var viewModel = new GenerateViewModel(
-            Mock.Of<IRunHistoryService>(), Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(), Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(), new RunViewModel(Mock.Of<IWpfGenerationService>(), auth: auth.Object));
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
@@ -782,14 +757,13 @@ public sealed class GenerateViewModelStepTests
         snackbarMock = new Mock<ISnackbarService>();
 
         return new GenerateViewModel(
-            historyMock.Object,
             Mock.Of<ISettingsService>(),
             snackbarMock.Object,
             logger ?? Mock.Of<ILogger<GenerateViewModel>>(),
             metadataMock.Object,
             profileService ?? Mock.Of<IProfileService>(),
             Mock.Of<IContentDialogService>(),
-            new RunViewModel(generationMock.Object));
+            new RunViewModel(generationMock.Object, snackbar: snackbarMock.Object, history: historyMock.Object));
     }
 
     private static GenerateViewModel CreateViewModel(
@@ -801,7 +775,6 @@ public sealed class GenerateViewModelStepTests
     /// <summary>Wires the Rules-page handoff so <c>EditRulesCommand</c> fills <paramref name="request"/>.</summary>
     private static GenerateViewModel CreateViewModelWithRulesRequest(RulesNavigationRequest request) =>
         new(
-            Mock.Of<IRunHistoryService>(),
             Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
             Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
             Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
@@ -907,6 +880,96 @@ public sealed class GenerateViewModelStepTests
         Assert.Equal($"account · {id:D}", viewModel.ReviewPreviewRows.Single().Values[0]);
     }
 
+    [Fact]
+    public async Task GenerateAsync_RecordsTheProfileNameCapturedBeforeTheRunStarted()
+    {
+        var viewModel = CreateViewModel(out var generationMock, out _, out var historyMock);
+        viewModel.ActiveProfileName = "before-run";
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+
+        var tcs = new TaskCompletionSource<GenerationResult>();
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(tcs.Task);
+
+        var runTask = viewModel.GenerateCommand.ExecuteAsync(null);
+        viewModel.ActiveProfileName = "loaded-mid-run";
+        tcs.SetResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+        });
+        await runTask;
+
+        historyMock.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => r.Profile == "before-run"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void ApplyImportReport_NoOp_WhileGenerateIsRunning()
+    {
+        var viewModel = CreateViewModel(out _, out _, out _);
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        viewModel.IsRunning = true;
+
+        var report = new ProfileImportReport(
+            new Dictionary<string, Dictionary<string, FieldRule>>(),
+            new Dictionary<string, int>(),
+            null, 0, [], [], [], "imported-profile");
+
+        viewModel.ApplyImportReport(report);
+
+        Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
+    }
+
+    [Fact]
+    public async Task Rules_saves_during_a_run_leave_the_board_alone_until_it_ends_on_both_routes()
+    {
+        // WR-009: Generate's Rules page (request.OnSaved) and the Profiles page's Rules save
+        // (ApplySavedProfileIfActive) both renamed the profile and dropped tables under a live run.
+        var result = new TaskCompletionSource<GenerationResult>();
+        var generation = new Mock<IWpfGenerationService>();
+        generation
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(result.Task);
+        var history = new Mock<IRunHistoryService>();
+        var request = new RulesNavigationRequest();
+        var viewModel = new GenerateViewModel(
+            Mock.Of<ISettingsService>(), Mock.Of<ISnackbarService>(),
+            Mock.Of<ILogger<GenerateViewModel>>(), Mock.Of<IMetadataProvider>(),
+            Mock.Of<IProfileService>(), Mock.Of<IContentDialogService>(),
+            new RunViewModel(generation.Object, history: history.Object),
+            request,
+            Mock.Of<IAppNavigator>());
+        viewModel.OnEntitiesChanged(
+        [
+            new EntitySummary("account", "Account", false),
+            new EntitySummary("contact", "Contact", false),
+        ]);
+        viewModel.ActiveProfileName = "contact-acct";
+        viewModel.EditRulesCommand.Execute(null); // wires request.OnSaved, Generate's route
+        var step = viewModel.CurrentStep;
+        var saved = new Profile(2, "contact-acct", null, 42, [new ProfileTable("account", 10, null)]);
+
+        var run = viewModel.GenerateCommand.ExecuteAsync(null);
+        request.OnSaved!(saved);                     // Generate's Rules page
+        viewModel.ApplySavedProfileIfActive(saved);  // Profiles' Rules page, same loaded profile
+
+        Assert.Equal(["account", "contact"], viewModel.SelectedEntities.Select(e => e.LogicalName));
+        Assert.Equal("contact-acct", viewModel.ActiveProfileName);
+        Assert.Equal(step, viewModel.CurrentStep);
+
+        result.SetResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+        });
+        await run;
+
+        Assert.Equal(["account"], viewModel.SelectedEntities.Select(e => e.LogicalName)); // applied at the end
+        history.Verify(h => h.AddRunAsync(
+            It.Is<RunRecord>(r => r.Profile == "contact-acct" && r.EntityNames.Length == 2),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
     // RuleEditorViewModelTests / SeedBomb.Bulk.Tests/RuledGenerationTests.
     private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)

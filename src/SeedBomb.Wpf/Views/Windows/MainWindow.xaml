@@ -115,7 +115,7 @@
             <ui:NavigationView.PaneFooter>
                 <Button Style="{StaticResource DG.LinkButton}"
                         Opacity="{Binding ConnectedOpacity}"
-                        Command="{Binding OpenConnectionsCommand}"
+                        Command="{Binding OpenConnectionManagerCommand}"
                         HorizontalContentAlignment="Stretch"
                         Margin="8,8,8,12">
                     <Border BorderBrush="{DynamicResource DG.Border}"
@@ -141,7 +141,7 @@
                                            FontSize="{DynamicResource DG.Type.Caption}"
                                            Foreground="{DynamicResource DG.TextNav}"
                                            TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding EnvironmentHost}"
+                                <TextBlock Text="{Binding OrgHost}"
                                            FontSize="{DynamicResource DG.Type.Label}"
                                            Foreground="{DynamicResource DG.Text3}"
                                            TextTrimming="CharacterEllipsis" />
@@ -171,7 +171,7 @@
                     <TextBlock Style="{DynamicResource DG.PageSubtitle}"
                                Text="SeedBomb needs a Dataverse connection before it can generate data." />
                     <Button Style="{DynamicResource DG.PrimaryButton}" Margin="0,20,0,0"
-                            Command="{Binding OpenConnectionsCommand}" Content="Add connection" />
+                            Command="{Binding OpenConnectionManagerCommand}" Content="Add connection" />
                 </StackPanel>
             </Border>
         </Border>
@@ -197,7 +197,7 @@
                          forever with no way to reach Connections and fix or delete it. -->
                     <Button Style="{DynamicResource DG.LinkButton}" Margin="0,8,0,0"
                             HorizontalAlignment="Center"
-                            Command="{Binding OpenConnectionsCommand}" Content="Manage connections" />
+                            Command="{Binding OpenConnectionManagerCommand}" Content="Manage connections" />
 
                     <!-- Bindings for both properties below are wired up in code-behind, with an
                          explicit Source, against the same ConnectionManagerViewModel instance

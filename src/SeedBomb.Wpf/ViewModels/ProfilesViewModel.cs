@@ -48,7 +48,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private readonly IContentDialogService? _dialogs;
     private readonly Dictionary<string, Profile> _profilesByName = new(StringComparer.OrdinalIgnoreCase);
 
-    private List<ProfileListItem> _allItems = [];
     private int _sortMode;
     private CancellationTokenSource? _loadCts;
 
@@ -117,9 +116,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Import-summary caption; version comes from <see cref="Profile.CurrentProfileVersion"/>.</summary>
     public string SchemaValidationCaption =>
         $"Validated against schema v{Profile.CurrentProfileVersion} and this environment's live metadata. Results are applied visually — nothing here is editable text.";
-
-    /// <summary>Alias for <see cref="ImportFromFileCommand"/> (page header binding).</summary>
-    public IRelayCommand ImportCommand => ImportFromFileCommand;
 
     /// <summary>Flattened rules of the selected profile.</summary>
     public ObservableCollection<ProfileRuleRow> SelectedProfileRules { get; } = [];
@@ -206,9 +202,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Pending import waiting for Open in board / Discard.</summary>
     public ProfileImportReport? PendingImport { get; private set; }
 
-    /// <summary>True when the caller applied the pending import to the board.</summary>
-    public bool AppliedToBoard { get; private set; }
-
     // ── Host callbacks (wired by GenerateViewModel before ShowAsync) ──────────
 
     /// <summary>Snapshots the current wizard state as a profile (Save current).</summary>
@@ -238,9 +231,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     /// <summary>File picker: export destination, or null if cancelled.</summary>
     public Func<string, string?>? PickExportPath { get; set; }
-
-    /// <summary>Prompt for a new profile name (Save / Duplicate); null = cancel.</summary>
-    public Func<string, string?>? PromptName { get; set; }
 
     /// <summary>Confirm delete; true = delete.</summary>
     public Func<string, bool>? ConfirmDelete { get; set; }
@@ -285,12 +275,13 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         };
 
         var selectedName = SelectedItem?.Name;
-        _allItems = ordered.ToList();
+        var allItems = ordered.ToList();
         Items.Clear();
-        foreach (var item in _allItems)
+        foreach (var item in allItems)
             Items.Add(item);
 
-        ApplySearchFilter();
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(CountLabel));
         SelectedItem = null;
         SelectedItem = Items.FirstOrDefault(i =>
             string.Equals(i.Name, selectedName, StringComparison.OrdinalIgnoreCase));
@@ -329,8 +320,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     {
         if (IsBoardDirty?.Invoke() == true)
         {
-            var ok = ConfirmOverwrite?.Invoke(
-                "The rules board has unsaved changes. Load this profile and overwrite the draft?") ?? true;
+            var ok = await ConfirmOverwriteAsync(
+                "The rules board has unsaved changes. Load this profile and overwrite the draft?");
             if (!ok) return false;
         }
 
@@ -375,9 +366,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         string? newName;
         var suggested = $"{SelectedItem.Name}-copy";
-        if (PromptName is not null)
-            newName = PromptName(suggested) ?? suggested;
-        else if (_dialogs is not null)
+        if (_dialogs is not null)
         {
             newName = await AskNameAsync(suggested);
             if (string.IsNullOrWhiteSpace(newName)) return;
@@ -443,7 +432,30 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         StatusMessage = null;
         HasError = false;
 
-        var (profile, error) = await _profiles.ImportAsync(sourcePath, ct);
+        Profile? profile;
+        string? error;
+        try
+        {
+            (profile, error) = await _profiles.ImportAsync(sourcePath, ct);
+            if (profile is null && error is { } conflict
+                && conflict.StartsWith("conflict:", StringComparison.Ordinal))
+            {
+                // WR-014: importing over a same-name profile is a real overwrite — ask, the same
+                // way Load already asks before replacing a dirty board.
+                var ok = await ConfirmOverwriteAsync(conflict["conflict:".Length..].Trim());
+                if (!ok) return;
+                (profile, error) = await _profiles.ImportAsync(sourcePath, ct, allowOverwrite: true);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // WR-006: a locked or read-only source file must land in the import summary, not the
+            // generic crash box.
+            SchemaErrorMessage = ex.Message;
+            ShowImportSummary = true;
+            return;
+        }
+
         if (profile is null)
         {
             SchemaErrorMessage = error ?? "not a valid profile";
@@ -495,7 +507,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         var report = ProfileImport.ValidateAgainstMetadata(profile, metadata, runId);
         PendingImport = report;
-        AppliedToBoard = false;
         SchemaErrorMessage = null;
         ShowImportSummary = true;
 
@@ -529,7 +540,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private void OpenInBoard()
     {
         if (PendingImport is null) return;
-        AppliedToBoard = true;
         ProfileApplied?.Invoke(this, PendingImport);
         ShowImportSummary = false;
     }
@@ -539,7 +549,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private void DiscardImport()
     {
         PendingImport = null;
-        AppliedToBoard = false;
         ShowImportSummary = false;
         ImportAppliedMessage = null;
         ImportAdjustedMessage = null;
@@ -627,12 +636,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     partial void OnSelectedItemChanged(ProfileListItem? value) => RebuildSelectedDetail();
 
-    private void ApplySearchFilter()
-    {
-        OnPropertyChanged(nameof(VisibleItems));
-        OnPropertyChanged(nameof(CountLabel));
-    }
-
     private void RebuildSelectedDetail()
     {
         SelectedProfileRules.Clear();
@@ -666,11 +669,16 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedProfileRuleSummary));
     }
 
-    private async Task<string?> AskNameAsync(string suggested)
+    private async Task<string?> AskNameAsync(string suggested) =>
+        _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
+
+    // WR-020: the themed dialog is the production path; the seam stays for tests.
+    private async Task<bool> ConfirmOverwriteAsync(string message)
     {
-        if (PromptName is not null)
-            return PromptName(suggested);
-        return _dialogs is null ? null : await _dialogs.AskProfileNameAsync(suggested);
+        if (ConfirmOverwrite is not null)
+            return ConfirmOverwrite(message);
+        return _dialogs is not null
+            && await _dialogs.ConfirmAsync("Load profile", message, "Overwrite");
     }
 
     private async Task<bool> ConfirmDeleteAsync(string name)

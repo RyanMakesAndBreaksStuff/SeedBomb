@@ -54,12 +54,4 @@ public partial class GeneratePage : Page, INavigableView<GenerateViewModel>
 
     private void OnEntitiesChanged(object sender, IReadOnlyList<EntitySummary> entities) =>
         _vm.OnEntitiesChanged(entities);
-
-    /// <summary>Resets the wizard and reloads the entity picker after an org switch.</summary>
-    public void ReloadForConnectionSwitch()
-    {
-        EntitySelectorCtrl.ClearSelection();
-        _ = _vm.ResetWithoutPromptAsync();
-        EntitySelectorCtrl.ViewModel?.LoadEntitiesCommand.Execute(null);
-    }
 }

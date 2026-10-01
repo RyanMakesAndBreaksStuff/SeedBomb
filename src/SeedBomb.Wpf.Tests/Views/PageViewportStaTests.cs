@@ -1,5 +1,6 @@
 using SeedBomb.Wpf.Tests;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
@@ -89,6 +90,26 @@ public sealed class PageViewportStaTests : IDisposable
         AssertPinnedToHost(page, host);
         AssertInsideHost(page, host, "PageHeader");
         Assert.False(ScrollViewer.GetCanContentScroll(page));
+    }
+
+    [StaFact]
+    public void RulesPage_PreviewPane_StaysInsideLaunchViewport() =>
+        AssertRulesPreviewInside(LaunchContentWidth, LaunchContentHeight);
+
+    [StaFact]
+    public void RulesPage_PreviewPane_StaysInsideMinViewport() =>
+        AssertRulesPreviewInside(MinContentWidth, MinContentHeight);
+
+    private void AssertRulesPreviewInside(double width, double height)
+    {
+        EnsureApplication();
+        var name = new StringAttributeMetadata { LogicalName = "name", IsValidForCreate = true, MaxLength = 20 };
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { name });
+        var vm = new RuleEditorViewModel(meta, recordCount: 10, seed: 42, runId: "r1");
+        var page = new RulesPage(vm);
+        var host = Host(page, width, height);
+        AssertInsideHost(page, host, "PreviewPane");
     }
 
     public void Dispose()

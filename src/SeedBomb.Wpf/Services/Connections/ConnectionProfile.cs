@@ -72,6 +72,9 @@ public sealed partial class ConnectionProfile : ObservableObject
 
     /// <summary>Not persisted. Set by the VM to mark the currently active (last-used) profile.</summary>
     public bool IsLastUsed { get; set; }
+
+    /// <summary>Not persisted. True when the store holds an encrypted client secret for this profile.</summary>
+    public bool HasSavedSecret { get; init; }
 }
 
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>

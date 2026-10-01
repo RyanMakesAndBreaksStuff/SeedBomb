@@ -1,7 +1,8 @@
 <!--
     Rules — 3b. Full page, three panes.
     Middle pane MUST take the star column: fixed side panes starved the config pane in the mock
-    and the template string bled out of its card. Sides are fixed, centre flexes.
+    and the template string bled out of its card. Sides shrink toward their MinWidth (capped at
+    the design widths) so all three panes fit the launch and minimum window; centre takes the rest.
 -->
 <Page x:Class="SeedBomb.Views.Pages.RulesPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -95,15 +96,15 @@
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="200" MaxWidth="{StaticResource DG.Size.ColumnPane}" />
                 <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="*" MinWidth="300" />
+                <ColumnDefinition Width="2*" MinWidth="240" />
                 <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="180" MaxWidth="{StaticResource DG.Size.PreviewPane}" />
             </Grid.ColumnDefinitions>
             <controls:RuleColumnListControl Grid.Column="0" />
             <controls:RuleOperationPane Grid.Column="2" />
-            <controls:RulePreviewPane Grid.Column="4" />
+            <controls:RulePreviewPane x:Name="PreviewPane" Grid.Column="4" />
         </Grid>
     </Grid>
 </Page>

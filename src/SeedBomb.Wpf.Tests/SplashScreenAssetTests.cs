@@ -17,7 +17,8 @@ public sealed class SplashScreenAssetTests
         Assert.Contains("splash.SetStatus(\"Starting services...\");", app, StringComparison.Ordinal);
         Assert.Contains("splash.SetStatus(\"Restoring your session...\");", app, StringComparison.Ordinal);
         Assert.Contains("splash.SetStatus(\"Ready\");", app, StringComparison.Ordinal);
-        Assert.Contains("splash?.Close();", app, StringComparison.Ordinal);
+        // WR-002: the startup catch must leave the splash to Shutdown(1), or the exit code is 0.
+        Assert.DoesNotContain("splash?.Close();", app, StringComparison.Ordinal);
         AssertOrdered(app, "Current.MainWindow = mainWindow;", "mainWindow.Show();");
     }
 

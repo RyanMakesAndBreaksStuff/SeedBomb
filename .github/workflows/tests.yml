@@ -50,10 +50,6 @@ jobs:
         if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
         run: dotnet run --project src/SeedBomb.Bulk.Tests/SeedBomb.Bulk.Tests.csproj -c Release --no-restore
 
-      - name: Web tests
-        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
-        run: dotnet run --project src/SeedBomb.Web.Tests/SeedBomb.Web.Tests.csproj -c Release --no-restore
-
       - name: WPF tests
         if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
         run: dotnet run --project src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj -c Release --no-restore

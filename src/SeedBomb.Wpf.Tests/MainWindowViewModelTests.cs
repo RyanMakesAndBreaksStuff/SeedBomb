@@ -18,29 +18,6 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void EnvironmentHostIsOrgHostAlias()
-    {
-        var vm = new MainWindowViewModel();
-        string? last = null;
-        vm.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(vm.EnvironmentHost))
-                last = vm.EnvironmentHost;
-        };
-        vm.OrgUrl = "https://contoso-dev.crm.dynamics.com/";
-        Assert.Equal("contoso-dev.crm.dynamics.com", vm.OrgHost);
-        Assert.Equal(vm.OrgHost, vm.EnvironmentHost);
-        Assert.Equal(vm.OrgHost, last);
-    }
-
-    [Fact]
-    public void OpenConnectionsCommandIsOpenConnectionManagerCommand()
-    {
-        var vm = new MainWindowViewModel();
-        Assert.Same(vm.OpenConnectionManagerCommand, vm.OpenConnectionsCommand);
-    }
-
-    [Fact]
     public async Task HasConnection_FollowsTheProfileCount()
     {
         var (vm, store) = await MainWindowViewModelWithProfilesAsync(count: 1);
@@ -68,6 +45,27 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(1, reloads);
     }
 
+    [Fact]
+    public void SignInCommand_CannotExecute_WhileSwitchingConnection()
+    {
+        // WR-005: SignInCommand had no CanExecute, so a double-click could run two interactive
+        // sign-ins whose results raced to set SwitchError/IsSwitchingConnection.
+        var connectionManager = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(), Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>())
+        {
+            IsSwitchingConnection = true,
+        };
+        var vm = new MainWindowViewModel(Mock.Of<IConnectionProfileService>(), connectionManager);
+
+        Assert.False(vm.SignInCommand.CanExecute(null));
+
+        var raised = false;
+        vm.SignInCommand.CanExecuteChanged += (_, _) => raised = true;
+        connectionManager.IsSwitchingConnection = false;
+
+        Assert.True(raised);
+        Assert.True(vm.SignInCommand.CanExecute(null));
+    }
     private static async Task<(MainWindowViewModel vm, FakeConnectionProfileStore store)>
         MainWindowViewModelWithProfilesAsync(int count)
     {

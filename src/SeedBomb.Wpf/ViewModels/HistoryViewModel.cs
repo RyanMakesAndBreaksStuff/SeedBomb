@@ -63,9 +63,6 @@ public sealed partial class HistoryViewModel : ViewModelBase
     /// <summary>All loaded run records.</summary>
     public ObservableCollection<RunRecord> Runs { get; } = [];
 
-    /// <summary>Runs grouped by local calendar day, newest day first.</summary>
-    public ObservableCollection<HistoryDayGroup> DayGroups { get; } = [];
-
     /// <summary>Flattened day headers and run rows for the virtualized History list.</summary>
     public ObservableCollection<object> FlatItems { get; } = [];
 
@@ -117,6 +114,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
             RebuildDayGroups();
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(HistorySummary));
+
+            if (_historyService.LoadWarning is { } warning)
+                _snackbar?.Show("Run history", warning, ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
         }
         catch (OperationCanceledException)
         {
@@ -184,15 +184,15 @@ public sealed partial class HistoryViewModel : ViewModelBase
                 var duration = $"{(int)run.Duration.TotalMinutes:00}:{run.Duration.Seconds:00}";
                 var status = run.Succeeded ? "Success" : "Failed";
                 lines.Add(string.Join(",",
-                    EscapeCsv(run.Timestamp.ToString("O")),
-                    EscapeCsv(entities),
-                    EscapeCsv(run.TotalRecords.ToString()),
-                    EscapeCsv(duration),
-                    EscapeCsv(status),
-                    EscapeCsv(run.ErrorCount.ToString()),
-                    EscapeCsv(run.Environment),
-                    EscapeCsv(run.User),
-                    EscapeCsv(run.Profile)));
+                    CsvField.Escape(run.Timestamp.ToString("O")),
+                    CsvField.Escape(entities),
+                    CsvField.Escape(run.TotalRecords.ToString()),
+                    CsvField.Escape(duration),
+                    CsvField.Escape(status),
+                    CsvField.Escape(run.ErrorCount.ToString()),
+                    CsvField.Escape(run.Environment),
+                    CsvField.Escape(run.User),
+                    CsvField.Escape(run.Profile)));
             }
 
             await System.IO.File.WriteAllLinesAsync(path, lines);
@@ -240,11 +240,9 @@ public sealed partial class HistoryViewModel : ViewModelBase
                 FormatDayLabel(g.Key),
                 g.OrderByDescending(r => r.Timestamp).ToList()));
 
-        DayGroups.Clear();
         FlatItems.Clear();
         foreach (var group in groups)
         {
-            DayGroups.Add(group);
             FlatItems.Add(new HistoryDayHeader(group.DayLabel));
             foreach (var run in group.Runs)
                 FlatItems.Add(run);
@@ -259,13 +257,5 @@ public sealed partial class HistoryViewModel : ViewModelBase
         if (date == today.AddDays(-1))
             return "Yesterday";
         return date.ToString("ddd d MMM yyyy");
-    }
-
-    private static string EscapeCsv(string value)
-    {
-        if (!value.Contains(',') && !value.Contains('\"') && !value.Contains('\r') && !value.Contains('\n'))
-            return value;
-
-        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }

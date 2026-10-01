@@ -1,5 +1,7 @@
 using SeedBomb.Services.Theme;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Media;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -30,27 +32,25 @@ public sealed class ThemePaletteConfigurationTests
     private static readonly string[] RequiredApplyKeys =
     [
         "DG.Bg", "DG.TitleBar", "DG.Surface1", "DG.Card", "DG.CodeSurface",
-        "DG.Accent", "DG.AccentHover", "DG.AccentLight", "DG.OnAccent",
-        "DG.Success", "DG.Warning", "DG.Error", "DG.Info",
-        "DG.SuccessSoft", "DG.WarningSoft", "DG.ErrorSoft", "DG.InfoSoft",
+        "DG.Accent", "DG.AccentHover", "DG.OnAccent",
+        "DG.Success", "DG.Warning", "DG.Error",
+        "DG.WarningSoft", "DG.ErrorSoft",
         "AccentBrush",
         "AccentFillColorDefaultBrush",
         "SystemAccentColorBrush",
         "SystemFillColorSuccessBackgroundBrush",
-        "DG.Energy", "DG.Focus", "DG.SelectionIndicator",
-        "DG.Series1", "DG.Series2", "DG.Series3", "DG.Series4", "DG.Series5",
+        "DG.SelectionIndicator",
         "DG.RunSweep",
     ];
 
     private static readonly string[] RequiredSharedKeys =
     [
-        "DG.TitleBar", "DG.OnAccent", "DG.AccentLight", "DG.Info", "DG.InfoSoft",
-        "DG.SuccessSoft", "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
+        "DG.TitleBar", "DG.OnAccent",
+        "DG.Type.Stat", "DG.Pad.ActionRow", "DG.Pad.IndexRow",
         "DG.Pad.RowTall", "DG.Size.NavPane", "DG.PrimaryButton", "DG.Cell", "DG.CheckBox",
         "DG.ComboBox", "DG.ComboBoxItem", "DG.ToggleButton",
-        "BoolToVisible", "BoolToVisibilityConverter",
-        "DG.Energy", "DG.Focus", "DG.SelectionIndicator",
-        "DG.Series1", "DG.Series2", "DG.Series3", "DG.Series4", "DG.Series5",
+        "BoolToVisibilityConverter",
+        "DG.SelectionIndicator",
         "DG.RunSweep",
     ];
 
@@ -76,12 +76,8 @@ public sealed class ThemePaletteConfigurationTests
         Assert.Contains("kiln", manager, StringComparison.Ordinal);
         Assert.Contains("0xBADD52", manager, StringComparison.OrdinalIgnoreCase);   // Kiln dark accent
         Assert.Contains("0x262420", manager, StringComparison.OrdinalIgnoreCase);   // Kiln light accent
-        Assert.Contains("DG.Energy", manager, StringComparison.Ordinal);
         Assert.Contains("DG.SelectionIndicator", manager, StringComparison.Ordinal);
-        Assert.Contains("DG.Series1", manager, StringComparison.Ordinal);
-        Assert.Contains("DG.Focus", manager, StringComparison.Ordinal);
         Assert.Contains("DG.RunSweep", manager, StringComparison.Ordinal);
-        Assert.Contains("DG.AccentLight", manager, StringComparison.Ordinal);
 
         foreach (var id in RetiredPaletteIds)
             Assert.DoesNotContain($"[\"{id}\"]", manager, StringComparison.Ordinal);
@@ -112,6 +108,7 @@ public sealed class ThemePaletteConfigurationTests
         Assert.DoesNotContain("#A79CF1", shared, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("x:Key=\"InverseBoolToVisible\"", shared, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"EqualityToBoolConverter\"", shared, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Key=\"BoolToVisible\"", shared, StringComparison.Ordinal);
         foreach (var key in RequiredSharedKeys)
             Assert.Contains($"x:Key=\"{key}\"", shared, StringComparison.Ordinal);
         Assert.DoesNotContain("#3E6FA8", shared, StringComparison.OrdinalIgnoreCase);
@@ -170,6 +167,38 @@ public sealed class ThemePaletteConfigurationTests
         ];
         foreach (var line in expected)
             Assert.Contains(line, manager, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HighContrastMapsEveryTokenToSystemColors()
+    {
+        // WR-017: DG.* brushes are bound explicitly, so a WPF-UI theme switch alone left brand
+        // colors on screen under High Contrast.
+        var resources = new ResourceDictionary();
+        DesignThemeManager.PublishTokens(resources, isDark: true, "kiln", highContrast: false);
+        Color Solid(object key) => ((SolidColorBrush)resources[key]).Color;
+        var ordinaryBg = Solid("DG.Bg");
+
+        DesignThemeManager.PublishTokens(resources, isDark: true, "kiln", highContrast: true);
+
+        var window = SystemColors.WindowColor;
+        Color[] system =
+        [
+            window, SystemColors.WindowTextColor, SystemColors.HighlightColor,
+            SystemColors.HighlightTextColor, SystemColors.GrayTextColor, SystemColors.HotTrackColor,
+            Color.FromArgb(0xCC, window.R, window.G, window.B),
+        ];
+        Assert.All(
+            resources.Keys.Cast<object>().Where(k => resources[k] is SolidColorBrush),
+            k => Assert.Contains(Solid(k), system));
+        Assert.Equal(window, Solid("DG.Bg"));
+        Assert.Equal(SystemColors.WindowTextColor, Solid("TextFillColorPrimaryBrush"));
+        Assert.Equal(SystemColors.GrayTextColor, Solid("TextFillColorDisabledBrush"));
+        Assert.Equal(SystemColors.HighlightColor, Solid("KeyboardFocusBorderColorBrush"));
+        Assert.Equal(SystemColors.HighlightColor, Solid("NavigationViewSelectionIndicatorForeground"));
+
+        DesignThemeManager.PublishTokens(resources, isDark: true, "kiln", highContrast: false);
+        Assert.Equal(ordinaryBg, Solid("DG.Bg"));
     }
 
     private static string ReadRepoFile(string relativePath, [CallerFilePath] string sourceFile = "")
