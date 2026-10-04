@@ -424,16 +424,6 @@
       "featured": false
     },
     {
-      "name": "System.Formats.Asn1",
-      "version": "11.0.0-preview.7.26381.103",
-      "purpose": "",
-      "license": "MIT",
-      "copyright": "© Microsoft Corporation. All rights reserved.",
-      "projectUrl": "https://dot.net/",
-      "licenseResource": "SeedBomb.Licenses.System.Formats.Asn1-DISPLAY.txt",
-      "featured": false
-    },
-    {
       "name": "System.Runtime.Caching",
       "version": "4.7.0",
       "purpose": "",
@@ -441,26 +431,6 @@
       "copyright": "© Microsoft Corporation. All rights reserved.",
       "projectUrl": "https://github.com/dotnet/corefx",
       "licenseResource": "SeedBomb.Licenses.System.Runtime.Caching-DISPLAY.txt",
-      "featured": false
-    },
-    {
-      "name": "System.Security.Cryptography.Pkcs",
-      "version": "11.0.0-preview.7.26381.103",
-      "purpose": "",
-      "license": "MIT",
-      "copyright": "© Microsoft Corporation. All rights reserved.",
-      "projectUrl": "https://dot.net/",
-      "licenseResource": "SeedBomb.Licenses.System.Security.Cryptography.Pkcs-DISPLAY.txt",
-      "featured": false
-    },
-    {
-      "name": "System.Security.Cryptography.Xml",
-      "version": "11.0.0-preview.7.26381.103",
-      "purpose": "",
-      "license": "MIT",
-      "copyright": "© Microsoft Corporation. All rights reserved.",
-      "projectUrl": "https://dot.net/",
-      "licenseResource": "SeedBomb.Licenses.System.Security.Cryptography.Xml-DISPLAY.txt",
       "featured": false
     },
     {

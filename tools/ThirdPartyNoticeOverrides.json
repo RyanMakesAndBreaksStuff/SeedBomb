@@ -113,9 +113,6 @@
     "Microsoft.Extensions.Logging.EventSource/10.0.12",
     "Microsoft.Extensions.Options/10.0.12",
     "Microsoft.Extensions.Options.ConfigurationExtensions/10.0.12",
-    "Microsoft.Extensions.Primitives/10.0.12",
-    "System.Formats.Asn1/11.0.0-preview.7.26381.103",
-    "System.Security.Cryptography.Pkcs/11.0.0-preview.7.26381.103",
-    "System.Security.Cryptography.Xml/11.0.0-preview.7.26381.103"
+    "Microsoft.Extensions.Primitives/10.0.12"
   ]
 }
