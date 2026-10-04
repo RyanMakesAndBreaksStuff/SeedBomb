@@ -45,6 +45,9 @@ public enum EligibilityReason
 
     /// <summary>Owner is assigned by the platform, not by a field rule.</summary>
     OwnerAssigned,
+
+    /// <summary>Alternate key — SeedBomb generates run-unique values for it.</summary>
+    AlternateKey,
 }
 
 /// <summary>Classification result for one attribute.</summary>
@@ -60,7 +63,9 @@ public readonly record struct EligibilityResult(bool IsSettable, EligibilityReas
 public static class RuleEligibility
 {
     /// <summary>Classifies one attribute as settable-for-rules or excluded-with-reason.</summary>
-    public static EligibilityResult Classify(AttributeMetadata attr)
+    /// <param name="attr">The attribute.</param>
+    /// <param name="entity">Owning entity. Supplies alternate keys; null skips that gate (no entity context).</param>
+    public static EligibilityResult Classify(AttributeMetadata attr, EntityMetadata? entity = null)
     {
         ArgumentNullException.ThrowIfNull(attr);
 
@@ -102,6 +107,10 @@ public static class RuleEligibility
             return new(false, EligibilityReason.MultiSelectV2);
         if (attr.IsValidForCreate == false)
             return new(false, EligibilityReason.NotCreatable);
+        // WR-004: keys are entity-level metadata, so this is the one gate that needs the entity.
+        if (entity is not null && attr.LogicalName is { } name
+            && (entity.Keys ?? []).Any(k => (k.KeyAttributes ?? []).Contains(name, StringComparer.OrdinalIgnoreCase)))
+            return new(false, EligibilityReason.AlternateKey);
 
         return new(true, EligibilityReason.Settable);
     }

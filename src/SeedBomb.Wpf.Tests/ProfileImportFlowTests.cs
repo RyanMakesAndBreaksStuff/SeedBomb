@@ -629,4 +629,29 @@ public sealed class ProfileImportFlowTests : IDisposable
         Assert.True(vm.ShowImportSummary);
         Assert.Equal("import.profile.json is locked", vm.SchemaErrorMessage);
     }
+
+    [Fact]
+    public void Import_RejectsARuleOnADateTimeAlternateKeyColumn()
+    {
+        // WR-004: a constant on a DateTime alternate key showed as Applied, passed Review and Bulk,
+        // and rows 2..N were then rejected as duplicates.
+        var effectiveOn = new DateTimeAttributeMetadata { LogicalName = "new_effectiveon", IsValidForCreate = true };
+        var meta = new EntityMetadata { LogicalName = "account" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { effectiveOn });
+        meta.GetType().GetProperty("Keys")!.SetValue(meta,
+            new[] { new EntityKeyMetadata { LogicalName = "effective_key", KeyAttributes = ["new_effectiveon"] } });
+        var profile = new Profile(Profile.CurrentProfileVersion, "keys", null, 42,
+        [
+            new ProfileTable("account", 3, new Dictionary<string, FieldRule>
+            {
+                ["new_effectiveon"] = new ConstantRule(JsonDocument.Parse("\"2026-01-01\"").RootElement),
+            }),
+        ]);
+
+        var report = ProfileImport.ValidateAgainstMetadata(
+            profile, new Dictionary<string, EntityMetadata> { ["account"] = meta }, "run-1");
+
+        Assert.Equal(0, report.AppliedRuleCount);
+        Assert.Contains(report.NotImported, line => line.Contains("ALTERNATE_KEY", StringComparison.Ordinal));
+    }
 }

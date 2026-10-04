@@ -772,13 +772,8 @@ public class BulkCreator : IBulkCreator
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule targets unknown attribute '{logicalName}'.");
 
-                var handling = _edgeCaseValidator.Validate(ruleAttr, meta);
-                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == SpecialHandlingCategory.AlternateKeyUniqueness)
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
-
                 var validation = RuleValidator.Validate(
-                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId));
+                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId, meta));
                 if (!validation.IsValid)
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule for '{logicalName}' is invalid — " +

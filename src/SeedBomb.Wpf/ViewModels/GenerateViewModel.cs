@@ -600,7 +600,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 }
 
                 var result = RuleValidator.Validate(
-                    rule, attr, new RuleValidationContext(table, recordCount, RunId));
+                    rule, attr, new RuleValidationContext(table, recordCount, RunId, meta));
                 messages.AddRange(result.Messages);
                 if (result.IsValid && result.EffectiveRule is not null)
                 {
