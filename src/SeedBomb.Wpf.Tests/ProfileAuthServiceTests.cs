@@ -274,6 +274,62 @@ public sealed class ProfileAuthServiceTests
         Assert.Equal(2, buildCount);
     }
 
+    [Theory]
+    [InlineData("tenant")]
+    [InlineData("cloud")]
+    public async Task GetOrCreatePca_RebuildsClient_WhenAuthorityChanges(string change)
+    {
+        // WR-013: the fingerprint omitted tenant and cloud, so an edited authority reused the old client.
+        var svc = new ProfileAuthService(new Mock<IConnectionProfileService>().Object);
+        var buildCount = 0;
+        svc.CreatePcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IPublicClientApplication>();
+        };
+        var profile = MakeOAuthProfile();
+
+        var first = await svc.GetOrCreatePca(profile, commitSession: true);
+        Change(profile, change);
+        var second = await svc.GetOrCreatePca(profile, commitSession: true);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, buildCount);
+    }
+
+    [Theory]
+    [InlineData("tenant")]
+    [InlineData("cloud")]
+    [InlineData("clientId")]
+    public async Task GetOrCreateCca_RebuildsClient_WhenAuthorityOrClientIdChanges(string change)
+    {
+        var svc = new ProfileAuthService(new Mock<IConnectionProfileService>().Object);
+        var buildCount = 0;
+        svc.CreateCcaOverride = _ =>
+        {
+            buildCount++;
+            return Mock.Of<IConfidentialClientApplication>();
+        };
+        var profile = MakeCertificateProfile();
+
+        var first = await svc.GetOrCreateCca(profile, commitSession: true);
+        Change(profile, change);
+        var second = await svc.GetOrCreateCca(profile, commitSession: true);
+
+        Assert.NotSame(first, second);
+        Assert.Equal(2, buildCount);
+    }
+
+    private static void Change(ConnectionProfile profile, string change)
+    {
+        switch (change)
+        {
+            case "tenant": profile.TenantId = Guid.NewGuid().ToString(); break;
+            case "cloud": profile.EnvironmentUrl = "https://org.crm.dynamics.cn"; break;
+            default: profile.ClientId = Guid.NewGuid().ToString(); break;
+        }
+    }
+
     [Fact]
     public async Task GetOrCreatePca_RebuildsClient_WhenClientIdChanges()
     {

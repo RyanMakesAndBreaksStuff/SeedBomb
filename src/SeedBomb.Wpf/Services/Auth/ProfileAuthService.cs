@@ -475,16 +475,16 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     }
 
     /// <summary>
-    /// Fingerprint of the credential a public client is built from: the client ID plus the
-    /// auth type. A cached client whose fingerprint doesn't match the profile's current
+    /// Fingerprint of every input a public client is built from: auth type, client ID and
+    /// authority. A cached client whose fingerprint doesn't match the profile's current
     /// values is stale and must be rebuilt.
     /// </summary>
     private static string ComputePcaFingerprint(ConnectionProfile profile) =>
-        $"{profile.AuthType}:{profile.ClientId}";
+        $"{profile.AuthType}:{profile.ClientId}:{AuthorityKey(profile)}";
 
     /// <summary>
-    /// Fingerprint of the credential a confidential client is built from: the auth type plus
-    /// a SHA-256 hash of the secret or certificate thumbprint currently in use. Hashing keeps
+    /// Fingerprint of every input a confidential client is built from: auth type, client ID,
+    /// authority, and a SHA-256 hash of the secret or certificate thumbprint. Hashing keeps
     /// the raw secret out of the cache key/comparison state.
     /// </summary>
     private static string ComputeCcaFingerprint(ConnectionProfile profile, string? clientSecret)
@@ -493,8 +493,12 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             ? profile.CertificateThumbprint
             : clientSecret;
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(credential ?? string.Empty));
-        return $"{profile.AuthType}:{Convert.ToHexString(hash)}";
+        return $"{profile.AuthType}:{profile.ClientId}:{AuthorityKey(profile)}:{Convert.ToHexString(hash)}";
     }
+
+    // WR-013: both builders call WithAuthority(ResolveCloud, ResolveTenant); the fingerprint must cover it too.
+    private static string AuthorityKey(ConnectionProfile profile) =>
+        $"{ResolveCloud(profile)}:{ResolveTenant(profile)}";
 
     internal async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)
     {
