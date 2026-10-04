@@ -753,6 +753,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         SequenceRule => "sequence",
         NullRule => "null",
         BogusRule b => $"bogus · {b.Api}.{b.Endpoint}",
+        LookupRandomRule => "lookupRandom",
         _ => rule.GetType().Name,
     };
 }
