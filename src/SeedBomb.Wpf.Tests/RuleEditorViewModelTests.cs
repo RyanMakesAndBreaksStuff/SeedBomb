@@ -615,7 +615,7 @@ public sealed class RuleEditorViewModelTests
     }
 
     [Fact]
-    public async Task SaveRule_WhenStoreThrows_SetsMetadataErrorAndDoesNotPropagate()
+    public async Task SaveRule_WhenStoreThrows_SetsStoreErrorAndDoesNotPropagate()
     {
         var (vm, profiles) = await ReadyEditorAsync();
         profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
@@ -623,12 +623,13 @@ public sealed class RuleEditorViewModelTests
 
         await vm.SaveRuleCommand.ExecuteAsync(null);
 
-        Assert.True(vm.HasMetadataError);
-        Assert.Contains("profile file is locked", vm.MetadataError!, StringComparison.Ordinal);
+        Assert.True(vm.HasStoreError);
+        Assert.False(vm.HasMetadataError);
+        Assert.Contains("profile file is locked", vm.StoreError!, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task DeleteRule_WhenStoreThrows_SetsMetadataErrorAndDoesNotPropagate()
+    public async Task DeleteRule_WhenStoreThrows_SetsStoreErrorAndDoesNotPropagate()
     {
         var (vm, profiles) = await ReadyEditorAsync();
         profiles.Setup(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
@@ -636,8 +637,36 @@ public sealed class RuleEditorViewModelTests
 
         await vm.DeleteRuleCommand.ExecuteAsync(null);
 
-        Assert.True(vm.HasMetadataError);
-        Assert.Contains("profile is corrupt", vm.MetadataError!, StringComparison.Ordinal);
+        Assert.True(vm.HasStoreError);
+        Assert.False(vm.HasMetadataError);
+        Assert.Contains("profile is corrupt", vm.StoreError!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FailedRuleSave_LeavesTheRuleUnsaved_AndRetrySaveCommitsIt()
+    {
+        // WR-002: the rule was committed in memory before the write, so a failed save looked saved.
+        var (vm, _, profiles, saved) = await LoadedEditorAsync(isStored: true, profileName: "g2");
+        profiles.SetupSequence(p => p.SaveAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("profile file is locked"))
+            .Returns(Task.CompletedTask);
+        vm.SelectedColumn = vm.SettableColumns.Single(c => c.LogicalName == "name");
+        vm.SelectedOp = "constant";
+        vm.ConstantText = "fixed";
+
+        await vm.SaveRuleCommand.ExecuteAsync(null);
+
+        Assert.Empty(saved);
+        Assert.False(vm.DeleteRuleCommand.CanExecute(null)); // still unmapped: nothing was saved
+        Assert.True(vm.HasStoreError);
+        Assert.False(vm.HasMetadataError);
+
+        await vm.RetrySaveCommand.ExecuteAsync(null);
+
+        Assert.True(Assert.Single(saved).Tables.Single().Columns!.ContainsKey("name"));
+        Assert.True(vm.DeleteRuleCommand.CanExecute(null));
+        Assert.False(vm.HasStoreError);
+        Assert.False(vm.RetrySaveCommand.CanExecute(null));
     }
 
     [Fact]

@@ -176,6 +176,15 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasMetadataError))]
     private string? _metadataError;
 
+    /// <summary>WR-002: the last profile-store failure. Shown in its own banner with Retry save.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasStoreError))]
+    private string? _storeError;
+
+    /// <summary>True when the last profile write failed and the change is not saved.</summary>
+    public bool HasStoreError => StoreError is not null;
+
+    private Func<CancellationToken, Task>? _retryStoreWrite;
+
     // ── Page-scoped surface ──────────────────────────────────────────────────
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsWorkingSet))]
@@ -546,6 +555,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         _onSaved = _request?.OnSaved;
         _returnPage = _request?.ReturnPage;
         _isStored = _request?.IsStored ?? false;
+        SetStoreFailure(null, null); // a new profile on the page has no pending write
         OnPropertyChanged(nameof(BreadcrumbRootLabel));
         var profile = _request?.Profile;
         var tableName = _request?.TableName;
@@ -785,52 +795,64 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
             return false;
 
         var rule = BuildRule();
-        if (rule is null)
+        return rule is not null
+               && await CommitColumnRuleAsync(_table, SelectedColumn.LogicalName, rule, "save the rule", ct);
+    }
+
+    /// <summary>Sets one column rule (or removes it when <paramref name="rule"/> is null) and commits it.</summary>
+    private async Task<bool> CommitColumnRuleAsync(
+        string table, string column, FieldRule? rule, string action, CancellationToken ct)
+    {
+        if (_profile is null
+            || !_profile.Tables.Any(t => string.Equals(t.Table, table, StringComparison.OrdinalIgnoreCase)))
             return false;
 
-        var tables = _profile.Tables.ToList();
-        var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
-        if (idx < 0)
-            return false;
-
-        var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
-        cols[SelectedColumn.LogicalName] = rule;
-        tables[idx] = tables[idx] with { Columns = cols };
-        _profile = _profile with { Tables = tables };
-
-        if (!await PersistProfileAsync("save the rule", ct))
+        if (!await CommitAsync(_profile.WithColumnRule(table, column, rule), action,
+                c => CommitColumnRuleAsync(table, column, rule, action, c), ct))
             return false;
 
         RefreshMappedColumn();
         return true;
     }
 
-    /// <summary>Writes <see cref="_profile"/> back when it is already a stored profile, then tells the
-    /// opener. Generate working-set snapshots are not in the store — callback only, no disk write.</summary>
+    /// <summary>
+    /// WR-002: the single store-commit path. <paramref name="next"/> becomes the committed profile only
+    /// after the write succeeds; on failure the committed profile is untouched and Retry save replays
+    /// <paramref name="retry"/>. Generate working-set snapshots are not in the store — callback only.
+    /// </summary>
     /// <returns>False when the store write failed.</returns>
-    private async Task<bool> PersistProfileAsync(string action, CancellationToken ct)
+    private async Task<bool> CommitAsync(Profile next, string action, Func<CancellationToken, Task> retry,
+        CancellationToken ct, bool alwaysWrite = false)
     {
-        if (_profiles is null || _profile is null)
+        if (_profiles is null)
             return false;
 
         try
         {
             // CR-003: opened from Profiles, it's always written back. Opened from Generate, only when the
             // loaded profile has a file ("working-set" never does). ListAsync returns file stems, so
-            // match the stem this name saves to, not the raw name.
-            var stem = JsonProfileService.Sanitize(_profile.Name);
-            if (_isStored || (await _profiles.ListAsync(ct)).Any(n => string.Equals(n, stem, StringComparison.OrdinalIgnoreCase)))
-                await _profiles.SaveAsync(_profile, ct);
+            // match the stem this name saves to, not the raw name. Save As always writes.
+            var stem = JsonProfileService.Sanitize(next.Name);
+            if (alwaysWrite || _isStored
+                || (await _profiles.ListAsync(ct)).Any(n => string.Equals(n, stem, StringComparison.OrdinalIgnoreCase)))
+                await _profiles.SaveAsync(next, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            FailProfileStore(action, ex);
+            FailProfileStore(action, retry, ex);
             return false;
         }
 
-        _onSaved?.Invoke(_profile);
+        _profile = next;
+        SetStoreFailure(null, null);
+        _onSaved?.Invoke(next);
         return true;
     }
+
+    [RelayCommand(CanExecute = nameof(CanRetrySave))]
+    private Task RetrySaveAsync(CancellationToken ct) => _retryStoreWrite?.Invoke(ct) ?? Task.CompletedTask;
+
+    private bool CanRetrySave() => _retryStoreWrite is not null;
 
     /// <summary>Commits the current rule without leaving the page (Preview pane's Save button).</summary>
     [RelayCommand(CanExecute = nameof(CanSaveProfile))]
@@ -875,38 +897,30 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (name is null || !JsonProfileService.IsValidName(name))
             return;
 
-        var tables = _profile.Tables.ToList();
         var rule = BuildRule();
-        if (rule is not null && SelectedColumn is not null)
-        {
-            var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
-            if (idx >= 0)
-            {
-                var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
-                cols[SelectedColumn.LogicalName] = rule;
-                tables[idx] = tables[idx] with { Columns = cols };
-            }
-        }
-
-        var newProfile = _profile with { Name = name, Tables = tables };
-        try
-        {
-            await _profiles.SaveAsync(newProfile, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            FailProfileStore("save the rule", ex);
+        if (!await SaveAsCoreAsync(name, _table, SelectedColumn?.LogicalName, rule, ct))
             return;
-        }
-
-        _profile = newProfile;
-        _isStored = true; // CR-003: it now has a file, so later rule edits persist
-        ProfileName = newProfile.Name;
-        _onSaved?.Invoke(newProfile);
-        RefreshMappedColumn();
 
         if (_returnPage is not null)
             _navigator?.Navigate(_returnPage);
+    }
+
+    private async Task<bool> SaveAsCoreAsync(
+        string name, string table, string? column, FieldRule? rule, CancellationToken ct)
+    {
+        if (_profile is null)
+            return false;
+
+        var next = (rule is null || column is null ? _profile : _profile.WithColumnRule(table, column, rule))
+            with { Name = name };
+        if (!await CommitAsync(next, "save the rule",
+                c => SaveAsCoreAsync(name, table, column, rule, c), ct, alwaysWrite: true))
+            return false;
+
+        _isStored = true; // CR-003: it now has a file, so later rule edits persist
+        ProfileName = name;
+        RefreshMappedColumn();
+        return true;
     }
 
     private bool CanDeleteRule() =>
@@ -935,18 +949,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (!await ConfirmDeleteRuleAsync(SelectedColumn.DisplayName))
             return;
 
-        var tables = _profile.Tables.ToList();
-        var idx = tables.FindIndex(t => string.Equals(t.Table, _table, StringComparison.OrdinalIgnoreCase));
-        if (idx < 0)
-            return;
-
-        var cols = tables[idx].Columns ?? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
-        cols.Remove(SelectedColumn.LogicalName);
-        tables[idx] = tables[idx] with { Columns = cols };
-        _profile = _profile with { Tables = tables };
-
-        if (await PersistProfileAsync("delete the rule", ct))
-            RefreshMappedColumn();
+        await CommitColumnRuleAsync(_table, SelectedColumn.LogicalName, null, "delete the rule", ct);
     }
 
     // A profile needs at least one table (the store rejects an empty list), so the last one stays.
@@ -978,21 +981,26 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         if (!await ConfirmRemoveTableAsync(table.DisplayName))
             return;
 
-        var before = _profile;
-        _profile = _profile with
+        await RemoveTableCoreAsync(table, ct);
+    }
+
+    private async Task<bool> RemoveTableCoreAsync(RuleTableOption table, CancellationToken ct)
+    {
+        if (_profile is null)
+            return false;
+
+        var next = _profile with
         {
             Tables = _profile.Tables
                 .Where(t => !string.Equals(t.Table, table.LogicalName, StringComparison.OrdinalIgnoreCase))
                 .ToList(),
         };
-        if (!await PersistProfileAsync("remove the table", ct))
-        {
-            _profile = before; // the switcher still lists the table; keep the two in step
-            return;
-        }
+        if (!await CommitAsync(next, "remove the table", c => RemoveTableCoreAsync(table, c), ct))
+            return false; // the switcher still lists the table, matching the unchanged profile
 
         SelectedTable = Tables.First(t => t != table);
         Tables.Remove(table);
+        return true;
     }
 
     private void RefreshMappedColumn()
@@ -1494,12 +1502,22 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         NotifyReadyCommands();
     }
 
-    /// <summary>Routes a profile-store failure to the same banner + snackbar surface as <see cref="FailMetadata"/>.</summary>
-    private void FailProfileStore(string action, Exception ex)
+    /// <summary>
+    /// WR-002: a profile-store failure gets its own banner and Retry save. The metadata banner's Retry
+    /// reloads metadata and cannot redo the write.
+    /// </summary>
+    private void FailProfileStore(string action, Func<CancellationToken, Task> retry, Exception ex)
     {
         _logger?.LogError(ex, "Failed to {Action}", action);
         _snackbar?.Show($"Couldn't {action}", ex.Message,
             ControlAppearance.Danger, null, TimeSpan.FromSeconds(6));
-        MetadataError = ex.Message;
+        SetStoreFailure($"Couldn't {action}: {ex.Message}", retry);
+    }
+
+    private void SetStoreFailure(string? error, Func<CancellationToken, Task>? retry)
+    {
+        StoreError = error;
+        _retryStoreWrite = retry;
+        RetrySaveCommand.NotifyCanExecuteChanged();
     }
 }
