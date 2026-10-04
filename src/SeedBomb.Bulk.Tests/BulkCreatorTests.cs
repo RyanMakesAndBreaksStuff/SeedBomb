@@ -419,7 +419,43 @@ public class BulkCreatorTests
 
         var result = await sut.CreateAsync(config, metadata, graph);
 
-        Assert.Equal(-2147015902, Assert.Single(result.Errors).FaultCode);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(-2147015902, error.FaultCode);
+        Assert.False(error.IsTransient);
+    }
+
+    [Fact]
+    public async Task CreateAsync_UnreachableEndpoint_MarksTheBatchTransient()
+    {
+        // A dropped network surfaces as EndpointNotFoundException; Retry must be offered for it.
+        var (sut, serviceMock) = BuildSut();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new EndpointNotFoundException(
+                "There was no endpoint listening at https://contoso.crm.dynamics.com."));
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        var error = Assert.Single(result.Errors);
+        Assert.True(error.IsTransient);
+        Assert.Equal(10, error.RowCount);
     }
 
     [Fact]

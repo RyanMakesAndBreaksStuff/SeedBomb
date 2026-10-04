@@ -350,7 +350,8 @@ public class DeferredLookupBackfill(
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "{Context}: batch {BatchIndex}/{Total} failed.", context, i + 1, batches.Count);
-                errors.Add(new BatchError(context, i, ex.Message, null, batch.Length));
+                errors.Add(new BatchError(context, i, ex.Message, null, batch.Length,
+                    ThrottlePolicy.IsTransient(ex.InnerException ?? ex)));
             }
         }
 

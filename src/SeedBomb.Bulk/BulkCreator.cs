@@ -378,7 +378,8 @@ public class BulkCreator : IBulkCreator
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
                     batchErrors = [new BatchError(entityName, batchIndex, ex.Message,
-                        (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length)];
+                        (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length,
+                        ThrottlePolicy.IsTransient(ex.InnerException))];
                 }
 
                 idBags[batchIndex] = batchIds;

@@ -43,6 +43,12 @@ public sealed class RunViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Classifier_TransientNetworkFailureIsRetryable() =>
+        Assert.True(RejectionClassifier.IsRetryable(new BatchError(
+            "contact", 0, "Batch creation failed for 'contact' on attempt 1: There was no endpoint listening at …",
+            null, RowCount: 50, IsTransient: true)));
+
+    [Fact]
     public void ApplyResult_GroupsByCause_AndDoesNotSelectFixFirst()
     {
         var vm = new RunViewModel();
