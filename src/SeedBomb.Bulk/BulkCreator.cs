@@ -13,6 +13,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Runtime.ExceptionServices;
 using System.ServiceModel;
 
 namespace SeedBomb.Bulk;
@@ -78,6 +79,7 @@ public class BulkCreator : IBulkCreator
         {
             var validatedRules = ValidateConfiguredRules(config, entityMetadata);
             config = config with { FieldRules = validatedRules };
+            PreflightTables(config, entityMetadata);
 
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
@@ -123,12 +125,14 @@ public class BulkCreator : IBulkCreator
                     "Generating {RecordCount} records for {Entity}.",
                     recordCount, entityName);
 
-                var (createdIds, errors) = await CreateEntityRecordsAsync(
+                var (createdIds, errors, failure) = await CreateEntityRecordsAsync(
                     entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, lookupRun, progress, ct).ConfigureAwait(false);
 
                 pool.Add(entityName, createdIds);
                 allCreatedRecords[entityName] = createdIds.AsReadOnly();
                 allErrors.AddRange(errors);
+                if (failure is not null)
+                    ExceptionDispatchInfo.Capture(failure).Throw();
 
                 _logger.LogInformation(
                     "Completed {Entity}: {Created}/{Requested} records created.",
@@ -190,15 +194,20 @@ public class BulkCreator : IBulkCreator
                 Elapsed = elapsed
             };
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested && allCreatedRecords.Count > 0)
+        catch (Exception ex) when (allCreatedRecords.Values.Any(ids => ids.Count > 0))
         {
-            // WR-002: cancel does not roll back — return the rows already written instead of losing their IDs.
+            // WR-002 / CR-003: nothing is rolled back — return the rows already written so the
+            // summary and History record what landed, whether the run was cancelled or failed.
+            var cancelled = ex is OperationCanceledException && ct.IsCancellationRequested;
+            if (!cancelled)
+                _logger.LogError(ex, "Bulk creation stopped after {Count} table(s) were written.", allCreatedRecords.Count);
             return new GenerationResult
             {
                 CreatedRecords = allCreatedRecords,
                 Errors = allErrors.AsReadOnly(),
                 Elapsed = DateTimeOffset.UtcNow - runStart,
-                Cancelled = true,
+                Cancelled = cancelled,
+                FatalError = cancelled ? null : ex.Message,
             };
         }
         finally
@@ -207,7 +216,7 @@ public class BulkCreator : IBulkCreator
         }
     }
 
-    private async Task<(List<Guid> ids, List<BatchError> errors)> CreateEntityRecordsAsync(
+    private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> CreateEntityRecordsAsync(
         string entityName,
         EntityMetadata meta,
         int entityIndex,
@@ -220,58 +229,10 @@ public class BulkCreator : IBulkCreator
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
-        // T-06: pre-flight — warn about any attributes that will be silently skipped due to FieldAction.Fail
-        if (meta.Attributes is not null)
-        {
-            foreach (var attr in meta.Attributes)
-            {
-                var validation = _edgeCaseValidator.Validate(attr, meta);
-                if (validation.Action == FieldAction.Fail)
-                    _logger.LogWarning(
-                        "Entity {Entity}: field {Field} has FieldAction.Fail — field will be skipped",
-                        entityName, attr.LogicalName);
-            }
-        }
-
         var tableRules = config.FieldRules is not null
             && config.FieldRules.TryGetValue(entityName, out var configuredRules)
             ? configuredRules
             : new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
-
-        // T-25: pre-flight required-lookup validation
-        if (meta.Attributes is not null)
-        {
-            foreach (var attr in meta.Attributes.OfType<LookupAttributeMetadata>())
-            {
-                var level = attr.RequiredLevel?.Value ?? AttributeRequiredLevel.None;
-                if (level == AttributeRequiredLevel.SystemRequired)
-                {
-                    var validation = _edgeCaseValidator.Validate(attr, meta);
-                    if (validation.Action == FieldAction.SpecialHandling
-                        && validation.HandlingCategory == SpecialHandlingCategory.OwnerLookup)
-                    {
-                        // ownerid is SystemRequired on every Dataverse table; omit it and let
-                        // Dataverse default to the calling user on insert.
-                        _logger.LogDebug(
-                            "Entity {Entity}: skipping ownerid — Dataverse will default to calling user",
-                            entityName);
-                        continue;
-                    }
-                    if (attr.LogicalName is not null
-                        && tableRules.TryGetValue(attr.LogicalName, out var explicitRule)
-                        && explicitRule is ConstantRule or OneOfRule or LookupRandomRule)
-                    {
-                        continue;
-                    }
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': required lookup '{attr.LogicalName}' (SystemRequired) has no generator — cannot create records.");
-                }
-                if (level == AttributeRequiredLevel.ApplicationRequired)
-                    _logger.LogWarning(
-                        "Entity {Entity}: lookup {Field} is ApplicationRequired but may have no generator",
-                        entityName, attr.LogicalName);
-            }
-        }
 
         // Sequential Bogus generation — single Faker instance, no sharing across threads
         var attributesToGenerate = GetGeneratableAttributes(meta);
@@ -373,7 +334,7 @@ public class BulkCreator : IBulkCreator
             entityName, batches, recordCount, config, effectiveDop, progress, ct).ConfigureAwait(false);
     }
 
-    private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitEntityBatchesAsync(
+    private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> SubmitEntityBatchesAsync(
         string entityName,
         Entity[][] batches,
         int recordCount,
@@ -439,6 +400,7 @@ public class BulkCreator : IBulkCreator
                 });
             });
 
+        Exception? failure = null;
         try
         {
             await submit.ConfigureAwait(false);
@@ -447,13 +409,17 @@ public class BulkCreator : IBulkCreator
         {
             // WR-002: keep the IDs of batches that landed before the cancel; CreateAsync reports them.
         }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
 
         foreach (var idBag in idBags)
             if (idBag is not null) allIds.AddRange(idBag);
         foreach (var errorBag in errorBags)
             if (errorBag is not null) allErrors.AddRange(errorBag);
 
-        return (allIds, allErrors);
+        return (allIds, allErrors, failure);
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitBatchAsync(
@@ -694,6 +660,42 @@ public class BulkCreator : IBulkCreator
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogDebug(ex, "Warmup WhoAmI failed; continuing with default DOP.");
+        }
+    }
+
+    /// <summary>
+    /// Metadata-only checks that must pass before the first write, so a failure leaves the
+    /// environment untouched instead of stranding earlier tables (CR-003).
+    /// </summary>
+    private void PreflightTables(GenerationConfig config, IReadOnlyDictionary<string, EntityMetadata> entityMetadata)
+    {
+        foreach (var entityName in config.EntityLogicalNames)
+        {
+            if (!config.RecordCounts.TryGetValue(entityName, out var count) || count <= 0
+                || !entityMetadata.TryGetValue(entityName, out var meta))
+                continue;
+
+            // T-06: warn about any attributes that will be silently skipped due to FieldAction.Fail
+            foreach (var attr in meta.Attributes ?? [])
+            {
+                if (_edgeCaseValidator.Validate(attr, meta).Action == FieldAction.Fail)
+                    _logger.LogWarning(
+                        "Entity {Entity}: field {Field} has FieldAction.Fail — field will be skipped",
+                        entityName, attr.LogicalName);
+            }
+
+            var missing = RequiredLookupPreflight.FindUnsupplied(
+                entityName, meta, config.FieldRules?.GetValueOrDefault(entityName));
+            if (missing.Count > 0)
+                throw new DataGenerationException(missing[0]);
+
+            foreach (var attr in (meta.Attributes ?? []).OfType<LookupAttributeMetadata>())
+            {
+                if (attr.RequiredLevel?.Value == AttributeRequiredLevel.ApplicationRequired)
+                    _logger.LogWarning(
+                        "Entity {Entity}: lookup {Field} is ApplicationRequired but may have no generator",
+                        entityName, attr.LogicalName);
+            }
         }
     }
 

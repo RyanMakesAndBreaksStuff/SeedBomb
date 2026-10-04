@@ -653,6 +653,15 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 reviewed[table] = tableRules;
         }
 
+        // CR-003: the same required-lookup check Bulk runs before its first write.
+        foreach (var entity in SelectedEntities)
+        {
+            if (_entityMetadata.TryGetValue(entity.LogicalName, out var entityMeta))
+                messages.AddRange(RequiredLookupPreflight
+                    .FindUnsupplied(entity.LogicalName, entityMeta, reviewed.GetValueOrDefault(entity.LogicalName))
+                    .Select(m => new RuleMessage(RuleMessageSeverity.Error, m)));
+        }
+
         ReviewedRules = reviewed;
         ReviewMessages = messages;
         ReviewedDraftRevision = _fieldRules.Revision;
@@ -821,6 +830,9 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             LastResult = await Run.ExecuteAsync(config, _cts.Token, tableLabels, profileName);
             if (LastResult.Cancelled)
                 Run.ReportRunFailure(new OperationCanceledException());
+            else if (LastResult.FatalError is not null)
+                _snackbar.Show("Run stopped", Run.LastFailureMessage,
+                    Wpf.Ui.Controls.ControlAppearance.Danger, null, TimeSpan.FromSeconds(10));
             else
                 ReportOutcome(LastResult);
             if (!Run.KeepWindowOpen)

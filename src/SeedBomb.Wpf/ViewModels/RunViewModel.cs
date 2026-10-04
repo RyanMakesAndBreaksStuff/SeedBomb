@@ -401,7 +401,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
                 [.. _plannedTables.Select(t => _tableLabels.GetValueOrDefault(t, t))],
                 result?.TotalRecords ?? 0,
                 result?.Elapsed ?? TimeSpan.Zero,
-                result is { Cancelled: false, Errors.Count: 0 },
+                result is { Cancelled: false, Errors.Count: 0, FatalError: null },
                 result?.Errors.Sum(e => e.RowCount) ?? 0,
                 EnvironmentLabel,
                 UserLabel,
@@ -560,10 +560,12 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         RowsWrittenLabel = written.ToString("N0");
         RunDescription = BuildRunDescription(written, planned, environmentHost, seed);
 
-        var ended = result.Cancelled ? "Cancelled" : "Finished"; // WR-002: a partial result is not a finished run
+        var ended = result.Cancelled ? "Cancelled" : result.FatalError is null ? "Finished" : "Stopped"; // WR-002: a partial result is not a finished run
         RunMetaLine = $"{ended} {DateTime.Now:d MMM yyyy, HH:mm} · {FormatDuration(result.Elapsed)} · seed {seed}";
         ApplyOutcome(written, rejected, result.Elapsed, tableCount: CountTables(result, _plannedTables));
         StatusHeadline = result.Cancelled ? "Cancelled" : OutcomeHeadline;
+        if (result.FatalError is { } fatal)
+            ApplyFailure($"{fatal} Stopped after writing {written:N0} rows; their lookups and links were not completed.");
 
         ReplaceGroups(result.Errors
             .GroupBy(e => (e.EntityLogicalName, e.ErrorMessage))

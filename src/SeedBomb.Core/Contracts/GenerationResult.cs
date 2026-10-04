@@ -31,4 +31,10 @@ public record GenerationResult
     /// only the rows written before the cancel; they are not rolled back.
     /// </summary>
     public bool Cancelled { get; init; }
+
+    /// <summary>
+    /// Set when the run stopped on an error after at least one row was written.
+    /// <see cref="CreatedRecords"/> then holds only the rows written before the failure; they are not rolled back.
+    /// </summary>
+    public string? FatalError { get; init; }
 }

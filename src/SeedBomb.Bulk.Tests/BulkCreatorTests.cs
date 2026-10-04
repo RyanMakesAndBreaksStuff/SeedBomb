@@ -483,4 +483,160 @@ public class BulkCreatorTests
         serviceMock.Verify(
             s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    private static EntityMetadata Meta(string name, params AttributeMetadata[] attrs)
+    {
+        var meta = new EntityMetadata { LogicalName = name };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, attrs);
+        return meta;
+    }
+
+    private static LookupAttributeMetadata RequiredLookup(string name, string target)
+    {
+        var attr = new LookupAttributeMetadata { LogicalName = name, Targets = [target] };
+        attr.GetType().GetProperty("RequiredLevel")!.SetValue(
+            attr, new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+        return attr;
+    }
+
+    [Fact]
+    public async Task CreateAsync_RequiredLookupGapOnSecondTable_WritesNothing()
+    {
+        // CR-003: the check ran inside the write loop, after the first table was committed.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        graph.AddNode("contact");
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", RequiredLookup("new_requiredid", "account")),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+        };
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() => sut.CreateAsync(config, metadata, graph));
+
+        Assert.Contains("new_requiredid", ex.Message, StringComparison.Ordinal);
+        serviceMock.Verify(s => s.ExecuteAsync(
+            It.Is<OrganizationRequest>(r => r is CreateMultipleRequest || r is ExecuteMultipleRequest),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_FailureAfterAWrite_ReturnsWrittenIds()
+    {
+        // CR-003: any non-cancel exception after a table committed discarded allCreatedRecords.
+        // The opening "Linking" snapshot (BulkCreator.cs:156) is reported after the last table commits.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 2 },
+            BatchSize = 10,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph, new InlineProgress(p =>
+        {
+            if (p.Phase == "Linking") throw new InvalidOperationException("link phase exploded");
+        }));
+
+        Assert.Equal(2, result.TotalRecords);
+        Assert.False(result.Cancelled);
+        Assert.Contains("link phase exploded", result.FatalError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateAsync_FailureAfterBatchWrite_ReturnsCurrentTableIds()
+    {
+        // CR-003: a mid-table failure must drain successful batch IDs before leaving the helper.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 4 },
+            BatchSize = 2,
+            MaxParallelism = 1,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph, new InlineProgress(p =>
+        {
+            if (p.Phase == "Generating") throw new InvalidOperationException("create progress exploded");
+        }));
+
+        Assert.Equal(2, result.TotalRecords);
+        Assert.Equal(2, result.CreatedRecords["account"].Count);
+        Assert.False(result.Cancelled);
+        Assert.Equal("create progress exploded", result.FatalError);
+    }
+
+    // Progress<T> posts to the thread pool; this reports inline so a throw lands inside CreateAsync.
+    private sealed class InlineProgress(Action<SeedBomb.Bulk.Contracts.BulkCreationProgress> report)
+        : IProgress<SeedBomb.Bulk.Contracts.BulkCreationProgress>
+    {
+        public void Report(SeedBomb.Bulk.Contracts.BulkCreationProgress value) => report(value);
+    }
+
+    // CreateMultiple → "unsupported" fault, so every create goes through ExecuteMultiple. Each
+    // CreateRequest gets a new id unless reject(target) is true, which returns a throttle fault.
+    private static List<Entity> AnswerCreates(
+        Mock<IOrganizationServiceAsync2> serviceMock, Func<Entity, bool>? reject = null)
+    {
+        var captured = new List<Entity>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
+            {
+                if (req is CreateMultipleRequest)
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) });
+                if (req is not ExecuteMultipleRequest emr)
+                    return new OrganizationResponse();
+
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (int i = 0; i < emr.Requests.Count; i++)
+                {
+                    if (emr.Requests[i] is not CreateRequest cr)
+                    {
+                        responses.Add(new ExecuteMultipleResponseItem { RequestIndex = i, Response = new OrganizationResponse() });
+                        continue;
+                    }
+
+                    lock (captured) captured.Add(cr.Target);
+                    responses.Add(reject?.Invoke(cr.Target) == true
+                        ? new ExecuteMultipleResponseItem
+                        {
+                            RequestIndex = i,
+                            Fault = new OrganizationServiceFault { ErrorCode = -2147015902, Message = "request throttled" },
+                        }
+                        : new ExecuteMultipleResponseItem
+                        {
+                            RequestIndex = i,
+                            Response = new CreateResponse { Results = { ["id"] = Guid.NewGuid() } },
+                        });
+                }
+
+                return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+            });
+        return captured;
+    }
 }

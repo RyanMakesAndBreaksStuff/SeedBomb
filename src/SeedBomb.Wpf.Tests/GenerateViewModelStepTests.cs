@@ -970,6 +970,29 @@ public sealed class GenerateViewModelStepTests
             It.Is<RunRecord>(r => r.Profile == "contact-acct" && r.EntityNames.Length == 2),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GoToReview_FlagsUnsuppliedRequiredLookup()
+    {
+        // CR-003: Review passed, then Start wrote the parent table and failed on the child.
+        var required = new LookupAttributeMetadata { LogicalName = "new_requiredid", Targets = ["contact"], IsValidForCreate = true };
+        required.GetType().GetProperty("RequiredLevel")!.SetValue(
+            required, new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[BuildAccountMetadata(required)]);
+        viewModel.AttachFieldRules(new FieldRulesViewModel());
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.True(viewModel.ReviewHasErrors);
+        Assert.Contains("new_requiredid", viewModel.ReviewErrorSummary, StringComparison.Ordinal);
+        Assert.False(viewModel.GenerateCommand.CanExecute(null));
+    }
+
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
     // RuleEditorViewModelTests / SeedBomb.Bulk.Tests/RuledGenerationTests.
     private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)
