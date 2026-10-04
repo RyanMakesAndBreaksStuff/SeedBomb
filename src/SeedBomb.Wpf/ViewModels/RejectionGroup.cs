@@ -17,6 +17,9 @@ public sealed partial class RejectionGroup : ObservableObject
     /// <summary>Rows in this cause.</summary>
     public int RowCount { get; init; }
 
+    /// <summary>Generation-order rows this cause lost. Retry regenerates exactly these.</summary>
+    public IReadOnlyList<int> RowIndexes { get; init; } = [];
+
     /// <summary>When false the checkbox is disabled and excluded from retry.</summary>
     public bool IsRetryable { get; init; }
 

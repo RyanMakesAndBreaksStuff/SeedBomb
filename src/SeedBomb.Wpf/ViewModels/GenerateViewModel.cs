@@ -874,6 +874,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             MaxParallelism = MaxParallelism == 0 ? null : Math.Clamp(MaxParallelism, 1, GenerationLimits.MaxDop),
             FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
             RunId = RunId,
+            // CR-002: a fresh key scope per Start; Retry reuses the run's via RunViewModel._lastConfig.
+            AlternateKeyScope = Guid.NewGuid().ToString("N"),
         };
     }
 

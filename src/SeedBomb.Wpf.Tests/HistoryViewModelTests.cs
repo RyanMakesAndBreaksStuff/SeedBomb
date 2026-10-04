@@ -207,7 +207,7 @@ public sealed class HistoryViewModelTests
         live.ApplyResult(new SeedBomb.Core.Contracts.GenerationResult
         {
             Elapsed = TimeSpan.FromMinutes(1),
-            Errors = [new SeedBomb.Core.Contracts.BatchError("account", "request throttled", -2147015902, 7)],
+            Errors = [new SeedBomb.Core.Contracts.BatchError("account", "request throttled", -2147015902, 7) { RowIndexes = [0, 1, 2, 3, 4, 5, 6] }],
         }, seed: 42, environmentHost: "contoso-dev",
             new SeedBomb.Core.Contracts.GenerationConfig {
                 EntityLogicalNames = ["account"],

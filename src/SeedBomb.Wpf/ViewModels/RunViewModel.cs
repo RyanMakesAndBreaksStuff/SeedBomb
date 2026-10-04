@@ -542,10 +542,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         foreach (var (table, ids) in result.CreatedRecords)
         {
             _tableWritten[table] = ids.Count;
-            var plannedForTable = _lastConfig?.RecordCounts is { } counts
-                                  && counts.TryGetValue(table, out var want)
-                ? want
-                : ids.Count;
+            var plannedForTable = _lastConfig?.PlannedRows(table) is int want and > 0 ? want : ids.Count;
             UpdateTableRow(
                 new ProgressUpdate("Generating", table, ids.Count, plannedForTable, 0, 0, 0, result.Elapsed),
                 final: true);
@@ -642,13 +639,10 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         if (selected.Count == 0)
             return;
 
-        var names = selected
-            .Select(g => g.TableName)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var group in selected)
-            counts[group.TableName] = counts.GetValueOrDefault(group.TableName) + group.RowCount;
+        var rows = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var table in selected.GroupBy(g => g.TableName, StringComparer.OrdinalIgnoreCase))
+            rows[table.Key] = table.SelectMany(g => g.RowIndexes).Distinct().Order().ToArray();
+        var names = rows.Keys.ToArray();
 
         Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>? rules = null;
         if (_lastConfig.FieldRules is { } existing)
@@ -660,10 +654,14 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
                 rules = null;
         }
 
+        // CR-002: original counts + the rejected rows, so each row regenerates its original values
+        // (same seed, RunId and AlternateKeyScope from _lastConfig).
         var retryConfig = _lastConfig with
         {
             EntityLogicalNames = names,
-            RecordCounts = counts,
+            RecordCounts = names.ToDictionary(
+                n => n, n => _lastConfig.RecordCounts.GetValueOrDefault(n), StringComparer.OrdinalIgnoreCase),
+            RowIndexes = rows,
             FieldRules = rules,
         };
 
@@ -901,13 +899,18 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
     private static RejectionGroup BuildGroup(
         IGrouping<(string EntityLogicalName, string ErrorMessage), BatchError> grouping)
     {
-        var retryable = grouping.Any(RejectionClassifier.IsRetryable);
+        var rows = grouping.SelectMany(e => e.RowIndexes).Distinct().Order().ToArray();
+        var transient = grouping.Any(RejectionClassifier.IsRetryable);
+        // CR-002: only rows Bulk can locate can be regenerated; link-phase errors carry none.
+        var retryable = transient && rows.Length > 0;
         var message = grouping.Key.ErrorMessage;
         var hint = retryable
             ? "Transient throttle or timeout — safe to retry."
-            : message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
-                ? "Duplicate key — fix the source data or rule before retry."
-                : "Needs a data or plugin fix before retry.";
+            : transient
+                ? "Throttled while linking records — these links were not written."
+                : message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                    ? "Duplicate key — fix the source data or rule before retry."
+                    : "Needs a data or plugin fix before retry.";
 
         return new RejectionGroup
         {
@@ -915,6 +918,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
             CauseHint = hint,
             TableName = grouping.Key.EntityLogicalName,
             RowCount = grouping.Sum(e => e.RowCount),
+            RowIndexes = rows,
             IsRetryable = retryable,
             DispositionLabel = retryable ? "Retryable" : "Needs a fix",
             DispositionKey = retryable ? "Retryable" : "FixFirst",

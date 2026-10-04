@@ -63,7 +63,7 @@ public sealed class RunViewModelTests : IDisposable
             [
                 new BatchError("account", "Duplicate key on emailaddress1", null),
                 new BatchError("account", "Duplicate key on emailaddress1", null),
-                new BatchError("account", "request throttled", -2147015902),
+                new BatchError("account", "request throttled", -2147015902) { RowIndexes = [0] },
             ],
         }, seed: 40719, environmentHost: "contoso-dev");
 
@@ -105,7 +105,7 @@ public sealed class RunViewModelTests : IDisposable
         {
             CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
             Elapsed = TimeSpan.FromSeconds(1),
-            Errors = [new BatchError("account", "request throttled", -2147015902)],
+            Errors = [new BatchError("account", "request throttled", -2147015902) { RowIndexes = [0] }],
         }, seed: 40719, environmentHost: "contoso-dev", config: config);
 
         await vm.RetrySelectedCommand.ExecuteAsync(null);
@@ -170,7 +170,7 @@ public sealed class RunViewModelTests : IDisposable
         };
         vm.ApplyResult(new GenerationResult
         {
-            Errors = [new BatchError("account", "request throttled", -2147015902)],
+            Errors = [new BatchError("account", "request throttled", -2147015902) { RowIndexes = [0] }],
         }, seed: 7, environmentHost: "contoso-dev", config: config);
 
         // Retry swallows cancellation and reports via ReportRunFailure — the bound command must not throw.
@@ -218,7 +218,7 @@ public sealed class RunViewModelTests : IDisposable
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", "request throttled", -2147015902)],
+                Errors = [new BatchError("account", "request throttled", -2147015902) { RowIndexes = [0] }],
             })
             .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
 
@@ -541,7 +541,7 @@ public sealed class RunViewModelTests : IDisposable
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", "request throttled", -2147015902, 2)],
+                Errors = [new BatchError("account", "request throttled", -2147015902, 2) { RowIndexes = [0, 1] }],
             })
             .ReturnsAsync(new GenerationResult
             {
@@ -847,7 +847,7 @@ public sealed class RunViewModelTests : IDisposable
     {
         CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
         Elapsed = TimeSpan.FromSeconds(1),
-        Errors = [new BatchError("account", "request throttled", -2147015902, 1)],
+        Errors = [new BatchError("account", "request throttled", -2147015902, 1) { RowIndexes = [0] }],
     };
 
     private static Mock<IWpfGenerationService> Generation(Action? onCall = null, GenerationResult? result = null)
@@ -894,6 +894,49 @@ public sealed class RunViewModelTests : IDisposable
         Assert.False(vm.LastRunSucceeded);
         Assert.Contains("ServiceClient failed to connect", vm.LastFailureMessage, StringComparison.Ordinal);
         Assert.Contains("Nothing was rolled back", vm.OutcomeDetail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RetrySelected_RegeneratesOnlyTheRejectedRows()
+    {
+        // CR-002: retry sent a count-only config, so generation restarted at row 0.
+        GenerationConfig? retried = null;
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Callback<GenerationConfig, IProgress<ProgressUpdate>, CancellationToken>((c, _, _) => retried = c)
+            .ReturnsAsync(new GenerationResult());
+        var vm = new RunViewModel(generation: gen.Object);
+        vm.ApplyResult(new GenerationResult
+        {
+            Errors = [new BatchError("account", "request throttled", -2147015902, 2) { RowIndexes = [3, 7] }],
+        }, seed: 1, environmentHost: "contoso-dev", config: new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            AlternateKeyScope = "scope-1",
+        });
+
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+
+        Assert.NotNull(retried);
+        Assert.Equal(10, retried!.RecordCounts["account"]);
+        Assert.Equal([3, 7], retried.RowIndexes!["account"]);
+        Assert.Equal("scope-1", retried.AlternateKeyScope);
+        Assert.Equal(2, retried.PlannedTotal);
+    }
+
+    [Fact]
+    public void RejectionWithoutRows_IsNotRetryable()
+    {
+        // Link-phase errors carry no rows; regenerating rows would duplicate records instead of linking them.
+        var vm = new RunViewModel();
+        vm.ApplyResult(new GenerationResult
+        {
+            Errors = [new BatchError("account.parentaccountid", "request throttled", -2147015902)],
+        }, seed: 1, environmentHost: "contoso-dev");
+
+        Assert.False(Assert.Single(vm.RejectionGroups).IsRetryable);
     }
 
     private sealed class MutableAuth : IAuthService

@@ -1033,4 +1033,25 @@ public sealed class GenerateViewModelStepTests
             : extra.Concat<AttributeMetadata>([name, employees]).ToArray());
         return meta;
     }
+
+    [Fact]
+    public async Task EachStart_GetsItsOwnAlternateKeyScope()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
+        fieldRules.SetRule("account", "name",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+        viewModel.GoToReviewCommand.Execute(null);
+        var scopes = new List<string>();
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Callback<GenerationConfig, IProgress<ProgressUpdate>, CancellationToken>((cfg, _, _) => scopes.Add(cfg.AlternateKeyScope))
+            .ReturnsAsync(new GenerationResult());
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, scopes.Count);
+        Assert.All(scopes, s => Assert.False(string.IsNullOrEmpty(s)));
+        Assert.NotEqual(scopes[0], scopes[1]);
+    }
 }
