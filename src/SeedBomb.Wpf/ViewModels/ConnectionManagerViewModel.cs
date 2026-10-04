@@ -77,7 +77,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
-    [NotifyPropertyChangedFor(nameof(EnvironmentUrlError))]
+    [NotifyPropertyChangedFor(nameof(ProfileError))]
     private ConnectionProfile? _editingProfile;
 
     [ObservableProperty]
@@ -104,6 +104,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    [NotifyPropertyChangedFor(nameof(ProfileError))]
     private bool _isDirty;
 
     /// <summary>Shown for ~2s by <see cref="ConnectAsync"/> after a successful connect.</summary>
@@ -126,17 +127,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <summary>Gets whether the Connect button should show: saved, with no pending edits.</summary>
     public bool ShowConnectButton => IsEditing && !IsNewProfile && !IsDirty;
 
-    /// <summary>Gets an inline validation message for the environment URL, or null when it's valid or blank.</summary>
-    public string? EnvironmentUrlError =>
-        EditingProfile is { } p && !string.IsNullOrWhiteSpace(p.EnvironmentUrl) && !IsValidHttpsUrl(p.EnvironmentUrl)
-            ? "Enter a valid https:// environment URL, e.g. https://contoso.crm.dynamics.com"
-            : null;
-
-    private static bool IsValidHttpsUrl(string? url) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
-
-    /// <summary>Re-evaluates <see cref="EnvironmentUrlError"/> after an EnvironmentUrl edit.</summary>
-    internal void RefreshEnvironmentUrlValidation() => OnPropertyChanged(nameof(EnvironmentUrlError));
+    /// <summary>Gets the first sign-in problem with the edited profile, or null while it's valid or untouched.</summary>
+    public string? ProfileError => EditingProfile is { } p && IsDirty ? p.SignInError() : null;
 
     /// <summary>Loads profiles from storage and marks the active profile.</summary>
     [RelayCommand]
@@ -171,8 +163,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     {
         EditingProfile = new ConnectionProfile
         {
-            // Microsoft's well-known public client ID for Dynamics 365 / Power Platform
-            ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            ClientId = ConnectionProfile.WellKnownClientId,
         };
         IsEditing = true;
         IsDirty = false;
@@ -277,13 +268,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     // SelectProfileAsync, so the user sees a sign-in failure rather than a validation error.
     // The AuthType credential check closes the same gap for app-only auth: a blank secret or
     // thumbprint would otherwise save and then fail sign-in with a confusing error instead of
-    // being blocked at save time.
+    // being blocked at save time. SignInError is the exact check sign-in runs, so Save can't drift from it.
     private bool CanSaveProfile() =>
         !RunIsWriting
         && EditingProfile is { } p
         && !string.IsNullOrWhiteSpace(p.Name)
-        && !string.IsNullOrWhiteSpace(p.ClientId)
-        && IsValidHttpsUrl(p.EnvironmentUrl)
+        && p.SignInError() is null
         && p.AuthType switch
         {
             AuthType.ClientSecret => p.HasSavedSecret || !string.IsNullOrWhiteSpace(p.ClientSecret),
@@ -422,7 +412,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private void UseDefaultClientId()
     {
         if (EditingProfile is null) return;
-        EditingProfile.ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
+        EditingProfile.ClientId = ConnectionProfile.WellKnownClientId;
     }
 
     partial void OnEditingProfileChanging(ConnectionProfile? oldValue, ConnectionProfile? newValue)
@@ -437,8 +427,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     {
         IsDirty = true;
         SaveProfileCommand.NotifyCanExecuteChanged();
-        if (e.PropertyName is nameof(ConnectionProfile.EnvironmentUrl))
-            RefreshEnvironmentUrlValidation();
+        OnPropertyChanged(nameof(ProfileError));
     }
 
     partial void OnSelectedProfileChanged(ConnectionProfile? value)

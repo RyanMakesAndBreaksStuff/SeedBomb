@@ -65,7 +65,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                           ?? throw new InvalidOperationException("Not signed in. Connect to an environment first.");
             var profileId = profile.Id;
             var environmentUrl = profile.EnvironmentUrl;
-            var scopes = new[] { $"{environmentUrl}/.default" };
+            var scopes = profile.DataverseScopes;
 
             // WR-006: the constructor signs in and connects synchronously, and the awaits above
             // usually complete inline — so build it on the pool, never on the dispatcher.

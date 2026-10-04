@@ -75,6 +75,28 @@ public sealed partial class ConnectionProfile : ObservableObject
 
     /// <summary>Not persisted. True when the store holds an encrypted client secret for this profile.</summary>
     public bool HasSavedSecret { get; init; }
+
+    /// <summary>Microsoft's well-known public client ID for Dynamics 365 / Power Platform.</summary>
+    public const string WellKnownClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d";
+
+    /// <summary>Token scopes for this profile's Dataverse environment.</summary>
+    public string[] DataverseScopes => [$"{EnvironmentUrl}/.default"];
+
+    /// <summary>
+    /// WR-012: the one sign-in validator, shared by the editor's Save gate and the auth service.
+    /// Returns the first problem that would make sign-in fail, or null when the profile can sign in.
+    /// </summary>
+    public string? SignInError()
+    {
+        if (!Uri.TryCreate(EnvironmentUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            return "Enter a valid https:// environment URL, e.g. https://contoso.crm.dynamics.com";
+        if (!Guid.TryParse(ClientId, out _))
+            return "Application (client) ID must be a GUID.";
+        // OAuth may leave the tenant blank (the common endpoint); app-only sign-in needs the tenant GUID.
+        if (AuthType != AuthType.OAuth && !Guid.TryParse(TenantId, out _))
+            return "Tenant ID must be a GUID for client secret and certificate sign-in.";
+        return null;
+    }
 }
 
 /// <summary>Provides all <see cref="AuthType"/> values for binding to ComboBox.</summary>

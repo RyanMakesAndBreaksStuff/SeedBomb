@@ -335,7 +335,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         // Stage the candidate. GetOrCreatePca(commitSession: true) would replace the cached client
         // before the token call; direct test calls of GetOrCreate* keep that cache behaviour.
         var (pca, fingerprint, replaceClient) = await StagePcaAsync(profile, commitSession).ConfigureAwait(false);
-        var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
+        var scopes = profile.DataverseScopes;
 
         try
         {
@@ -429,7 +429,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         var (cca, fingerprint, replaceClient) = await StageCcaAsync(profile, commitSession, clientSecret)
             .ConfigureAwait(false);
-        var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
+        var scopes = profile.DataverseScopes;
 
         try
         {
@@ -603,24 +603,8 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     private static void ValidateProfile(ConnectionProfile profile)
     {
-        if (string.IsNullOrWhiteSpace(profile.EnvironmentUrl))
-            throw new InvalidOperationException("Environment URL is not configured.");
-
-        if (string.IsNullOrWhiteSpace(profile.ClientId))
-            throw new InvalidOperationException("Client ID is not configured.");
-
-        if (!Guid.TryParse(profile.ClientId, out _))
-            throw new InvalidOperationException($"Client ID '{profile.ClientId}' is not a valid GUID.");
-
-        // TenantId is optional for OAuth (falls back to /common endpoint)
-        if (profile.AuthType != AuthType.OAuth)
-        {
-            if (string.IsNullOrWhiteSpace(profile.TenantId))
-                throw new InvalidOperationException("Tenant ID is not configured.");
-
-            if (!Guid.TryParse(profile.TenantId, out _))
-                throw new InvalidOperationException($"Tenant ID '{profile.TenantId}' is not a valid GUID.");
-        }
+        if (profile.SignInError() is { } error)
+            throw new InvalidOperationException(error);
     }
 
     private Task<AuthenticationResult> AcquireSilentAsync(

@@ -165,6 +165,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
             Name = "app",
             EnvironmentUrl = "https://c.crm.dynamics.com",
             ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+            TenantId = "8f4a1c22-0000-4a00-9000-2f0e0e0a1111",
             AuthType = AuthType.ClientSecret,
             CertificateThumbprint = "ABC123",
             HasSavedSecret = true,
@@ -395,6 +396,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
                 Name = "Dev",
                 EnvironmentUrl = "https://contoso.crm.dynamics.com",
                 ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+                TenantId = "8f4a1c22-0000-4a00-9000-2f0e0e0a1111",
                 AuthType = authType,
                 ClientSecret = clientSecret,
                 CertificateThumbprint = certificateThumbprint,
@@ -402,6 +404,48 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         };
 
         Assert.Equal(expectedCanSave, vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    [Theory]
+    [InlineData(AuthType.ClientSecret, "")]
+    [InlineData(AuthType.Certificate, "contoso.onmicrosoft.com")]
+    public void SaveProfileCommand_BlocksAppOnlyProfileWithoutAGuidTenant(AuthType authType, string tenantId)
+    {
+        // WR-012: Save accepted these, then sign-in rejected them with "Tenant ID is not configured".
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object)
+        {
+            EditingProfile = new ConnectionProfile
+            {
+                Name = "Dev",
+                EnvironmentUrl = "https://contoso.crm.dynamics.com",
+                ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+                AuthType = authType,
+                TenantId = tenantId,
+                ClientSecret = "s3cret",
+                CertificateThumbprint = "ABC123",
+            },
+        };
+
+        Assert.False(vm.SaveProfileCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ProfileError_NamesTheMissingTenant_OnceTheProfileIsEdited()
+    {
+        var vm = new ConnectionManagerViewModel(
+            new Mock<IConnectionProfileService>().Object,
+            new Mock<IAuthService>().Object,
+            new Mock<IDataverseConnectionService>().Object);
+        vm.NewProfileCommand.Execute(null);
+        Assert.Null(vm.ProfileError); // an untouched form shows nothing
+
+        vm.EditingProfile!.EnvironmentUrl = "https://contoso.crm.dynamics.com";
+        vm.EditingProfile.AuthType = AuthType.ClientSecret;
+
+        Assert.Contains("Tenant ID", vm.ProfileError, StringComparison.Ordinal);
     }
 
     [Fact]
