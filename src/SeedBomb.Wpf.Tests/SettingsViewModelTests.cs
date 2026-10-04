@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Moq;
+using SeedBomb.Core.Contracts;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
@@ -74,7 +75,7 @@ public sealed class SettingsViewModelTests
 
         await vm.SaveCommand.ExecuteAsync(null);
 
-        Assert.Equal(GenerateViewModel.MaxDop, saved?.DefaultDop);
+        Assert.Equal(GenerationLimits.MaxDop, saved?.DefaultDop);
     }
 
     [Fact]

@@ -46,10 +46,6 @@ public sealed record ReviewPreviewRow(
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>Upper bound for configured parallelism. Settings and Generate share this cap so a
-    /// value saved in one place can never exceed what the other enforces (WR-008).</summary>
-    public const int MaxDop = 16;
-
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
     private readonly IMetadataProvider _metadataProvider;
@@ -70,7 +66,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(SelectedTableRows), nameof(PlannedTotal))]
-    private int _defaultRecordCount = 10;
+    private int _defaultRecordCount = GenerationLimits.DefaultRecordCount;
 
     /// <summary>Initialises the view-model.</summary>
     /// <param name="settingsService">Settings persistence service, for the configured default record count.</param>
@@ -204,7 +200,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// <summary>Run-level Bogus locale. Read-only; always <c>en</c> until a picker ships.</summary>
     public string Locale => DeterministicFaker.DefaultLocale;
 
-    [ObservableProperty] private int _batchSize = 500;
+    [ObservableProperty] private int _batchSize = GenerationLimits.DefaultBatchSize;
     [ObservableProperty] private int _maxParallelism;
 
     [ObservableProperty]
@@ -858,8 +854,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 e => rawCounts.GetValueOrDefault(e.LogicalName, DefaultRecordCount)),
             Seed = Seed,
             Locale = Locale,
-            BatchSize = BatchSize,
-            MaxParallelism = MaxParallelism == 0 ? null : Math.Clamp(MaxParallelism, 1, MaxDop),
+            BatchSize = Math.Clamp(BatchSize, 1, GenerationLimits.MaxBatchSize),
+            MaxParallelism = MaxParallelism == 0 ? null : Math.Clamp(MaxParallelism, 1, GenerationLimits.MaxDop),
             FieldRules = ReviewedRules is { Count: > 0 } ? ReviewedRules : null,
             RunId = RunId,
         };

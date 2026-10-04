@@ -253,7 +253,7 @@ public sealed class GenerateViewModelStepTests
         await viewModel.GenerateCommand.ExecuteAsync(null);
 
         Assert.NotNull(captured);
-        Assert.Equal(GenerateViewModel.MaxDop, captured!.MaxParallelism);
+        Assert.Equal(GenerationLimits.MaxDop, captured!.MaxParallelism);
     }
 
     [Fact]

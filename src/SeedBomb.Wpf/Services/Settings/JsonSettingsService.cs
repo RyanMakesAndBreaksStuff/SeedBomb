@@ -45,8 +45,8 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
                 return AppSettings.Default;
 
             await using var stream = File.OpenRead(_filePath);
-            return await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, ct).ConfigureAwait(false)
-                   ?? AppSettings.Default;
+            var loaded = await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, ct).ConfigureAwait(false);
+            return loaded?.Clamped() ?? AppSettings.Default;
         }
         catch (JsonException ex)
         {
@@ -69,7 +69,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-            await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(settings, JsonOptions), ct).ConfigureAwait(false);
+            await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(settings.Clamped(), JsonOptions), ct).ConfigureAwait(false);
             LoadWarning = null;
         }
         finally

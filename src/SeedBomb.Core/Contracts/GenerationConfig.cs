@@ -32,7 +32,7 @@ public record GenerationConfig
     /// <summary>
     /// Gets the batch size for bulk creation. Default is 500.
     /// </summary>
-    public int BatchSize { get; init; } = 500;
+    public int BatchSize { get; init; } = GenerationLimits.DefaultBatchSize;
 
     /// <summary>
     /// Gets the maximum degree of parallelism. Null means system default.

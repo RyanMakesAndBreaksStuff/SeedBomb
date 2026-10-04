@@ -67,6 +67,7 @@ public class BulkCreator : IBulkCreator
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(entityMetadata);
         ArgumentNullException.ThrowIfNull(graph);
+        GenerationLimits.Validate(config);
 
         PreparedBogusRun? preparedRun = null;
         // WR-002: declared outside the try so a cancel can still report what was written.

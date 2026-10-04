@@ -1,6 +1,7 @@
 <UserControl x:Class="SeedBomb.Views.Controls.FieldOverridesControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:core="clr-namespace:SeedBomb.Core.Contracts;assembly=SeedBomb.Core"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <ItemsControl ItemsSource="{Binding Entries}">
@@ -19,7 +20,7 @@
                     <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
                                   Value="{Binding Count, Mode=TwoWay}"
                                   Minimum="1"
-                                  Maximum="100000" />
+                                  Maximum="{Binding Source={x:Static core:GenerationLimits.MaxRecordCount}, Mode=OneTime}" />
                 </StackPanel>
             </DataTemplate>
         </ItemsControl.ItemTemplate>

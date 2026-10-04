@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using SeedBomb.Core.Contracts;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Dataverse;
@@ -42,8 +43,8 @@ public sealed partial class SettingsViewModel(
     private CancellationTokenSource? _appearanceSaveCts;
     private CancellationTokenSource? _navCts;
     private Task _appearanceSaveTask = Task.CompletedTask;
-    [ObservableProperty] private int _defaultRecordCount = 10;
-    [ObservableProperty] private int _defaultBatchSize = 500;
+    [ObservableProperty] private int _defaultRecordCount = GenerationLimits.DefaultRecordCount;
+    [ObservableProperty] private int _defaultBatchSize = GenerationLimits.DefaultBatchSize;
     [ObservableProperty] private int _defaultDop;
     [ObservableProperty] private bool _darkTheme;
     [ObservableProperty] private string _paletteId = DesignThemeManager.DefaultPaletteId;
@@ -155,8 +156,8 @@ public sealed partial class SettingsViewModel(
         try
         {
             var settings = new AppSettings(
-                DefaultRecordCount, DefaultBatchSize, Math.Clamp(DefaultDop, 0, GenerateViewModel.MaxDop),
-                DarkTheme, PaletteId, KeepRunSheetOpen);
+                DefaultRecordCount, DefaultBatchSize, DefaultDop,
+                DarkTheme, PaletteId, KeepRunSheetOpen).Clamped();
 
             CancelPendingAppearanceSave();
             await _settingsService.SaveAsync(settings);

@@ -464,4 +464,23 @@ public class BulkCreatorTests
         Assert.True(result.Cancelled);
         Assert.Equal(10, result.CreatedRecords["account"].Count);
     }
+
+    [Fact]
+    public async Task CreateAsync_BatchSizeAboveExecuteMultipleCap_ThrowsBeforeAnyRequest()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            BatchSize = 1001,
+        };
+
+        await Assert.ThrowsAsync<DataGenerationException>(() =>
+            sut.CreateAsync(config, new Dictionary<string, EntityMetadata>(), graph));
+        serviceMock.Verify(
+            s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

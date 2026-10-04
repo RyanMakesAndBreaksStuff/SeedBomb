@@ -1,5 +1,6 @@
 using SeedBomb.Services.History;
 using SeedBomb.Services.Settings;
+using SeedBomb.Core.Contracts;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
@@ -47,5 +48,21 @@ public sealed class JsonStoreRecoveryTests : IDisposable
 
         await svc.SaveAsync(AppSettings.Default, ct);
         Assert.Null(svc.LoadWarning);
+    }
+
+    [Fact]
+    public async Task Out_of_range_settings_are_clamped_on_load()
+    {
+        // WR-014: a hand-edited batch size of 0 made Chunk throw mid-run; above 1000 every batch faulted.
+        var ct = TestContext.Current.CancellationToken;
+        await File.WriteAllTextAsync(Path.Combine(_dir, "settings.json"),
+            """{"defaultRecordCount":0,"defaultBatchSize":5000,"defaultDop":99}""", ct);
+        using var svc = new JsonSettingsService(_dir);
+
+        var loaded = await svc.LoadAsync(ct);
+
+        Assert.Equal(1, loaded.DefaultRecordCount);
+        Assert.Equal(GenerationLimits.MaxBatchSize, loaded.DefaultBatchSize);
+        Assert.Equal(GenerationLimits.MaxDop, loaded.DefaultDop);
     }
 }

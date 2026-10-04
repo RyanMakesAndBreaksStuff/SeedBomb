@@ -1,3 +1,4 @@
+using SeedBomb.Core.Contracts;
 using SeedBomb.Core.Rules;
 using SeedBomb.Services.Diagnostics;
 using System.IO;
@@ -19,10 +20,6 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     private const string DraftFileName = "draft.profile.json";
     private const string FileSuffix = ".profile.json";
     private const int MaxProfileBytes = 1024 * 1024; // §08: read at most 1 MiB per file.
-
-    /// <summary>Upper bound on one table's record count — guards a crafted or corrupt profile
-    /// from queuing an unbounded write against the connected environment (WR-014).</summary>
-    public const int MaxRecordCount = 100_000;
 
     private static readonly string DefaultRoot = Path.Combine(AppPaths.Root, "profiles");
 
@@ -95,6 +92,9 @@ public sealed class JsonProfileService : IProfileService, IDisposable
     /// </summary>
     private async Task SaveLockedAsync(Profile profile, CancellationToken ct)
     {
+        if (profile.Tables?.Select(CountError).FirstOrDefault(e => e is not null) is { } countError)
+            throw new InvalidOperationException($"Profile not saved: {countError}.");
+
         var path = ResolvePath(profile.Name);
         var collision = await FindSlugCollisionAsync(path, profile.Name, ct).ConfigureAwait(false);
         if (collision is not null)
@@ -440,11 +440,8 @@ public sealed class JsonProfileService : IProfileService, IDisposable
         {
             if (string.IsNullOrWhiteSpace(table.Table))
                 return (null, "not a valid profile: table name is required");
-            if (table.Count < 1)
-                return (null, $"not a valid profile: table \"{table.Table}\" count must be at least 1");
-            if (table.Count > MaxRecordCount)
-                return (null,
-                    $"not a valid profile: table \"{table.Table}\" count must be at most {MaxRecordCount:N0}");
+            if (CountError(table) is { } countError)
+                return (null, $"not a valid profile: {countError}");
             if (!tableNames.Add(table.Table))
                 return (null, $"not a valid profile: duplicate table \"{table.Table}\"");
 
@@ -459,6 +456,15 @@ public sealed class JsonProfileService : IProfileService, IDisposable
 
         return (profile, null);
     }
+
+    /// <summary>The one record-count rule for load and save (WR-014).</summary>
+    private static string? CountError(ProfileTable table) => table.Count switch
+    {
+        < 1 => $"table \"{table.Table}\" count must be at least 1",
+        > GenerationLimits.MaxRecordCount =>
+            $"table \"{table.Table}\" count must be at most {GenerationLimits.MaxRecordCount:N0}",
+        _ => null,
+    };
 
     private static bool ContainsBogusRule(Profile profile)
     {

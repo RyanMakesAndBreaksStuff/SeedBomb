@@ -14,6 +14,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:vm="clr-namespace:SeedBomb.ViewModels"
+      xmlns:core="clr-namespace:SeedBomb.Core.Contracts;assembly=SeedBomb.Core"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
@@ -160,19 +161,19 @@
                             <StackPanel MinWidth="160" Width="220" Margin="0,0,16,8">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Record count" />
                                 <ui:NumberBox Value="{Binding DefaultRecordCount, Mode=TwoWay}"
-                                              Minimum="1" Maximum="100000"
+                                              Minimum="1" Maximum="{Binding Source={x:Static core:GenerationLimits.MaxRecordCount}, Mode=OneTime}"
                                               Height="{DynamicResource DG.Size.Control}" />
                             </StackPanel>
                             <StackPanel MinWidth="160" Width="220" Margin="0,0,16,8">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Batch size" />
                                 <ui:NumberBox Value="{Binding DefaultBatchSize, Mode=TwoWay}"
-                                              Minimum="1" Maximum="1000"
+                                              Minimum="1" Maximum="{Binding Source={x:Static core:GenerationLimits.MaxBatchSize}, Mode=OneTime}"
                                               Height="{DynamicResource DG.Size.Control}" />
                             </StackPanel>
                             <StackPanel MinWidth="160" Width="220" Margin="0,0,0,8">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max parallelism" />
                                 <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay}"
-                                              Minimum="0" Maximum="16" PlaceholderText="auto"
+                                              Minimum="0" Maximum="{Binding Source={x:Static core:GenerationLimits.MaxDop}, Mode=OneTime}" PlaceholderText="auto"
                                               Height="{DynamicResource DG.Size.Control}" />
                             </StackPanel>
                         </WrapPanel>
