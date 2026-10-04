@@ -79,13 +79,13 @@ public class BulkCreator : IBulkCreator
         {
             var validatedRules = ValidateConfiguredRules(config, entityMetadata);
             config = config with { FieldRules = validatedRules };
-            PreflightTables(config, entityMetadata);
+
+            // Sort first (pure, no I/O): preflight and PreparedLookupRun both need the creation order
+            // to know which lookup targets this run creates before their source table.
+            var sortedEntities = _topologicalSort.Sort(graph);
+            PreflightTables(config, validatedRules, entityMetadata, sortedEntities);
 
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
-
-            // Sort first: PreparedLookupRun needs the creation order to know which lookup targets
-            // this run creates before their source table.
-            var sortedEntities = _topologicalSort.Sort(graph);
 
             var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
                 _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
@@ -667,13 +667,26 @@ public class BulkCreator : IBulkCreator
     /// Metadata-only checks that must pass before the first write, so a failure leaves the
     /// environment untouched instead of stranding earlier tables (CR-003).
     /// </summary>
-    private void PreflightTables(GenerationConfig config, IReadOnlyDictionary<string, EntityMetadata> entityMetadata)
+    private void PreflightTables(
+        GenerationConfig config,
+        Dictionary<string, Dictionary<string, FieldRule>> validatedRules,
+        IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
+        IReadOnlyList<string> sortedEntities)
     {
         foreach (var entityName in config.EntityLogicalNames)
         {
             if (!config.RecordCounts.TryGetValue(entityName, out var count) || count <= 0
                 || !entityMetadata.TryGetValue(entityName, out var meta))
                 continue;
+
+            // Tables written before this one with a positive count: their records fill its required lookups.
+            var position = sortedEntities.ToList().FindIndex(t => string.Equals(t, entityName, StringComparison.OrdinalIgnoreCase));
+            var createdEarlier = position < 0
+                ? []
+                : sortedEntities
+                    .Take(position)
+                    .Where(t => config.RecordCounts.TryGetValue(t, out var n) && n > 0)
+                    .ToArray();
 
             // T-06: warn about any attributes that will be silently skipped due to FieldAction.Fail
             foreach (var attr in meta.Attributes ?? [])
@@ -685,9 +698,22 @@ public class BulkCreator : IBulkCreator
             }
 
             var missing = RequiredLookupPreflight.FindUnsupplied(
-                entityName, meta, config.FieldRules?.GetValueOrDefault(entityName));
+                entityName, meta, config.FieldRules?.GetValueOrDefault(entityName), createdEarlier);
             if (missing.Count > 0)
                 throw new DataGenerationException(missing[0]);
+
+            // FieldFilter never generates a SystemRequired lookup, so one accepted only because its target
+            // is created earlier gets an implicit lookupRandom rule (an explicit rule is never replaced).
+            // validatedRules is config.FieldRules, so PreparedLookupRun and generation both see it.
+            var implicitLookups = RequiredLookupPreflight.FindSuppliedByCreatedEarlier(
+                entityName, meta, validatedRules.GetValueOrDefault(entityName), createdEarlier);
+            if (implicitLookups.Count > 0)
+            {
+                if (!validatedRules.TryGetValue(entityName, out var tableRules))
+                    validatedRules[entityName] = tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+                foreach (var column in implicitLookups)
+                    tableRules.TryAdd(column, new LookupRandomRule());
+            }
 
             foreach (var attr in (meta.Attributes ?? []).OfType<LookupAttributeMetadata>())
             {

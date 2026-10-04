@@ -653,12 +653,18 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
                 reviewed[table] = tableRules;
         }
 
-        // CR-003: the same required-lookup check Bulk runs before its first write.
+        // CR-003: the same required-lookup check Bulk runs before its first write. A required target the
+        // run creates is sorted first (a SystemRequired edge is never deferred), so every other selected
+        // table with a positive count counts as created earlier.
+        var created = SelectedEntities
+            .Where(e => rawCounts.GetValueOrDefault(e.LogicalName, DefaultRecordCount) > 0)
+            .Select(e => e.LogicalName)
+            .ToArray();
         foreach (var entity in SelectedEntities)
         {
             if (_entityMetadata.TryGetValue(entity.LogicalName, out var entityMeta))
                 messages.AddRange(RequiredLookupPreflight
-                    .FindUnsupplied(entity.LogicalName, entityMeta, reviewed.GetValueOrDefault(entity.LogicalName))
+                    .FindUnsupplied(entity.LogicalName, entityMeta, reviewed.GetValueOrDefault(entity.LogicalName), created)
                     .Select(m => new RuleMessage(RuleMessageSeverity.Error, m)));
         }
 

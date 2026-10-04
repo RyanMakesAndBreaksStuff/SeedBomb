@@ -488,6 +488,8 @@ public class BulkCreatorTests
     {
         var meta = new EntityMetadata { LogicalName = name };
         meta.GetType().GetProperty("Attributes")!.SetValue(meta, attrs);
+        // Real metadata always carries it; PreparedLookupRun reads in-run lookup targets through it.
+        meta.GetType().GetProperty(nameof(EntityMetadata.PrimaryIdAttribute))!.SetValue(meta, name + "id");
         return meta;
     }
 
@@ -511,7 +513,8 @@ public class BulkCreatorTests
         var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
         {
             ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
-            ["contact"] = Meta("contact", RequiredLookup("new_requiredid", "account")),
+            // Points outside the run: no table in this run creates new_external, so only a rule can supply it.
+            ["contact"] = Meta("contact", RequiredLookup("new_requiredid", "new_external")),
         };
         var config = new GenerationConfig
         {
@@ -526,6 +529,75 @@ public class BulkCreatorTests
         serviceMock.Verify(s => s.ExecuteAsync(
             It.Is<OrganizationRequest>(r => r is CreateMultipleRequest || r is ExecuteMultipleRequest),
             It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RequiredLookupToTableCreatedEarlier_NeedsNoRule()
+    {
+        // CR-003 amendment: the run creates account before contact, so the lookup is filled from the in-run pool.
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var lookup = RequiredLookup("new_requiredid", "account");
+        lookup.IsValidForCreate = true; // FieldFilter only generates creatable columns
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", lookup),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Single(result.CreatedRecords["account"]);
+        Assert.Single(result.CreatedRecords["contact"]);
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        var reference = Assert.IsType<EntityReference>(contact["new_requiredid"]);
+        Assert.Equal("account", reference.LogicalName);
+        Assert.Contains(reference.Id, result.CreatedRecords["account"]);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RequiredLookupToTableCreatedEarly_KeepsAnExplicitRule()
+    {
+        // The implicit lookupRandom rule must never replace a user's rule on the same column.
+        var external = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var lookup = RequiredLookup("new_requiredid", "account");
+        lookup.IsValidForCreate = true;
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", lookup),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+            FieldRules = new Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>
+            {
+                ["contact"] = new()
+                {
+                    ["new_requiredid"] = new SeedBomb.Core.Rules.ConstantRule(System.Text.Json.JsonDocument.Parse(
+                        $$"""{"entity":"account","id":"{{external}}"}""").RootElement),
+                },
+            },
+        };
+
+        await sut.CreateAsync(config, metadata, graph);
+
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        Assert.Equal(external, Assert.IsType<EntityReference>(contact["new_requiredid"]).Id);
     }
 
     [Fact]
