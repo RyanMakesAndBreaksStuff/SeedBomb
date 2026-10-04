@@ -864,6 +864,32 @@ public sealed class RunViewModelTests : IDisposable
         ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
     };
 
+    [Fact]
+    public async Task FailedRun_LeavesATerminalFailedSheet()
+    {
+        // WR-006: the held-open sheet kept "Generating…" and a spinning ring after a pre-write failure.
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
+        var vm = new RunViewModel(generation: gen.Object);
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+        };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => vm.ExecuteAsync(config, TestContext.Current.CancellationToken));
+        vm.ReportRunFailure(ex);
+
+        Assert.Equal("Failed", vm.StatusHeadline);
+        Assert.False(vm.IsIndeterminate);
+        Assert.False(vm.LastRunSucceeded);
+        Assert.Contains("ServiceClient failed to connect", vm.LastFailureMessage, StringComparison.Ordinal);
+        Assert.Contains("Nothing was rolled back", vm.OutcomeDetail, StringComparison.Ordinal);
+    }
+
     private sealed class MutableAuth : IAuthService
     {
         public ConnectionProfile? ActiveProfile { get; set; }

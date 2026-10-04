@@ -197,7 +197,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
     /// <summary>False when the last run produced rejected rows. Drives the outcome banner style.</summary>
     [ObservableProperty] private bool _lastRunSucceeded = true;
 
-    /// <summary>Text shown in the last failure toast. Empty until a run fails.</summary>
+    /// <summary>Why the last run failed; shown under the sheet headline. Empty until a run fails.</summary>
     [ObservableProperty] private string _lastFailureMessage = "";
 
     /// <summary>Outcome glyph. Enum, not a Brush.</summary>
@@ -332,6 +332,9 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
             finally
             {
                 IsRunning = false;
+                // WR-006: a cancel or failure before the first batch must not leave the ring spinning.
+                IsIndeterminate = false;
+                IsLinking = false;
                 _runClock.Stop();
                 _clockTimer?.Stop();
 
@@ -439,6 +442,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         LinkPercent = 0;
         LinkLabel = "";
         StatusHeadline = "Generating…";
+        LastFailureMessage = "";
         OverallPercent = 0;
         OverallPercentLabel = "0";
         RowsWrittenLabel = 0.ToString("N0");
@@ -685,16 +689,32 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
                     ControlAppearance.Caution, null, TimeSpan.FromSeconds(3));
                 break;
             case MsalUiRequiredException:
+                ApplyFailure("Session expired. Sign in again, then start the run again.");
                 _snackbar?.Show("Session expired", "Please sign in again",
                     ControlAppearance.Danger, null, TimeSpan.FromSeconds(3));
                 break;
             default:
                 _logger?.LogError(ex, "Generation failed");
-                LastFailureMessage = DescribeFailure(ex);
+                ApplyFailure(DescribeFailure(ex));
                 _snackbar?.Show("Error", LastFailureMessage,
                     ControlAppearance.Danger, null, TimeSpan.FromSeconds(10));
                 break;
         }
+    }
+
+    /// <summary>
+    /// The one terminal-failure state (WR-006): the held-open sheet and the summary must read as
+    /// failed, not as running or completed.
+    /// </summary>
+    /// <param name="message">User-facing reason; also shown under the sheet headline.</param>
+    private void ApplyFailure(string message)
+    {
+        LastFailureMessage = message;
+        StatusHeadline = "Failed";
+        LastRunSucceeded = false;
+        OutcomeGlyph = SymbolRegular.ErrorCircle24;
+        OutcomeHeadline = "Run failed";
+        OutcomeDetail = $"{message} Nothing was rolled back.";
     }
 
     /// <summary>
