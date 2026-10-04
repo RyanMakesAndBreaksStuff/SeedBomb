@@ -20,6 +20,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private readonly IContentDialogService? _dialogs;
     private readonly RunViewModel? _run;
     private readonly RunSessionGate? _sessionGate;
+    private readonly SynchronizationContext? _uiContext;
 
     /// <summary>Initialises the view-model.</summary>
     /// <param name="profileService">Connection profile store.</param>
@@ -44,9 +45,11 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         _dialogs = dialogs;
         _run = run;
         _sessionGate = sessionGate;
+        _uiContext = SynchronizationContext.Current;
         // Both singletons: the subscription lives as long as the app.
         if (_run is not null)
             _run.PropertyChanged += OnRunPropertyChanged;
+        _authService.SignedOut += OnSignedOut;
     }
 
     // WR-001: save, delete, connect and switch can each dispose the ServiceClient a running
@@ -96,8 +99,17 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasSwitchError))]
     private string? _switchError;
 
-    /// <summary>Not persisted. Id of the profile the app is actually connected to right now, if any.</summary>
-    [ObservableProperty] private Guid? _connectedProfileId;
+    /// <summary>Id of the profile the live session is signed in to. WR-003: read from the auth service, never mirrored.</summary>
+    public Guid? ConnectedProfileId => _authService.ActiveProfile?.Id;
+
+    // SignedOut can fire on a background thread (ProfileAuthService uses ConfigureAwait(false)).
+    private void OnSignedOut(object? sender, EventArgs e)
+    {
+        if (_uiContext is null || ReferenceEquals(SynchronizationContext.Current, _uiContext))
+            OnPropertyChanged(nameof(ConnectedProfileId));
+        else
+            _uiContext.Post(static s => ((ConnectionManagerViewModel)s!).OnPropertyChanged(nameof(ConnectedProfileId)), this);
+    }
 
     /// <summary>Whether the editing profile has unsaved edits since it was opened or last saved.</summary>
     [ObservableProperty]
@@ -161,6 +173,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void NewProfile()
     {
+        SelectedProfile = null; // WR-011: so clicking the previously selected row reopens it
         EditingProfile = new ConnectionProfile
         {
             ClientId = ConnectionProfile.WellKnownClientId,
@@ -188,7 +201,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             if (result.Succeeded)
             {
                 await _connectionService.ResetAsync();
-                ConnectedProfileId = profile.Id;
+                OnPropertyChanged(nameof(ConnectedProfileId));
                 ConnectionSwitched?.Invoke(this, (profile, result));
             }
             else
@@ -303,6 +316,10 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                 if (_sessionGate is not null)
                     lease = await _sessionGate.AcquireAsync();
 
+                // WR-003: deleting can sign the session out (ProfilesChanged → ReconcileSessionAsync), so
+                // decide on the reset from the owner before it changes.
+                var wasActive = _authService.ActiveProfile?.Id == profile.Id;
+
                 // WR-015: purge the cached MSAL refresh token before the profile record itself
                 // disappears — the delete confirmation promises credential removal.
                 await _authService.ForgetProfileAsync(profile);
@@ -324,9 +341,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                 var activeId = _authService.ActiveProfile?.Id;
                 if (activeId == profile.Id)
                     await _authService.SignOutAsync();
-                if (activeId == profile.Id || ConnectedProfileId == profile.Id)
+                if (wasActive || activeId == profile.Id)
                 {
-                    ConnectedProfileId = null;
+                    OnPropertyChanged(nameof(ConnectedProfileId));
                     // WR-001: only deleting the connected profile drops the live connection; saving or
                     // deleting any other profile leaves it alone.
                     await _connectionService.ResetAsync();
@@ -375,6 +392,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
     {
+        SelectedProfile = null; // WR-011
         IsEditing = false;
         EditingProfile = null;
         TestResult = null;

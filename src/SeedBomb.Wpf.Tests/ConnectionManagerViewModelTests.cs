@@ -110,8 +110,11 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([profile]);
         profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(profile);
 
+        ConnectionProfile? active = null;
         var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(() => active);
         auth.Setup(a => a.SignInAsync(It.IsAny<ConnectionProfile>(), It.IsAny<nint>(), It.IsAny<CancellationToken>()))
+            .Callback<ConnectionProfile, nint, CancellationToken>((p, _, _) => active = p)
             .ReturnsAsync(new AuthResult(true, "user@contoso.com", null));
 
         var connection = new Mock<IDataverseConnectionService>();
@@ -253,33 +256,6 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         await vm.DeleteProfileCommand.ExecuteAsync(vm.Profiles[0]);
 
         Assert.Empty(vm.Profiles);
-    }
-
-    [Fact]
-    public async Task DeleteProfileAsync_ClearsConnectedProfileId_WhenDeletingTheConnectedProfile()
-    {
-        var stored = new List<ConnectionProfile>
-        {
-            new() { Name = "Only", EnvironmentUrl = "https://c.crm.dynamics.com" },
-        };
-        var target = stored[0];
-
-        var profiles = new Mock<IConnectionProfileService>();
-        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => stored.ToList());
-        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(() => stored.FirstOrDefault());
-        profiles.Setup(p => p.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Callback<Guid, CancellationToken>((id, _) => stored.RemoveAll(p => p.Id == id))
-            .Returns(Task.CompletedTask);
-
-        var vm = new ConnectionManagerViewModel(
-            profiles.Object, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>())
-        {
-            ConnectedProfileId = target.Id,
-        };
-
-        await vm.DeleteProfileCommand.ExecuteAsync(target);
-
-        Assert.Null(vm.ConnectedProfileId);
     }
 
     [Fact]
@@ -722,16 +698,54 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         var profiles = new Mock<IConnectionProfileService>();
         profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([connected, other]);
         var connection = new Mock<IDataverseConnectionService>();
-        var vm = new ConnectionManagerViewModel(profiles.Object, Mock.Of<IAuthService>(), connection.Object)
-        {
-            ConnectedProfileId = connected.Id,
-        };
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(connected);
+        var vm = new ConnectionManagerViewModel(profiles.Object, auth.Object, connection.Object);
 
         await vm.DeleteProfileCommand.ExecuteAsync(other);
         connection.Verify(c => c.ResetAsync(), Times.Never);
 
         await vm.DeleteProfileCommand.ExecuteAsync(connected);
         connection.Verify(c => c.ResetAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Deleting_the_signed_in_profile_resets_the_connection_without_a_window_seeding_it()
+    {
+        // WR-003: the reset read ConnectedProfileId, a mirror only MainWindow code-behind seeded and
+        // SignedOut could clear first. Startup's silent sign-in never wrote it at all.
+        var prod = new ConnectionProfile { Name = "PROD", EnvironmentUrl = "https://prod.crm.dynamics.com" };
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync([prod]);
+        ConnectionProfile? active = prod;
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(() => active);
+        profiles.Setup(p => p.DeleteAsync(prod.Id, It.IsAny<CancellationToken>()))
+            .Callback(() => active = null) // ProfilesChanged → ReconcileSessionAsync drops the session
+            .Returns(Task.CompletedTask);
+        var connection = new Mock<IDataverseConnectionService>();
+        var vm = new ConnectionManagerViewModel(profiles.Object, auth.Object, connection.Object);
+
+        await vm.DeleteProfileCommand.ExecuteAsync(prod);
+
+        connection.Verify(c => c.ResetAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cancel_and_NewProfile_clear_the_selection_so_reselecting_reopens_the_editor()
+    {
+        // WR-011: SelectedProfile stayed set, so clicking the same row raised no change.
+        var vm = await ViewModelWithOneSavedProfileAsync();
+        var saved = vm.Profiles[0];
+
+        vm.SelectedProfile = saved;
+        vm.CancelCommand.Execute(null);
+        vm.SelectedProfile = saved;
+        Assert.Equal(saved.Id, vm.EditingProfile?.Id);
+
+        vm.NewProfileCommand.Execute(null);
+        vm.SelectedProfile = saved;
+        Assert.Equal(saved.Id, vm.EditingProfile?.Id);
     }
 
     internal static readonly TimeSpan Bound = TimeSpan.FromSeconds(5);
@@ -1038,10 +1052,7 @@ public sealed class ConnectionManagerSessionStaTests
         var run = new RunViewModel(
             generation: gen.Object, settings: ReadySettings().Object, auth: auth, sessionGate: gate);
         var vm = new ConnectionManagerViewModel(
-            profiles.Object, auth, Mock.Of<IDataverseConnectionService>(), dialogs.Object, sessionGate: gate)
-        {
-            ConnectedProfileId = active.Id,
-        };
+            profiles.Object, auth, Mock.Of<IDataverseConnectionService>(), dialogs.Object, sessionGate: gate);
 
         var deleting = vm.DeleteProfileCommand.ExecuteAsync(active);
         try
