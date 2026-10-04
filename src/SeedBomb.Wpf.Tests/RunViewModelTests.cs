@@ -4,15 +4,27 @@ using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Generation;
 using SeedBomb.Services.History;
+using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
+using System.Windows.Threading;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
 
-public sealed class RunViewModelTests
+[Collection("RunSession")]
+public sealed class RunViewModelTests : IDisposable
 {
+    // Retry notifications go through RunViewModel.UiDispatcher, else Application.Current.Dispatcher. A
+    // StaUi test may own a live, non-pumping Application at the same time, so this collection pins the
+    // caller's own dispatcher: notifications run inline and deterministically.
+    public RunViewModelTests() => UseInlineRetryNotifications();
+
+    public void Dispose() => RunViewModel.UiDispatcher = null;
+
+    internal static void UseInlineRetryNotifications() => RunViewModel.UiDispatcher = () => Dispatcher.CurrentDispatcher;
+
     [Theory]
     [InlineData(-2147015902)] // Number of requests exceeded the limit
     [InlineData(-2147015903)] // Combined execution time exceeded the limit
@@ -118,7 +130,7 @@ public sealed class RunViewModelTests
         };
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => vm.ExecuteAsync(config, "contoso-dev", ["account"], 3, TestContext.Current.CancellationToken));
+            () => vm.ExecuteAsync(config, TestContext.Current.CancellationToken));
 
         gen.Verify(g => g.GenerateAsync(
             It.IsAny<GenerationConfig>(),
@@ -211,7 +223,7 @@ public sealed class RunViewModelTests
                 EntityLogicalNames = ["account"],
                 RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
             },
-            "contoso-dev", ["account"], 1, TestContext.Current.CancellationToken);
+            TestContext.Current.CancellationToken);
 
         // Must not throw: the summary page's primary button is bound straight to this command.
         await vm.RetrySelectedCommand.ExecuteAsync(null);
@@ -336,7 +348,7 @@ public sealed class RunViewModelTests
                 EntityLogicalNames = ["account"],
                 RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
             },
-            environmentHost: "", ["account"], 1, TestContext.Current.CancellationToken);
+            TestContext.Current.CancellationToken);
 
         Assert.Contains("contoso-uat.crm.dynamics.com", vm.RunDescription, StringComparison.Ordinal);
         Assert.DoesNotContain("written to Dataverse", vm.RunDescription, StringComparison.Ordinal);
@@ -494,7 +506,7 @@ public sealed class RunViewModelTests
                 RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
                 Seed = 42,
             },
-            "contoso-dev", ["account"], 1, TestContext.Current.CancellationToken);
+            TestContext.Current.CancellationToken);
         vm.ShowHistorical(new SeedBomb.Services.History.RunRecord(Guid.NewGuid(), DateTimeOffset.Now,
             ["contact"], 3, TimeSpan.FromSeconds(2), true, 0));
         var raised = new List<string?>();
@@ -538,7 +550,7 @@ public sealed class RunViewModelTests
                 EntityLogicalNames = ["account"],
                 RecordCounts = new Dictionary<string, int> { ["account"] = 2 },
             },
-            "contoso-dev", ["account"], 2, TestContext.Current.CancellationToken,
+            TestContext.Current.CancellationToken,
             tableLabels: new Dictionary<string, string> { ["account"] = "Account" }, profileName: "sales");
 
         await vm.RetrySelectedCommand.ExecuteAsync(null);
@@ -547,5 +559,340 @@ public sealed class RunViewModelTests
             It.Is<RunRecord>(r => r.Id == vm.CurrentRunId && r.Succeeded && r.TotalRecords == 2
                 && r.EntityNames.Single() == "Account" && r.Profile == "sales"),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static readonly TimeSpan Bound = TimeSpan.FromSeconds(5);
+
+    [Fact]
+    public async Task Run_UsesProfileActiveAfterPreparation()
+    {
+        var profileA = Profile("A", "https://a.crm.dynamics.com");
+        var profileB = Profile("B", "https://b.crm.dynamics.com");
+        var auth = new MutableAuth { ActiveProfile = profileA, CurrentUserDisplayName = "ada@a" };
+        var prepEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePrep = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                prepEntered.TrySetResult();
+                return releasePrep.Task.ContinueWith(_ => AppSettings.Default);
+            });
+        var calls = 0;
+        var gen = Generation(onCall: () => Interlocked.Increment(ref calls), Throttled());
+        RunRecord? recorded = null;
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.AddRunAsync(It.IsAny<RunRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<RunRecord, CancellationToken>((row, _) => recorded = row)
+            .Returns(Task.CompletedTask);
+        var vm = new RunViewModel(
+            generation: gen.Object, settings: settings.Object, auth: auth, history: history.Object,
+            sessionGate: new RunSessionGate());
+
+        var running = vm.ExecuteAsync(AccountConfig(), TestContext.Current.CancellationToken);
+        try
+        {
+            await prepEntered.Task.WaitAsync(Bound, TestContext.Current.CancellationToken);
+            auth.ActiveProfile = profileB;
+            auth.CurrentUserDisplayName = "ada@b";
+            auth.RaiseChanged();
+        }
+        finally
+        {
+            releasePrep.TrySetResult();
+        }
+
+        await running.WaitAsync(Bound, TestContext.Current.CancellationToken);
+
+        Assert.Equal("b.crm.dynamics.com", vm.EnvironmentLabel);
+        Assert.Equal("ada@b", recorded?.User);
+        Assert.Equal(profileB.Id, auth.ActiveProfile?.Id);
+        Assert.True(vm.RetrySelectedCommand.CanExecute(null));
+
+        auth.ActiveProfile = profileA;
+        auth.RaiseChanged();
+        Assert.False(vm.RetrySelectedCommand.CanExecute(null));
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+        Assert.Equal(1, calls);
+        Assert.Equal("b.crm.dynamics.com", vm.EnvironmentLabel);
+    }
+
+    [Fact]
+    public async Task Retry_RechecksTargetAfterPreparation()
+    {
+        var profileA = Profile("A", "https://a.crm.dynamics.com");
+        var profileB = Profile("B", "https://b.crm.dynamics.com");
+        var auth = new MutableAuth { ActiveProfile = profileA, CurrentUserDisplayName = "ada@a" };
+        var loads = 0;
+        var prepEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePrep = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (Interlocked.Increment(ref loads) == 1)
+                    return Task.FromResult(AppSettings.Default);
+                prepEntered.TrySetResult();
+                return releasePrep.Task.ContinueWith(_ => AppSettings.Default);
+            });
+        var calls = 0;
+        var gen = Generation(onCall: () => Interlocked.Increment(ref calls), Throttled());
+        var vm = new RunViewModel(
+            generation: gen.Object, settings: settings.Object, auth: auth, sessionGate: new RunSessionGate());
+        await vm.ExecuteAsync(AccountConfig(), TestContext.Current.CancellationToken);
+        Assert.Equal(1, calls);
+        Assert.Equal("a.crm.dynamics.com", vm.EnvironmentLabel);
+
+        var retrying = vm.RetrySelectedCommand.ExecuteAsync(null);
+        try
+        {
+            await prepEntered.Task.WaitAsync(Bound, TestContext.Current.CancellationToken);
+            auth.ActiveProfile = profileB;
+            auth.CurrentUserDisplayName = "ada@b";
+            auth.RaiseChanged();
+        }
+        finally
+        {
+            releasePrep.TrySetResult();
+        }
+
+        await retrying.WaitAsync(Bound, TestContext.Current.CancellationToken);
+        Assert.Equal(1, calls);
+        Assert.Equal("a.crm.dynamics.com", vm.EnvironmentLabel);
+        Assert.False(vm.RetrySelectedCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ProfileChange_NotifiesRetryImmediately()
+    {
+        var profileA = Profile("A", "https://a.crm.dynamics.com");
+        var profileB = Profile("B", "https://b.crm.dynamics.com");
+        var auth = new MutableAuth { ActiveProfile = profileA, CurrentUserDisplayName = "ada" };
+        var vm = new RunViewModel(generation: Generation(result: Throttled()).Object, auth: auth);
+        await vm.ExecuteAsync(AccountConfig(), TestContext.Current.CancellationToken);
+        var selected = Assert.Single(vm.RejectionGroups, g => g.IsRetryable).IsSelectedForRetry;
+        Assert.True(vm.RetrySelectedCommand.CanExecute(null));
+
+        var notifications = 0;
+        vm.RetrySelectedCommand.CanExecuteChanged += (_, _) => notifications++;
+        auth.ActiveProfile = profileB;
+        auth.RaiseChanged();
+
+        Assert.True(notifications > 0);
+        Assert.False(vm.RetrySelectedCommand.CanExecute(null));
+        Assert.Equal(selected, Assert.Single(vm.RejectionGroups, g => g.IsRetryable).IsSelectedForRetry);
+
+        var beforeSignOut = notifications;
+        auth.ActiveProfile = null;
+        auth.CurrentUserDisplayName = null;
+        auth.RaiseChanged();
+        Assert.True(notifications > beforeSignOut);
+        Assert.False(vm.RetrySelectedCommand.CanExecute(null));
+
+        if (string.Equals(Environment.GetEnvironmentVariable("SEEDBOMB_SKIP_GATE_UI"), "1", StringComparison.Ordinal))
+            return;
+        var notifiedOn = -1;
+        var uiThread = 0;
+        DispatcherFrame? pumping = null;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sta = new Thread(() =>
+        {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            pumping = new DispatcherFrame();
+            uiThread = Environment.CurrentManagedThreadId;
+            RunViewModel.UiDispatcher = () => dispatcher;
+            started.TrySetResult();
+            Dispatcher.PushFrame(pumping);
+            dispatcher.InvokeShutdown();
+        });
+        sta.IsBackground = true;
+        sta.SetApartmentState(ApartmentState.STA);
+        sta.Start();
+        try
+        {
+            await started.Task.WaitAsync(Bound, TestContext.Current.CancellationToken);
+            vm.RetrySelectedCommand.CanExecuteChanged += (_, _) =>
+            {
+                notifiedOn = Environment.CurrentManagedThreadId;
+                if (pumping is not null)
+                    pumping.Continue = false;
+            };
+            auth.ActiveProfile = profileA;
+            ThreadPool.QueueUserWorkItem(_ => auth.RaiseChanged());
+            Assert.True(sta.Join(Bound));
+            Assert.Equal(uiThread, notifiedOn);
+            Assert.True(vm.RetrySelectedCommand.CanExecute(null));
+        }
+        finally
+        {
+            UseInlineRetryNotifications();
+            if (pumping is not null)
+                pumping.Continue = false;
+        }
+    }
+
+    [Fact]
+    public async Task CancelledSessionWait_DoesNotStartRun()
+    {
+        var gate = new RunSessionGate();
+        var hold = await gate.AcquireAsync(TestContext.Current.CancellationToken);
+        var calls = 0;
+        var releaseGen = new TaskCompletionSource<GenerationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns((GenerationConfig _, IProgress<ProgressUpdate> _, CancellationToken token) =>
+            {
+                Interlocked.Increment(ref calls);
+                token.Register(() => releaseGen.TrySetCanceled(token));
+                return releaseGen.Task;
+            });
+        var vm = new RunViewModel(generation: gen.Object, sessionGate: gate);
+        using var cts = new CancellationTokenSource();
+        var running = vm.ExecuteAsync(AccountConfig(), cts.Token);
+        try
+        {
+            cts.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
+            Assert.False(vm.IsRunning);
+            Assert.Equal(0, calls);
+        }
+        finally
+        {
+            releaseGen.TrySetResult(Throttled());
+            hold.Dispose();
+            try
+            {
+                await running.WaitAsync(Bound, TestContext.Current.CancellationToken);
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        using (var again = await gate.AcquireAsync(TestContext.Current.CancellationToken)
+                   .WaitAsync(Bound, TestContext.Current.CancellationToken))
+            Assert.NotNull(again);
+
+        var exploding = new Mock<IWpfGenerationService>();
+        exploding.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
+        var failed = new RunViewModel(generation: exploding.Object, sessionGate: gate);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            failed.ExecuteAsync(AccountConfig(), TestContext.Current.CancellationToken));
+        using (var afterException = await gate.AcquireAsync(TestContext.Current.CancellationToken)
+                   .WaitAsync(Bound, TestContext.Current.CancellationToken))
+            Assert.NotNull(afterException);
+
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelling = new Mock<IWpfGenerationService>();
+        cancelling.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(async (GenerationConfig _, IProgress<ProgressUpdate> _, CancellationToken token) =>
+            {
+                entered.TrySetResult();
+                await Task.Delay(Timeout.Infinite, token);
+                return Throttled();
+            });
+        var cancelledRun = new RunViewModel(generation: cancelling.Object, sessionGate: gate);
+        using var runCts = new CancellationTokenSource();
+        var inFlight = cancelledRun.ExecuteAsync(AccountConfig(), runCts.Token);
+        await entered.Task.WaitAsync(Bound, TestContext.Current.CancellationToken);
+        runCts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => inFlight);
+        using var afterCancel = await gate.AcquireAsync(TestContext.Current.CancellationToken)
+            .WaitAsync(Bound, TestContext.Current.CancellationToken);
+        Assert.NotNull(afterCancel);
+    }
+
+    [Fact]
+    public async Task Retry_IsBlocked_AfterTheSessionMovesToAnotherProfile()
+    {
+        var dev = Profile("Dev", "https://dev.crm.dynamics.com");
+        var prod = Profile("Prod", "https://prod.crm.dynamics.com");
+        var auth = new MutableAuth { ActiveProfile = dev, CurrentUserDisplayName = "ada" };
+        var calls = 0;
+        var gen = Generation(onCall: () => Interlocked.Increment(ref calls), Throttled());
+        RunRecord? recorded = null;
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.AddRunAsync(It.IsAny<RunRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<RunRecord, CancellationToken>((row, _) => recorded = row)
+            .Returns(Task.CompletedTask);
+        var vm = new RunViewModel(generation: gen.Object, auth: auth, history: history.Object);
+
+        await vm.ExecuteAsync(AccountConfig(), TestContext.Current.CancellationToken);
+
+        Assert.Equal("dev.crm.dynamics.com", vm.EnvironmentLabel);
+        Assert.Equal("dev.crm.dynamics.com", recorded?.Environment);
+        auth.ActiveProfile = prod;
+        auth.RaiseChanged();
+        Assert.False(vm.RetrySelectedCommand.CanExecute(null));
+        await vm.RetrySelectedCommand.ExecuteAsync(null);
+        Assert.Equal(1, calls);
+    }
+
+    private static GenerationConfig AccountConfig() => new()
+    {
+        EntityLogicalNames = ["account"],
+        RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+        Seed = 42,
+    };
+
+    private static GenerationResult Throttled() => new()
+    {
+        CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
+        Elapsed = TimeSpan.FromSeconds(1),
+        Errors = [new BatchError("account", 0, "request throttled", -2147015902, 1)],
+    };
+
+    private static Mock<IWpfGenerationService> Generation(Action? onCall = null, GenerationResult? result = null)
+    {
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                onCall?.Invoke();
+                return Task.FromResult(result ?? Throttled());
+            });
+        return gen;
+    }
+
+    private static ConnectionProfile Profile(string name, string url) => new()
+    {
+        Name = name,
+        EnvironmentUrl = url,
+        ClientId = "51f81489-12ee-4a9e-aaae-a2591f45987d",
+    };
+
+    private sealed class MutableAuth : IAuthService
+    {
+        public ConnectionProfile? ActiveProfile { get; set; }
+        public string? CurrentUserDisplayName { get; set; }
+        public event EventHandler? SignedOut;
+        public event EventHandler? ActiveProfileChanged;
+
+        public Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default) =>
+            Task.FromResult(new AuthResult(false, null, "not used"));
+
+        public Task<AuthResult> SignInAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default) =>
+            Task.FromResult(new AuthResult(true, CurrentUserDisplayName, null));
+
+        public Task<AuthResult> TryConnectAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default) =>
+            Task.FromResult(new AuthResult(false, null, null));
+
+        public Task SignOutAsync(CancellationToken ct = default)
+        {
+            ActiveProfile = null;
+            CurrentUserDisplayName = null;
+            SignedOut?.Invoke(this, EventArgs.Empty);
+            ActiveProfileChanged?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        }
+
+        public Task ForgetProfileAsync(ConnectionProfile profile, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default) => Task.FromResult("token");
+
+        public void RaiseChanged() => ActiveProfileChanged?.Invoke(this, EventArgs.Empty);
     }
 }

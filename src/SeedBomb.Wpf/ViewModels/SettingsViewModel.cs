@@ -21,6 +21,9 @@ namespace SeedBomb.ViewModels;
 /// <param name="connections">Optional Dataverse connection cache to reset on sign-out.</param>
 /// <param name="profiles">Optional connection profile store, used to tailor the sign-out message to the active profile's auth type.</param>
 /// <param name="run">Optional run sheet. While it is writing, sign-out is blocked.</param>
+/// <param name="sessionGate">
+/// Process-wide run/session gate. Null (existing fixtures) does not coordinate with a live run.
+/// </param>
 public sealed partial class SettingsViewModel(
     ISettingsService settingsService,
     ILogger<SettingsViewModel> logger,
@@ -28,7 +31,8 @@ public sealed partial class SettingsViewModel(
     IAuthService? auth = null,
     IDataverseConnectionService? connections = null,
     IConnectionProfileService? profiles = null,
-    RunViewModel? run = null) : ViewModelBase
+    RunViewModel? run = null,
+    RunSessionGate? sessionGate = null) : ViewModelBase
 {
     private readonly ISettingsService _settingsService = settingsService;
     private readonly ILogger<SettingsViewModel> _logger = logger;
@@ -37,6 +41,7 @@ public sealed partial class SettingsViewModel(
     private readonly IDataverseConnectionService? _connections = connections;
     private readonly IConnectionProfileService? _profiles = profiles;
     private readonly RunViewModel? _run = run;
+    private readonly RunSessionGate? _sessionGate = sessionGate;
     private AppSettings _loadedSettings = AppSettings.Default;
     private bool _isLoadingSettings;
     private bool _loadFailed;
@@ -187,9 +192,19 @@ public sealed partial class SettingsViewModel(
         if (_auth is null) return;
         try
         {
-            await _auth.SignOutAsync();
-            if (_connections is not null)
-                await _connections.ResetAsync();
+            IDisposable? lease = null;
+            try
+            {
+                if (_sessionGate is not null)
+                    lease = await _sessionGate.AcquireAsync();
+                await _auth.SignOutAsync();
+                if (_connections is not null)
+                    await _connections.ResetAsync();
+            }
+            finally
+            {
+                lease?.Dispose();
+            }
 
             // WR-T7: app-only profiles (client secret / certificate) have no user account to sign
             // out of - the credential stays on disk and the profile stays last-used, so the next

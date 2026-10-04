@@ -818,9 +818,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         var profileName = ActiveProfileName;
         try
         {
-            var names = SelectedEntities.Select(e => e.LogicalName).ToArray();
-            LastResult = await Run.ExecuteAsync(config, string.Empty, names, PlannedTotal, _cts.Token,
-                tableLabels, profileName);
+            LastResult = await Run.ExecuteAsync(config, _cts.Token, tableLabels, profileName);
             if (LastResult.Cancelled)
                 Run.ReportRunFailure(new OperationCanceledException());
             else

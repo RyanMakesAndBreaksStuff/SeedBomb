@@ -2,6 +2,9 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SeedBomb.Core.Contracts;
 using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
+using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Generation;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
 using Wpf.Ui;
@@ -142,5 +145,105 @@ public sealed class SettingsViewModelTests
             It.IsAny<string>(), It.IsAny<string>(),
             ControlAppearance.Danger, It.IsAny<IconElement?>(), It.IsAny<TimeSpan>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task InFlightSignOut_BlocksRunStartupUntilResetCompletes()
+    {
+        var gate = new RunSessionGate();
+        var auth = new MutableAuth
+        {
+            ActiveProfile = new ConnectionProfile
+            {
+                Name = "Dev",
+                EnvironmentUrl = "https://dev.crm.dynamics.com",
+            },
+            CurrentUserDisplayName = "ada",
+        };
+        var resetEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseReset = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connections = new Mock<IDataverseConnectionService>();
+        connections.Setup(c => c.ResetAsync()).Returns(async () =>
+        {
+            resetEntered.TrySetResult();
+            await releaseReset.Task;
+        });
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(AppSettings.Default);
+        var profiles = new Mock<IConnectionProfileService>();
+        profiles.Setup(p => p.GetLastUsedAsync(It.IsAny<CancellationToken>())).ReturnsAsync((ConnectionProfile?)null);
+        var calls = 0;
+        var gen = new Mock<IWpfGenerationService>();
+        gen.Setup(g => g.GenerateAsync(
+                It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                Interlocked.Increment(ref calls);
+                return Task.FromResult(new GenerationResult { Elapsed = TimeSpan.FromSeconds(1) });
+            });
+        var run = new RunViewModel(
+            generation: gen.Object, settings: settings.Object, auth: auth, sessionGate: gate);
+        var vm = new SettingsViewModel(
+            settings.Object,
+            Mock.Of<ILogger<SettingsViewModel>>(),
+            auth: auth,
+            connections: connections.Object,
+            profiles: profiles.Object,
+            run: run,
+            sessionGate: gate);
+
+        var signingOut = vm.SignOutCommand.ExecuteAsync(null);
+        await resetEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var running = run.ExecuteAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            },
+            TestContext.Current.CancellationToken);
+        try
+        {
+            Assert.Equal(0, calls);
+            Assert.False(run.IsRunning);
+        }
+        finally
+        {
+            releaseReset.TrySetResult();
+        }
+
+        await signingOut.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => running);
+        Assert.Equal(0, calls);
+        Assert.Null(auth.ActiveProfile);
+    }
+
+    private sealed class MutableAuth : IAuthService
+    {
+        public ConnectionProfile? ActiveProfile { get; set; }
+        public string? CurrentUserDisplayName { get; set; }
+        public event EventHandler? SignedOut;
+        public event EventHandler? ActiveProfileChanged;
+
+        public Task<AuthResult> SignInAsync(nint parentHwnd, CancellationToken ct = default) =>
+            Task.FromResult(new AuthResult(false, null, null));
+
+        public Task<AuthResult> SignInAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default) =>
+            Task.FromResult(new AuthResult(true, CurrentUserDisplayName, null));
+
+        public Task<AuthResult> TryConnectAsync(ConnectionProfile profile, nint parentHwnd, CancellationToken ct = default) =>
+            Task.FromResult(new AuthResult(false, null, null));
+
+        public Task SignOutAsync(CancellationToken ct = default)
+        {
+            ActiveProfile = null;
+            CurrentUserDisplayName = null;
+            SignedOut?.Invoke(this, EventArgs.Empty);
+            ActiveProfileChanged?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        }
+
+        public Task ForgetProfileAsync(ConnectionProfile profile, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default) => Task.FromResult("token");
     }
 }

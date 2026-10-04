@@ -19,6 +19,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     private readonly IDataverseConnectionService _connectionService;
     private readonly IContentDialogService? _dialogs;
     private readonly RunViewModel? _run;
+    private readonly RunSessionGate? _sessionGate;
 
     /// <summary>Initialises the view-model.</summary>
     /// <param name="profileService">Connection profile store.</param>
@@ -26,18 +27,23 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     /// <param name="connectionService">Dataverse connection cache.</param>
     /// <param name="dialogs">Optional dialog host. When null, delete proceeds unconfirmed (tests).</param>
     /// <param name="run">Optional run sheet. While it is writing, connection changes are blocked.</param>
+    /// <param name="sessionGate">
+    /// Process-wide run/session gate. Null (existing fixtures) does not coordinate with a live run.
+    /// </param>
     public ConnectionManagerViewModel(
         IConnectionProfileService profileService,
         IAuthService authService,
         IDataverseConnectionService connectionService,
         IContentDialogService? dialogs = null,
-        RunViewModel? run = null)
+        RunViewModel? run = null,
+        RunSessionGate? sessionGate = null)
     {
         _profileService = profileService;
         _authService = authService;
         _connectionService = connectionService;
         _dialogs = dialogs;
         _run = run;
+        _sessionGate = sessionGate;
         // Both singletons: the subscription lives as long as the app.
         if (_run is not null)
             _run.PropertyChanged += OnRunPropertyChanged;
@@ -178,9 +184,13 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     {
         IsSwitchingConnection = true;
         SwitchError = null;
+        IDisposable? lease = null;
 
         try
         {
+            if (_sessionGate is not null)
+                lease = await _sessionGate.AcquireAsync();
+
             // CR-002: sign in to this profile explicitly; last-used only moves when that succeeds.
             var result = await _authService.SignInAsync(profile, ParentHwnd);
 
@@ -201,6 +211,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         }
         finally
         {
+            lease?.Dispose();
             IsSwitchingConnection = false;
         }
     }
@@ -237,8 +248,12 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         if (EditingProfile is null) return;
         var savedInstance = EditingProfile;
         SwitchError = null;
+        IDisposable? lease = null;
         try
         {
+            if (_sessionGate is not null)
+                lease = await _sessionGate.AcquireAsync();
+
             await _profileService.SaveAsync(savedInstance);
             await LoadAsync();
 
@@ -251,6 +266,10 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         catch (Exception ex)
         {
             SwitchError = ex.Message;
+        }
+        finally
+        {
+            lease?.Dispose();
         }
     }
 
@@ -288,27 +307,44 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                     "Delete"))
                 return;
 
-            // WR-015: purge the cached MSAL refresh token before the profile record itself
-            // disappears — the delete confirmation promises credential removal.
-            await _authService.ForgetProfileAsync(profile);
-            await _profileService.DeleteAsync(profile.Id);
-            await LoadAsync();
-
-            // Delete connection's CommandParameter is EditingProfile itself, so a successful
-            // delete always empties the pane it was just deleted from — otherwise the stale
-            // profile stays visible/editable after it no longer exists in the store.
-            if (EditingProfile?.Id == profile.Id)
+            IDisposable? lease = null;
+            try
             {
-                EditingProfile = null;
-                IsEditing = false;
+                if (_sessionGate is not null)
+                    lease = await _sessionGate.AcquireAsync();
+
+                // WR-015: purge the cached MSAL refresh token before the profile record itself
+                // disappears — the delete confirmation promises credential removal.
+                await _authService.ForgetProfileAsync(profile);
+                await _profileService.DeleteAsync(profile.Id);
+                await LoadAsync();
+
+                // Delete connection's CommandParameter is EditingProfile itself, so a successful
+                // delete always empties the pane it was just deleted from — otherwise the stale
+                // profile stays visible/editable after it no longer exists in the store.
+                if (EditingProfile?.Id == profile.Id)
+                {
+                    EditingProfile = null;
+                    IsEditing = false;
+                }
+
+                // Re-check under the lease. Do not wait for fire-and-forget reconciliation to drop
+                // a deleted active session, and do not sign out a profile that became active while
+                // the confirmation was up.
+                var activeId = _authService.ActiveProfile?.Id;
+                if (activeId == profile.Id)
+                    await _authService.SignOutAsync();
+                if (activeId == profile.Id || ConnectedProfileId == profile.Id)
+                {
+                    ConnectedProfileId = null;
+                    // WR-001: only deleting the connected profile drops the live connection; saving or
+                    // deleting any other profile leaves it alone.
+                    await _connectionService.ResetAsync();
+                }
             }
-
-            if (ConnectedProfileId == profile.Id)
+            finally
             {
-                ConnectedProfileId = null;
-                // WR-001: only deleting the connected profile drops the live connection; saving or
-                // deleting any other profile leaves it alone.
-                await _connectionService.ResetAsync();
+                lease?.Dispose();
             }
         }
         catch (Exception ex)

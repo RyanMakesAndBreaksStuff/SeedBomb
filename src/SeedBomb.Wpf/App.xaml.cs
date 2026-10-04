@@ -69,7 +69,17 @@ public partial class App : Application
             // back as a failed AuthResult and land on the sign-in overlay.
             splash.SetStatus("Restoring your session...");
             var auth = _host.Services.GetRequiredService<IAuthService>();
-            var result = await auth.SignInAsync(nint.Zero);
+            var sessionGate = _host.Services.GetRequiredService<RunSessionGate>();
+            AuthResult result;
+            var startupLease = await sessionGate.AcquireAsync();
+            try
+            {
+                result = await auth.SignInAsync(nint.Zero);
+            }
+            finally
+            {
+                startupLease.Dispose();
+            }
 
             // Always show MainWindow — its "Sign in to continue" overlay covers a failed
             // silent attempt, and the first-run overlay already covers zero profiles.
@@ -204,6 +214,7 @@ public partial class App : Application
         // App services — all singleton (one app lifetime)
         sc.AddSingleton<ISettingsService, JsonSettingsService>();
         sc.AddSingleton<IConnectionProfileService, JsonConnectionProfileService>();
+        sc.AddSingleton<RunSessionGate>();
         sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();

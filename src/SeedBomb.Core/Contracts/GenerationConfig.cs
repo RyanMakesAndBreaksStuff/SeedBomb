@@ -53,4 +53,11 @@ public record GenerationConfig
 
     /// <summary>Run stamp substituted for the {runId} pattern token. Never auto-injected into data (D4).</summary>
     public string RunId { get; init; } = "";
+
+    /// <summary>Planned rows for <paramref name="table"/>, or 0 when the table is absent or negative.</summary>
+    /// <param name="table">Entity logical name.</param>
+    public int PlannedRows(string table) => Math.Max(0, RecordCounts.GetValueOrDefault(table));
+
+    /// <summary>Sum of <see cref="PlannedRows"/> across <see cref="EntityLogicalNames"/>.</summary>
+    public int PlannedTotal => EntityLogicalNames.Sum(PlannedRows);
 }

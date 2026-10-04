@@ -6,6 +6,7 @@ using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using SeedBomb.Services.Auth;
+using SeedBomb.Services.Connections;
 using SeedBomb.Services.Diagnostics;
 using SeedBomb.Services.Export;
 using SeedBomb.Services.Generation;
@@ -40,7 +41,7 @@ public sealed record RunTableProgressRow(
 public sealed record RunActivityRow(string Line, string? ValueKind = null);
 
 /// <summary>Drives the in-progress sheet and the run summary. Owns first-run and retry calls to <see cref="IWpfGenerationService"/>.</summary>
-public sealed partial class RunViewModel : ObservableObject
+public sealed partial class RunViewModel : ObservableObject, IDisposable
 {
     private const string AllTablesFilter = "All tables";
     private const int ActivityLogCap = 200;
@@ -54,6 +55,7 @@ public sealed partial class RunViewModel : ObservableObject
     private readonly IAppNavigator? _navigator;
     private readonly IAuthService? _auth;
     private readonly IRunHistoryService? _history;
+    private readonly RunSessionGate? _sessionGate;
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
@@ -67,12 +69,20 @@ public sealed partial class RunViewModel : ObservableObject
     private int _plannedTotal;
     private int _seed;
     private string _environmentHost = "";
+    private string _userLabel = "";
+    private Guid? _runProfileId;
     private IReadOnlyDictionary<string, string> _tableLabels = new Dictionary<string, string>();
     private string _profileName = "";
     private RunViewModel _summaryView;
 
     /// <summary>Tests set this to skip the risky-Bogus content dialog.</summary>
     internal Func<Task<bool>>? ConfirmRiskyBogus { get; set; }
+
+    /// <summary>
+    /// Test seam for the dispatcher that receives <see cref="IAuthService.ActiveProfileChanged"/>.
+    /// Null uses <see cref="System.Windows.Application.Current"/> when that dispatcher is still alive.
+    /// </summary>
+    internal static Func<System.Windows.Threading.Dispatcher?>? UiDispatcher { get; set; }
 
     /// <summary>Test seam: overrides the export destination. Null uses the real Downloads folder.</summary>
     internal string? ExportDirectoryOverride { get; set; }
@@ -86,6 +96,9 @@ public sealed partial class RunViewModel : ObservableObject
     /// <param name="logger">Failure logging. Null suppresses it.</param>
     /// <param name="auth">Signed-in user and target environment for history rows. Null leaves them blank.</param>
     /// <param name="history">History store; each run and retry adds one row. Null skips it.</param>
+    /// <param name="sessionGate">
+    /// Process-wide run/session gate. Null (existing fixtures) does not coordinate with profile switches.
+    /// </param>
     public RunViewModel(
         IWpfGenerationService? generation = null,
         IContentDialogService? contentDialogService = null,
@@ -94,7 +107,8 @@ public sealed partial class RunViewModel : ObservableObject
         ISnackbarService? snackbar = null,
         ILogger<RunViewModel>? logger = null,
         IAuthService? auth = null,
-        IRunHistoryService? history = null)
+        IRunHistoryService? history = null,
+        RunSessionGate? sessionGate = null)
     {
         _generation = generation;
         _dialogs = contentDialogService;
@@ -104,7 +118,17 @@ public sealed partial class RunViewModel : ObservableObject
         _logger = logger;
         _auth = auth;
         _history = history;
+        _sessionGate = sessionGate;
         _summaryView = this;
+        if (_auth is not null)
+            _auth.ActiveProfileChanged += OnActiveProfileChanged;
+    }
+
+    /// <summary>Drops the active-profile subscription. Historical summary copies never subscribed.</summary>
+    public void Dispose()
+    {
+        if (_auth is not null)
+            _auth.ActiveProfileChanged -= OnActiveProfileChanged;
     }
 
     /// <summary>Id of the live run. History uses this to reopen the live summary.</summary>
@@ -120,8 +144,8 @@ public sealed partial class RunViewModel : ObservableObject
     /// <summary>Host of the environment the last run targeted, e.g. <c>contoso.crm.dynamics.com</c>.</summary>
     public string EnvironmentLabel => _environmentHost;
 
-    /// <summary>Signed-in user for the last run, or "" when unknown.</summary>
-    public string UserLabel => _auth?.CurrentUserDisplayName ?? "";
+    /// <summary>Signed-in user captured for the last run, or "" when unknown.</summary>
+    public string UserLabel => _userLabel;
 
     /// <summary>
     /// Host of the environment the live session is signed in to — where a run started now writes —
@@ -219,30 +243,28 @@ public sealed partial class RunViewModel : ObservableObject
     public ObservableCollection<string> TableFilters { get; } = [AllTablesFilter];
 
     /// <summary>Only <see cref="IWpfGenerationService.GenerateAsync"/> caller. First run and retry both go through here.</summary>
-    public async Task<GenerationResult> ExecuteAsync(
+    /// <param name="config">What to generate. Tables, planned total and the target host come from this and the live session.</param>
+    /// <param name="ct">Cancels preparation and the run.</param>
+    /// <param name="tableLabels">Logical name to display name for the history row. Null keeps the previous run's labels.</param>
+    /// <param name="profileName">Generation-template name for the history row, not the connection profile. Null keeps the previous one.</param>
+    public Task<GenerationResult> ExecuteAsync(
         GenerationConfig config,
-        string environmentHost,
-        IReadOnlyList<string> tables,
-        int plannedTotal,
         CancellationToken ct = default,
         IReadOnlyDictionary<string, string>? tableLabels = null,
-        string? profileName = null)
+        string? profileName = null) =>
+        ExecuteCoreAsync(config, isRetry: false, expectedProfileId: null, ct, tableLabels, profileName);
+
+    private async Task<GenerationResult> ExecuteCoreAsync(
+        GenerationConfig config,
+        bool isRetry,
+        Guid? expectedProfileId,
+        CancellationToken ct,
+        IReadOnlyDictionary<string, string>? tableLabels,
+        string? profileName)
     {
         ArgumentNullException.ThrowIfNull(config);
-        ArgumentNullException.ThrowIfNull(tables);
         if (_generation is null)
             throw new InvalidOperationException("Generation service is not configured.");
-
-        // History-row labels (logical → display name, profile). A retry passes null and reuses the first run's.
-        _tableLabels = tableLabels ?? _tableLabels;
-        _profileName = profileName ?? _profileName;
-
-        _lastConfig = config with { AllowRiskyBogusValues = false };
-        _environmentHost = string.IsNullOrWhiteSpace(environmentHost) ? TargetHost : environmentHost;
-        _plannedTables = tables;
-        _plannedTotal = plannedTotal;
-        _seed = config.Seed;
-        CurrentRunId = Guid.NewGuid();
 
         // WR-001: a close confirmed during preparation must not raise the risky-values prompt.
         ct.ThrowIfCancellationRequested();
@@ -254,46 +276,113 @@ public sealed partial class RunViewModel : ObservableObject
             config = config with { AllowRiskyBogusValues = true };
         }
 
+        // A switch that finished before preparation rejects the retry. One that finishes during
+        // preparation is checked again under the lease, and must not start on the new profile.
+        EnsureRetryTarget(isRetry, expectedProfileId);
+
         await LoadKeepWindowOpenAsync();
-        StartRun(_environmentHost, config.Seed, plannedTotal, tables);
+        ct.ThrowIfCancellationRequested();
 
-        _runCts?.Dispose();
-        _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var progress = new Progress<ProgressUpdate>(u => AcceptProgress(u, tables, plannedTotal));
-
-        var cancelled = false;
-        GenerationResult? result = null;
+        IDisposable? lease = null;
         try
         {
-            result = await _generation.GenerateAsync(config, progress, _runCts.Token);
-            ApplyResult(result, config.Seed, _environmentHost, config);
-            return result;
-        }
-        catch (OperationCanceledException)
-        {
-            StatusHeadline = "Cancelled";
-            cancelled = true;
-            throw;
+            if (_sessionGate is not null)
+                lease = await _sessionGate.AcquireAsync(ct);
+
+            ct.ThrowIfCancellationRequested();
+            EnsureRetryTarget(isRetry, expectedProfileId);
+
+            var profile = _auth?.ActiveProfile;
+            if (_auth is not null && profile is null)
+                throw new InvalidOperationException("Not signed in. Connect to an environment first.");
+
+            var tables = config.EntityLogicalNames;
+            var plannedTotal = config.PlannedTotal;
+            var host = HostOf(profile);
+            // One read: history and the sheet keep these scalars. Finalization must not read live auth.
+            _userLabel = _auth?.CurrentUserDisplayName ?? "";
+            _runProfileId = profile?.Id;
+            _tableLabels = tableLabels ?? _tableLabels;
+            _profileName = profileName ?? _profileName;
+            _lastConfig = config with { AllowRiskyBogusValues = false };
+            _plannedTables = tables;
+            _plannedTotal = plannedTotal;
+            _seed = config.Seed;
+            CurrentRunId = Guid.NewGuid();
+            StartRun(host, config.Seed, plannedTotal, tables);
+
+            _runCts?.Dispose();
+            _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var progress = new Progress<ProgressUpdate>(u => AcceptProgress(u, tables, plannedTotal));
+
+            var cancelled = false;
+            GenerationResult? result = null;
+            try
+            {
+                result = await _generation.GenerateAsync(config, progress, _runCts.Token);
+                ApplyResult(result, config.Seed, _environmentHost, config);
+                return result;
+            }
+            catch (OperationCanceledException)
+            {
+                StatusHeadline = "Cancelled";
+                cancelled = true;
+                throw;
+            }
+            finally
+            {
+                IsRunning = false;
+                _runClock.Stop();
+                _clockTimer?.Stop();
+
+                // Hold the completed sheet up until manual Close when the user asked to keep it open.
+                IsSheetVisible = KeepWindowOpen;
+                _runCts?.Dispose();
+                _runCts = null;
+
+                // WR-002/IN-009: one History row for every run or retry that returned a result or
+                // failed. A cancel that throws wrote nothing, so it has no row.
+                if (!cancelled)
+                    await RecordRunAsync(result);
+
+                // IN-008: History can replace the summary while a run is active or finishing; restore the live result before returning.
+                ShowLive();
+            }
         }
         finally
         {
-            IsRunning = false;
-            _runClock.Stop();
-            _clockTimer?.Stop();
-
-            // Hold the completed sheet up until manual Close when the user asked to keep it open.
-            IsSheetVisible = KeepWindowOpen;
-            _runCts?.Dispose();
-            _runCts = null;
-
-            // WR-002/IN-009: one History row for every run or retry that returned a result or
-            // failed. A cancel that throws wrote nothing, so it has no row.
-            if (!cancelled)
-                await RecordRunAsync(result);
-
-            // IN-008: History can replace the summary while a run is active or finishing; restore the live result before returning.
-            ShowLive();
+            lease?.Dispose();
         }
+    }
+
+    private void EnsureRetryTarget(bool isRetry, Guid? expectedProfileId)
+    {
+        if (!isRetry || _auth is null)
+            return;
+        if (expectedProfileId is not Guid expected || _auth.ActiveProfile?.Id != expected)
+            throw new InvalidOperationException("The signed-in connection changed, so this retry was not started.");
+    }
+
+    private static string HostOf(ConnectionProfile? profile) =>
+        Uri.TryCreate(profile?.EnvironmentUrl, UriKind.Absolute, out var uri) ? uri.Host : string.Empty;
+
+    private void OnActiveProfileChanged(object? sender, EventArgs e)
+    {
+        // A shut-down Application dispatcher (headless runs after an STA test) must not swallow
+        // the notification: nothing is pumping it. Invoke on the caller instead.
+        var dispatcher = UiDispatcher?.Invoke() ?? System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is { HasShutdownStarted: false, Thread.IsAlive: true } && !dispatcher.CheckAccess())
+            dispatcher.BeginInvoke(NotifyRetryProfileChanged);
+        else
+            NotifyRetryProfileChanged();
+    }
+
+    private void NotifyRetryProfileChanged() => RetrySelectedCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsRunningChanged(bool value)
+    {
+        _ = value;
+        RetrySelectedCommand.NotifyCanExecuteChanged();
     }
 
     private async Task RecordRunAsync(GenerationResult? result)
@@ -522,8 +611,17 @@ public sealed partial class RunViewModel : ObservableObject
 
     private bool CanRetrySelected() =>
         _generation is not null
+        && !IsRunning
         && _lastConfig is not null
-        && _allRejectionGroups.Any(g => g.IsRetryable && g.IsSelectedForRetry && g.RowCount > 0);
+        && _allRejectionGroups.Any(g => g.IsRetryable && g.IsSelectedForRetry && g.RowCount > 0)
+        && SessionStillMatchesRun();
+
+    private bool SessionStillMatchesRun()
+    {
+        if (_auth is null)
+            return true;
+        return _runProfileId is Guid id && _auth.ActiveProfile?.Id == id;
+    }
 
     /// <summary>Rebuilds config from the stored snapshot for selected retryable tables. No events.</summary>
     [RelayCommand(CanExecute = nameof(CanRetrySelected))]
@@ -565,7 +663,7 @@ public sealed partial class RunViewModel : ObservableObject
 
         try
         {
-            await ExecuteAsync(retryConfig, _environmentHost, names, counts.Values.Sum());
+            await ExecuteCoreAsync(retryConfig, isRetry: true, _runProfileId, CancellationToken.None, null, null);
         }
         catch (Exception ex)
         {
