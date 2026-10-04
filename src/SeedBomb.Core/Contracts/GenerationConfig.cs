@@ -54,9 +54,24 @@ public record GenerationConfig
     /// <summary>Run stamp substituted for the {runId} pattern token. Never auto-injected into data (D4).</summary>
     public string RunId { get; init; } = "";
 
+    /// <summary>
+    /// Retry filter: when a table has an entry, only these generation-order rows are written.
+    /// <see cref="RecordCounts"/> keeps the original count so each row regenerates its original values.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<int>>? RowIndexes { get; init; }
+
+    /// <summary>
+    /// Mixed into generated alternate-key values so separate runs never collide (CR-002). A retry keeps
+    /// its run's value so rejected rows regenerate the keys they were first given.
+    /// </summary>
+    public string AlternateKeyScope { get; init; } = "";
+
     /// <summary>Planned rows for <paramref name="table"/>, or 0 when the table is absent or negative.</summary>
     /// <param name="table">Entity logical name.</param>
-    public int PlannedRows(string table) => Math.Max(0, RecordCounts.GetValueOrDefault(table));
+    public int PlannedRows(string table) =>
+        RowIndexes is not null && RowIndexes.TryGetValue(table, out var rows)
+            ? rows.Count
+            : Math.Max(0, RecordCounts.GetValueOrDefault(table));
 
     /// <summary>Sum of <see cref="PlannedRows"/> across <see cref="EntityLogicalNames"/>.</summary>
     public int PlannedTotal => EntityLogicalNames.Sum(PlannedRows);

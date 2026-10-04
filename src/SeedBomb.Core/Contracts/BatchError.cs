@@ -1,10 +1,9 @@
 namespace SeedBomb.Core.Contracts;
 
 /// <summary>
-/// Represents an error that occurred during a batch creation operation.
+/// Represents an error that occurred while creating or linking records.
 /// </summary>
-/// <param name="EntityLogicalName">The entity that failed.</param>
-/// <param name="BatchIndex">The index of the batch that failed.</param>
+/// <param name="EntityLogicalName">The entity (or link context) that failed.</param>
 /// <param name="ErrorMessage">The error message.</param>
 /// <param name="FaultCode">The optional Dataverse fault code.</param>
 /// <param name="RowCount">
@@ -18,8 +17,14 @@ namespace SeedBomb.Core.Contracts;
 /// </param>
 public record BatchError(
     string EntityLogicalName,
-    int BatchIndex,
     string ErrorMessage,
     int? FaultCode,
     int RowCount = 1,
-    bool IsTransient = false);
+    bool IsTransient = false)
+{
+    /// <summary>
+    /// Generation-order indexes (0-based within the table) of the rows this create error lost; Retry
+    /// regenerates exactly these. Empty for link-phase errors, which regenerating rows cannot fix.
+    /// </summary>
+    public IReadOnlyList<int> RowIndexes { get; init; } = [];
+}

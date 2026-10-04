@@ -13,8 +13,11 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Buffers.Binary;
 using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
 using System.ServiceModel;
+using System.Text;
 
 namespace SeedBomb.Bulk;
 
@@ -25,6 +28,9 @@ namespace SeedBomb.Bulk;
 /// </summary>
 public class BulkCreator : IBulkCreator
 {
+    // Eight scope hex characters, a separator and an eight-digit row index must survive truncation.
+    private const int MinimumScopedStringKeyLength = 17;
+
     private readonly IOrganizationServiceAsync2 _service;
     private readonly GeneratorFactory _generatorFactory;
     private readonly EdgeCaseValidator _edgeCaseValidator;
@@ -261,6 +267,7 @@ public class BulkCreator : IBulkCreator
         using var bogusSession = new BogusEvaluatorSession(config.Locale);
         var evalContext = new RuleEvaluationContext(entityName, config.Seed, config.Locale, config.RunId, recordCount);
         var entities = new List<Entity>(recordCount);
+        var keyScope = SHA256.HashData(Encoding.UTF8.GetBytes(config.AlternateKeyScope));
 
         for (int i = 0; i < recordCount; i++)
         {
@@ -314,7 +321,7 @@ public class BulkCreator : IBulkCreator
 
             foreach (var attr in alternateKeyAttrs)
             {
-                entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i);
+                entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i, keyScope);
             }
             entities.Add(entity);
         }
@@ -328,22 +335,29 @@ public class BulkCreator : IBulkCreator
             }
         }
 
-        var batches = entities.Chunk(config.BatchSize).ToArray();
+        // CR-002: every row is generated so the Faker stream matches the first run, then a retry
+        // writes only its rows. ponytail: a retry regenerates the whole table; fine at MaxRecordCount.
+        int[] rowIndexes = config.RowIndexes?.GetValueOrDefault(entityName) is { } retryRows
+            ? [.. retryRows.Distinct().Order()]
+            : [.. Enumerable.Range(0, recordCount)];
+        var rowBatches = rowIndexes.Chunk(config.BatchSize).ToArray();
+        var batches = rowBatches.Select(rows => rows.Select(row => entities[row]).ToArray()).ToArray();
 
         return await SubmitEntityBatchesAsync(
-            entityName, batches, recordCount, config, effectiveDop, progress, ct).ConfigureAwait(false);
+            entityName, batches, rowBatches, rowIndexes.Length, config, effectiveDop, progress, ct).ConfigureAwait(false);
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> SubmitEntityBatchesAsync(
         string entityName,
         Entity[][] batches,
-        int recordCount,
+        int[][] rowBatches,
+        int plannedCount,
         GenerationConfig config,
         int effectiveDop,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
-        var allIds = new List<Guid>(recordCount);
+        var allIds = new List<Guid>(plannedCount);
         var allErrors = new List<BatchError>();
         var createdCount = 0;
         var entityStart = DateTimeOffset.UtcNow;
@@ -364,22 +378,26 @@ public class BulkCreator : IBulkCreator
             async (batchIndex, innerCt) =>
             {
                 var batch = batches[batchIndex];
+                var rows = rowBatches[batchIndex];
                 List<Guid> batchIds;
                 List<BatchError> batchErrors;
 
                 try
                 {
                     (batchIds, batchErrors) = await SubmitBatchAsync(
-                        entityName, batch, config.MaxRetries, innerCt).ConfigureAwait(false);
+                        entityName, batch, rows, config.MaxRetries, innerCt).ConfigureAwait(false);
                 }
                 catch (DataGenerationException ex)
                 {
                     _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
-                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message,
+                    batchErrors = [new BatchError(entityName, ex.Message,
                         (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length,
-                        ThrottlePolicy.IsTransient(ex.InnerException))];
+                        ThrottlePolicy.IsTransient(ex.InnerException))
+                    {
+                        RowIndexes = rows,
+                    }];
                 }
 
                 idBags[batchIndex] = batchIds;
@@ -395,7 +413,7 @@ public class BulkCreator : IBulkCreator
                     BatchIndex = batchIndex + 1,
                     TotalBatches = batches.Length,
                     RecordsCreated = added,
-                    TotalRecords = recordCount,
+                    TotalRecords = plannedCount,
                     RecordsPerMinute = ratePerMin,
                     ErrorMessage = batchErrors.Count > 0 ? batchErrors[0].ErrorMessage : null
                 });
@@ -426,6 +444,7 @@ public class BulkCreator : IBulkCreator
     private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitBatchAsync(
         string entityName,
         Entity[] batch,
+        int[] rows,
         int maxRetries,
         CancellationToken ct)
     {
@@ -457,7 +476,7 @@ public class BulkCreator : IBulkCreator
         }
 
         return await _throttlePolicy.ExecuteAsync(
-            () => ExecuteMultipleFallbackAsync(entityName, batch, ct),
+            () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct),
             entityName, maxRetries, ct).ConfigureAwait(false);
     }
 
@@ -489,6 +508,7 @@ public class BulkCreator : IBulkCreator
     private async Task<(List<Guid> ids, List<BatchError> errors)> ExecuteMultipleFallbackAsync(
         string entityName,
         Entity[] batch,
+        int[] rows,
         CancellationToken ct)
     {
         var requests = new OrganizationRequestCollection();
@@ -514,7 +534,10 @@ public class BulkCreator : IBulkCreator
         {
             if (item.Fault is not null)
             {
-                errors.Add(new BatchError(entityName, item.RequestIndex, item.Fault.Message, item.Fault.ErrorCode));
+                errors.Add(new BatchError(entityName, item.Fault.Message, item.Fault.ErrorCode)
+                {
+                    RowIndexes = [rows[item.RequestIndex]],
+                });
             }
             else if (item.Response is CreateResponse createResp)
             {
@@ -637,16 +660,19 @@ public class BulkCreator : IBulkCreator
         }
     }
 
-    private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex) =>
-        attr switch
-        {
-            StringAttributeMetadata s => TruncateKey($"{entityName}-{recordIndex:D8}", s.MaxLength ?? 100),
-            IntegerAttributeMetadata => recordIndex,
-            _ => TruncateKey($"{entityName}-{recordIndex:D8}", 100)
-        };
+    // CR-002: scoped to the run so re-runs never collide, and a function of the row index so a
+    // retry regenerates the key a rejected row was first given. Preflight ensures truncation keeps scope and row.
+    // ponytail: integer keys get one of 21,000 run offsets (1-in-21,000 chance two runs share one);
+    // range-restricted integer keys are not honoured. Use string keys if either bites.
+    private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex, byte[] scope)
+    {
+        if (attr is IntegerAttributeMetadata)
+            return (int)(BinaryPrimitives.ReadUInt32BigEndian(scope) % 21_000) * GenerationLimits.MaxRecordCount + recordIndex;
 
-    private static string TruncateKey(string value, int maxLength) =>
-        value.Length > maxLength ? value[..maxLength] : value;
+        var key = $"{entityName}-{Convert.ToHexStringLower(scope.AsSpan(0, 4))}-{recordIndex:D8}";
+        var max = (attr as StringAttributeMetadata)?.MaxLength ?? 100;
+        return key.Length > max ? key[^max..] : key;
+    }
 
     private async Task WarmupAndAdoptRecommendedDopAsync(CancellationToken ct)
     {
@@ -679,6 +705,13 @@ public class BulkCreator : IBulkCreator
             if (!config.RecordCounts.TryGetValue(entityName, out var count) || count <= 0
                 || !entityMetadata.TryGetValue(entityName, out var meta))
                 continue;
+
+            foreach (var attr in GetAlternateKeyAttributes(meta).OfType<StringAttributeMetadata>())
+            {
+                if ((attr.MaxLength ?? 100) < MinimumScopedStringKeyLength)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': alternate-key attribute '{attr.LogicalName}' must allow at least {MinimumScopedStringKeyLength} characters to retain the run scope and row index (MaxLength was {attr.MaxLength}).");
+            }
 
             // Tables written before this one with a positive count: their records fill its required lookups.
             var position = sortedEntities.ToList().FindIndex(t => string.Equals(t, entityName, StringComparison.OrdinalIgnoreCase));

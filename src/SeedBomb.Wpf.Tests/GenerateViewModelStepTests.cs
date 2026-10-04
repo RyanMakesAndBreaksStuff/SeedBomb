@@ -343,7 +343,7 @@ public sealed class GenerateViewModelStepTests
             .ReturnsAsync(new GenerationResult
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
-                Errors = [new BatchError("account", 0, "plugin failed", null)],
+                Errors = [new BatchError("account", "plugin failed", null)],
             });
 
         await viewModel.GenerateCommand.ExecuteAsync(null);

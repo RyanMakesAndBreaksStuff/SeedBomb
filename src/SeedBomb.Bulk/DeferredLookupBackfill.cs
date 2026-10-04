@@ -343,14 +343,14 @@ public class DeferredLookupBackfill(
 
                     foreach (var item in response.Responses.Where(r => r.Fault is not null))
                     {
-                        errors.Add(new BatchError(context, i, item.Fault?.Message ?? "Unknown fault", item.Fault?.ErrorCode));
+                        errors.Add(new BatchError(context, item.Fault?.Message ?? "Unknown fault", item.Fault?.ErrorCode));
                     }
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "{Context}: batch {BatchIndex}/{Total} failed.", context, i + 1, batches.Count);
-                errors.Add(new BatchError(context, i, ex.Message, null, batch.Length,
+                errors.Add(new BatchError(context, ex.Message, null, batch.Length,
                     ThrottlePolicy.IsTransient(ex.InnerException ?? ex)));
             }
         }

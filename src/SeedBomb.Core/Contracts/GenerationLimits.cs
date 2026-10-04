@@ -42,5 +42,12 @@ public static class GenerationLimits
                 throw new DataGenerationException(
                     $"Entity '{table}': record count must be at most {MaxRecordCount:N0} (was {count:N0}).");
         }
+        foreach (var (table, rows) in config.RowIndexes ?? new Dictionary<string, IReadOnlyList<int>>())
+        {
+            var count = config.RecordCounts.GetValueOrDefault(table);
+            if (rows.Any(row => row < 0 || row >= count))
+                throw new DataGenerationException(
+                    $"Entity '{table}': retry rows must be between 0 and {count - 1:N0}.");
+        }
     }
 }

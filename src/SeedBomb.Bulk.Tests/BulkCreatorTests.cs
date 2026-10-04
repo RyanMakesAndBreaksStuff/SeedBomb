@@ -747,4 +747,99 @@ public class BulkCreatorTests
             });
         return captured;
     }
+
+    private static EntityMetadata KeyedAccount(int keyWidth = 20)
+    {
+        var meta = Meta("account",
+            new StringAttributeMetadata { LogicalName = "accountnumber", MaxLength = keyWidth },
+            new IntegerAttributeMetadata { LogicalName = "new_code", MinValue = int.MinValue, MaxValue = int.MaxValue });
+        meta.GetType().GetProperty("Keys")!.SetValue(meta, new[]
+        {
+            new EntityKeyMetadata { LogicalName = "number_key", KeyAttributes = ["accountnumber"] },
+            new EntityKeyMetadata { LogicalName = "code_key", KeyAttributes = ["new_code"] },
+        });
+        return meta;
+    }
+
+    private static GenerationConfig KeyedConfig(string scope) => new()
+    {
+        EntityLogicalNames = ["account"],
+        RecordCounts = new Dictionary<string, int> { ["account"] = 3 },
+        BatchSize = 10,
+        AlternateKeyScope = scope,
+    };
+
+    private static async Task<(GenerationResult Result, List<Entity> Written)> RunKeyedAsync(
+        GenerationConfig config, Func<Entity, bool>? reject = null, int keyWidth = 20)
+    {
+        var (sut, serviceMock) = BuildSut();
+        var written = AnswerCreates(serviceMock, reject);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var result = await sut.CreateAsync(config,
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = KeyedAccount(keyWidth) }, graph);
+        return (result, written);
+    }
+
+    [Theory]
+    [InlineData(17)]
+    [InlineData(20)]
+    public async Task AlternateKeys_AreStableWithinARun_AndDistinctAcrossRuns(int keyWidth)
+    {
+        // CR-002: keys were a function of row index only, so every re-run collided on key tables.
+        var (_, first) = await RunKeyedAsync(KeyedConfig("scope-a"), keyWidth: keyWidth);
+        var (_, again) = await RunKeyedAsync(KeyedConfig("scope-a"), keyWidth: keyWidth);
+        var (_, other) = await RunKeyedAsync(KeyedConfig("scope-b"), keyWidth: keyWidth);
+
+        Assert.Equal(first.Select(e => e["accountnumber"]), again.Select(e => e["accountnumber"]));
+        Assert.Empty(first.Select(e => e["accountnumber"]).Intersect(other.Select(e => e["accountnumber"])));
+        Assert.Empty(first.Select(e => e["new_code"]).Intersect(other.Select(e => e["new_code"])));
+        Assert.All(first, e => Assert.True(((string)e["accountnumber"]).Length <= keyWidth));
+        Assert.Equal(3, first.Select(e => e["accountnumber"]).Distinct().Count());
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(16)]
+    public async Task AlternateKeyTooShort_FailsBeforeAnyCreateCall(int maxLength)
+    {
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var meta = KeyedAccount(maxLength);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() => sut.CreateAsync(
+            KeyedConfig("scope-a"),
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = meta }, graph));
+
+        Assert.Contains("accountnumber", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("at least 17", ex.Message, StringComparison.Ordinal);
+        serviceMock.Verify(s => s.ExecuteAsync(
+            It.Is<OrganizationRequest>(r => r is CreateMultipleRequest || r is ExecuteMultipleRequest),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RowFilter_WritesOnlyTheRejectedRows_WithTheirOriginalValues()
+    {
+        // CR-002: Retry regenerated rows 0..k-1 (copies of rows already written), not the rejected ones.
+        static bool IsRowOne(Entity e) => ((string)e["accountnumber"]).EndsWith("00000001", StringComparison.Ordinal);
+        var (result, firstWrite) = await RunKeyedAsync(KeyedConfig("scope-a"), reject: IsRowOne);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal([1], error.RowIndexes);
+        var rejected = firstWrite.Single(IsRowOne);
+
+        var (_, retried) = await RunKeyedAsync(KeyedConfig("scope-a") with
+        {
+            RowIndexes = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["account"] = error.RowIndexes,
+            },
+        });
+
+        var row = Assert.Single(retried);
+        Assert.Equal(rejected["accountnumber"], row["accountnumber"]);
+        Assert.Equal(rejected["new_code"], row["new_code"]);
+    }
 }

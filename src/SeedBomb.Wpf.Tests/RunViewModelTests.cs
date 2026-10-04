@@ -31,21 +31,21 @@ public sealed class RunViewModelTests : IDisposable
     [InlineData(-2147015898)] // Number of concurrent requests exceeded the limit
     public void Classifier_ServiceProtectionFaultsAreRetryable(int faultCode) =>
         Assert.True(RejectionClassifier.IsRetryable(new BatchError(
-            "account", 0, "Number of requests exceeded the limit of 6000 over time window of 300 seconds.", faultCode)));
+            "account", "Number of requests exceeded the limit of 6000 over time window of 300 seconds.", faultCode)));
 
     [Fact]
     public void Classifier_PluginFailureAndDuplicateAreNotRetryable()
     {
         // 0x80040224 IsvUnExpected: an unexpected error from plugin code needs a fix, not a retry.
         Assert.False(RejectionClassifier.IsRetryable(new BatchError(
-            "account", 0, "An unexpected error occurred from ISV code.", -2147220956)));
-        Assert.False(RejectionClassifier.IsRetryable(new BatchError("account", 0, "Duplicate key on emailaddress1", null)));
+            "account", "An unexpected error occurred from ISV code.", -2147220956)));
+        Assert.False(RejectionClassifier.IsRetryable(new BatchError("account", "Duplicate key on emailaddress1", null)));
     }
 
     [Fact]
     public void Classifier_TransientNetworkFailureIsRetryable() =>
         Assert.True(RejectionClassifier.IsRetryable(new BatchError(
-            "contact", 0, "Batch creation failed for 'contact' on attempt 1: There was no endpoint listening at …",
+            "contact", "Batch creation failed for 'contact' on attempt 1: There was no endpoint listening at …",
             null, RowCount: 50, IsTransient: true)));
 
     [Fact]
@@ -61,9 +61,9 @@ public sealed class RunViewModelTests : IDisposable
             Elapsed = TimeSpan.FromSeconds(10),
             Errors =
             [
-                new BatchError("account", 0, "Duplicate key on emailaddress1", null),
-                new BatchError("account", 1, "Duplicate key on emailaddress1", null),
-                new BatchError("account", 2, "request throttled", -2147015902),
+                new BatchError("account", "Duplicate key on emailaddress1", null),
+                new BatchError("account", "Duplicate key on emailaddress1", null),
+                new BatchError("account", "request throttled", -2147015902),
             ],
         }, seed: 40719, environmentHost: "contoso-dev");
 
@@ -105,7 +105,7 @@ public sealed class RunViewModelTests : IDisposable
         {
             CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
             Elapsed = TimeSpan.FromSeconds(1),
-            Errors = [new BatchError("account", 2, "request throttled", -2147015902)],
+            Errors = [new BatchError("account", "request throttled", -2147015902)],
         }, seed: 40719, environmentHost: "contoso-dev", config: config);
 
         await vm.RetrySelectedCommand.ExecuteAsync(null);
@@ -170,7 +170,7 @@ public sealed class RunViewModelTests : IDisposable
         };
         vm.ApplyResult(new GenerationResult
         {
-            Errors = [new BatchError("account", 2, "request throttled", -2147015902)],
+            Errors = [new BatchError("account", "request throttled", -2147015902)],
         }, seed: 7, environmentHost: "contoso-dev", config: config);
 
         // Retry swallows cancellation and reports via ReportRunFailure — the bound command must not throw.
@@ -218,7 +218,7 @@ public sealed class RunViewModelTests : IDisposable
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", 0, "request throttled", -2147015902)],
+                Errors = [new BatchError("account", "request throttled", -2147015902)],
             })
             .ThrowsAsync(new InvalidOperationException("ServiceClient failed to connect"));
 
@@ -248,7 +248,7 @@ public sealed class RunViewModelTests : IDisposable
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", 0, "Duplicate key on emailaddress1", null)],
+                Errors = [new BatchError("account", "Duplicate key on emailaddress1", null)],
             }, seed: 1, environmentHost: "contoso-dev");
 
             vm.ExportRejectedCsvCommand.Execute(null);
@@ -273,7 +273,7 @@ public sealed class RunViewModelTests : IDisposable
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", 0, "=cmd|'/c calc'!A1", null)],
+                Errors = [new BatchError("account", "=cmd|'/c calc'!A1", null)],
             }, seed: 1, environmentHost: "contoso-dev");
 
             vm.ExportRejectedCsvCommand.Execute(null);
@@ -322,7 +322,7 @@ public sealed class RunViewModelTests : IDisposable
         {
             CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
             Elapsed = TimeSpan.FromSeconds(1),
-            Errors = [new BatchError("account", 0, "Duplicate key on emailaddress1", null)],
+            Errors = [new BatchError("account", "Duplicate key on emailaddress1", null)],
         }, seed: 1, environmentHost: "contoso-dev");
         Assert.False(rejected.LastRunSucceeded);
     }
@@ -442,7 +442,7 @@ public sealed class RunViewModelTests : IDisposable
                 ["account"] = [Guid.NewGuid()],
             },
             Elapsed = TimeSpan.FromMinutes(1),
-            Errors = [new BatchError("account", 15, "request throttled", -2147015902, 500)],
+            Errors = [new BatchError("account", "request throttled", -2147015902, 500)],
         }, seed: 42, environmentHost: "contoso-dev");
 
         Assert.Equal("500", Assert.Single(vm.SummaryStats, s => s.Label == "Rejected").Value);
@@ -541,7 +541,7 @@ public sealed class RunViewModelTests : IDisposable
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
                 Elapsed = TimeSpan.FromSeconds(1),
-                Errors = [new BatchError("account", 0, "request throttled", -2147015902, 2)],
+                Errors = [new BatchError("account", "request throttled", -2147015902, 2)],
             })
             .ReturnsAsync(new GenerationResult
             {
@@ -847,7 +847,7 @@ public sealed class RunViewModelTests : IDisposable
     {
         CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
         Elapsed = TimeSpan.FromSeconds(1),
-        Errors = [new BatchError("account", 0, "request throttled", -2147015902, 1)],
+        Errors = [new BatchError("account", "request throttled", -2147015902, 1)],
     };
 
     private static Mock<IWpfGenerationService> Generation(Action? onCall = null, GenerationResult? result = null)

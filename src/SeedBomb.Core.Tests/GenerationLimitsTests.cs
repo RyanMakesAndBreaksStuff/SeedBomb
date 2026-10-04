@@ -26,4 +26,11 @@ public class GenerationLimitsTests
         GenerationLimits.Validate(Config(
             GenerationLimits.MaxBatchSize, GenerationLimits.MaxDop, GenerationLimits.MaxRecordCount));
     }
+
+    [Fact]
+    public void Validate_rejects_a_retry_row_outside_the_table() =>
+        Assert.Throws<DataGenerationException>(() => GenerationLimits.Validate(Config(500, null, 3) with
+        {
+            RowIndexes = new Dictionary<string, IReadOnlyList<int>> { ["account"] = [3] },
+        }));
 }
