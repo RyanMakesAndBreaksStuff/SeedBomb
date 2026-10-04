@@ -115,7 +115,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(HistorySummary));
 
-            if (_historyService.LoadWarning is { } warning)
+            if (_historyService.TakeLoadWarning() is { } warning)
                 _snackbar?.Show("Run history", warning, ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
         }
         catch (OperationCanceledException)

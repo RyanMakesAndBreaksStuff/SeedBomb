@@ -83,7 +83,7 @@ public sealed class HistoryViewModelTests
     {
         var history = new Mock<IRunHistoryService>();
         history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        history.SetupGet(h => h.LoadWarning)
+        history.Setup(h => h.TakeLoadWarning())
             .Returns("Run history could not be read, so SeedBomb started without it.");
 
         var snackbar = new Mock<ISnackbarService>();

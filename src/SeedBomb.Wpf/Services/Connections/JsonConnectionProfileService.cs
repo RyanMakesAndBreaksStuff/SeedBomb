@@ -136,6 +136,13 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         {
             return await LoadLockedAsync(ct).ConfigureAwait(false);
         }
+        catch (Exception ex) when (AtomicFile.IsUnavailable(ex))
+        {
+            // WR-008: locked or denied — read as empty without caching, so the next read retries.
+            // Writes call LoadLockedAsync directly and still throw rather than overwrite the file.
+            LoadWarning = AtomicFile.UnavailableWarning("Saved connections", _storagePath, ex);
+            return new StoreDto();
+        }
         finally
         {
             _lock.Release();

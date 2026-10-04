@@ -15,8 +15,8 @@ public interface IRunHistoryService
     Task ClearAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Set when the stored file could not be read and was moved aside, so history started empty;
-    /// cleared by the next successful write. Null when there is nothing to report.
+    /// Returns, once, the warning recorded when the stored file could not be read and was moved
+    /// aside. Null when there is nothing to report or it was already taken (WR-007).
     /// </summary>
-    string? LoadWarning => null;
+    string? TakeLoadWarning() => null;
 }

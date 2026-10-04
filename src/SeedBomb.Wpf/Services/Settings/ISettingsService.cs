@@ -14,8 +14,8 @@ public interface ISettingsService
     Task SaveAsync(AppSettings settings, CancellationToken ct = default);
 
     /// <summary>
-    /// Set when the stored file could not be read and was moved aside, so settings started at
-    /// defaults; cleared by the next successful write. Null when there is nothing to report.
+    /// Set when the stored file could not be read (moved aside) or opened (left in place), so
+    /// settings started at defaults. Null when there is nothing to report.
     /// </summary>
     string? LoadWarning => null;
 }

@@ -72,6 +72,26 @@ public sealed class ConnectionStoreRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Locked_connections_read_as_empty_without_caching_and_writes_still_fail()
+    {
+        // WR-008: GetLastUsedAsync threw at startup (App.ShowMainWindow), which ended the app.
+        var ct = TestContext.Current.CancellationToken;
+        using (var seed = new JsonConnectionProfileService(_dir))
+            await seed.SaveAsync(new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://org.crm.dynamics.com" }, ct);
+        using var svc = new JsonConnectionProfileService(_dir); // fresh cache, like a new launch
+
+        using (File.Open(StorePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Empty(await svc.GetAllAsync(ct));
+            Assert.Contains("could not be opened", svc.LoadWarning, StringComparison.Ordinal);
+            await Assert.ThrowsAnyAsync<IOException>(() => svc.SaveAsync(new ConnectionProfile { Name = "Other" }, ct));
+        }
+
+        Assert.Single(await svc.GetAllAsync(ct)); // the empty read was not cached
+        Assert.False(File.Exists(StorePath + ".corrupt"));
+    }
+
+    [Fact]
     public async Task SignIn_with_an_undecryptable_secret_asks_for_it_again()
     {
         // "AQID" is valid base64 but not DPAPI data: the same failure as a secret protected by

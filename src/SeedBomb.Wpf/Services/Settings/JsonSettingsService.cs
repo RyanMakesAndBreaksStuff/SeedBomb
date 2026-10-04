@@ -21,6 +21,10 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
     /// <inheritdoc />
     public string? LoadWarning { get; private set; }
 
+    // WR-008: set while the last load couldn't open the file. This instance then holds only defaults,
+    // so SaveAsync refuses rather than overwrite the user's settings with them.
+    private bool _unreadable;
+
     /// <summary>Stores settings in <c>%LOCALAPPDATA%\SeedBomb\settings.json</c>.</summary>
     /// <param name="logger">Warns when an unreadable settings file is moved aside.</param>
     public JsonSettingsService(ILogger<JsonSettingsService> logger)
@@ -41,6 +45,7 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            _unreadable = false;
             if (!File.Exists(_filePath))
                 return AppSettings.Default;
 
@@ -56,6 +61,13 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
             _logger?.LogWarning(ex, "Settings were unreadable; moved them to {Path} and loaded defaults", kept);
             return AppSettings.Default;
         }
+        catch (Exception ex) when (AtomicFile.IsUnavailable(ex))
+        {
+            _unreadable = true;
+            LoadWarning = AtomicFile.UnavailableWarning("Settings", _filePath, ex);
+            _logger?.LogWarning(ex, "Settings could not be opened; using defaults and leaving {Path} untouched", _filePath);
+            return AppSettings.Default;
+        }
         finally
         {
             _lock.Release();
@@ -68,6 +80,8 @@ public sealed class JsonSettingsService : ISettingsService, IDisposable
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (_unreadable)
+                throw new IOException(LoadWarning);
             Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
             await AtomicFile.WriteAllTextAsync(_filePath, JsonSerializer.Serialize(settings.Clamped(), JsonOptions), ct).ConfigureAwait(false);
             LoadWarning = null;

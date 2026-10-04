@@ -18,6 +18,32 @@ public sealed class AppPathsTests
     }
 
     [Fact]
+    public void Failed_legacy_move_keeps_using_the_legacy_folder_and_says_so()
+    {
+        // WR-008: the failed move was swallowed and an empty root created, so all data looked gone.
+        var local = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"))).FullName;
+        var legacy = Directory.CreateDirectory(Path.Combine(local, "DataGen")).FullName;
+        try
+        {
+            // An open handle inside the folder makes the rename fail, as an antivirus scan would.
+            using (File.Open(Path.Combine(legacy, "connections.json"), FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                var (root, warning) = AppPaths.Resolve(local);
+
+                Assert.Equal(legacy, root);
+                Assert.Contains(legacy, warning, StringComparison.Ordinal);
+            }
+
+            Assert.False(Directory.Exists(Path.Combine(local, "SeedBomb"))); // so next launch retries
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FileLogger_WritesTheMessageAndException()
     {
         using var provider = new FileLoggerProvider();
