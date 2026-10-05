@@ -60,6 +60,23 @@ public sealed class ProfilesPageHandoffTests
     }
 
     [Fact]
+    public async Task LoadCommand_IsDisabledUntilAProfileIsSelected()
+    {
+        // Smoke item 8a: Load Profile with nothing selected silently did nothing.
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "Sales" });
+        profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>())).ReturnsAsync(MakeProfile("Sales"));
+        var vm = ProfilesHost.Create(profiles.Object);
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = null;
+
+        Assert.False(vm.LoadCommand.CanExecute(null));
+
+        vm.SelectedItem = vm.Items.Single();
+        Assert.True(vm.LoadCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task OpenInBoard_applies_the_report_to_the_board_and_opens_Generate()
     {
         // WR-001: this hop lived in ProfilesPage code-behind (ProfileApplied → ApplyImportReport + Navigate).

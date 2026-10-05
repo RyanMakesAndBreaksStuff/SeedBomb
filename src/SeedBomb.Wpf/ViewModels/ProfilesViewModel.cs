@@ -261,7 +261,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     }
 
     /// <summary>Loads the selected (or parameter) profile into the pending-import slot (then Open in board).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanMutateSelected))]
     private async Task LoadAsync(ProfileListItem? item)
     {
         if (item is not null)
