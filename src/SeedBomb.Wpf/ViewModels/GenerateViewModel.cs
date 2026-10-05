@@ -43,6 +43,17 @@ public sealed record ReviewPreviewRow(
     public string SampleLine => string.Join(" · ", Values);
 }
 
+/// <summary>WR-005: one Review result. Replaced by Review, cleared as a unit when the draft or tables change.</summary>
+/// <param name="Rules">Effective rules that passed review, by table then column.</param>
+/// <param name="Messages">Review messages, including errors that block Start.</param>
+/// <param name="DraftRevision">The board revision reviewed; Start requires it to still match.</param>
+/// <param name="PreviewRows">Review-card samples.</param>
+public sealed record ReviewSnapshot(
+    Dictionary<string, Dictionary<string, FieldRule>> Rules,
+    IReadOnlyList<RuleMessage> Messages,
+    long DraftRevision,
+    IReadOnlyList<ReviewPreviewRow> PreviewRows);
+
 /// <summary>ViewModel for the Generate wizard page.</summary>
 public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IProfileBoard
 {
@@ -236,28 +247,27 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
     private int _currentStep;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Steps), nameof(ReviewedRuleCount), nameof(RulesLinkLabel), nameof(RunPlanStats),
-        nameof(ProfileSummaryLine))]
+    [NotifyPropertyChangedFor(nameof(ReviewedRules), nameof(ReviewMessages), nameof(ReviewPreviewRows),
+        nameof(ReviewErrorSummary), nameof(ReviewHasErrors), nameof(Steps), nameof(ReviewedRuleCount),
+        nameof(RulesLinkLabel), nameof(RunPlanStats), nameof(ProfileSummaryLine))]
     [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
-    private Dictionary<string, Dictionary<string, FieldRule>>? _reviewedRules;
+    private ReviewSnapshot? _review;
 
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ReviewErrorSummary), nameof(ReviewHasErrors))]
-    [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
-    [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
-    [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
-    private IReadOnlyList<RuleMessage> _reviewMessages = [];
+    /// <summary>Effective rules that passed review; null until Review runs.</summary>
+    public Dictionary<string, Dictionary<string, FieldRule>>? ReviewedRules => Review?.Rules;
+
+    /// <summary>Review messages; empty until Review runs.</summary>
+    public IReadOnlyList<RuleMessage> ReviewMessages => Review?.Messages ?? [];
+
+    /// <summary>Review-card samples; empty until Review runs.</summary>
+    public IReadOnlyList<ReviewPreviewRow> ReviewPreviewRows => Review?.PreviewRows ?? [];
 
     /// <summary>Computed from <see cref="ReviewMessages"/> — true when any reviewed message is Error-severity.</summary>
     public bool ReviewHasErrors => ReviewMessages.Any(m => m.Severity == RuleMessageSeverity.Error);
 
-    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(GenerateCommand))]
-    private long? _reviewedDraftRevision;
-
     [ObservableProperty] private string _runId = "";
-
-    [ObservableProperty] private IReadOnlyList<ReviewPreviewRow> _reviewPreviewRows = [];
 
     // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -504,10 +514,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
     // Any draft mutation invalidates the reviewed snapshot — Start stays locked until preflight reruns.
     private void OnFieldRulesDraftChanged(object? sender, EventArgs e)
     {
-        ReviewedRules = null;
-        ReviewMessages = [];
-        ReviewedDraftRevision = null;
-        ReviewPreviewRows = [];
+        Review = null;
         OnPropertyChanged(nameof(DraftRuleCount));
         OnPropertyChanged(nameof(RulesLinkLabel));
         OnPropertyChanged(nameof(ProfileSummaryLine));
@@ -532,10 +539,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
         _fieldRules?.RetainTables(incoming);
         IsRulesLoaded = false;
         CurrentStep = 0;
-        ReviewedRules = null;
-        ReviewMessages = [];
-        ReviewedDraftRevision = null;
-        ReviewPreviewRows = [];
+        Review = null;
     }
 
     /// <summary>
@@ -625,29 +629,10 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
                 {
                     try
                     {
-                        var values = new List<string>(5);
-                        if (result.EffectiveRule is LookupRandomRule)
-                        {
-                            values.Add(
-                                $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.");
-                        }
-                        else
-                        {
-                            var eval = new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount);
-                            using var session = result.EffectiveRule is BogusRule
-                                ? new BogusEvaluatorSession(Locale)
-                                : null;
-                            PreparedBogusRule? prepared = result.EffectiveRule is BogusRule bogus
-                                ? BogusRulePreparer.CompileRule(bogus, attr, eval)
-                                : null;
-                            for (var row = 0; row < 5; row++)
-                            {
-                                var value = prepared is not null && session is not null
-                                    ? session.Evaluate(prepared, attr, eval, row)
-                                    : RuleValueGenerator.Evaluate(result.EffectiveRule, attr, Seed, table, row, RunId);
-                                values.Add(FormatPreview(value));
-                            }
-                        }
+                        // WR-005: the Rules page's sampler, five rows instead of three.
+                        var values = RulePreviewController.Sample(
+                            result.EffectiveRule, attr,
+                            new RuleEvaluationContext(table, Seed, Locale, RunId, recordCount), rows: 5);
 
                         tableRules[column] = result.EffectiveRule;
                         var displayName = attr.DisplayName?.UserLocalizedLabel?.Label ?? column;
@@ -687,10 +672,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
                     .Select(m => new RuleMessage(RuleMessageSeverity.Error, m)));
         }
 
-        ReviewedRules = reviewed;
-        ReviewMessages = messages;
-        ReviewedDraftRevision = _fieldRules.Revision;
-        ReviewPreviewRows = previewRows;
+        Review = new ReviewSnapshot(reviewed, messages, _fieldRules.Revision, previewRows);
         if (CurrentStep < 2) CurrentStep = 2;
     }
 
@@ -750,20 +732,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
 
     private bool CanGoToReview() => IsRulesLoaded && !IsRunning;
 
-    private static string FormatPreview(object? value)
-    {
-        if (value is null) return "(null)";
-        if (ReferenceEquals(value, RuleValueGenerator.Omit)) return "(omitted)";
-        return value switch
-        {
-            OptionSetValue osv => osv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            Money m => m.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            DateTime dt => dt.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
-            EntityReference r => $"{r.LogicalName} · {r.Id:D}",
-            _ => value.ToString() ?? string.Empty,
-        };
-    }
-
     /// <summary>Tests set this to skip the content dialog.</summary>
     internal Func<Task<bool>>? ConfirmReset { get; set; }
 
@@ -802,10 +770,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
         OnPropertyChanged(nameof(EntityMetadataMap));
         IsRulesLoaded = false;
         CurrentStep = 0;
-        ReviewedRules = null;
-        ReviewMessages = [];
-        ReviewedDraftRevision = null;
-        ReviewPreviewRows = [];
+        Review = null;
         RunId = "";
         Seed = 42;
         ActiveProfileName = "No profile loaded";
@@ -913,10 +878,10 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
     private bool CanStartGenerate() =>
         !IsRunning
         && SelectedEntities.Count > 0
-        && ReviewedRules is not null
+        && Review is { } review
         && !ReviewHasErrors
         && _fieldRules is not null
-        && ReviewedDraftRevision == _fieldRules.Revision;
+        && review.DraftRevision == _fieldRules.Revision;
 
     private bool CanReset() => !IsRunning;
 

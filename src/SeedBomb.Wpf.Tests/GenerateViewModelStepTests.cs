@@ -150,10 +150,10 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = CreateViewModel(out _, out _, out _);
 
-        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Error, "boom")];
+        viewModel.Review = new ReviewSnapshot(new(), [new RuleMessage(RuleMessageSeverity.Error, "boom")], 0, []);
         Assert.True(viewModel.ReviewHasErrors);
 
-        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Warning, "heads up")];
+        viewModel.Review = new ReviewSnapshot(new(), [new RuleMessage(RuleMessageSeverity.Warning, "heads up")], 0, []);
         Assert.False(viewModel.ReviewHasErrors);
     }
 
@@ -866,6 +866,8 @@ public sealed class GenerateViewModelStepTests
         Assert.Contains("1,000", preview);
         Assert.Contains("Candidate validation happens at Start", preview);
         Assert.DoesNotContain("11111111", preview);
+        // WR-005: Review and the Rules page must preview the same rule identically.
+        Assert.Equal(new RuleEditorViewModel(meta, 10, 42, "r1").LookupRandomExplanation, preview);
     }
 
     [Fact]

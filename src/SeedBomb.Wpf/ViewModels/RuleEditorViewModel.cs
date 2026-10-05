@@ -158,8 +158,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         IsLookupColumn && SelectedOp is "constant" or "oneOf";
 
     /// <summary>Run-time-only copy for lookupRandom preview. Interpolates the shared candidate bound.</summary>
-    public string LookupRandomExplanation =>
-        $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts.";
+    public string LookupRandomExplanation => RulePreviewController.LookupRandomExplanation;
 
     /// <summary>True when a metadata load failed and the page should show reconnect/retry guidance.</summary>
     public bool HasMetadataError => !string.IsNullOrWhiteSpace(MetadataError);
@@ -1312,8 +1311,7 @@ public sealed partial class RuleEditorViewModel : ObservableObject, INotifyDataE
         AttributeMetadata? attr = null;
         if (SelectedColumn is not null)
             _byName.TryGetValue(SelectedColumn.LogicalName, out attr);
-        _preview.Schedule(
-            _effectiveRule, attr, _seed, _table, _runId, _recordCount, LookupRandomExplanation);
+        _preview.Schedule(_effectiveRule, attr, _seed, _table, _runId, _recordCount);
     }
 
     private void OnPreviewChanged(object? sender, EventArgs e) =>
