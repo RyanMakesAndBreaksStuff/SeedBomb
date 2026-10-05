@@ -674,6 +674,7 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         {
             EditingProfile = profile,
         };
+        vm.Profiles.Add(profile); // a stored profile: Delete is gated on the run only
 
         Assert.False(vm.SaveProfileCommand.CanExecute(null));
         Assert.False(vm.DeleteProfileCommand.CanExecute(profile));
@@ -687,6 +688,22 @@ public sealed class ConnectionManagerViewModelTests : IDisposable
         Assert.True(vm.SaveProfileCommand.CanExecute(null));
         Assert.True(vm.DeleteProfileCommand.CanExecute(profile));
         Assert.True(vm.SelectProfileCommand.CanExecute(profile));
+    }
+
+    [Fact]
+    public void DeleteConnection_NeedsASavedProfile()
+    {
+        // Smoke item 9: the empty editor bound a null EditingProfile and Delete stayed enabled.
+        var vm = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(), Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
+
+        Assert.False(vm.DeleteProfileCommand.CanExecute(null));
+
+        vm.NewProfileCommand.Execute(null);
+        Assert.False(vm.DeleteProfileCommand.CanExecute(vm.EditingProfile));
+
+        vm.Profiles.Add(vm.EditingProfile!);
+        Assert.True(vm.DeleteProfileCommand.CanExecute(vm.EditingProfile));
     }
 
     [Fact]

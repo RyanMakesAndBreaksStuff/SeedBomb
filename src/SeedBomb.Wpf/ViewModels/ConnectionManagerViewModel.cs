@@ -78,6 +78,7 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveProfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteProfileCommand))]
     [NotifyPropertyChangedFor(nameof(ShowSaveButton))]
     [NotifyPropertyChangedFor(nameof(ShowConnectButton))]
     [NotifyPropertyChangedFor(nameof(ProfileError))]
@@ -158,6 +159,8 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
                 p.IsLastUsed = lastUsed?.Id == p.Id;
                 Profiles.Add(p);
             }
+
+            DeleteProfileCommand.NotifyCanExecuteChanged();
 
             // CR-006: say where an unreadable connections.json went instead of showing an empty list.
             if (_profileService.LoadWarning is { } warning)
@@ -361,7 +364,9 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
         }
     }
 
-    private bool CanDeleteProfile() => !RunIsWriting;
+    // Smoke item 9: the empty editor passes a null EditingProfile, and a new profile isn't stored yet.
+    private bool CanDeleteProfile(ConnectionProfile? profile) =>
+        !RunIsWriting && profile is not null && Profiles.Any(p => p.Id == profile.Id);
 
     /// <summary>Tests the connection for the current editing profile.</summary>
     [RelayCommand]
