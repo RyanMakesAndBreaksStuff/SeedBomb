@@ -860,12 +860,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
         };
     }
 
+    // The sheet's headline owns the outcome wording, so the toast counts rejected rows, not batches.
     private void ReportOutcome(GenerationResult result) =>
         _snackbar.Show(
-            result.Errors.Count == 0 ? "Success" : "Completed with errors",
-            result.Errors.Count == 0
-                ? $"Created {result.TotalRecords:N0} records"
-                : $"Created {result.TotalRecords:N0} records with {result.Errors.Count} error(s)",
+            Run.OutcomeHeadline,
+            $"Created {result.TotalRecords:N0} records",
             result.Errors.Count == 0
                 ? Wpf.Ui.Controls.ControlAppearance.Success
                 : Wpf.Ui.Controls.ControlAppearance.Caution,

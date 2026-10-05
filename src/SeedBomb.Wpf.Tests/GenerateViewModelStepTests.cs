@@ -334,7 +334,7 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public async Task GenerateSnackbarUsesCautionWhenResultHasErrors()
+    public async Task GenerateSnackbar_CountsRejectedRowsNotBatches()
     {
         var viewModel = await CreateReadyForRulesAsync(out _, out var generationMock, out _, out _, out var snackbarMock);
         viewModel.GoToReviewCommand.Execute(null);
@@ -343,15 +343,20 @@ public sealed class GenerateViewModelStepTests
             .ReturnsAsync(new GenerationResult
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
-                Errors = [new BatchError("account", "plugin failed", null)],
+                // Two failed batches of 50: the run lost 100 rows, not 2.
+                Errors =
+                [
+                    new BatchError("account", "plugin failed", null, RowCount: 50),
+                    new BatchError("account", "plugin failed", null, RowCount: 50),
+                ],
             });
 
         await viewModel.GenerateCommand.ExecuteAsync(null);
 
         snackbarMock.Verify(
             s => s.Show(
-                "Completed with errors",
-                It.Is<string>(m => m.Contains("1", StringComparison.Ordinal)),
+                "Completed with 100 rejected rows",
+                "Created 1 records",
                 ControlAppearance.Caution,
                 null,
                 It.IsAny<TimeSpan>()),
