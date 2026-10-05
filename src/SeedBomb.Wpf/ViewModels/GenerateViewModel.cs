@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SeedBomb.Core.Contracts;
+using SeedBomb.Core.Exceptions;
+using System.ServiceModel;
 using SeedBomb.Core.Generators;
 using SeedBomb.Core.Metadata;
 using SeedBomb.Core.Rules;
@@ -679,8 +681,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
     /// or replaces entries <see cref="GoToRulesAsync"/> (or a prior call) already fetched. Lets a
     /// profiles-first flow (Profiles → Generate…) validate against real metadata without requiring
     /// a prior visit to the Rules step. Tables unavailable in this environment are skipped, so
-    /// per-table import validation can report them; only when every requested fetch fails does
-    /// the failure propagate to the caller rather than resolve to an empty map.
+    /// per-table import validation can report them, even when none resolve. Only a failure other
+    /// than a missing table (network, auth) that hits every fetch propagates.
     /// </summary>
     /// <param name="logicalNames">Table logical names to ensure metadata for.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -699,7 +701,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
 
         var failures = results.Where(r => r.Meta is null).ToArray();
         if (failures.Length == missing.Length)
-            throw failures[0].Error!;
+        {
+            var hard = failures.FirstOrDefault(f => !IsMissingTable(f.Error!));
+            if (hard.Error is not null)
+                throw hard.Error;
+        }
 
         foreach (var r in results.Where(r => r.Meta is not null))
             _entityMetadata[r.Meta!.LogicalName ?? r.Name] = r.Meta;
@@ -726,6 +732,12 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
             return (name, null, ex);
         }
     }
+
+    // RetrieveEntity on a table this org doesn't have: ObjectDoesNotExist.
+    private const int ObjectDoesNotExist = unchecked((int)0x80040217);
+
+    private static bool IsMissingTable(Exception error) =>
+        error is SchemaException { InnerException: FaultException<OrganizationServiceFault> { Detail.ErrorCode: ObjectDoesNotExist } };
 
     private bool CanGoToReview() => IsRulesLoaded && !IsRunning;
 

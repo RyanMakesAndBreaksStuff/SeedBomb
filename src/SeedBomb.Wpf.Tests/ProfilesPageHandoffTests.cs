@@ -1,5 +1,8 @@
 using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
+using Microsoft.Xrm.Sdk;
+using SeedBomb.Core.Exceptions;
+using System.ServiceModel;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Generation;
@@ -163,4 +166,42 @@ public sealed class ProfilesPageHandoffTests
         Assert.True(generate.EntityMetadataMap.ContainsKey("account"));
         Assert.False(generate.EntityMetadataMap.ContainsKey("bogus_table"));
     }
+
+    [Fact]
+    public async Task Load_ProfileWhoseTablesAreAllMissing_ListsEachInNotImported()
+    {
+        // Smoke item 7: event-profile on an org with ryan_event instead of test_event surfaced
+        // "Could not find an entity with name test_event…" instead of the import summary.
+        var generate = MakeGenerateViewModel(out var metadataMock);
+        metadataMock
+            .Setup(m => m.GetEntityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns<string, CancellationToken>((name, _) => Task.FromException<EntityMetadata>(MissingTable(name)));
+        var profile = new Profile(Profile.CurrentProfileVersion, "event-profile", null, 7,
+            [new ProfileTable("test_event", 10, null), new ProfileTable("test_eventattendance", 10, null)]);
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "event-profile" });
+        profiles.Setup(p => p.LoadAsync("event-profile", It.IsAny<CancellationToken>())).ReturnsAsync(profile);
+
+        var vm = ProfilesHost.Create(profiles.Object, board: generate);
+        vm.ConfirmOverwrite = _ => true;
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = vm.Items.Single();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.HasError, vm.StatusMessage);
+        Assert.Equal(
+            ["test_event — table not available in this environment.",
+             "test_eventattendance — table not available in this environment."],
+            vm.PendingImport!.NotImported);
+    }
+
+    // The shape DataverseMetadataProvider throws for RetrieveEntity on a table the org lacks.
+    private static SchemaException MissingTable(string name) => new(
+        $"Failed to retrieve metadata for entity '{name}': Could not find an entity with name {name}",
+        new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+        {
+            ErrorCode = unchecked((int)0x80040217),
+            Message = $"Could not find an entity with name {name}",
+        }));
 }
