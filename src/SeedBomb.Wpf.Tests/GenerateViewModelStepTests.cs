@@ -396,6 +396,25 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task DraftClearFailure_IsShownOncePerSession()
+    {
+        // WR-009: clear failures were Debug-logged (dropped by the file logger), so a board the user
+        // reset silently came back next launch.
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ClearDraftAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("draft.json is locked"));
+        var viewModel = CreateViewModel(out _, out _, out _, out var snackbarMock, profileService: profiles.Object);
+        viewModel.ConfirmReset = () => Task.FromResult(true);
+
+        await viewModel.ResetCommand.ExecuteAsync(null);
+        await viewModel.ResetCommand.ExecuteAsync(null);
+
+        snackbarMock.Verify(s => s.Show(
+            "Generate draft", It.Is<string>(m => m.Contains("draft.json is locked")),
+            ControlAppearance.Caution, null, It.IsAny<TimeSpan>()), Times.Once);
+    }
+
+    [Fact]
     public async Task OnNavigatedTo_does_not_overwrite_batch_when_tables_already_selected()
     {
         var settingsMock = new Mock<ISettingsService>();

@@ -1,6 +1,5 @@
 using SeedBomb.Core.Contracts;
 using SeedBomb.Core.Rules;
-using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.ViewModels.Controls;
@@ -17,23 +16,19 @@ internal sealed class GenerateProfileBridge
     private readonly GenerateViewModel _owner;
     private readonly IProfileService _profiles;
     private readonly RulesNavigationRequest? _rulesRequest;
-    private readonly ILogger<GenerateViewModel> _logger;
     private Profile? _restoredDraft;
 
     /// <summary>Initialises the profile-bridge collaborator.</summary>
     public GenerateProfileBridge(
         GenerateViewModel owner,
         IProfileService profiles,
-        RulesNavigationRequest? rulesRequest,
-        ILogger<GenerateViewModel> logger)
+        RulesNavigationRequest? rulesRequest)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(profiles);
-        ArgumentNullException.ThrowIfNull(logger);
         _owner = owner;
         _profiles = profiles;
         _rulesRequest = rulesRequest;
-        _logger = logger;
     }
 
     /// <summary>Loads the autosaved draft and stamps its seed onto the wizard when present.</summary>
@@ -47,12 +42,12 @@ internal sealed class GenerateProfileBridge
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft profile load skipped");
+            _owner.ReportDraftFailure("restore", ex);
             _restoredDraft = null;
         }
     }
 
-    /// <summary>Deletes the autosaved draft. Failures are debug-logged.</summary>
+    /// <summary>Deletes the autosaved draft. Failures go to <see cref="GenerateViewModel.ReportDraftFailure"/>.</summary>
     public async Task ClearDraftAsync()
     {
         try
@@ -61,7 +56,7 @@ internal sealed class GenerateProfileBridge
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft clear skipped");
+            _owner.ReportDraftFailure("clear", ex);
         }
     }
 

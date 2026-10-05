@@ -100,10 +100,10 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
         Run = run;
         _fieldRules = new FieldRulesViewModel();
         AttachFieldRules(_fieldRules);
-        _profileBridge = new GenerateProfileBridge(this, profileService, rulesRequest, logger);
+        _profileBridge = new GenerateProfileBridge(this, profileService, rulesRequest);
         _draftAutosave = new GenerateDraftAutosave(
             profileService,
-            logger,
+            ReportDraftFailure,
             () => SelectedEntities.Count > 0 || (_fieldRules is not null && _fieldRules.GetRules().Count > 0),
             BuildProfileSnapshot);
         if (_mainWindow is not null)
@@ -115,6 +115,25 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     {
         if (_mainWindow is not null)
             _mainWindow.ConnectionReloadRequested -= OnConnectionReloadRequested;
+    }
+
+    private bool _draftFailureShown;
+
+    /// <summary>
+    /// WR-009: the one place draft store failures surface. Logged at Warning (the file logger drops
+    /// Debug) and shown once per session, so a failing autosave can't stack snackbars.
+    /// </summary>
+    /// <param name="action">What failed: "save", "restore" or "clear".</param>
+    /// <param name="ex">The store failure.</param>
+    internal void ReportDraftFailure(string action, Exception ex)
+    {
+        _logger.LogWarning(ex, "Couldn't {Action} the Generate draft", action);
+        if (_draftFailureShown)
+            return;
+        _draftFailureShown = true;
+        _snackbar.Show("Generate draft",
+            $"Couldn't {action} the draft: {ex.Message}. The board may not match after a restart.",
+            Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
     }
 
     private void OnConnectionReloadRequested(object? sender, EventArgs e) =>

@@ -110,12 +110,14 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(
         object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
-        CrashLog.Write(e.Exception);
+        var logPath = CrashLog.Write(e.Exception);
         if (e.Exception is OutOfMemoryException or StackOverflowException or AccessViolationException)
             return;
 
+        // IN-002: only claim the details were saved when they were.
+        var details = logPath is null ? string.Empty : $"\n\nDetails were written to {logPath}.";
         MessageBox.Show(
-            $"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to the crash log.",
+            $"Something went wrong:\n\n{e.Exception.Message}{details}",
             "SeedBomb", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
