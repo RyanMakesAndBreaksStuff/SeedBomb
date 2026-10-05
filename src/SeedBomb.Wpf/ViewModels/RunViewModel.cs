@@ -402,7 +402,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
                 result?.TotalRecords ?? 0,
                 result?.Elapsed ?? TimeSpan.Zero,
                 result is { Cancelled: false, Errors.Count: 0, FatalError: null },
-                result?.Errors.Sum(e => e.RowCount) ?? 0,
+                result?.RejectedRows ?? 0,
                 EnvironmentLabel,
                 UserLabel,
                 _profileName,
@@ -549,7 +549,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         }
 
         var written = result.TotalRecords;
-        var rejected = result.Errors.Sum(e => e.RowCount);
+        var rejected = result.RejectedRows;
         var planned = _plannedTotal > 0 ? _plannedTotal : written;
         var pct = planned > 0 ? Math.Clamp(100.0 * written / planned, 0, 100) : 100;
         OverallPercent = pct;
