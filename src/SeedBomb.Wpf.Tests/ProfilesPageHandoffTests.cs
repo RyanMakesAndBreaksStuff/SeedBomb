@@ -68,7 +68,8 @@ public sealed class ProfilesPageHandoffTests
             .ReturnsAsync(new[] { "Sales" });
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
-        var board = ProfilesHost.Board(runId: "run-1");
+        var board = ProfilesHost.Board(
+            new Dictionary<string, EntityMetadata> { ["account"] = new() { LogicalName = "account" } }, runId: "run-1");
         var navigator = new Mock<IAppNavigator>();
         var vm = ProfilesHost.Create(profiles.Object, navigator: navigator.Object, board: board.Object);
         vm.ConfirmOverwrite = _ => true;
@@ -83,6 +84,24 @@ public sealed class ProfilesPageHandoffTests
         board.Verify(b => b.ApplyImportReport(report!), Times.Once);
         navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
         Assert.False(vm.ShowImportSummary);
+    }
+
+    [Fact]
+    public async Task OpenInBoard_IsDisabledWhenNoTableIsInThisOrg()
+    {
+        // The board would get only the profile name and seed; Not imported already lists the tables.
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "Sales" });
+        profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>())).ReturnsAsync(MakeProfile("Sales"));
+        var vm = ProfilesHost.Create(profiles.Object); // empty metadata map: "account" isn't in this org
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = vm.Items.Single();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.ShowImportSummary);
+        Assert.False(vm.OpenInBoardCommand.CanExecute(null));
+        Assert.True(vm.DiscardImportCommand.CanExecute(null));
     }
 
     // ── T1: cold-start profile metadata (no prior Rules visit) ────────────────

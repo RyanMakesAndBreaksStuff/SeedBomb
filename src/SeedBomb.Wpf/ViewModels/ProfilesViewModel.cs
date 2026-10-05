@@ -635,7 +635,9 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;
 
-    private bool CanOpenInBoard() => ShowImportSummary && PendingImport is not null && SchemaErrorMessage is null;
+    // A report with no table in this org would load only a profile name and seed onto the board.
+    private bool CanOpenInBoard() =>
+        ShowImportSummary && PendingImport is { AppliedTableSummaries.Count: > 0 } && SchemaErrorMessage is null;
 
     private bool CanLeaveImportSummary() => ShowImportSummary;
 
