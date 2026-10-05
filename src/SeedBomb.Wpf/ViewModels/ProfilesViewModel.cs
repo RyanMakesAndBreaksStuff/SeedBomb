@@ -18,15 +18,13 @@ namespace SeedBomb.ViewModels;
 /// <param name="Name">Profile display name.</param>
 /// <param name="VersionLabel">e.g. v1.</param>
 /// <param name="SummaryLine">e.g. 3 tables · 11 rules · 9,500 rows.</param>
-/// <param name="Description">Optional profile description.</param>
-/// <param name="Seed">Pinned seed, if any.</param>
+/// <param name="RowCount">Total configured rows, used for sorting independently of display text.</param>
 /// <param name="RuleCount">Active column rules.</param>
 public sealed record ProfileListItem(
     string Name,
     string VersionLabel,
     string SummaryLine,
-    string? Description = null,
-    int? Seed = null,
+    int RowCount,
     int RuleCount = 0);
 
 /// <summary>One ruled column in the selected profile's detail table.</summary>
@@ -240,7 +238,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         IEnumerable<ProfileListItem> ordered = _sortMode switch
         {
-            1 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
+            1 => projected.OrderByDescending(p => p.RowCount),
             _ => projected.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
         };
 
@@ -673,19 +671,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             profile.Name,
             $"v{profile.ProfileVersion}",
             summary,
-            profile.Description,
-            profile.Seed,
+            rowCount,
             ruleCount);
-    }
-
-    private static int ParseRowCount(string summary)
-    {
-        var idx = summary.LastIndexOf('·');
-        var tail = idx >= 0 ? summary[(idx + 1)..] : summary;
-        tail = tail.Replace("rows", "", StringComparison.OrdinalIgnoreCase)
-            .Replace(",", "", StringComparison.Ordinal)
-            .Trim();
-        return int.TryParse(tail, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
     }
 
     private static string OperationSummary(FieldRule rule) => rule switch

@@ -26,7 +26,7 @@ namespace SeedBomb.Bulk;
 /// Uses <c>CreateMultiple</c> where available and falls back to <c>ExecuteMultiple</c>.
 /// Bogus record generation is sequential per entity; API calls are parallelised per batch.
 /// </summary>
-public class BulkCreator : IBulkCreator
+public class BulkCreator
 {
     // Eight scope hex characters, a separator and an eight-digit row index must survive truncation.
     private const int MinimumScopedStringKeyLength = 17;
@@ -63,7 +63,16 @@ public class BulkCreator : IBulkCreator
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Generates and creates records for all requested entities in the correct dependency order.
+    /// Deferred lookups (cycle-broken edges) are backfilled in a second pass.
+    /// </summary>
+    /// <param name="config">Generation configuration (batch size, seed, parallelism, retries).</param>
+    /// <param name="entityMetadata">Metadata keyed by entity logical name for all selected entities.</param>
+    /// <param name="graph">Dependency graph with topological ordering and deferred edge info.</param>
+    /// <param name="progress">Optional progress reporter for real-time feedback.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A <see cref="GenerationResult"/> with all created record IDs and any batch errors.</returns>
     public async Task<GenerationResult> CreateAsync(
         GenerationConfig config,
         IReadOnlyDictionary<string, EntityMetadata> entityMetadata,

@@ -164,7 +164,7 @@ public sealed class GenerateViewModelStepTests
 
         // "name" is a string column — a numeric constant is an Error per RuleValidator.ValidateConstant.
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("123").RootElement), "Name", "123");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("123").RootElement));
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -180,7 +180,7 @@ public sealed class GenerateViewModelStepTests
         var authored = new RangeRule(
             System.Text.Json.JsonDocument.Parse("-500").RootElement,
             System.Text.Json.JsonDocument.Parse("5000").RootElement);
-        fieldRules.SetRule("account", "numberofemployees", authored, "Number of Employees", "0");
+        fieldRules.SetRule("account", "numberofemployees", authored);
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -198,13 +198,13 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
 
         viewModel.GoToReviewCommand.Execute(null);
         Assert.NotNull(viewModel.ReviewedRules);
 
         // Any further draft mutation — edit or remove — must invalidate the snapshot.
-        fieldRules.RemoveRule("account", "name");
+        fieldRules.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>());
 
         Assert.Null(viewModel.ReviewedRules);
         Assert.False(viewModel.GenerateCommand.CanExecute(null));
@@ -215,7 +215,7 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         viewModel.GoToReviewCommand.Execute(null);
         Assert.True(viewModel.GenerateCommand.CanExecute(null));
 
@@ -240,7 +240,7 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         viewModel.GoToReviewCommand.Execute(null);
         viewModel.MaxParallelism = 64;
 
@@ -260,7 +260,7 @@ public sealed class GenerateViewModelStepTests
     public async Task GoToReview_BogusRule_UsesContextAndSessionPreview()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
-        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1));
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -289,7 +289,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         await viewModel.GoNextCommand.ExecuteAsync(null);
 
-        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1));
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -483,7 +483,7 @@ public sealed class GenerateViewModelStepTests
         var account = new EntitySummary("account", "Account", false);
         viewModel.OnEntitiesChanged([account, new EntitySummary("contact", "Contact", false)]);
         viewModel.FieldRules.SetRule("contact", "firstname",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Ada\"").RootElement), "First Name", "Ada");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Ada\"").RootElement));
 
         viewModel.OnEntitiesChanged([account]);
         viewModel.EditRulesCommand.Execute(null);
@@ -516,7 +516,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.OnEntitiesChanged([new EntitySummary("contact", "Contact", false)]);
         viewModel.ActiveProfileName = "contact-acct";
         viewModel.FieldRules.SetRule("contact", "address1_freighttermscode",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("1").RootElement), "Freight Terms", "1");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("1").RootElement));
         var ruleDeleted = new Profile(2, "contact-acct", null, 42, [new ProfileTable("contact", 10, null)]);
 
         viewModel.ApplySavedProfileIfActive(ruleDeleted with { Name = "g2" });
@@ -543,7 +543,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.AttachFieldRules(fieldRules);
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         Assert.NotEmpty(fieldRules.GetRules());
         viewModel.Seed = 99;
         viewModel.CurrentStep = 1;
@@ -664,9 +664,7 @@ public sealed class GenerateViewModelStepTests
             fieldRules.SetRule(
                 "account",
                 "name",
-                new ConstantRule(System.Text.Json.JsonDocument.Parse("\"x\"").RootElement),
-                "Name",
-                "x");
+                new ConstantRule(System.Text.Json.JsonDocument.Parse("\"x\"").RootElement));
             fieldRules.Commit();
 
             await Task.Delay(800, TestContext.Current.CancellationToken);
@@ -857,7 +855,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         await viewModel.GoNextCommand.ExecuteAsync(null);
 
-        fieldRules.SetRule("account", "parentaccountid", new LookupRandomRule(), "Parent Account", "preview");
+        fieldRules.SetRule("account", "parentaccountid", new LookupRandomRule());
         viewModel.GoToReviewCommand.Execute(null);
 
         Assert.False(viewModel.ReviewHasErrors);
@@ -893,8 +891,7 @@ public sealed class GenerateViewModelStepTests
 
         var id = Guid.Parse("11111111-1111-1111-1111-111111111111");
         fieldRules.SetRule("account", "parentaccountid",
-            new ConstantRule(new LookupRuleValue("account", id, "Acme").ToJson()),
-            "Parent Account", "preview");
+            new ConstantRule(new LookupRuleValue("account", id, "Acme").ToJson()));
         viewModel.GoToReviewCommand.Execute(null);
 
         Assert.False(viewModel.ReviewHasErrors);
@@ -1068,7 +1065,7 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         viewModel.GoToReviewCommand.Execute(null);
         var scopes = new List<string>();
         generationMock

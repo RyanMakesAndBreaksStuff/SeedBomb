@@ -15,9 +15,9 @@ public class FieldRulesViewModelTests
     {
         var vm = new FieldRulesViewModel();
         Assert.Empty(vm.GetRules());                 // absence IS the auto configuration
-        vm.SetRule("account", "description", new ConstantRule(J("\"[MARKER]\"")), displayName: "Description", preview: "[MARKER]");
+        vm.SetRule("account", "description", new ConstantRule(J("\"[MARKER]\"")));
         Assert.Single(vm.GetRules());
-        vm.RemoveRule("account", "description");
+        vm.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>());
         Assert.Empty(vm.GetRules());                 // column quietly returns to auto
     }
 
@@ -25,11 +25,11 @@ public class FieldRulesViewModelTests
     public void GetRules_returns_config_shape_and_empty_tables_are_omitted()
     {
         var vm = new FieldRulesViewModel();
-        vm.SetRule("account", "description", new ConstantRule(J("\"old\"")), "Description", "old");
+        vm.SetRule("account", "description", new ConstantRule(J("\"old\"")));
         var rules = vm.GetRules();
         Assert.Single(rules);
         Assert.Single(rules["account"]);
-        vm.RemoveRule("account", "description");
+        vm.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>());
         Assert.Empty(vm.GetRules());                 // {} table never emitted — keeps S7 trigger trivial
     }
 
@@ -37,7 +37,7 @@ public class FieldRulesViewModelTests
     public void HardReset_clears_draft_and_raises_one_change_event()
     {
         var vm = new FieldRulesViewModel();
-        vm.SetRule("account", "description", new ConstantRule(J("\"old\"")), "Description", "old");
+        vm.SetRule("account", "description", new ConstantRule(J("\"old\"")));
         vm.Commit();
         var events = 0;
         vm.DraftChanged += (_, _) => events++;
@@ -56,10 +56,10 @@ public class FieldRulesViewModelTests
     {
         var vm = new FieldRulesViewModel();
         var start = vm.Revision;
-        vm.SetRule("account", "description", new ConstantRule(J("\"x\"")), "Description", "x");
+        vm.SetRule("account", "description", new ConstantRule(J("\"x\"")));
         Assert.True(vm.Revision > start);
         var afterSet = vm.Revision;
-        vm.RemoveRule("account", "description");
+        vm.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>());
         Assert.True(vm.Revision > afterSet);
     }
 }

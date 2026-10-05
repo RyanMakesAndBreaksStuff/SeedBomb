@@ -172,13 +172,6 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             LoadWarning = $"Saved connections could not be read, so SeedBomb started without them. The file was kept at {kept}.";
             _cache = new StoreDto();
         }
-        foreach (var profile in _cache.Profiles)
-        {
-            // Legacy ROPC profiles (AuthType 2 / "UserPassword") predate WR-010b.
-            // Downgrade to OAuth rather than leaving an undefined enum value.
-            if (!Enum.IsDefined(profile.AuthType))
-                profile.AuthType = AuthType.OAuth;
-        }
 
         return _cache;
     }

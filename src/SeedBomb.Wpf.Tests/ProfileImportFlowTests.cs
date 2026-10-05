@@ -169,8 +169,8 @@ public sealed class ProfileImportFlowTests : IDisposable
 
         // Board state identical to building the same effective rules by hand.
         var handBoard = new FieldRulesViewModel();
-        handBoard.SetRule("account", "name", nameRule, "name", "");
-        handBoard.SetRule("account", "numberofemployees", rangeRule, "numberofemployees", "");
+        handBoard.SetRule("account", "name", nameRule);
+        handBoard.SetRule("account", "numberofemployees", rangeRule);
 
         var importBoard = new FieldRulesViewModel();
         var draft = new Dictionary<string, Dictionary<string, RuleDraftEntry>>(StringComparer.OrdinalIgnoreCase)

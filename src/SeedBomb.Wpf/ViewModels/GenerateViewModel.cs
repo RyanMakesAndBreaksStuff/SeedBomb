@@ -241,7 +241,7 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
     private bool _isRulesLoaded;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Steps), nameof(NextButtonLabel), nameof(StepProgressLabel), nameof(IsReviewOpen))]
+    [NotifyPropertyChangedFor(nameof(Steps), nameof(NextButtonLabel), nameof(StepProgressLabel))]
     [NotifyCanExecuteChangedFor(nameof(GoNextCommand))]
     [NotifyCanExecuteChangedFor(nameof(GoBackCommand))]
     private int _currentStep;
@@ -282,9 +282,6 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
 
     /// <summary>Singleton run sheet bound by the overlay.</summary>
     public RunViewModel Run { get; }
-
-    /// <summary>True when the wizard is on Review or Run.</summary>
-    public bool IsReviewOpen => CurrentStep >= 2;
 
     /// <summary>Footer primary-button caption.</summary>
     public string NextButtonLabel => CurrentStep == 3 ? "Start run" : "Next";

@@ -25,20 +25,11 @@ public sealed partial class FieldRulesViewModel : ObservableObject
     public event EventHandler? DraftChanged;
 
     /// <summary>Adds or replaces the draft rule for (table, column).</summary>
-    public void SetRule(string table, string column, FieldRule rule, string displayName, string preview)
+    public void SetRule(string table, string column, FieldRule rule)
     {
         if (!_draft.TryGetValue(table, out var cols))
             _draft[table] = cols = new(StringComparer.OrdinalIgnoreCase);
         cols[column] = new(rule);
-        MarkChanged();
-    }
-
-    /// <summary>Removes the rule — the column quietly returns to auto; empty tables are dropped (S7).</summary>
-    public void RemoveRule(string table, string column)
-    {
-        if (!_draft.TryGetValue(table, out var cols) || !cols.Remove(column))
-            return;
-        if (cols.Count == 0) _draft.Remove(table);
         MarkChanged();
     }
 
