@@ -1050,7 +1050,7 @@ public sealed class ConnectionManagerSessionStaTests
             else
             {
                 probeCts.Cancel();
-                try { await probe; } catch (OperationCanceledException) { }
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => probe);
             }
 
             auth.ActiveProfile = null;

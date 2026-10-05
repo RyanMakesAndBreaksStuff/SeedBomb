@@ -767,11 +767,8 @@ public sealed class RunViewModelTests : IDisposable
         {
             releaseGen.TrySetResult(Throttled());
             hold.Dispose();
-            try
-            {
-                await running.WaitAsync(Bound, TestContext.Current.CancellationToken);
-            }
-            catch (OperationCanceledException) { }
+            // Let the run settle whether or not the asserts passed; the try already asserted the cancel.
+            await Task.WhenAny(running).WaitAsync(Bound, TestContext.Current.CancellationToken);
         }
 
         using (var again = await gate.AcquireAsync(TestContext.Current.CancellationToken)
@@ -793,11 +790,11 @@ public sealed class RunViewModelTests : IDisposable
         var cancelling = new Mock<IWpfGenerationService>();
         cancelling.Setup(g => g.GenerateAsync(
                 It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
-            .Returns(async (GenerationConfig _, IProgress<ProgressUpdate> _, CancellationToken token) =>
+            .Returns((GenerationConfig _, IProgress<ProgressUpdate> _, CancellationToken token) =>
             {
                 entered.TrySetResult();
-                await Task.Delay(Timeout.Infinite, token);
-                return Throttled();
+                // Never completes on its own: only the run's cancel ends it.
+                return new TaskCompletionSource<GenerationResult>().Task.WaitAsync(token);
             });
         var cancelledRun = new RunViewModel(generation: cancelling.Object, sessionGate: gate);
         using var runCts = new CancellationTokenSource();
