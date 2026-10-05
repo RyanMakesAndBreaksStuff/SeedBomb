@@ -252,6 +252,8 @@ public partial class App : Application
         sc.AddSingleton<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
         sc.AddSingleton<GenerateViewModel>();
+        sc.AddSingleton<IProfileBoard>(sp => sp.GetRequiredService<GenerateViewModel>());
+        sc.AddSingleton<IFileDialogService, FileDialogService>();
         sc.AddTransient<ProfilesViewModel>();
         sc.AddTransient<HistoryViewModel>();
         sc.AddTransient<SettingsViewModel>();

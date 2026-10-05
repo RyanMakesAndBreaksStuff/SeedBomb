@@ -85,15 +85,16 @@ internal sealed class GenerateProfileBridge
         return true;
     }
 
-    private Profile? _savedDuringRun;
+    // WR-009/WR-010: the last board change (a Rules save or an "Open in board" import) made while
+    // Generate runs. The latest one wins, matching what the user did last.
+    private Action? _deferredDuringRun;
 
-    /// <summary>Applies the last Rules save held back while Generate was running (WR-009).</summary>
-    public void ApplyRulesSavedDuringRun()
+    /// <summary>Applies the board change held back while Generate was running, if any.</summary>
+    public void ApplyDeferredBoardChange()
     {
-        if (_savedDuringRun is not { } profile)
-            return;
-        _savedDuringRun = null;
-        ApplySavedRulesProfile(profile);
+        var change = _deferredDuringRun;
+        _deferredDuringRun = null;
+        change?.Invoke();
     }
 
     /// <summary>Applies a profile returned from the Rules page onto the wizard board.</summary>
@@ -103,7 +104,7 @@ internal sealed class GenerateProfileBridge
         // renaming the profile and dropping tables under the run; GenerateAsync applies it after.
         if (_owner.IsRunning)
         {
-            _savedDuringRun = profile;
+            _deferredDuringRun = () => ApplySavedRulesProfile(profile);
             return;
         }
 
@@ -211,6 +212,12 @@ internal sealed class GenerateProfileBridge
     public void ApplyImportReport(ProfileImportReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
+
+        if (_owner.IsRunning)
+        {
+            _deferredDuringRun = () => ApplyImportReport(report);
+            return;
+        }
 
         // The Profiles page applies a report directly (no ApplySavedRulesProfile hop), so the
         // Profile card's name has to come off the report or it stays "No profile loaded".

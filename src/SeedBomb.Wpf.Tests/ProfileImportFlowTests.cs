@@ -194,11 +194,7 @@ public sealed class ProfileImportFlowTests : IDisposable
             JsonSerializer.Serialize(imported["account"]["numberofemployees"], FieldRule.JsonOptions));
 
         // ProfilesViewModel surfaces the same report via PresentImport (visual summary path).
-        var vm = new ProfilesViewModel(svc)
-        {
-            GetMetadata = () => metadata,
-            GetRunId = () => "run-test",
-        };
+        var vm = ProfilesHost.Create(svc, board: ProfilesHost.Board(metadata, "run-test").Object);
         var presented = vm.PresentImport(profile, "import.profile.json");
         Assert.Equal(report.AppliedRuleCount, presented.AppliedRuleCount);
         Assert.True(vm.HasImportApplied);
@@ -213,11 +209,7 @@ public sealed class ProfileImportFlowTests : IDisposable
     {
         var svc = NewService(out _);
         var path = await WriteSourceAsync("{ not json");
-        var vm = new ProfilesViewModel(svc)
-        {
-            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
-            GetRunId = () => "",
-        };
+        var vm = ProfilesHost.Create(svc);
 
         await vm.ImportFromPathAsync(path, TestContext.Current.CancellationToken);
 
@@ -507,18 +499,16 @@ public sealed class ProfileImportFlowTests : IDisposable
         // session, so every table read "not available") and skipped the dirty-board prompt.
         var cache = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase);
         string? prompt = null;
-        var vm = new ProfilesViewModel(NewService(out _))
-        {
-            GetMetadata = () => cache,
-            EnsureMetadata = (tables, _) =>
+        var board = ProfilesHost.Board(cache, dirty: true);
+        board.Setup(b => b.EnsureMetadataAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, CancellationToken>((tables, _) =>
             {
                 foreach (var table in tables)
                     cache[table] = BuildAccountMetadata();
-                return Task.CompletedTask;
-            },
-            IsBoardDirty = () => true,
-            ConfirmOverwrite = message => { prompt = message; return true; },
-        };
+            })
+            .Returns(Task.CompletedTask);
+        var vm = ProfilesHost.Create(NewService(out _), board: board.Object);
+        vm.ConfirmOverwrite = message => { prompt = message; return true; };
 
         await vm.ImportFromPathAsync(await WriteSourceAsync(HandTooledProfileJson), TestContext.Current.CancellationToken);
 
@@ -529,12 +519,8 @@ public sealed class ProfileImportFlowTests : IDisposable
     [Fact]
     public async Task Import_presents_nothing_when_the_user_keeps_a_dirty_board()
     {
-        var vm = new ProfilesViewModel(NewService(out _))
-        {
-            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
-            IsBoardDirty = () => true,
-            ConfirmOverwrite = _ => false,
-        };
+        var vm = ProfilesHost.Create(NewService(out _), board: ProfilesHost.Board(dirty: true).Object);
+        vm.ConfirmOverwrite = _ => false;
 
         await vm.ImportFromPathAsync(await WriteSourceAsync(HandTooledProfileJson), TestContext.Current.CancellationToken);
 
@@ -555,11 +541,7 @@ public sealed class ProfileImportFlowTests : IDisposable
         var dialogs = new Mock<IContentDialogService>();
         dialogs.Setup(d => d.ShowAsync(It.IsAny<ContentDialog>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ContentDialogResult.None);
-        var vm = new ProfilesViewModel(NewService(out _), dialogs: dialogs.Object)
-        {
-            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
-            IsBoardDirty = () => true,
-        };
+        var vm = ProfilesHost.Create(NewService(out _), dialogs: dialogs.Object, board: ProfilesHost.Board(dirty: true).Object);
 
         var write = WriteSourceAsync(HandTooledProfileJson);
         Wait(write);
@@ -596,11 +578,8 @@ public sealed class ProfileImportFlowTests : IDisposable
         var before = await File.ReadAllTextAsync(path, ct);
 
         string? prompt = null;
-        var vm = new ProfilesViewModel(svc)
-        {
-            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
-            ConfirmOverwrite = message => { prompt = message; return true; },
-        };
+        var vm = ProfilesHost.Create(svc);
+        vm.ConfirmOverwrite = message => { prompt = message; return true; };
 
         var json = """{"profileVersion":1,"name":"acme-sales","tables":[{"table":"account","count":5}]}""";
         await vm.ImportFromPathAsync(await WriteSourceAsync(json), ct);
@@ -619,10 +598,7 @@ public sealed class ProfileImportFlowTests : IDisposable
         profiles.Setup(p => p.ImportAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ThrowsAsync(new IOException("import.profile.json is locked"));
 
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => new Dictionary<string, EntityMetadata>(),
-        };
+        var vm = ProfilesHost.Create(profiles.Object);
 
         await vm.ImportFromPathAsync(@"C:\temp\import.profile.json", TestContext.Current.CancellationToken);
 

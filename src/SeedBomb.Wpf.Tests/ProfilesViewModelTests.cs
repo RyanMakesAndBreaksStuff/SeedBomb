@@ -46,7 +46,7 @@ public sealed class ProfilesViewModelTests : IDisposable
                 ["name"] = rule,
             })]), ct);
 
-        var vm = new ProfilesViewModel(svc);
+        var vm = ProfilesHost.Create(svc);
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = Assert.Single(vm.Items);
         return vm;

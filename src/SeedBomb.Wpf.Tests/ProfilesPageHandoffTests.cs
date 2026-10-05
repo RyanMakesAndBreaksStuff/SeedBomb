@@ -3,9 +3,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Generation;
+using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
+using SeedBomb.Views.Pages;
 using Wpf.Ui;
 using Xunit;
 
@@ -36,26 +38,6 @@ public sealed class ProfilesPageHandoffTests
     }
 
     [Fact]
-    public async Task LoadAsync_WithoutMetadataHost_ReportsErrorRatherThanSuccess()
-    {
-        var profiles = new Mock<IProfileService>();
-        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { "Sales" });
-        profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(MakeProfile("Sales"));
-
-        var vm = new ProfilesViewModel(profiles.Object);
-        await vm.RefreshCommand.ExecuteAsync(null);
-        vm.SelectedItem = vm.Items.Single();
-
-        // GetMetadata deliberately left null — simulates a host that forgot to wire itself.
-        await vm.LoadCommand.ExecuteAsync(null);
-
-        Assert.Null(vm.PendingImport);
-        Assert.True(vm.HasError);
-    }
-
-    [Fact]
     public async Task LoadAsync_WithMetadataHost_ProducesPendingImport()
     {
         var profiles = new Mock<IProfileService>();
@@ -64,14 +46,8 @@ public sealed class ProfilesPageHandoffTests
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
 
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => new Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata>(
-                StringComparer.OrdinalIgnoreCase),
-            GetRunId = () => "run-1",
-            ConfirmOverwrite = _ => true,
-            IsBoardDirty = () => false,
-        };
+        var vm = ProfilesHost.Create(profiles.Object, board: ProfilesHost.Board(runId: "run-1").Object);
+        vm.ConfirmOverwrite = _ => true;
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single();
 
@@ -81,34 +57,29 @@ public sealed class ProfilesPageHandoffTests
     }
 
     [Fact]
-    public async Task OpenInBoard_WithPendingImport_RaisesProfileApplied()
+    public async Task OpenInBoard_applies_the_report_to_the_board_and_opens_Generate()
     {
+        // WR-001: this hop lived in ProfilesPage code-behind (ProfileApplied → ApplyImportReport + Navigate).
         var profiles = new Mock<IProfileService>();
         profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { "Sales" });
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
-
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => new Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata>(
-                StringComparer.OrdinalIgnoreCase),
-            GetRunId = () => "run-1",
-            ConfirmOverwrite = _ => true,
-            IsBoardDirty = () => false,
-        };
+        var board = ProfilesHost.Board(runId: "run-1");
+        var navigator = new Mock<IAppNavigator>();
+        var vm = ProfilesHost.Create(profiles.Object, navigator: navigator.Object, board: board.Object);
+        vm.ConfirmOverwrite = _ => true;
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single();
         await vm.LoadCommand.ExecuteAsync(null);
-
-        ProfileImportReport? applied = null;
-        vm.ProfileApplied += (_, report) => applied = report;
+        var report = vm.PendingImport;
 
         Assert.True(vm.OpenInBoardCommand.CanExecute(null));
         vm.OpenInBoardCommand.Execute(null);
 
-        Assert.NotNull(applied);
-        Assert.Same(vm.PendingImport, applied);
+        board.Verify(b => b.ApplyImportReport(report!), Times.Once);
+        navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+        Assert.False(vm.ShowImportSummary);
     }
 
     // ── T1: cold-start profile metadata (no prior Rules visit) ────────────────
@@ -132,13 +103,8 @@ public sealed class ProfilesPageHandoffTests
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
 
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => generate.EntityMetadataMap,
-            GetRunId = () => generate.RunId,
-            ConfirmOverwrite = _ => true,
-            IsBoardDirty = () => false,
-        };
+        var vm = ProfilesHost.Create(profiles.Object, board: generate);
+        vm.ConfirmOverwrite = _ => true;
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single();
 

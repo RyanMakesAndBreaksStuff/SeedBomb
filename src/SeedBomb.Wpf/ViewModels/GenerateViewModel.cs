@@ -44,7 +44,7 @@ public sealed record ReviewPreviewRow(
 }
 
 /// <summary>ViewModel for the Generate wizard page.</summary>
-public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
+public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IProfileBoard
 {
     private readonly ISettingsService _settingsService;
     private readonly ISnackbarService _snackbar;
@@ -874,8 +874,8 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
             _cts = null;
         }
 
-        // WR-009: a Rules save held back during the run lands on the board now.
-        _profileBridge.ApplyRulesSavedDuringRun();
+        // WR-009/WR-010: a Rules save or an import held back during the run lands on the board now.
+        _profileBridge.ApplyDeferredBoardChange();
     }
 
     private GenerationConfig BuildConfig()
@@ -940,8 +940,11 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable
     /// <summary>Pushes a metadata-validated import report onto the board (EffectiveRules only).</summary>
     public void ApplyImportReport(ProfileImportReport report)
     {
-        // WR-009: "Open in board" while Generate runs must not reset the wizard under the run.
-        if (IsRunning) return;
+        // WR-010: during a run the bridge queues the report and applies it when the run ends.
+        if (IsRunning)
+            _snackbar.Show("Profile queued",
+                $"“{report.ProfileName}” loads onto the board when the current run finishes.",
+                Wpf.Ui.Controls.ControlAppearance.Info, null, TimeSpan.FromSeconds(5));
         _profileBridge.ApplyImportReport(report);
     }
 

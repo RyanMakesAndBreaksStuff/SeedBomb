@@ -925,20 +925,28 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public void ApplyImportReport_NoOp_WhileGenerateIsRunning()
+    public async Task OpenInBoard_during_a_run_applies_the_profile_when_the_run_ends()
     {
-        var viewModel = CreateViewModel(out _, out _, out _);
+        // WR-010: ApplyImportReport returned early while running, and the import was dropped.
+        var viewModel = CreateViewModel(out var generationMock, out _, out _);
+        var result = new TaskCompletionSource<GenerationResult>();
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(result.Task);
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        viewModel.IsRunning = true;
-
         var report = new ProfileImportReport(
             new Dictionary<string, Dictionary<string, FieldRule>>(),
             new Dictionary<string, int>(),
             null, 0, [], [], [], "imported-profile");
 
+        var run = viewModel.GenerateCommand.ExecuteAsync(null);
         viewModel.ApplyImportReport(report);
+        Assert.Equal("No profile loaded", viewModel.ActiveProfileName); // never under the live run
 
-        Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
+        result.SetResult(new GenerationResult());
+        await run;
+
+        Assert.Equal("imported-profile", viewModel.ActiveProfileName);
     }
 
     [Fact]

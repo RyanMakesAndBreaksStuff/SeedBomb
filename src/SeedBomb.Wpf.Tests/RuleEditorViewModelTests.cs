@@ -1439,7 +1439,7 @@ public sealed class RuleEditorViewModelTests
     private static async Task<RuleEditorViewModel> EditRulesFromProfilesAsync(
         Mock<IProfileService> profiles, RulesNavigationRequest request)
     {
-        var library = new ProfilesViewModel(profiles.Object, request, Mock.Of<IAppNavigator>());
+        var library = ProfilesHost.Create(profiles.Object, request, Mock.Of<IAppNavigator>());
         await library.RefreshCommand.ExecuteAsync(null);
         library.SelectedItem = Assert.Single(library.Items);
         await library.EditRulesCommand.ExecuteAsync(null);
