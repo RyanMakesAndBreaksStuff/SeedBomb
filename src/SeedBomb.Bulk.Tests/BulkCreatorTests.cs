@@ -599,6 +599,88 @@ public class BulkCreatorTests
         Assert.Contains(reference.Id, result.CreatedRecords["account"]);
     }
 
+    // Serves `accounts` as the environment's existing account rows (PreparedLookupRun reads them).
+    private static void ExistingAccounts(Mock<IOrganizationServiceAsync2> serviceMock, List<Guid> accounts) =>
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(
+                It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).EntityName == "account"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new EntityCollection(accounts.Select(id => new Entity("account", id)).ToList()));
+
+    private static (Dictionary<string, EntityMetadata> Metadata, DependencyGraph Graph) AccountContact()
+    {
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var lookup = RequiredLookup("new_requiredid", "account");
+        lookup.IsValidForCreate = true;
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", lookup,
+                new StringAttributeMetadata { LogicalName = "lastname", MaxLength = 50, IsValidForCreate = true }),
+        };
+        return (metadata, graph);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ImplicitRequiredLookup_PrefersThisRunsParents()
+    {
+        // WR-002: an existing account must not win over the account this run created.
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        ExistingAccounts(serviceMock, [Guid.Parse("11111111-1111-1111-1111-111111111111")]);
+        var (metadata, graph) = AccountContact();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        Assert.Contains(((EntityReference)contact["new_requiredid"]).Id, result.CreatedRecords["account"]);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ChildOnlyRetry_KeepsTopologyAndRegeneratesTheRow()
+    {
+        // WR-001: retrying only contact row 1 keeps account in the topology (empty filter), passes
+        // required-lookup preflight, writes no account, and regenerates the row's original values.
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        var existing = new List<Guid>();
+        ExistingAccounts(serviceMock, existing);
+        var (metadata, graph) = AccountContact();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 2 },
+            BatchSize = 10,
+            Seed = 42,
+        };
+        var first = await sut.CreateAsync(config, metadata, graph);
+        var original = captured.Where(e => e.LogicalName == "contact").ToList();
+        existing.AddRange(first.CreatedRecords["account"]);
+        captured.Clear();
+
+        var retry = config with
+        {
+            RowIndexes = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["contact"] = [1],
+                ["account"] = [],
+            },
+        };
+        await sut.CreateAsync(retry, metadata, graph);
+
+        var row = Assert.Single(captured);
+        Assert.Equal("contact", row.LogicalName);
+        Assert.Equal(original[1]["lastname"], row["lastname"]);
+        Assert.Equal(first.CreatedRecords["account"].Single(), ((EntityReference)row["new_requiredid"]).Id);
+    }
+
     [Fact]
     public async Task CreateAsync_RequiredLookupToTableCreatedEarly_KeepsAnExplicitRule()
     {

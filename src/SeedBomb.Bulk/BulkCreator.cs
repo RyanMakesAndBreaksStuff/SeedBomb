@@ -98,12 +98,12 @@ public class BulkCreator
             // Sort first (pure, no I/O): preflight and PreparedLookupRun both need the creation order
             // to know which lookup targets this run creates before their source table.
             var sortedEntities = _topologicalSort.Sort(graph);
-            PreflightTables(config, validatedRules, entityMetadata, sortedEntities);
+            var implicitLookups = PreflightTables(config, validatedRules, entityMetadata, sortedEntities);
 
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
             var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
-                _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
+                _service, _throttlePolicy, _logger, ct, implicitLookups).ConfigureAwait(false);
 
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
@@ -129,6 +129,10 @@ public class BulkCreator
                     _logger.LogDebug("Skipping {Entity}: no record count specified.", entityName);
                     continue;
                 }
+
+                // Retry (WR-001): tables kept only for topology and seed alignment write nothing.
+                if (config.PlannedRows(entityName) == 0)
+                    continue;
 
                 if (!entityMetadata.TryGetValue(entityName, out var meta))
                 {
@@ -703,12 +707,14 @@ public class BulkCreator
     /// Metadata-only checks that must pass before the first write, so a failure leaves the
     /// environment untouched instead of stranding earlier tables (CR-003).
     /// </summary>
-    private void PreflightTables(
+    /// <returns>"table.column" keys of the implicit lookupRandom rules added here (WR-002).</returns>
+    private HashSet<string> PreflightTables(
         GenerationConfig config,
         Dictionary<string, Dictionary<string, FieldRule>> validatedRules,
         IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
         IReadOnlyList<string> sortedEntities)
     {
+        var implicitKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entityName in config.EntityLogicalNames)
         {
             if (!config.RecordCounts.TryGetValue(entityName, out var count) || count <= 0
@@ -755,7 +761,8 @@ public class BulkCreator
                 if (!validatedRules.TryGetValue(entityName, out var tableRules))
                     validatedRules[entityName] = tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
                 foreach (var column in implicitLookups)
-                    tableRules.TryAdd(column, new LookupRandomRule());
+                    if (tableRules.TryAdd(column, new LookupRandomRule()))
+                        implicitKeys.Add($"{entityName}.{column}");
             }
 
             foreach (var attr in (meta.Attributes ?? []).OfType<LookupAttributeMetadata>())
@@ -766,6 +773,7 @@ public class BulkCreator
                         entityName, attr.LogicalName);
             }
         }
+        return implicitKeys;
     }
 
     private Dictionary<string, Dictionary<string, FieldRule>> ValidateConfiguredRules(

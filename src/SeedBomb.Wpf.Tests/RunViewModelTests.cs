@@ -695,8 +695,6 @@ public sealed class RunViewModelTests : IDisposable
         Assert.True(notifications > beforeSignOut);
         Assert.False(vm.RetrySelectedCommand.CanExecute(null));
 
-        if (string.Equals(Environment.GetEnvironmentVariable("SEEDBOMB_SKIP_GATE_UI"), "1", StringComparison.Ordinal))
-            return;
         var notifiedOn = -1;
         var uiThread = 0;
         DispatcherFrame? pumping = null;

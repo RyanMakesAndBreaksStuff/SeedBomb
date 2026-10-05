@@ -92,6 +92,27 @@ public sealed class ConnectionStoreRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Locked_file_warning_clears_once_the_store_reads_again()
+    {
+        // WR-003: the locked-file warning stayed on the service and the Connections page after recovery.
+        var ct = TestContext.Current.CancellationToken;
+        using (var seed = new JsonConnectionProfileService(_dir))
+            await seed.SaveAsync(new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://org.crm.dynamics.com" }, ct);
+        using var svc = new JsonConnectionProfileService(_dir);
+        var vm = new ConnectionManagerViewModel(svc, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
+
+        using (File.Open(StorePath, FileMode.Open, FileAccess.Read, FileShare.None))
+            await vm.LoadCommand.ExecuteAsync(null);
+        Assert.NotNull(vm.SwitchError);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.Null(svc.LoadWarning);
+        Assert.Null(vm.SwitchError);
+        Assert.Single(vm.Profiles);
+    }
+
+    [Fact]
     public async Task SignIn_with_an_undecryptable_secret_asks_for_it_again()
     {
         // "AQID" is valid base64 but not DPAPI data: the same failure as a secret protected by

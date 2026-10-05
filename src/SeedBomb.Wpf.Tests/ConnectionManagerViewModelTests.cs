@@ -1008,8 +1008,6 @@ public sealed class ConnectionManagerSessionStaTests
 
     private static async Task DeletingActiveProfileAsync()
     {
-        if (string.Equals(Environment.GetEnvironmentVariable("SEEDBOMB_SKIP_GATE_UI"), "1", StringComparison.Ordinal))
-            return;
         var gate = new RunSessionGate();
         var active = Env("Dev", "https://dev.crm.dynamics.com");
         var auth = new MutableAuth { ActiveProfile = active, CurrentUserDisplayName = "ada" };

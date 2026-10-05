@@ -15,6 +15,7 @@ namespace SeedBomb.ViewModels;
 public sealed partial class ConnectionManagerViewModel : ObservableObject
 {
     private readonly IConnectionProfileService _profileService;
+    private string? _shownLoadWarning;
     private readonly IAuthService _authService;
     private readonly IDataverseConnectionService _connectionService;
     private readonly IContentDialogService? _dialogs;
@@ -163,8 +164,13 @@ public sealed partial class ConnectionManagerViewModel : ObservableObject
             DeleteProfileCommand.NotifyCanExecuteChanged();
 
             // CR-006: say where an unreadable connections.json went instead of showing an empty list.
-            if (_profileService.LoadWarning is { } warning)
+            // WR-003: clear the warning this page showed once the store reads cleanly again.
+            var warning = _profileService.LoadWarning;
+            if (warning is not null)
                 SwitchError = warning;
+            else if (SwitchError is not null && SwitchError == _shownLoadWarning)
+                SwitchError = null;
+            _shownLoadWarning = warning;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

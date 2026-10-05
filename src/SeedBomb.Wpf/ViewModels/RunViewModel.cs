@@ -296,7 +296,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
             if (_auth is not null && profile is null)
                 throw new InvalidOperationException("Not signed in. Connect to an environment first.");
 
-            var tables = config.EntityLogicalNames;
+            var tables = config.EntityLogicalNames.Where(t => config.PlannedRows(t) > 0).ToArray();
             var plannedTotal = config.PlannedTotal;
             var host = HostOf(profile);
             // One read: history and the sheet keep these scalars. Finalization must not read live auth.
@@ -642,28 +642,13 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         var rows = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
         foreach (var table in selected.GroupBy(g => g.TableName, StringComparer.OrdinalIgnoreCase))
             rows[table.Key] = table.SelectMany(g => g.RowIndexes).Distinct().Order().ToArray();
-        var names = rows.Keys.ToArray();
-
-        Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>? rules = null;
-        if (_lastConfig.FieldRules is { } existing)
-        {
-            rules = existing
-                .Where(kv => names.Contains(kv.Key, StringComparer.OrdinalIgnoreCase))
-                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
-            if (rules.Count == 0)
-                rules = null;
-        }
-
-        // CR-002: original counts + the rejected rows, so each row regenerates its original values
-        // (same seed, RunId and AlternateKeyScope from _lastConfig).
-        var retryConfig = _lastConfig with
-        {
-            EntityLogicalNames = names,
-            RecordCounts = names.ToDictionary(
-                n => n, n => _lastConfig.RecordCounts.GetValueOrDefault(n), StringComparer.OrdinalIgnoreCase),
-            RowIndexes = rows,
-            FieldRules = rules,
-        };
+        // WR-001: keep the first run's tables, counts and rules so topology, seeds and required-lookup
+        // preflight match (same RunId and AlternateKeyScope); tables not retried write nothing.
+        foreach (var table in _lastConfig.EntityLogicalNames)
+            rows.TryAdd(table, []);
+        // ponytail: lookups to parents not retried draw from the environment, not the original parent;
+        // seed the original ids into the pool (hidden from backfill) if exact replay matters.
+        var retryConfig = _lastConfig with { RowIndexes = rows };
 
         try
         {

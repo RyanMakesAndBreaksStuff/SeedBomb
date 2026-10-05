@@ -159,6 +159,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         }
 
         var json = await File.ReadAllTextAsync(_storagePath, ct).ConfigureAwait(false);
+        LoadWarning = null; // WR-003: a successful read clears an earlier locked-file warning
         json = CoerceLegacyAuthJson(json);
         try
         {

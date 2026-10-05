@@ -55,8 +55,10 @@ public record GenerationConfig
     public string RunId { get; init; } = "";
 
     /// <summary>
-    /// Retry filter: when a table has an entry, only these generation-order rows are written.
-    /// <see cref="RecordCounts"/> keeps the original count so each row regenerates its original values.
+    /// Retry filter: when a table has an entry, only these generation-order rows are written (an empty
+    /// entry keeps the table in the topology but writes nothing). <see cref="RecordCounts"/> keeps the
+    /// original counts, so alternate keys, rule values and lookup-free values regenerate as before;
+    /// lookups whose parents are not retried draw from the environment instead of the original parents.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<int>>? RowIndexes { get; init; }
 
