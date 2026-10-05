@@ -644,12 +644,20 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private void SetStatus(string message)
     {
         HasError = false;
-        StatusMessage = message;
+        ShowStatus(message);
     }
 
     private void SetError(string message)
     {
         HasError = true;
+        ShowStatus(message);
+    }
+
+    // The bar's close button sets IsOpen locally; an unchanged message raises no change and the
+    // bar stays closed. Clearing first makes every Set* reopen it.
+    private void ShowStatus(string message)
+    {
+        StatusMessage = null;
         StatusMessage = message;
     }
 
