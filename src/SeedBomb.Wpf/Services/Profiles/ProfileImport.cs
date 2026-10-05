@@ -91,7 +91,7 @@ public static class ProfileImport
                     continue;
                 }
 
-                var eligibility = RuleEligibility.Classify(attr);
+                var eligibility = RuleEligibility.Classify(attr, meta);
                 if (!eligibility.IsSettable)
                 {
                     notImported.Add(
@@ -100,7 +100,7 @@ public static class ProfileImport
                 }
 
                 var result = RuleValidator.Validate(
-                    rule, attr, new RuleValidationContext(table.Table, table.Count, runId));
+                    rule, attr, new RuleValidationContext(table.Table, table.Count, runId, meta));
                 if (!result.IsValid || result.EffectiveRule is null)
                 {
                     var detail = result.Messages.FirstOrDefault(m => m.Severity == RuleMessageSeverity.Error)?.Text

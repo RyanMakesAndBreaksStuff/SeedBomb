@@ -419,7 +419,43 @@ public class BulkCreatorTests
 
         var result = await sut.CreateAsync(config, metadata, graph);
 
-        Assert.Equal(-2147015902, Assert.Single(result.Errors).FaultCode);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(-2147015902, error.FaultCode);
+        Assert.False(error.IsTransient);
+    }
+
+    [Fact]
+    public async Task CreateAsync_UnreachableEndpoint_MarksTheBatchTransient()
+    {
+        // A dropped network surfaces as EndpointNotFoundException; Retry must be offered for it.
+        var (sut, serviceMock) = BuildSut();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new EndpointNotFoundException(
+                "There was no endpoint listening at https://contoso.crm.dynamics.com."));
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        var error = Assert.Single(result.Errors);
+        Assert.True(error.IsTransient);
+        Assert.Equal(10, error.RowCount);
     }
 
     [Fact]
@@ -463,5 +499,429 @@ public class BulkCreatorTests
 
         Assert.True(result.Cancelled);
         Assert.Equal(10, result.CreatedRecords["account"].Count);
+    }
+
+    [Fact]
+    public async Task CreateAsync_BatchSizeAboveExecuteMultipleCap_ThrowsBeforeAnyRequest()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1 },
+            BatchSize = 1001,
+        };
+
+        await Assert.ThrowsAsync<DataGenerationException>(() =>
+            sut.CreateAsync(config, new Dictionary<string, EntityMetadata>(), graph));
+        serviceMock.Verify(
+            s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static EntityMetadata Meta(string name, params AttributeMetadata[] attrs)
+    {
+        var meta = new EntityMetadata { LogicalName = name };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, attrs);
+        // Real metadata always carries it; PreparedLookupRun reads in-run lookup targets through it.
+        meta.GetType().GetProperty(nameof(EntityMetadata.PrimaryIdAttribute))!.SetValue(meta, name + "id");
+        return meta;
+    }
+
+    private static LookupAttributeMetadata RequiredLookup(string name, string target)
+    {
+        var attr = new LookupAttributeMetadata { LogicalName = name, Targets = [target] };
+        attr.GetType().GetProperty("RequiredLevel")!.SetValue(
+            attr, new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+        return attr;
+    }
+
+    [Fact]
+    public async Task CreateAsync_RequiredLookupGapOnSecondTable_WritesNothing()
+    {
+        // CR-003: the check ran inside the write loop, after the first table was committed.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        graph.AddNode("contact");
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            // Points outside the run: no table in this run creates new_external, so only a rule can supply it.
+            ["contact"] = Meta("contact", RequiredLookup("new_requiredid", "new_external")),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+        };
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() => sut.CreateAsync(config, metadata, graph));
+
+        Assert.Contains("new_requiredid", ex.Message, StringComparison.Ordinal);
+        serviceMock.Verify(s => s.ExecuteAsync(
+            It.Is<OrganizationRequest>(r => r is CreateMultipleRequest || r is ExecuteMultipleRequest),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RequiredLookupToTableCreatedEarlier_NeedsNoRule()
+    {
+        // CR-003 amendment: the run creates account before contact, so the lookup is filled from the in-run pool.
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var lookup = RequiredLookup("new_requiredid", "account");
+        lookup.IsValidForCreate = true; // FieldFilter only generates creatable columns
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", lookup),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Single(result.CreatedRecords["account"]);
+        Assert.Single(result.CreatedRecords["contact"]);
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        var reference = Assert.IsType<EntityReference>(contact["new_requiredid"]);
+        Assert.Equal("account", reference.LogicalName);
+        Assert.Contains(reference.Id, result.CreatedRecords["account"]);
+    }
+
+    // Serves `accounts` as the environment's existing account rows (PreparedLookupRun reads them).
+    private static void ExistingAccounts(Mock<IOrganizationServiceAsync2> serviceMock, List<Guid> accounts) =>
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(
+                It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).EntityName == "account"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new EntityCollection(accounts.Select(id => new Entity("account", id)).ToList()));
+
+    private static (Dictionary<string, EntityMetadata> Metadata, DependencyGraph Graph) AccountContact()
+    {
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var lookup = RequiredLookup("new_requiredid", "account");
+        lookup.IsValidForCreate = true;
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", lookup,
+                new StringAttributeMetadata { LogicalName = "lastname", MaxLength = 50, IsValidForCreate = true }),
+        };
+        return (metadata, graph);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ImplicitRequiredLookup_PrefersThisRunsParents()
+    {
+        // WR-002: an existing account must not win over the account this run created.
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        ExistingAccounts(serviceMock, [Guid.Parse("11111111-1111-1111-1111-111111111111")]);
+        var (metadata, graph) = AccountContact();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        Assert.Contains(((EntityReference)contact["new_requiredid"]).Id, result.CreatedRecords["account"]);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ChildOnlyRetry_KeepsTopologyAndRegeneratesTheRow()
+    {
+        // WR-001: retrying only contact row 1 keeps account in the topology (empty filter), passes
+        // required-lookup preflight, writes no account, and regenerates the row's original values.
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        var existing = new List<Guid>();
+        ExistingAccounts(serviceMock, existing);
+        var (metadata, graph) = AccountContact();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 2 },
+            BatchSize = 10,
+            Seed = 42,
+        };
+        var first = await sut.CreateAsync(config, metadata, graph);
+        var original = captured.Where(e => e.LogicalName == "contact").ToList();
+        existing.AddRange(first.CreatedRecords["account"]);
+        captured.Clear();
+
+        var retry = config with
+        {
+            RowIndexes = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["contact"] = [1],
+                ["account"] = [],
+            },
+        };
+        await sut.CreateAsync(retry, metadata, graph);
+
+        var row = Assert.Single(captured);
+        Assert.Equal("contact", row.LogicalName);
+        Assert.Equal(original[1]["lastname"], row["lastname"]);
+        Assert.Equal(first.CreatedRecords["account"].Single(), ((EntityReference)row["new_requiredid"]).Id);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RequiredLookupToTableCreatedEarly_KeepsAnExplicitRule()
+    {
+        // The implicit lookupRandom rule must never replace a user's rule on the same column.
+        var external = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddEdge("contact", "account");
+        var lookup = RequiredLookup("new_requiredid", "account");
+        lookup.IsValidForCreate = true;
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+            ["contact"] = Meta("contact", lookup),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+            FieldRules = new Dictionary<string, Dictionary<string, SeedBomb.Core.Rules.FieldRule>>
+            {
+                ["contact"] = new()
+                {
+                    ["new_requiredid"] = new SeedBomb.Core.Rules.ConstantRule(System.Text.Json.JsonDocument.Parse(
+                        $$"""{"entity":"account","id":"{{external}}"}""").RootElement),
+                },
+            },
+        };
+
+        await sut.CreateAsync(config, metadata, graph);
+
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        Assert.Equal(external, Assert.IsType<EntityReference>(contact["new_requiredid"]).Id);
+    }
+
+    [Fact]
+    public async Task CreateAsync_FailureAfterAWrite_ReturnsWrittenIds()
+    {
+        // CR-003: any non-cancel exception after a table committed discarded allCreatedRecords.
+        // The opening "Linking" snapshot (BulkCreator.cs:156) is reported after the last table commits.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 2 },
+            BatchSize = 10,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph, new InlineProgress(p =>
+        {
+            if (p.Phase == "Linking") throw new InvalidOperationException("link phase exploded");
+        }));
+
+        Assert.Equal(2, result.TotalRecords);
+        Assert.False(result.Cancelled);
+        Assert.Contains("link phase exploded", result.FatalError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateAsync_FailureAfterBatchWrite_ReturnsCurrentTableIds()
+    {
+        // CR-003: a mid-table failure must drain successful batch IDs before leaving the helper.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 50 }),
+        };
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 4 },
+            BatchSize = 2,
+            MaxParallelism = 1,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph, new InlineProgress(p =>
+        {
+            if (p.Phase == "Generating") throw new InvalidOperationException("create progress exploded");
+        }));
+
+        Assert.Equal(2, result.TotalRecords);
+        Assert.Equal(2, result.CreatedRecords["account"].Count);
+        Assert.False(result.Cancelled);
+        Assert.Equal("create progress exploded", result.FatalError);
+    }
+
+    // Progress<T> posts to the thread pool; this reports inline so a throw lands inside CreateAsync.
+    private sealed class InlineProgress(Action<SeedBomb.Bulk.Contracts.BulkCreationProgress> report)
+        : IProgress<SeedBomb.Bulk.Contracts.BulkCreationProgress>
+    {
+        public void Report(SeedBomb.Bulk.Contracts.BulkCreationProgress value) => report(value);
+    }
+
+    // CreateMultiple → "unsupported" fault, so every create goes through ExecuteMultiple. Each
+    // CreateRequest gets a new id unless reject(target) is true, which returns a throttle fault.
+    private static List<Entity> AnswerCreates(
+        Mock<IOrganizationServiceAsync2> serviceMock, Func<Entity, bool>? reject = null)
+    {
+        var captured = new List<Entity>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrganizationRequest req, CancellationToken _) =>
+            {
+                if (req is CreateMultipleRequest)
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = unchecked((int)0x80040800) });
+                if (req is not ExecuteMultipleRequest emr)
+                    return new OrganizationResponse();
+
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (int i = 0; i < emr.Requests.Count; i++)
+                {
+                    if (emr.Requests[i] is not CreateRequest cr)
+                    {
+                        responses.Add(new ExecuteMultipleResponseItem { RequestIndex = i, Response = new OrganizationResponse() });
+                        continue;
+                    }
+
+                    lock (captured) captured.Add(cr.Target);
+                    responses.Add(reject?.Invoke(cr.Target) == true
+                        ? new ExecuteMultipleResponseItem
+                        {
+                            RequestIndex = i,
+                            Fault = new OrganizationServiceFault { ErrorCode = -2147015902, Message = "request throttled" },
+                        }
+                        : new ExecuteMultipleResponseItem
+                        {
+                            RequestIndex = i,
+                            Response = new CreateResponse { Results = { ["id"] = Guid.NewGuid() } },
+                        });
+                }
+
+                return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+            });
+        return captured;
+    }
+
+    private static EntityMetadata KeyedAccount(int keyWidth = 20)
+    {
+        var meta = Meta("account",
+            new StringAttributeMetadata { LogicalName = "accountnumber", MaxLength = keyWidth },
+            new IntegerAttributeMetadata { LogicalName = "new_code", MinValue = int.MinValue, MaxValue = int.MaxValue });
+        meta.GetType().GetProperty("Keys")!.SetValue(meta, new[]
+        {
+            new EntityKeyMetadata { LogicalName = "number_key", KeyAttributes = ["accountnumber"] },
+            new EntityKeyMetadata { LogicalName = "code_key", KeyAttributes = ["new_code"] },
+        });
+        return meta;
+    }
+
+    private static GenerationConfig KeyedConfig(string scope) => new()
+    {
+        EntityLogicalNames = ["account"],
+        RecordCounts = new Dictionary<string, int> { ["account"] = 3 },
+        BatchSize = 10,
+        AlternateKeyScope = scope,
+    };
+
+    private static async Task<(GenerationResult Result, List<Entity> Written)> RunKeyedAsync(
+        GenerationConfig config, Func<Entity, bool>? reject = null, int keyWidth = 20)
+    {
+        var (sut, serviceMock) = BuildSut();
+        var written = AnswerCreates(serviceMock, reject);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var result = await sut.CreateAsync(config,
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = KeyedAccount(keyWidth) }, graph);
+        return (result, written);
+    }
+
+    [Theory]
+    [InlineData(17)]
+    [InlineData(20)]
+    public async Task AlternateKeys_AreStableWithinARun_AndDistinctAcrossRuns(int keyWidth)
+    {
+        // CR-002: keys were a function of row index only, so every re-run collided on key tables.
+        var (_, first) = await RunKeyedAsync(KeyedConfig("scope-a"), keyWidth: keyWidth);
+        var (_, again) = await RunKeyedAsync(KeyedConfig("scope-a"), keyWidth: keyWidth);
+        var (_, other) = await RunKeyedAsync(KeyedConfig("scope-b"), keyWidth: keyWidth);
+
+        Assert.Equal(first.Select(e => e["accountnumber"]), again.Select(e => e["accountnumber"]));
+        Assert.Empty(first.Select(e => e["accountnumber"]).Intersect(other.Select(e => e["accountnumber"])));
+        Assert.Empty(first.Select(e => e["new_code"]).Intersect(other.Select(e => e["new_code"])));
+        Assert.All(first, e => Assert.True(((string)e["accountnumber"]).Length <= keyWidth));
+        Assert.Equal(3, first.Select(e => e["accountnumber"]).Distinct().Count());
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(16)]
+    public async Task AlternateKeyTooShort_FailsBeforeAnyCreateCall(int maxLength)
+    {
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var meta = KeyedAccount(maxLength);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() => sut.CreateAsync(
+            KeyedConfig("scope-a"),
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = meta }, graph));
+
+        Assert.Contains("accountnumber", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("at least 17", ex.Message, StringComparison.Ordinal);
+        serviceMock.Verify(s => s.ExecuteAsync(
+            It.Is<OrganizationRequest>(r => r is CreateMultipleRequest || r is ExecuteMultipleRequest),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RowFilter_WritesOnlyTheRejectedRows_WithTheirOriginalValues()
+    {
+        // CR-002: Retry regenerated rows 0..k-1 (copies of rows already written), not the rejected ones.
+        static bool IsRowOne(Entity e) => ((string)e["accountnumber"]).EndsWith("00000001", StringComparison.Ordinal);
+        var (result, firstWrite) = await RunKeyedAsync(KeyedConfig("scope-a"), reject: IsRowOne);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal([1], error.RowIndexes);
+        var rejected = firstWrite.Single(IsRowOne);
+
+        var (_, retried) = await RunKeyedAsync(KeyedConfig("scope-a") with
+        {
+            RowIndexes = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["account"] = error.RowIndexes,
+            },
+        });
+
+        var row = Assert.Single(retried);
+        Assert.Equal(rejected["accountnumber"], row["accountnumber"]);
+        Assert.Equal(rejected["new_code"], row["new_code"]);
     }
 }

@@ -40,4 +40,18 @@ public static class AtomicFile
         File.Move(path, corrupt, overwrite: true);
         return corrupt;
     }
+
+    /// <summary>
+    /// WR-008: true when <paramref name="ex"/> means the file can't be opened right now (locked or
+    /// denied), not that its contents are bad. Such a file may be valid, so it is never quarantined.
+    /// </summary>
+    /// <param name="ex">The failure from opening or reading a store file.</param>
+    public static bool IsUnavailable(Exception ex) => ex is IOException or UnauthorizedAccessException;
+
+    /// <summary>User-facing warning for a store that is running without a file it couldn't open.</summary>
+    /// <param name="what">What the file holds, e.g. "Settings".</param>
+    /// <param name="path">The file that was left in place.</param>
+    /// <param name="ex">Why it couldn't be opened.</param>
+    public static string UnavailableWarning(string what, string path, Exception ex) =>
+        $"{what} could not be opened ({ex.Message}), so SeedBomb is not using them this session. The file at {path} was left untouched.";
 }

@@ -199,4 +199,65 @@ public sealed class DataverseConnectionServiceTests
         Assert.Equal(2, built.Count);
         Assert.Equal(built, disposed);
     }
+
+    [Fact]
+    public async Task CachedClient_IsNotReusedForAnotherActiveProfile()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var profileA = new ConnectionProfile
+        {
+            Id = Guid.NewGuid(),
+            EnvironmentUrl = "https://a.crm.dynamics.com",
+        };
+        var profileB = new ConnectionProfile
+        {
+            Id = Guid.NewGuid(),
+            EnvironmentUrl = "https://b.crm.dynamics.com",
+        };
+        var sameIdNewUrl = new ConnectionProfile
+        {
+            Id = profileB.Id,
+            EnvironmentUrl = "https://b2.crm.dynamics.com",
+        };
+        ConnectionProfile? active = profileA;
+        var auth = new Mock<IAuthService>();
+        auth.SetupGet(a => a.ActiveProfile).Returns(() => active);
+        using var svc = new DataverseConnectionService(auth.Object);
+        var built = new List<(string Url, ServiceClient Client)>();
+        var disposed = new ConcurrentQueue<ServiceClient>();
+        svc.CreateClientOverride = url =>
+        {
+            var client = ReadyClient();
+            built.Add((url, client));
+            return client;
+        };
+        svc.DisposeClientOverride = disposed.Enqueue;
+
+        var first = await svc.GetOrganizationServiceAsync(ct);
+        Assert.Same(built[0].Client, first);
+
+        active = profileB;
+        var second = await svc.GetOrganizationServiceAsync(ct);
+        Assert.Same(built[1].Client, second);
+        Assert.Equal(profileB.EnvironmentUrl, built[1].Url);
+        Assert.Contains(built[0].Client, disposed);
+
+        active = sameIdNewUrl;
+        var third = await svc.GetOrganizationServiceAsync(ct);
+        Assert.Same(built[2].Client, third);
+        Assert.Equal(sameIdNewUrl.EnvironmentUrl, built[2].Url);
+        Assert.Contains(built[1].Client, disposed);
+    }
+
+    private static ServiceClient ReadyClient()
+    {
+        var client = (ServiceClient)RuntimeHelpers.GetUninitializedObject(typeof(ServiceClient));
+        GC.SuppressFinalize(client);
+        var field = typeof(ServiceClient).GetField(
+            "<IsReady>k__BackingField",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(client, true);
+        return client;
+    }
 }

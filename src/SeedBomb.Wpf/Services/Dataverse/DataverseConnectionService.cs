@@ -12,6 +12,8 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     private readonly IAuthService _auth;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cached;
+    private Guid? _cachedProfileId;
+    private string? _cachedEnvironmentUrl;
     private volatile bool _shuttingDown;
 
     /// <inheritdoc />
@@ -37,27 +39,38 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
     public async Task<IOrganizationServiceAsync2> GetOrganizationServiceAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_shuttingDown, this);
-        if (_cached is { IsReady: true })
-            return _cached;
+        if (ReadyCachedForActiveProfile() is { } fast)
+            return fast;
 
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // WR-001: Dispose may have run while this call waited for the lock.
             ObjectDisposedException.ThrowIf(_shuttingDown, this);
-            if (_cached is { IsReady: true })
-                return _cached;
+            if (ReadyCachedForActiveProfile() is { } ready)
+                return ready;
+
+            // A switch whose reset failed must not keep serving the previous environment's client.
+            // Identity is the profile id and environment URL recorded with the client. Lock order
+            // is the session gate (held by the caller, if any), then this connection lock.
+            if (_cached is not null)
+            {
+                DisposeClient(_cached);
+                ClearCachedIdentity();
+            }
 
             // CR-002: connect to the environment the live session signed in to. Re-reading last-used
             // is what let a failed or cancelled switch aim writes at a different org.
             var profile = _auth.ActiveProfile
                           ?? throw new InvalidOperationException("Not signed in. Connect to an environment first.");
-            var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
+            var profileId = profile.Id;
+            var environmentUrl = profile.EnvironmentUrl;
+            var scopes = profile.DataverseScopes;
 
             // WR-006: the constructor signs in and connects synchronously, and the awaits above
             // usually complete inline — so build it on the pool, never on the dispatcher.
-            var client = await Task.Run(() => CreateClientOverride?.Invoke(profile.EnvironmentUrl) ?? new ServiceClient(
-                instanceUrl: new Uri(profile.EnvironmentUrl),
+            var client = await Task.Run(() => CreateClientOverride?.Invoke(environmentUrl) ?? new ServiceClient(
+                instanceUrl: new Uri(environmentUrl),
                 tokenProviderFunction: CreateTokenProvider(scopes),
                 useUniqueInstance: true)
             {
@@ -83,6 +96,8 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 throw new InvalidOperationException($"ServiceClient failed to connect: {error}");
             }
 
+            _cachedProfileId = profileId;
+            _cachedEnvironmentUrl = environmentUrl;
             _cached = client;
             return client;
         }
@@ -90,6 +105,25 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         {
             _lock.Release();
         }
+    }
+
+    private ServiceClient? ReadyCachedForActiveProfile()
+    {
+        if (_cached is not { IsReady: true })
+            return null;
+        var profile = _auth.ActiveProfile;
+        if (profile is null
+            || profile.Id != _cachedProfileId
+            || !string.Equals(profile.EnvironmentUrl, _cachedEnvironmentUrl, StringComparison.OrdinalIgnoreCase))
+            return null;
+        return _cached;
+    }
+
+    private void ClearCachedIdentity()
+    {
+        _cached = null;
+        _cachedProfileId = null;
+        _cachedEnvironmentUrl = null;
     }
 
     internal Func<string, Task<string>> CreateTokenProvider(string[] scopes) =>
@@ -105,7 +139,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         try
         {
             cached = _cached;
-            _cached = null;
+            ClearCachedIdentity();
         }
         finally
         {
@@ -135,7 +169,7 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         try
         {
             cached = _cached;
-            _cached = null;
+            ClearCachedIdentity();
         }
         finally
         {

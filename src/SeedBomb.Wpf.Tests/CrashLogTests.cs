@@ -25,6 +25,19 @@ public sealed class CrashLogTests : IDisposable
     }
 
     [Fact]
+    public void Write_AppendsEachCrashUnderATimestamp()
+    {
+        // IN-002: each crash overwrote the one log, losing the first (usually root-cause) crash.
+        var path = CrashLog.Write(new InvalidOperationException("first-crash"), _root);
+        CrashLog.Write(new InvalidOperationException("second-crash"), _root);
+
+        var text = File.ReadAllText(path!);
+        Assert.Contains("first-crash", text, StringComparison.Ordinal);
+        Assert.Contains("second-crash", text, StringComparison.Ordinal);
+        Assert.Matches(@"^\[\d{4}-\d{2}-\d{2}T", text);
+    }
+
+    [Fact]
     public void Write_ReturnsNullAndDoesNotThrow_WhenDirectoryIsUnusable()
     {
         // A file where the directory should be — Directory.CreateDirectory throws IOException.

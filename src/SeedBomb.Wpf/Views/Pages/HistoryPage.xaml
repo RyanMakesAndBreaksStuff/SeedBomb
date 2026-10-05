@@ -215,16 +215,16 @@
                                                    Style="{DynamicResource DG.Cell}"
                                                    Text="{Binding Duration, StringFormat={}{0:mm\\:ss}}"
                                                    Margin="8,0,0,0" />
-                                        <TextBlock Grid.Column="7" Margin="8,0,0,0">
+                                        <TextBlock Grid.Column="7" Margin="8,0,0,0" Text="{Binding Status}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource DG.Cell}">
-                                                    <Setter Property="Text" Value="Failed" />
                                                     <Setter Property="Foreground" Value="{DynamicResource DG.Error}" />
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Succeeded}" Value="True">
-                                                            <Setter Property="Text" Value="Success" />
-                                                            <Setter Property="Foreground"
-                                                                    Value="{DynamicResource DG.Success}" />
+                                                        <DataTrigger Binding="{Binding Status}" Value="Success">
+                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Success}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Rejected">
+                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Warning}" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>

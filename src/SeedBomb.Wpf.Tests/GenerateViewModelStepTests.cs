@@ -150,10 +150,10 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = CreateViewModel(out _, out _, out _);
 
-        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Error, "boom")];
+        viewModel.Review = new ReviewSnapshot(new(), [new RuleMessage(RuleMessageSeverity.Error, "boom")], 0, []);
         Assert.True(viewModel.ReviewHasErrors);
 
-        viewModel.ReviewMessages = [new RuleMessage(RuleMessageSeverity.Warning, "heads up")];
+        viewModel.Review = new ReviewSnapshot(new(), [new RuleMessage(RuleMessageSeverity.Warning, "heads up")], 0, []);
         Assert.False(viewModel.ReviewHasErrors);
     }
 
@@ -164,7 +164,7 @@ public sealed class GenerateViewModelStepTests
 
         // "name" is a string column — a numeric constant is an Error per RuleValidator.ValidateConstant.
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("123").RootElement), "Name", "123");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("123").RootElement));
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -180,7 +180,7 @@ public sealed class GenerateViewModelStepTests
         var authored = new RangeRule(
             System.Text.Json.JsonDocument.Parse("-500").RootElement,
             System.Text.Json.JsonDocument.Parse("5000").RootElement);
-        fieldRules.SetRule("account", "numberofemployees", authored, "Number of Employees", "0");
+        fieldRules.SetRule("account", "numberofemployees", authored);
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -198,13 +198,13 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
 
         viewModel.GoToReviewCommand.Execute(null);
         Assert.NotNull(viewModel.ReviewedRules);
 
         // Any further draft mutation — edit or remove — must invalidate the snapshot.
-        fieldRules.RemoveRule("account", "name");
+        fieldRules.ReplaceDraft(new Dictionary<string, Dictionary<string, RuleDraftEntry>>());
 
         Assert.Null(viewModel.ReviewedRules);
         Assert.False(viewModel.GenerateCommand.CanExecute(null));
@@ -215,7 +215,7 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         viewModel.GoToReviewCommand.Execute(null);
         Assert.True(viewModel.GenerateCommand.CanExecute(null));
 
@@ -240,7 +240,7 @@ public sealed class GenerateViewModelStepTests
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         viewModel.GoToReviewCommand.Execute(null);
         viewModel.MaxParallelism = 64;
 
@@ -253,14 +253,14 @@ public sealed class GenerateViewModelStepTests
         await viewModel.GenerateCommand.ExecuteAsync(null);
 
         Assert.NotNull(captured);
-        Assert.Equal(GenerateViewModel.MaxDop, captured!.MaxParallelism);
+        Assert.Equal(GenerationLimits.MaxDop, captured!.MaxParallelism);
     }
 
     [Fact]
     public async Task GoToReview_BogusRule_UsesContextAndSessionPreview()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);
-        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1));
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -289,7 +289,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         await viewModel.GoNextCommand.ExecuteAsync(null);
 
-        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1), "Name", "NAME.firstName");
+        fieldRules.SetRule("account", "name", new BogusRule("NAME", "firstName", 1));
 
         viewModel.GoToReviewCommand.Execute(null);
 
@@ -334,7 +334,7 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public async Task GenerateSnackbarUsesCautionWhenResultHasErrors()
+    public async Task GenerateSnackbar_CountsRejectedRowsNotBatches()
     {
         var viewModel = await CreateReadyForRulesAsync(out _, out var generationMock, out _, out _, out var snackbarMock);
         viewModel.GoToReviewCommand.Execute(null);
@@ -343,15 +343,20 @@ public sealed class GenerateViewModelStepTests
             .ReturnsAsync(new GenerationResult
             {
                 CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
-                Errors = [new BatchError("account", 0, "plugin failed", null)],
+                // Two failed batches of 50: the run lost 100 rows, not 2.
+                Errors =
+                [
+                    new BatchError("account", "plugin failed", null, RowCount: 50),
+                    new BatchError("account", "plugin failed", null, RowCount: 50),
+                ],
             });
 
         await viewModel.GenerateCommand.ExecuteAsync(null);
 
         snackbarMock.Verify(
             s => s.Show(
-                "Completed with errors",
-                It.Is<string>(m => m.Contains("1", StringComparison.Ordinal)),
+                "Completed with 100 rejected rows",
+                "Created 1 records",
                 ControlAppearance.Caution,
                 null,
                 It.IsAny<TimeSpan>()),
@@ -393,6 +398,25 @@ public sealed class GenerateViewModelStepTests
         profileService.Verify(
             p => p.SaveDraftAsync(It.IsAny<Profile>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task DraftClearFailure_IsShownOncePerSession()
+    {
+        // WR-009: clear failures were Debug-logged (dropped by the file logger), so a board the user
+        // reset silently came back next launch.
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ClearDraftAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("draft.json is locked"));
+        var viewModel = CreateViewModel(out _, out _, out _, out var snackbarMock, profileService: profiles.Object);
+        viewModel.ConfirmReset = () => Task.FromResult(true);
+
+        await viewModel.ResetCommand.ExecuteAsync(null);
+        await viewModel.ResetCommand.ExecuteAsync(null);
+
+        snackbarMock.Verify(s => s.Show(
+            "Generate draft", It.Is<string>(m => m.Contains("draft.json is locked")),
+            ControlAppearance.Caution, null, It.IsAny<TimeSpan>()), Times.Once);
     }
 
     [Fact]
@@ -464,7 +488,7 @@ public sealed class GenerateViewModelStepTests
         var account = new EntitySummary("account", "Account", false);
         viewModel.OnEntitiesChanged([account, new EntitySummary("contact", "Contact", false)]);
         viewModel.FieldRules.SetRule("contact", "firstname",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Ada\"").RootElement), "First Name", "Ada");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Ada\"").RootElement));
 
         viewModel.OnEntitiesChanged([account]);
         viewModel.EditRulesCommand.Execute(null);
@@ -497,7 +521,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.OnEntitiesChanged([new EntitySummary("contact", "Contact", false)]);
         viewModel.ActiveProfileName = "contact-acct";
         viewModel.FieldRules.SetRule("contact", "address1_freighttermscode",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("1").RootElement), "Freight Terms", "1");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("1").RootElement));
         var ruleDeleted = new Profile(2, "contact-acct", null, 42, [new ProfileTable("contact", 10, null)]);
 
         viewModel.ApplySavedProfileIfActive(ruleDeleted with { Name = "g2" });
@@ -524,7 +548,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.AttachFieldRules(fieldRules);
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         fieldRules.SetRule("account", "name",
-            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement), "Name", "Acme");
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
         Assert.NotEmpty(fieldRules.GetRules());
         viewModel.Seed = 99;
         viewModel.CurrentStep = 1;
@@ -645,9 +669,7 @@ public sealed class GenerateViewModelStepTests
             fieldRules.SetRule(
                 "account",
                 "name",
-                new ConstantRule(System.Text.Json.JsonDocument.Parse("\"x\"").RootElement),
-                "Name",
-                "x");
+                new ConstantRule(System.Text.Json.JsonDocument.Parse("\"x\"").RootElement));
             fieldRules.Commit();
 
             await Task.Delay(800, TestContext.Current.CancellationToken);
@@ -838,7 +860,7 @@ public sealed class GenerateViewModelStepTests
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
         await viewModel.GoNextCommand.ExecuteAsync(null);
 
-        fieldRules.SetRule("account", "parentaccountid", new LookupRandomRule(), "Parent Account", "preview");
+        fieldRules.SetRule("account", "parentaccountid", new LookupRandomRule());
         viewModel.GoToReviewCommand.Execute(null);
 
         Assert.False(viewModel.ReviewHasErrors);
@@ -847,6 +869,8 @@ public sealed class GenerateViewModelStepTests
         Assert.Contains("1,000", preview);
         Assert.Contains("Candidate validation happens at Start", preview);
         Assert.DoesNotContain("11111111", preview);
+        // WR-005: Review and the Rules page must preview the same rule identically.
+        Assert.Equal(new RuleEditorViewModel(meta, 10, 42, "r1").LookupRandomExplanation, preview);
     }
 
     [Fact]
@@ -872,8 +896,7 @@ public sealed class GenerateViewModelStepTests
 
         var id = Guid.Parse("11111111-1111-1111-1111-111111111111");
         fieldRules.SetRule("account", "parentaccountid",
-            new ConstantRule(new LookupRuleValue("account", id, "Acme").ToJson()),
-            "Parent Account", "preview");
+            new ConstantRule(new LookupRuleValue("account", id, "Acme").ToJson()));
         viewModel.GoToReviewCommand.Execute(null);
 
         Assert.False(viewModel.ReviewHasErrors);
@@ -906,20 +929,28 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
-    public void ApplyImportReport_NoOp_WhileGenerateIsRunning()
+    public async Task OpenInBoard_during_a_run_applies_the_profile_when_the_run_ends()
     {
-        var viewModel = CreateViewModel(out _, out _, out _);
+        // WR-010: ApplyImportReport returned early while running, and the import was dropped.
+        var viewModel = CreateViewModel(out var generationMock, out _, out _);
+        var result = new TaskCompletionSource<GenerationResult>();
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Returns(result.Task);
         viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
-        viewModel.IsRunning = true;
-
         var report = new ProfileImportReport(
             new Dictionary<string, Dictionary<string, FieldRule>>(),
             new Dictionary<string, int>(),
             null, 0, [], [], [], "imported-profile");
 
+        var run = viewModel.GenerateCommand.ExecuteAsync(null);
         viewModel.ApplyImportReport(report);
+        Assert.Equal("No profile loaded", viewModel.ActiveProfileName); // never under the live run
 
-        Assert.Equal("No profile loaded", viewModel.ActiveProfileName);
+        result.SetResult(new GenerationResult());
+        await run;
+
+        Assert.Equal("imported-profile", viewModel.ActiveProfileName);
     }
 
     [Fact]
@@ -970,6 +1001,56 @@ public sealed class GenerateViewModelStepTests
             It.Is<RunRecord>(r => r.Profile == "contact-acct" && r.EntityNames.Length == 2),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GoToReview_FlagsUnsuppliedRequiredLookup()
+    {
+        // CR-003: Review passed, then Start wrote the parent table and failed on the child.
+        var required = new LookupAttributeMetadata { LogicalName = "new_requiredid", Targets = ["contact"], IsValidForCreate = true };
+        required.GetType().GetProperty("RequiredLevel")!.SetValue(
+            required, new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[BuildAccountMetadata(required)]);
+        viewModel.AttachFieldRules(new FieldRulesViewModel());
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.True(viewModel.ReviewHasErrors);
+        Assert.Contains("new_requiredid", viewModel.ReviewErrorSummary, StringComparison.Ordinal);
+        Assert.False(viewModel.GenerateCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task GoToReview_AllowsRequiredLookupToSelectedTable()
+    {
+        // CR-003 amendment: contact's required lookup targets account, which this run creates first.
+        var required = new LookupAttributeMetadata { LogicalName = "new_requiredid", Targets = ["account"], IsValidForCreate = true };
+        required.GetType().GetProperty("RequiredLevel")!.SetValue(
+            required, new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.SystemRequired));
+        var contact = new EntityMetadata { LogicalName = "contact" };
+        contact.GetType().GetProperty("Attributes")!.SetValue(contact, new AttributeMetadata[] { required });
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[BuildAccountMetadata(), contact]);
+        viewModel.AttachFieldRules(new FieldRulesViewModel());
+        viewModel.OnEntitiesChanged(
+        [
+            new EntitySummary("account", "Account", false),
+            new EntitySummary("contact", "Contact", false),
+        ]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.False(viewModel.ReviewHasErrors);
+        Assert.True(viewModel.GenerateCommand.CanExecute(null));
+    }
+
     // EntityMetadata.Attributes setter is non-public — same reflection-set pattern used by
     // RuleEditorViewModelTests / SeedBomb.Bulk.Tests/RuledGenerationTests.
     private static EntityMetadata BuildAccountMetadata(params AttributeMetadata[] extra)
@@ -982,5 +1063,26 @@ public sealed class GenerateViewModelStepTests
             ? [name, employees]
             : extra.Concat<AttributeMetadata>([name, employees]).ToArray());
         return meta;
+    }
+
+    [Fact]
+    public async Task EachStart_GetsItsOwnAlternateKeyScope()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
+        fieldRules.SetRule("account", "name",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
+        viewModel.GoToReviewCommand.Execute(null);
+        var scopes = new List<string>();
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Callback<GenerationConfig, IProgress<ProgressUpdate>, CancellationToken>((cfg, _, _) => scopes.Add(cfg.AlternateKeyScope))
+            .ReturnsAsync(new GenerationResult());
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, scopes.Count);
+        Assert.All(scopes, s => Assert.False(string.IsNullOrEmpty(s)));
+        Assert.NotEqual(scopes[0], scopes[1]);
     }
 }

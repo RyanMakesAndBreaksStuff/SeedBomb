@@ -71,27 +71,52 @@
             </StackPanel>
         </Grid>
 
-        <StackPanel Grid.Row="1" Margin="0,0,0,12">
-            <StackPanel.Style>
-                <Style TargetType="StackPanel">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasMetadataError}" Value="True">
-                            <Setter Property="Visibility" Value="Visible" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </StackPanel.Style>
-            <ui:InfoBar IsOpen="True"
-                        Severity="Error"
-                        IsClosable="False"
-                        Title="Metadata unavailable"
-                        Message="{Binding MetadataError}" />
-            <Button Style="{DynamicResource DG.Button}"
-                    Content="Retry"
-                    Command="{Binding RetryMetadataCommand}"
-                    HorizontalAlignment="Left"
-                    Margin="0,8,0,0" />
+        <StackPanel Grid.Row="1">
+            <StackPanel Margin="0,0,0,12">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasMetadataError}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <ui:InfoBar IsOpen="True"
+                            Severity="Error"
+                            IsClosable="False"
+                            Title="Metadata unavailable"
+                            Message="{Binding MetadataError}" />
+                <Button Style="{DynamicResource DG.Button}"
+                        Content="Retry"
+                        Command="{Binding RetryMetadataCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,8,0,0" />
+            </StackPanel>
+
+            <StackPanel Margin="0,0,0,12">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasStoreError}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <ui:InfoBar IsOpen="True"
+                            Severity="Error"
+                            IsClosable="False"
+                            Title="Profile not saved"
+                            Message="{Binding StoreError}" />
+                <Button Style="{DynamicResource DG.Button}"
+                        Content="Retry save"
+                        Command="{Binding RetrySaveCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,8,0,0" />
+            </StackPanel>
         </StackPanel>
 
         <Grid Grid.Row="2">

@@ -18,19 +18,52 @@ public sealed class AppPathsTests
     }
 
     [Fact]
+    public void Failed_legacy_move_keeps_using_the_legacy_folder_and_says_so()
+    {
+        // WR-008: the failed move was swallowed and an empty root created, so all data looked gone.
+        var local = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), "SeedBomb.Wpf.Tests", Guid.NewGuid().ToString("N"))).FullName;
+        var legacy = Directory.CreateDirectory(Path.Combine(local, "DataGen")).FullName;
+        try
+        {
+            // An open handle inside the folder makes the rename fail, as an antivirus scan would.
+            using (File.Open(Path.Combine(legacy, "connections.json"), FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                var (root, warning) = AppPaths.Resolve(local);
+
+                Assert.Equal(legacy, root);
+                Assert.Contains(legacy, warning, StringComparison.Ordinal);
+            }
+
+            Assert.False(Directory.Exists(Path.Combine(local, "SeedBomb"))); // so next launch retries
+        }
+        finally
+        {
+            Directory.Delete(local, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FileLogger_WritesTheMessageAndException()
     {
-        using var provider = new FileLoggerProvider();
-        var logger = provider.CreateLogger("AppPathsTests");
-        var marker = $"marker-{Guid.NewGuid():N}";
+        // Smoke item 10: this used to append to the real %LOCALAPPDATA%\SeedBomb\logs file.
+        var directory = Directory.CreateTempSubdirectory("seedbomb-log-test-");
+        try
+        {
+            using (var provider = new FileLoggerProvider(directory.FullName))
+            {
+                provider.CreateLogger("AppPathsTests")
+                    .LogError(new InvalidOperationException("boom"), "Generation failed {Marker}", "marker");
+            }
 
-        logger.LogError(new InvalidOperationException("boom"), "Generation failed {Marker}", marker);
-
-        var file = Directory.EnumerateFiles(AppPaths.Logs, "seedbomb-*.log")
-            .OrderByDescending(File.GetLastWriteTimeUtc).First();
-        var text = File.ReadAllText(file);
-        Assert.Contains(marker, text, StringComparison.Ordinal);
-        Assert.Contains("boom", text, StringComparison.Ordinal);
+            var text = File.ReadAllText(Directory.EnumerateFiles(directory.FullName, "seedbomb-*.log").Single());
+            Assert.Contains("Generation failed marker", text, StringComparison.Ordinal);
+            Assert.Contains("boom", text, StringComparison.Ordinal);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 
     [Fact]

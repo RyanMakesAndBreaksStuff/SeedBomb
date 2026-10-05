@@ -113,7 +113,7 @@ public sealed class RunCloseGuardTests
         {
             CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
             Elapsed = TimeSpan.FromSeconds(1),
-            Errors = [new BatchError("account", 2, "request throttled", -2147015902)],
+            Errors = [new BatchError("account", "request throttled", -2147015902) { RowIndexes = [0] }],
         }, seed: 40719, environmentHost: "contoso-dev", config: new GenerationConfig
         {
             EntityLogicalNames = ["account"],

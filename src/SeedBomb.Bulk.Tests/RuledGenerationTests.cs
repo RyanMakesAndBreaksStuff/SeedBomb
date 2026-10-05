@@ -300,8 +300,7 @@ public class RuledGenerationTests
         var statecodeAttr = new StateAttributeMetadata { LogicalName = "statecode" };
         var statecodeMeta = BuildMetaWithAttribute(statecodeAttr);
 
-        // externalid is part of an alternate key — rejected by BulkCreator's own preflight check
-        // (RuleEligibility can't see entity.Keys, so this is not RuleValidator's job).
+        // externalid is part of an alternate key — RuleEligibility.AlternateKey via the entity-aware context.
         var altKeyAttr = new StringAttributeMetadata { LogicalName = "externalid", MaxLength = 50 };
         var altKey = new EntityKeyMetadata { LogicalName = "externalid_key", KeyAttributes = ["externalid"] };
         var altKeyMeta = BuildMetaWithAttribute(altKeyAttr, [altKey]);
@@ -1165,5 +1164,33 @@ public class RuledGenerationTests
     {
         for (var i = 0; i < count; i++)
             yield return Guid.Parse($"00000000-0000-0000-0000-{(start + i):D12}");
+    }
+
+    [Fact]
+    public async Task DateTime_alternate_key_rule_fails_before_any_create_call()
+    {
+        // WR-004: EdgeCaseValidator classifies DateTime before alternate keys, so Bulk's old gate missed it.
+        var attr = new DateTimeAttributeMetadata { LogicalName = "new_effectiveon", IsValidForCreate = true };
+        var meta = BuildMetaWithAttribute(attr,
+            [new EntityKeyMetadata { LogicalName = "effective_key", KeyAttributes = ["new_effectiveon"] }]);
+        var graph = new DependencyGraph();
+        graph.AddNode("ruled_ineligible");
+        var (sut, captured) = BuildSut();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["ruled_ineligible"],
+            RecordCounts = new Dictionary<string, int> { ["ruled_ineligible"] = 3 },
+            BatchSize = 10,
+            FieldRules = new Dictionary<string, Dictionary<string, FieldRule>>
+            {
+                ["ruled_ineligible"] = new() { ["new_effectiveon"] = new ConstantRule(J("\"2026-01-01\"")) },
+            },
+        };
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() => sut.CreateAsync(config,
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["ruled_ineligible"] = meta }, graph));
+
+        Assert.Contains("new_effectiveon", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(captured);
     }
 }

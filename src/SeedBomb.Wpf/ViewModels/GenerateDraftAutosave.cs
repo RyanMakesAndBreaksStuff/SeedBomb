@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Profiles;
 
 namespace SeedBomb.ViewModels;
@@ -7,7 +6,7 @@ namespace SeedBomb.ViewModels;
 internal sealed class GenerateDraftAutosave
 {
     private readonly IProfileService _profiles;
-    private readonly ILogger<GenerateViewModel> _logger;
+    private readonly Action<string, Exception> _reportFailure;
     private readonly Func<bool> _hasDraft;
     private readonly Func<string, Profile> _snapshot;
 
@@ -17,16 +16,16 @@ internal sealed class GenerateDraftAutosave
     /// <summary>Initialises the autosave collaborator.</summary>
     public GenerateDraftAutosave(
         IProfileService profiles,
-        ILogger<GenerateViewModel> logger,
+        Action<string, Exception> reportFailure,
         Func<bool> hasDraft,
         Func<string, Profile> snapshot)
     {
         ArgumentNullException.ThrowIfNull(profiles);
-        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(reportFailure);
         ArgumentNullException.ThrowIfNull(hasDraft);
         ArgumentNullException.ThrowIfNull(snapshot);
         _profiles = profiles;
-        _logger = logger;
+        _reportFailure = reportFailure;
         _hasDraft = hasDraft;
         _snapshot = snapshot;
     }
@@ -60,7 +59,7 @@ internal sealed class GenerateDraftAutosave
         _task = null;
     }
 
-    /// <summary>Persists the current snapshot immediately, swallowing store failures.</summary>
+    /// <summary>Persists the current snapshot immediately; store failures go to the owner's reporter.</summary>
     public async Task PersistAsync(CancellationToken ct = default)
     {
         if (!_hasDraft())
@@ -77,7 +76,7 @@ internal sealed class GenerateDraftAutosave
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Draft autosave failed");
+            _reportFailure("save", ex);
         }
     }
 

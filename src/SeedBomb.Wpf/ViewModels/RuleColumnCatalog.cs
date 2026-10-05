@@ -77,16 +77,12 @@ public sealed class RuleColumnCatalog
         foreach (var attr in attrs.Where(a => a.LogicalName is not null))
             byName[attr.LogicalName!] = attr;
 
-        var altKeyAttrs = (meta.Keys ?? [])
-            .SelectMany(k => k.KeyAttributes ?? [])
-            .ToHashSet(StringComparer.Ordinal);
-
         _allSettable.Clear();
         _allExcluded.Clear();
         _allColumns.Clear();
         foreach (var attr in attrs)
         {
-            var column = BuildPickerColumn(attr, altKeyAttrs, isMapped);
+            var column = BuildPickerColumn(attr, meta, isMapped);
             (column.IsSelectable ? _allSettable : _allExcluded).Add(column);
             _allColumns.Add(column);
         }
@@ -144,15 +140,13 @@ public sealed class RuleColumnCatalog
     }
 
     private static PickerColumn BuildPickerColumn(
-        AttributeMetadata attr, ISet<string> altKeyAttrs, Func<string, bool> isMapped)
+        AttributeMetadata attr, EntityMetadata meta, Func<string, bool> isMapped)
     {
         var name = attr.LogicalName ?? string.Empty;
         var display = attr.DisplayName?.UserLocalizedLabel?.Label ?? name;
-        var eligibility = RuleEligibility.Classify(attr);
-        var selectable = eligibility.IsSettable && !altKeyAttrs.Contains(name);
-        var disabledReason = eligibility.IsSettable && altKeyAttrs.Contains(name)
-            ? "Alternate key — rejected before generation begins."
-            : ReasonText(eligibility.Reason);
+        var eligibility = RuleEligibility.Classify(attr, meta);
+        var selectable = eligibility.IsSettable;
+        var disabledReason = ReasonText(eligibility.Reason);
         var required = IsRequiredLevel(attr);
         var mapped = selectable && isMapped(name);
         var (stateKey, groupName, groupOrder) = ResolveState(selectable, mapped, required);
@@ -201,6 +195,7 @@ public sealed class RuleColumnCatalog
         EligibilityReason.PolymorphicType => "Owner/Customer type — determined by its paired lookup value.",
         EligibilityReason.NotCreatable => "Not valid for create.",
         EligibilityReason.MultiSelectV2 => "MultiSelect — rule editing planned for v2.",
+        EligibilityReason.AlternateKey => "Alternate key — SeedBomb generates unique values for it.",
         _ => reason.ToString(),
     };
 

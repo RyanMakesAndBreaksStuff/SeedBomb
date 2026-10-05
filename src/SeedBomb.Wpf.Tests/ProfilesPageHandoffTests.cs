@@ -1,11 +1,16 @@
 using SeedBomb.Core.Metadata;
 using Microsoft.Extensions.Logging;
+using Microsoft.Xrm.Sdk;
+using SeedBomb.Core.Exceptions;
+using System.ServiceModel;
 using Microsoft.Xrm.Sdk.Metadata;
 using Moq;
 using SeedBomb.Services.Generation;
+using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
+using SeedBomb.Views.Pages;
 using Wpf.Ui;
 using Xunit;
 
@@ -36,26 +41,6 @@ public sealed class ProfilesPageHandoffTests
     }
 
     [Fact]
-    public async Task LoadAsync_WithoutMetadataHost_ReportsErrorRatherThanSuccess()
-    {
-        var profiles = new Mock<IProfileService>();
-        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { "Sales" });
-        profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(MakeProfile("Sales"));
-
-        var vm = new ProfilesViewModel(profiles.Object);
-        await vm.RefreshCommand.ExecuteAsync(null);
-        vm.SelectedItem = vm.Items.Single();
-
-        // GetMetadata deliberately left null — simulates a host that forgot to wire itself.
-        await vm.LoadCommand.ExecuteAsync(null);
-
-        Assert.Null(vm.PendingImport);
-        Assert.True(vm.HasError);
-    }
-
-    [Fact]
     public async Task LoadAsync_WithMetadataHost_ProducesPendingImport()
     {
         var profiles = new Mock<IProfileService>();
@@ -64,14 +49,8 @@ public sealed class ProfilesPageHandoffTests
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
 
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => new Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata>(
-                StringComparer.OrdinalIgnoreCase),
-            GetRunId = () => "run-1",
-            ConfirmOverwrite = _ => true,
-            IsBoardDirty = () => false,
-        };
+        var vm = ProfilesHost.Create(profiles.Object, board: ProfilesHost.Board(runId: "run-1").Object);
+        vm.ConfirmOverwrite = _ => true;
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single();
 
@@ -81,34 +60,65 @@ public sealed class ProfilesPageHandoffTests
     }
 
     [Fact]
-    public async Task OpenInBoard_WithPendingImport_RaisesProfileApplied()
+    public async Task LoadCommand_IsDisabledUntilAProfileIsSelected()
     {
+        // Smoke item 8a: Load Profile with nothing selected silently did nothing.
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "Sales" });
+        profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>())).ReturnsAsync(MakeProfile("Sales"));
+        var vm = ProfilesHost.Create(profiles.Object);
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = null;
+
+        Assert.False(vm.LoadCommand.CanExecute(null));
+
+        vm.SelectedItem = vm.Items.Single();
+        Assert.True(vm.LoadCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task OpenInBoard_applies_the_report_to_the_board_and_opens_Generate()
+    {
+        // WR-001: this hop lived in ProfilesPage code-behind (ProfileApplied → ApplyImportReport + Navigate).
         var profiles = new Mock<IProfileService>();
         profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { "Sales" });
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
-
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => new Dictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata>(
-                StringComparer.OrdinalIgnoreCase),
-            GetRunId = () => "run-1",
-            ConfirmOverwrite = _ => true,
-            IsBoardDirty = () => false,
-        };
+        var board = ProfilesHost.Board(
+            new Dictionary<string, EntityMetadata> { ["account"] = new() { LogicalName = "account" } }, runId: "run-1");
+        var navigator = new Mock<IAppNavigator>();
+        var vm = ProfilesHost.Create(profiles.Object, navigator: navigator.Object, board: board.Object);
+        vm.ConfirmOverwrite = _ => true;
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single();
         await vm.LoadCommand.ExecuteAsync(null);
-
-        ProfileImportReport? applied = null;
-        vm.ProfileApplied += (_, report) => applied = report;
+        var report = vm.PendingImport;
 
         Assert.True(vm.OpenInBoardCommand.CanExecute(null));
         vm.OpenInBoardCommand.Execute(null);
 
-        Assert.NotNull(applied);
-        Assert.Same(vm.PendingImport, applied);
+        board.Verify(b => b.ApplyImportReport(report!), Times.Once);
+        navigator.Verify(n => n.Navigate(typeof(GeneratePage)), Times.Once);
+        Assert.False(vm.ShowImportSummary);
+    }
+
+    [Fact]
+    public async Task OpenInBoard_IsDisabledWhenNoTableIsInThisOrg()
+    {
+        // The board would get only the profile name and seed; Not imported already lists the tables.
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "Sales" });
+        profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>())).ReturnsAsync(MakeProfile("Sales"));
+        var vm = ProfilesHost.Create(profiles.Object); // empty metadata map: "account" isn't in this org
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = vm.Items.Single();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.ShowImportSummary);
+        Assert.False(vm.OpenInBoardCommand.CanExecute(null));
+        Assert.True(vm.DiscardImportCommand.CanExecute(null));
     }
 
     // ── T1: cold-start profile metadata (no prior Rules visit) ────────────────
@@ -132,13 +142,8 @@ public sealed class ProfilesPageHandoffTests
         profiles.Setup(p => p.LoadAsync("Sales", It.IsAny<CancellationToken>()))
             .ReturnsAsync(MakeProfile("Sales"));
 
-        var vm = new ProfilesViewModel(profiles.Object)
-        {
-            GetMetadata = () => generate.EntityMetadataMap,
-            GetRunId = () => generate.RunId,
-            ConfirmOverwrite = _ => true,
-            IsBoardDirty = () => false,
-        };
+        var vm = ProfilesHost.Create(profiles.Object, board: generate);
+        vm.ConfirmOverwrite = _ => true;
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single();
 
@@ -197,4 +202,42 @@ public sealed class ProfilesPageHandoffTests
         Assert.True(generate.EntityMetadataMap.ContainsKey("account"));
         Assert.False(generate.EntityMetadataMap.ContainsKey("bogus_table"));
     }
+
+    [Fact]
+    public async Task Load_ProfileWhoseTablesAreAllMissing_ListsEachInNotImported()
+    {
+        // Smoke item 7: event-profile on an org with ryan_event instead of test_event surfaced
+        // "Could not find an entity with name test_event…" instead of the import summary.
+        var generate = MakeGenerateViewModel(out var metadataMock);
+        metadataMock
+            .Setup(m => m.GetEntityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns<string, CancellationToken>((name, _) => Task.FromException<EntityMetadata>(MissingTable(name)));
+        var profile = new Profile(Profile.CurrentProfileVersion, "event-profile", null, 7,
+            [new ProfileTable("test_event", 10, null), new ProfileTable("test_eventattendance", 10, null)]);
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { "event-profile" });
+        profiles.Setup(p => p.LoadAsync("event-profile", It.IsAny<CancellationToken>())).ReturnsAsync(profile);
+
+        var vm = ProfilesHost.Create(profiles.Object, board: generate);
+        vm.ConfirmOverwrite = _ => true;
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.SelectedItem = vm.Items.Single();
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.HasError, vm.StatusMessage);
+        Assert.Equal(
+            ["test_event — table not available in this environment.",
+             "test_eventattendance — table not available in this environment."],
+            vm.PendingImport!.NotImported);
+    }
+
+    // The shape DataverseMetadataProvider throws for RetrieveEntity on a table the org lacks.
+    private static SchemaException MissingTable(string name) => new(
+        $"Failed to retrieve metadata for entity '{name}': Could not find an entity with name {name}",
+        new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+        {
+            ErrorCode = unchecked((int)0x80040217),
+            Message = $"Could not find an entity with name {name}",
+        }));
 }

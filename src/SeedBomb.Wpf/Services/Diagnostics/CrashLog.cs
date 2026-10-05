@@ -9,8 +9,8 @@ public static class CrashLog
     public const string FileName = "startup-error.log";
 
     /// <summary>
-    /// Writes <paramref name="ex"/> to the crash log and returns the path written, or
-    /// <see langword="null"/> when the write failed.
+    /// Appends <paramref name="ex"/> under a timestamp to the crash log and returns the path
+    /// written, or <see langword="null"/> when the write failed.
     /// </summary>
     /// <param name="ex">Exception to record.</param>
     /// <param name="directoryOverride">Test seam. Null uses %LOCALAPPDATA%\SeedBomb.</param>
@@ -21,7 +21,10 @@ public static class CrashLog
             var directory = directoryOverride ?? AppPaths.Root;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, FileName);
-            File.WriteAllText(path, ex?.ToString() ?? string.Empty);
+            // IN-002: append, so the first (usually root-cause) crash survives the ones it triggers.
+            // ponytail: unbounded; crashes are rare. Roll the file if it ever grows.
+            File.AppendAllText(path,
+                $"[{DateTimeOffset.Now:O}]{Environment.NewLine}{ex?.ToString() ?? string.Empty}{Environment.NewLine}{Environment.NewLine}");
             return path;
         }
         catch

@@ -15,7 +15,7 @@ public sealed partial class EntityCountEntry : ObservableObject
     /// <summary>Initialises the entry.</summary>
     /// <param name="entity">The entity.</param>
     /// <param name="count">Initial record count.</param>
-    public EntityCountEntry(EntitySummary entity, int count = 10)
+    public EntityCountEntry(EntitySummary entity, int count = GenerationLimits.DefaultRecordCount)
     {
         Entity = entity;
         _count = count;
@@ -34,7 +34,7 @@ public sealed class FieldOverridesViewModel : ObservableObject
     /// </summary>
     /// <param name="entities">Currently selected entities.</param>
     /// <param name="defaultCount">Initial count for newly-added entries (the user's configured default record count).</param>
-    public void SetEntities(IReadOnlyList<EntitySummary> entities, int defaultCount = 10)
+    public void SetEntities(IReadOnlyList<EntitySummary> entities, int defaultCount = GenerationLimits.DefaultRecordCount)
     {
         var existing = Entries.ToDictionary(e => e.Entity.LogicalName, e => e.Count);
 
