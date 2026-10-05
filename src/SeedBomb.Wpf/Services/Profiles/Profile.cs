@@ -18,6 +18,27 @@ public sealed record Profile(
 {
     /// <summary>Version written by every save, export, draft, and import path.</summary>
     public const int CurrentProfileVersion = 2;
+
+    /// <summary>
+    /// Copy of this profile with one column rule set, or removed when <paramref name="rule"/> is null.
+    /// Never mutates this instance, so a failed save leaves the committed profile intact (WR-002).
+    /// </summary>
+    public Profile WithColumnRule(string table, string column, FieldRule? rule) => this with
+    {
+        Tables = Tables.Select(t =>
+        {
+            if (!string.Equals(t.Table, table, StringComparison.OrdinalIgnoreCase))
+                return t;
+            var cols = t.Columns is null
+                ? new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, FieldRule>(t.Columns, StringComparer.OrdinalIgnoreCase);
+            if (rule is null)
+                cols.Remove(column);
+            else
+                cols[column] = rule;
+            return t with { Columns = cols };
+        }).ToList(),
+    };
 }
 
 /// <summary>

@@ -110,7 +110,8 @@ public sealed record RuleValidationResult(bool IsValid, FieldRule? EffectiveRule
 /// <param name="Table">Canonical table logical name, when known.</param>
 /// <param name="RecordCount">Planned row count for this table.</param>
 /// <param name="RunId">Run id used for pattern worst-case width.</param>
-public readonly record struct RuleValidationContext(string Table, int RecordCount, string RunId);
+/// <param name="Entity">Owning entity, for entity-level gates (alternate keys). Null skips them.</param>
+public readonly record struct RuleValidationContext(string Table, int RecordCount, string RunId, EntityMetadata? Entity = null);
 
 /// <summary>
 /// Single validation code path used by BOTH the rule editor (design-time) and run pre-flight (§3.3).
@@ -135,7 +136,7 @@ public static class RuleValidator
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(attr);
 
-        var eligibility = RuleEligibility.Classify(attr);
+        var eligibility = RuleEligibility.Classify(attr, context.Entity);
         if (!eligibility.IsSettable)
             return Invalid($"Column '{attr.LogicalName}' is not a rule target: {eligibility.Reason}.");
 

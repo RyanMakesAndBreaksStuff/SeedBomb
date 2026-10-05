@@ -61,12 +61,18 @@ public sealed class ThirdPartyNoticeServiceTests
     }
 
     [Fact]
-    public void Load_production_manifest_has_fifty_components_and_four_featured()
+    public void Load_production_manifest_has_forty_seven_components_and_four_featured()
     {
         var service = new ThirdPartyNoticeService(new AssemblyResourceReader(typeof(App).Assembly));
         var loaded = service.Load();
         Assert.Empty(loaded.Errors);
-        Assert.Equal(50, loaded.Components.Count);
+        Assert.Equal(47, loaded.Components.Count);
+        Assert.Contains(loaded.Components,
+            component => component.Name == "Microsoft.NETCore.App.Runtime.win-x64");
+        Assert.Contains(loaded.Components,
+            component => component.Name == "Microsoft.WindowsDesktop.App.Runtime.win-x64");
+        Assert.DoesNotContain(loaded.Components,
+            component => component.Version.Contains("preview", StringComparison.OrdinalIgnoreCase));
         var featured = service.GetFeatured(loaded);
         Assert.Equal(4, featured.Count);
         Assert.Equal(["Bogus", "WPF-UI", "CommunityToolkit.Mvvm", "Microsoft.PowerPlatform.Dataverse.Client"],

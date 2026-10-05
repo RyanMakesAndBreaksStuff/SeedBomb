@@ -14,6 +14,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IConnectionProfileService? _profileService;
     private readonly ConnectionManagerViewModel? _connectionManager;
     private readonly ILogger<MainWindowViewModel>? _logger;
+    private readonly IAuthService? _authService;
     private readonly SynchronizationContext? _uiContext;
     private bool _disposed;
 
@@ -26,11 +27,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <param name="profileService">Connection profile store.</param>
     /// <param name="connectionManager">Shared connection-manager view-model.</param>
     /// <param name="logger">Optional logger for the profile-reload path.</param>
+    /// <param name="authService">Optional auth service; its SignedOut shows the sign-in overlay.</param>
     [ActivatorUtilitiesConstructor]
     public MainWindowViewModel(
         IConnectionProfileService profileService,
         ConnectionManagerViewModel connectionManager,
-        ILogger<MainWindowViewModel>? logger = null)
+        ILogger<MainWindowViewModel>? logger = null,
+        IAuthService? authService = null)
     {
         ArgumentNullException.ThrowIfNull(profileService);
         ArgumentNullException.ThrowIfNull(connectionManager);
@@ -42,6 +45,18 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         _profileService.ProfilesChanged += OnProfilesChanged;
         _connectionManager.ConnectionSwitched += HandleConnectionSwitched;
         _connectionManager.PropertyChanged += OnConnectionManagerPropertyChanged;
+        _authService = authService;
+        if (_authService is not null)
+            _authService.SignedOut += OnSignedOut;
+    }
+
+    // WR-003: moved from MainWindow code-behind. SignedOut can fire on a background thread.
+    private void OnSignedOut(object? sender, EventArgs e)
+    {
+        if (_uiContext is null || ReferenceEquals(SynchronizationContext.Current, _uiContext))
+            NeedsSignIn = true;
+        else
+            _uiContext.Post(static s => ((MainWindowViewModel)s!).NeedsSignIn = true, this);
     }
 
     private void OnConnectionManagerPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -172,6 +187,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             _connectionManager.ConnectionSwitched -= HandleConnectionSwitched;
             _connectionManager.PropertyChanged -= OnConnectionManagerPropertyChanged;
         }
+        if (_authService is not null)
+            _authService.SignedOut -= OnSignedOut;
     }
 
     // T4: react to saves/deletes (fired by the profile store) instead of ObservableCollection's

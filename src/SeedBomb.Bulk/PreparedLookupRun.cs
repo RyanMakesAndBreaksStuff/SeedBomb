@@ -14,8 +14,9 @@ namespace SeedBomb.Bulk;
 /// <summary>One column's candidate sources: rows read before the run, plus targets this run creates first.</summary>
 /// <param name="Existing">Canonically ordered rows read from the environment before generation.</param>
 /// <param name="InRunTargets">Lower-cased targets created earlier in topological order.</param>
+/// <param name="PreferInRun">Implicit required-lookup rule: link to this run's parents, falling back to Existing (WR-002).</param>
 internal sealed record PreparedLookupColumn(
-    IReadOnlyList<LookupRuleValue> Existing, IReadOnlyList<string> InRunTargets);
+    IReadOnlyList<LookupRuleValue> Existing, IReadOnlyList<string> InRunTargets, bool PreferInRun = false);
 
 internal sealed class PreparedLookupRun(
     FrozenDictionary<string, PreparedLookupColumn> columns)
@@ -34,7 +35,7 @@ internal sealed class PreparedLookupRun(
         var key = $"{table}.{column}";
         if (!columns.TryGetValue(key, out var prepared))
             throw new InvalidOperationException($"Lookup candidates were not prepared for '{key}'.");
-        if (prepared.Existing.Count > 0)
+        if (prepared.Existing.Count > 0 && !prepared.PreferInRun)
             return prepared.Existing;
         if (_resolved.TryGetValue(key, out var cached))
             return cached;
@@ -44,6 +45,8 @@ internal sealed class PreparedLookupRun(
             .OrderBy(v => v.Entity, StringComparer.Ordinal)
             .ThenBy(v => v.Id.ToString("D"), StringComparer.Ordinal)
             .ToArray();
+        if (fromRun.Length == 0 && prepared.Existing.Count > 0)
+            return prepared.Existing;
         if (fromRun.Length == 0)
             throw new DataGenerationException(
                 $"No candidates for '{key}': target(s) {string.Join(", ", prepared.InRunTargets)} created no rows in this run.");
@@ -54,7 +57,8 @@ internal sealed class PreparedLookupRun(
 
     internal static async Task<PreparedLookupRun> PrepareAsync(GenerationConfig config,
         IReadOnlyDictionary<string, EntityMetadata> metadata, IReadOnlyList<string> creationOrder,
-        IOrganizationServiceAsync2 service, ThrottlePolicy throttle, ILogger logger, CancellationToken ct)
+        IOrganizationServiceAsync2 service, ThrottlePolicy throttle, ILogger logger, CancellationToken ct,
+        IReadOnlySet<string>? preferInRun = null)
     {
         var position = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < creationOrder.Count; i++)
@@ -64,7 +68,8 @@ internal sealed class PreparedLookupRun(
         var byColumn = new Dictionary<string, PreparedLookupColumn>(StringComparer.OrdinalIgnoreCase);
         foreach (var table in config.EntityLogicalNames)
         {
-            if (!config.RecordCounts.TryGetValue(table, out var count) || count <= 0
+            var count = config.PlannedRows(table);
+            if (count <= 0
                 || config.FieldRules is null || !config.FieldRules.TryGetValue(table, out var rules))
                 continue;
             var source = metadata[table];
@@ -80,7 +85,7 @@ internal sealed class PreparedLookupRun(
                 // Only targets the topological order puts strictly before this table are usable: by
                 // the time this table generates rows, their pool lists are complete and final.
                 var inRunTargets = targets
-                    .Where(t => config.RecordCounts.TryGetValue(t, out var planned) && planned > 0
+                    .Where(t => config.PlannedRows(t) > 0
                         && position.TryGetValue(t, out var pi) && pi < tableIndex)
                     .Select(t => t.ToLowerInvariant())
                     .ToArray();
@@ -112,7 +117,8 @@ internal sealed class PreparedLookupRun(
                     throw new DataGenerationException(
                         $"No readable existing candidates for '{table}.{column}' ({count} planned rows). Choose records manually or remove this rule.");
                 byColumn.Add($"{table}.{column}",
-                    new PreparedLookupColumn(Array.AsReadOnly(ordered), Array.AsReadOnly(inRunTargets)));
+                    new PreparedLookupColumn(Array.AsReadOnly(ordered), Array.AsReadOnly(inRunTargets),
+                        preferInRun?.Contains($"{table}.{column}") == true));
             }
         }
         return new(byColumn.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase));

@@ -105,6 +105,21 @@ public class ThrottlePolicy
             $"Batch creation for '{entityName}' exhausted {maxRetries} retries with no result.");
     }
 
+    /// <summary>
+    /// True for a fault a later resend can clear unchanged: a timeout, a network failure, an
+    /// unreachable or busy endpoint, or HTTP 429. Service faults and other protocol errors are false.
+    /// </summary>
+    /// <param name="ex">The failure, unwrapped from <see cref="DataGenerationException"/>.</param>
+    public static bool IsTransient(Exception? ex) => ex switch
+    {
+        TimeoutException or OperationCanceledException or HttpRequestException or IOException => true,
+        // The request never reached Dataverse, so a resend cannot duplicate rows. Checked before
+        // ProtocolException and FaultException, which are CommunicationExceptions too.
+        EndpointNotFoundException or ServerTooBusyException => true,
+        ProtocolException p => IsRateLimited(p),
+        _ => false,
+    };
+
     // ponytail: matches ServiceClient's own message text. A structured status code never reaches
     // us — ThrowIfResponseIsEmpty formats the code into the message and drops the response.
     private static bool IsRateLimited(ProtocolException ex) =>

@@ -136,6 +136,13 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         {
             return await LoadLockedAsync(ct).ConfigureAwait(false);
         }
+        catch (Exception ex) when (AtomicFile.IsUnavailable(ex))
+        {
+            // WR-008: locked or denied — read as empty without caching, so the next read retries.
+            // Writes call LoadLockedAsync directly and still throw rather than overwrite the file.
+            LoadWarning = AtomicFile.UnavailableWarning("Saved connections", _storagePath, ex);
+            return new StoreDto();
+        }
         finally
         {
             _lock.Release();
@@ -152,6 +159,7 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
         }
 
         var json = await File.ReadAllTextAsync(_storagePath, ct).ConfigureAwait(false);
+        LoadWarning = null; // WR-003: a successful read clears an earlier locked-file warning
         json = CoerceLegacyAuthJson(json);
         try
         {
@@ -164,13 +172,6 @@ public sealed class JsonConnectionProfileService : IConnectionProfileService, ID
             var kept = AtomicFile.Quarantine(_storagePath);
             LoadWarning = $"Saved connections could not be read, so SeedBomb started without them. The file was kept at {kept}.";
             _cache = new StoreDto();
-        }
-        foreach (var profile in _cache.Profiles)
-        {
-            // Legacy ROPC profiles (AuthType 2 / "UserPassword") predate WR-010b.
-            // Downgrade to OAuth rather than leaving an undefined enum value.
-            if (!Enum.IsDefined(profile.AuthType))
-                profile.AuthType = AuthType.OAuth;
         }
 
         return _cache;

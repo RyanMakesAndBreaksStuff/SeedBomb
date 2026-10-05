@@ -1,12 +1,10 @@
-﻿using SeedBomb.Services.Auth;
-using SeedBomb.Services.Connections;
+﻿using SeedBomb.Services.Connections;
 using SeedBomb.Services.Navigation;
 using SeedBomb.ViewModels;
 using SeedBomb.Views.Pages;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Interop;
-using System.Windows.Threading;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
@@ -18,7 +16,6 @@ public partial class MainWindow : FluentWindow
     private readonly MainWindowViewModel _vm;
     private readonly ConnectionManagerViewModel _connectionManagerViewModel;
     private readonly IConnectionProfileService _profileService;
-    private readonly IAuthService _authService;
     private readonly ISnackbarService _snackbarService;
     private readonly IContentDialogService _contentDialogService;
     private readonly NavigationViewNavigator _navigator;
@@ -31,7 +28,6 @@ public partial class MainWindow : FluentWindow
         MainWindowViewModel viewModel,
         ConnectionManagerViewModel connectionManagerViewModel,
         IConnectionProfileService profileService,
-        IAuthService authService,
         IServiceProvider serviceProvider,
         ISnackbarService snackbarService,
         IContentDialogService contentDialogService,
@@ -41,7 +37,6 @@ public partial class MainWindow : FluentWindow
         _vm = viewModel;
         _connectionManagerViewModel = connectionManagerViewModel;
         _profileService = profileService;
-        _authService = authService;
         _snackbarService = snackbarService;
         _contentDialogService = contentDialogService;
         _navigator = (NavigationViewNavigator)navigator;
@@ -95,7 +90,6 @@ public partial class MainWindow : FluentWindow
                 SyncSignInOverlay();
             }
         };
-        _authService.SignedOut += OnSignedOut;
         Loaded += OnWindowLoaded;
         SourceInitialized += OnSourceInitialized;
         Closed += OnWindowClosed;
@@ -175,39 +169,12 @@ public partial class MainWindow : FluentWindow
         await _connectionManagerViewModel.LoadCommand.ExecuteAsync(null);
         _vm.SyncHasConnection();
 
-        // Startup's silent sign-in (App.xaml.cs) never goes through SelectProfileAsync, so
-        // ConnectedProfileId is only ever set there for later, in-session switches — seed it
-        // here for the common case where the silent reconnect already succeeded.
-        if (_vm.IsConnected)
-        {
-            var lastUsed = _connectionManagerViewModel.Profiles.FirstOrDefault(p => p.IsLastUsed);
-            if (lastUsed is not null)
-                _connectionManagerViewModel.ConnectedProfileId = lastUsed.Id;
-        }
-
         RootNavigation.Navigate(typeof(GeneratePage));
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
-        _authService.SignedOut -= OnSignedOut;
         _vm.Dispose();
-    }
-
-    // ProfileAuthService.SignOutAsync uses ConfigureAwait(false) throughout, so SignedOut can
-    // fire on a background thread — marshal before touching the ViewModel.
-    private void OnSignedOut(object? sender, EventArgs e)
-    {
-        if (Dispatcher.CheckAccess())
-            SignOut();
-        else
-            Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(SignOut));
-
-        void SignOut()
-        {
-            _vm.NeedsSignIn = true;
-            _connectionManagerViewModel.ConnectedProfileId = null;
-        }
     }
 
     private void SyncFirstRunOverlay()

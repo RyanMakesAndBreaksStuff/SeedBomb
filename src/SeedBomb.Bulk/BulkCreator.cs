@@ -13,7 +13,11 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Buffers.Binary;
+using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
 using System.ServiceModel;
+using System.Text;
 
 namespace SeedBomb.Bulk;
 
@@ -22,8 +26,11 @@ namespace SeedBomb.Bulk;
 /// Uses <c>CreateMultiple</c> where available and falls back to <c>ExecuteMultiple</c>.
 /// Bogus record generation is sequential per entity; API calls are parallelised per batch.
 /// </summary>
-public class BulkCreator : IBulkCreator
+public class BulkCreator
 {
+    // Eight scope hex characters, a separator and an eight-digit row index must survive truncation.
+    private const int MinimumScopedStringKeyLength = 17;
+
     private readonly IOrganizationServiceAsync2 _service;
     private readonly GeneratorFactory _generatorFactory;
     private readonly EdgeCaseValidator _edgeCaseValidator;
@@ -56,7 +63,16 @@ public class BulkCreator : IBulkCreator
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Generates and creates records for all requested entities in the correct dependency order.
+    /// Deferred lookups (cycle-broken edges) are backfilled in a second pass.
+    /// </summary>
+    /// <param name="config">Generation configuration (batch size, seed, parallelism, retries).</param>
+    /// <param name="entityMetadata">Metadata keyed by entity logical name for all selected entities.</param>
+    /// <param name="graph">Dependency graph with topological ordering and deferred edge info.</param>
+    /// <param name="progress">Optional progress reporter for real-time feedback.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A <see cref="GenerationResult"/> with all created record IDs and any batch errors.</returns>
     public async Task<GenerationResult> CreateAsync(
         GenerationConfig config,
         IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
@@ -67,6 +83,7 @@ public class BulkCreator : IBulkCreator
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(entityMetadata);
         ArgumentNullException.ThrowIfNull(graph);
+        GenerationLimits.Validate(config);
 
         PreparedBogusRun? preparedRun = null;
         // WR-002: declared outside the try so a cancel can still report what was written.
@@ -78,14 +95,15 @@ public class BulkCreator : IBulkCreator
             var validatedRules = ValidateConfiguredRules(config, entityMetadata);
             config = config with { FieldRules = validatedRules };
 
+            // Sort first (pure, no I/O): preflight and PreparedLookupRun both need the creation order
+            // to know which lookup targets this run creates before their source table.
+            var sortedEntities = _topologicalSort.Sort(graph);
+            var implicitLookups = PreflightTables(config, validatedRules, entityMetadata, sortedEntities);
+
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
-            // Sort first: PreparedLookupRun needs the creation order to know which lookup targets
-            // this run creates before their source table.
-            var sortedEntities = _topologicalSort.Sort(graph);
-
             var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
-                _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
+                _service, _throttlePolicy, _logger, ct, implicitLookups).ConfigureAwait(false);
 
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
@@ -112,6 +130,10 @@ public class BulkCreator : IBulkCreator
                     continue;
                 }
 
+                // Retry (WR-001): tables kept only for topology and seed alignment write nothing.
+                if (config.PlannedRows(entityName) == 0)
+                    continue;
+
                 if (!entityMetadata.TryGetValue(entityName, out var meta))
                 {
                     _logger.LogWarning("Skipping {Entity}: metadata not found.", entityName);
@@ -122,12 +144,14 @@ public class BulkCreator : IBulkCreator
                     "Generating {RecordCount} records for {Entity}.",
                     recordCount, entityName);
 
-                var (createdIds, errors) = await CreateEntityRecordsAsync(
+                var (createdIds, errors, failure) = await CreateEntityRecordsAsync(
                     entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, lookupRun, progress, ct).ConfigureAwait(false);
 
                 pool.Add(entityName, createdIds);
                 allCreatedRecords[entityName] = createdIds.AsReadOnly();
                 allErrors.AddRange(errors);
+                if (failure is not null)
+                    ExceptionDispatchInfo.Capture(failure).Throw();
 
                 _logger.LogInformation(
                     "Completed {Entity}: {Created}/{Requested} records created.",
@@ -189,15 +213,20 @@ public class BulkCreator : IBulkCreator
                 Elapsed = elapsed
             };
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested && allCreatedRecords.Count > 0)
+        catch (Exception ex) when (allCreatedRecords.Values.Any(ids => ids.Count > 0))
         {
-            // WR-002: cancel does not roll back — return the rows already written instead of losing their IDs.
+            // WR-002 / CR-003: nothing is rolled back — return the rows already written so the
+            // summary and History record what landed, whether the run was cancelled or failed.
+            var cancelled = ex is OperationCanceledException && ct.IsCancellationRequested;
+            if (!cancelled)
+                _logger.LogError(ex, "Bulk creation stopped after {Count} table(s) were written.", allCreatedRecords.Count);
             return new GenerationResult
             {
                 CreatedRecords = allCreatedRecords,
                 Errors = allErrors.AsReadOnly(),
                 Elapsed = DateTimeOffset.UtcNow - runStart,
-                Cancelled = true,
+                Cancelled = cancelled,
+                FatalError = cancelled ? null : ex.Message,
             };
         }
         finally
@@ -206,7 +235,7 @@ public class BulkCreator : IBulkCreator
         }
     }
 
-    private async Task<(List<Guid> ids, List<BatchError> errors)> CreateEntityRecordsAsync(
+    private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> CreateEntityRecordsAsync(
         string entityName,
         EntityMetadata meta,
         int entityIndex,
@@ -219,58 +248,10 @@ public class BulkCreator : IBulkCreator
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
-        // T-06: pre-flight — warn about any attributes that will be silently skipped due to FieldAction.Fail
-        if (meta.Attributes is not null)
-        {
-            foreach (var attr in meta.Attributes)
-            {
-                var validation = _edgeCaseValidator.Validate(attr, meta);
-                if (validation.Action == FieldAction.Fail)
-                    _logger.LogWarning(
-                        "Entity {Entity}: field {Field} has FieldAction.Fail — field will be skipped",
-                        entityName, attr.LogicalName);
-            }
-        }
-
         var tableRules = config.FieldRules is not null
             && config.FieldRules.TryGetValue(entityName, out var configuredRules)
             ? configuredRules
             : new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
-
-        // T-25: pre-flight required-lookup validation
-        if (meta.Attributes is not null)
-        {
-            foreach (var attr in meta.Attributes.OfType<LookupAttributeMetadata>())
-            {
-                var level = attr.RequiredLevel?.Value ?? AttributeRequiredLevel.None;
-                if (level == AttributeRequiredLevel.SystemRequired)
-                {
-                    var validation = _edgeCaseValidator.Validate(attr, meta);
-                    if (validation.Action == FieldAction.SpecialHandling
-                        && validation.HandlingCategory == SpecialHandlingCategory.OwnerLookup)
-                    {
-                        // ownerid is SystemRequired on every Dataverse table; omit it and let
-                        // Dataverse default to the calling user on insert.
-                        _logger.LogDebug(
-                            "Entity {Entity}: skipping ownerid — Dataverse will default to calling user",
-                            entityName);
-                        continue;
-                    }
-                    if (attr.LogicalName is not null
-                        && tableRules.TryGetValue(attr.LogicalName, out var explicitRule)
-                        && explicitRule is ConstantRule or OneOfRule or LookupRandomRule)
-                    {
-                        continue;
-                    }
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': required lookup '{attr.LogicalName}' (SystemRequired) has no generator — cannot create records.");
-                }
-                if (level == AttributeRequiredLevel.ApplicationRequired)
-                    _logger.LogWarning(
-                        "Entity {Entity}: lookup {Field} is ApplicationRequired but may have no generator",
-                        entityName, attr.LogicalName);
-            }
-        }
 
         // Sequential Bogus generation — single Faker instance, no sharing across threads
         var attributesToGenerate = GetGeneratableAttributes(meta);
@@ -299,6 +280,7 @@ public class BulkCreator : IBulkCreator
         using var bogusSession = new BogusEvaluatorSession(config.Locale);
         var evalContext = new RuleEvaluationContext(entityName, config.Seed, config.Locale, config.RunId, recordCount);
         var entities = new List<Entity>(recordCount);
+        var keyScope = SHA256.HashData(Encoding.UTF8.GetBytes(config.AlternateKeyScope));
 
         for (int i = 0; i < recordCount; i++)
         {
@@ -352,7 +334,7 @@ public class BulkCreator : IBulkCreator
 
             foreach (var attr in alternateKeyAttrs)
             {
-                entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i);
+                entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i, keyScope);
             }
             entities.Add(entity);
         }
@@ -366,22 +348,29 @@ public class BulkCreator : IBulkCreator
             }
         }
 
-        var batches = entities.Chunk(config.BatchSize).ToArray();
+        // CR-002: every row is generated so the Faker stream matches the first run, then a retry
+        // writes only its rows. ponytail: a retry regenerates the whole table; fine at MaxRecordCount.
+        int[] rowIndexes = config.RowIndexes?.GetValueOrDefault(entityName) is { } retryRows
+            ? [.. retryRows.Distinct().Order()]
+            : [.. Enumerable.Range(0, recordCount)];
+        var rowBatches = rowIndexes.Chunk(config.BatchSize).ToArray();
+        var batches = rowBatches.Select(rows => rows.Select(row => entities[row]).ToArray()).ToArray();
 
         return await SubmitEntityBatchesAsync(
-            entityName, batches, recordCount, config, effectiveDop, progress, ct).ConfigureAwait(false);
+            entityName, batches, rowBatches, rowIndexes.Length, config, effectiveDop, progress, ct).ConfigureAwait(false);
     }
 
-    private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitEntityBatchesAsync(
+    private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> SubmitEntityBatchesAsync(
         string entityName,
         Entity[][] batches,
-        int recordCount,
+        int[][] rowBatches,
+        int plannedCount,
         GenerationConfig config,
         int effectiveDop,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
-        var allIds = new List<Guid>(recordCount);
+        var allIds = new List<Guid>(plannedCount);
         var allErrors = new List<BatchError>();
         var createdCount = 0;
         var entityStart = DateTimeOffset.UtcNow;
@@ -402,21 +391,26 @@ public class BulkCreator : IBulkCreator
             async (batchIndex, innerCt) =>
             {
                 var batch = batches[batchIndex];
+                var rows = rowBatches[batchIndex];
                 List<Guid> batchIds;
                 List<BatchError> batchErrors;
 
                 try
                 {
                     (batchIds, batchErrors) = await SubmitBatchAsync(
-                        entityName, batch, config.MaxRetries, innerCt).ConfigureAwait(false);
+                        entityName, batch, rows, config.MaxRetries, innerCt).ConfigureAwait(false);
                 }
                 catch (DataGenerationException ex)
                 {
                     _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
-                    batchErrors = [new BatchError(entityName, batchIndex, ex.Message,
-                        (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length)];
+                    batchErrors = [new BatchError(entityName, ex.Message,
+                        (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length,
+                        ThrottlePolicy.IsTransient(ex.InnerException))
+                    {
+                        RowIndexes = rows,
+                    }];
                 }
 
                 idBags[batchIndex] = batchIds;
@@ -432,12 +426,13 @@ public class BulkCreator : IBulkCreator
                     BatchIndex = batchIndex + 1,
                     TotalBatches = batches.Length,
                     RecordsCreated = added,
-                    TotalRecords = recordCount,
+                    TotalRecords = plannedCount,
                     RecordsPerMinute = ratePerMin,
                     ErrorMessage = batchErrors.Count > 0 ? batchErrors[0].ErrorMessage : null
                 });
             });
 
+        Exception? failure = null;
         try
         {
             await submit.ConfigureAwait(false);
@@ -446,18 +441,23 @@ public class BulkCreator : IBulkCreator
         {
             // WR-002: keep the IDs of batches that landed before the cancel; CreateAsync reports them.
         }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
 
         foreach (var idBag in idBags)
             if (idBag is not null) allIds.AddRange(idBag);
         foreach (var errorBag in errorBags)
             if (errorBag is not null) allErrors.AddRange(errorBag);
 
-        return (allIds, allErrors);
+        return (allIds, allErrors, failure);
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors)> SubmitBatchAsync(
         string entityName,
         Entity[] batch,
+        int[] rows,
         int maxRetries,
         CancellationToken ct)
     {
@@ -489,7 +489,7 @@ public class BulkCreator : IBulkCreator
         }
 
         return await _throttlePolicy.ExecuteAsync(
-            () => ExecuteMultipleFallbackAsync(entityName, batch, ct),
+            () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct),
             entityName, maxRetries, ct).ConfigureAwait(false);
     }
 
@@ -521,6 +521,7 @@ public class BulkCreator : IBulkCreator
     private async Task<(List<Guid> ids, List<BatchError> errors)> ExecuteMultipleFallbackAsync(
         string entityName,
         Entity[] batch,
+        int[] rows,
         CancellationToken ct)
     {
         var requests = new OrganizationRequestCollection();
@@ -546,7 +547,10 @@ public class BulkCreator : IBulkCreator
         {
             if (item.Fault is not null)
             {
-                errors.Add(new BatchError(entityName, item.RequestIndex, item.Fault.Message, item.Fault.ErrorCode));
+                errors.Add(new BatchError(entityName, item.Fault.Message, item.Fault.ErrorCode)
+                {
+                    RowIndexes = [rows[item.RequestIndex]],
+                });
             }
             else if (item.Response is CreateResponse createResp)
             {
@@ -669,16 +673,19 @@ public class BulkCreator : IBulkCreator
         }
     }
 
-    private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex) =>
-        attr switch
-        {
-            StringAttributeMetadata s => TruncateKey($"{entityName}-{recordIndex:D8}", s.MaxLength ?? 100),
-            IntegerAttributeMetadata => recordIndex,
-            _ => TruncateKey($"{entityName}-{recordIndex:D8}", 100)
-        };
+    // CR-002: scoped to the run so re-runs never collide, and a function of the row index so a
+    // retry regenerates the key a rejected row was first given. Preflight ensures truncation keeps scope and row.
+    // ponytail: integer keys get one of 21,000 run offsets (1-in-21,000 chance two runs share one);
+    // range-restricted integer keys are not honoured. Use string keys if either bites.
+    private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex, byte[] scope)
+    {
+        if (attr is IntegerAttributeMetadata)
+            return (int)(BinaryPrimitives.ReadUInt32BigEndian(scope) % 21_000) * GenerationLimits.MaxRecordCount + recordIndex;
 
-    private static string TruncateKey(string value, int maxLength) =>
-        value.Length > maxLength ? value[..maxLength] : value;
+        var key = $"{entityName}-{Convert.ToHexStringLower(scope.AsSpan(0, 4))}-{recordIndex:D8}";
+        var max = (attr as StringAttributeMetadata)?.MaxLength ?? 100;
+        return key.Length > max ? key[^max..] : key;
+    }
 
     private async Task WarmupAndAdoptRecommendedDopAsync(CancellationToken ct)
     {
@@ -694,6 +701,79 @@ public class BulkCreator : IBulkCreator
         {
             _logger.LogDebug(ex, "Warmup WhoAmI failed; continuing with default DOP.");
         }
+    }
+
+    /// <summary>
+    /// Metadata-only checks that must pass before the first write, so a failure leaves the
+    /// environment untouched instead of stranding earlier tables (CR-003).
+    /// </summary>
+    /// <returns>"table.column" keys of the implicit lookupRandom rules added here (WR-002).</returns>
+    private HashSet<string> PreflightTables(
+        GenerationConfig config,
+        Dictionary<string, Dictionary<string, FieldRule>> validatedRules,
+        IReadOnlyDictionary<string, EntityMetadata> entityMetadata,
+        IReadOnlyList<string> sortedEntities)
+    {
+        var implicitKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entityName in config.EntityLogicalNames)
+        {
+            if (!config.RecordCounts.TryGetValue(entityName, out var count) || count <= 0
+                || !entityMetadata.TryGetValue(entityName, out var meta))
+                continue;
+
+            foreach (var attr in GetAlternateKeyAttributes(meta).OfType<StringAttributeMetadata>())
+            {
+                if ((attr.MaxLength ?? 100) < MinimumScopedStringKeyLength)
+                    throw new DataGenerationException(
+                        $"Entity '{entityName}': alternate-key attribute '{attr.LogicalName}' must allow at least {MinimumScopedStringKeyLength} characters to retain the run scope and row index (MaxLength was {attr.MaxLength}).");
+            }
+
+            // Tables written before this one with a positive count: their records fill its required lookups.
+            var position = sortedEntities.ToList().FindIndex(t => string.Equals(t, entityName, StringComparison.OrdinalIgnoreCase));
+            var createdEarlier = position < 0
+                ? []
+                : sortedEntities
+                    .Take(position)
+                    .Where(t => config.RecordCounts.TryGetValue(t, out var n) && n > 0)
+                    .ToArray();
+
+            // T-06: warn about any attributes that will be silently skipped due to FieldAction.Fail
+            foreach (var attr in meta.Attributes ?? [])
+            {
+                if (_edgeCaseValidator.Validate(attr, meta).Action == FieldAction.Fail)
+                    _logger.LogWarning(
+                        "Entity {Entity}: field {Field} has FieldAction.Fail — field will be skipped",
+                        entityName, attr.LogicalName);
+            }
+
+            var missing = RequiredLookupPreflight.FindUnsupplied(
+                entityName, meta, config.FieldRules?.GetValueOrDefault(entityName), createdEarlier);
+            if (missing.Count > 0)
+                throw new DataGenerationException(missing[0]);
+
+            // FieldFilter never generates a SystemRequired lookup, so one accepted only because its target
+            // is created earlier gets an implicit lookupRandom rule (an explicit rule is never replaced).
+            // validatedRules is config.FieldRules, so PreparedLookupRun and generation both see it.
+            var implicitLookups = RequiredLookupPreflight.FindSuppliedByCreatedEarlier(
+                entityName, meta, validatedRules.GetValueOrDefault(entityName), createdEarlier);
+            if (implicitLookups.Count > 0)
+            {
+                if (!validatedRules.TryGetValue(entityName, out var tableRules))
+                    validatedRules[entityName] = tableRules = new Dictionary<string, FieldRule>(StringComparer.OrdinalIgnoreCase);
+                foreach (var column in implicitLookups)
+                    if (tableRules.TryAdd(column, new LookupRandomRule()))
+                        implicitKeys.Add($"{entityName}.{column}");
+            }
+
+            foreach (var attr in (meta.Attributes ?? []).OfType<LookupAttributeMetadata>())
+            {
+                if (attr.RequiredLevel?.Value == AttributeRequiredLevel.ApplicationRequired)
+                    _logger.LogWarning(
+                        "Entity {Entity}: lookup {Field} is ApplicationRequired but may have no generator",
+                        entityName, attr.LogicalName);
+            }
+        }
+        return implicitKeys;
     }
 
     private Dictionary<string, Dictionary<string, FieldRule>> ValidateConfiguredRules(
@@ -742,13 +822,8 @@ public class BulkCreator : IBulkCreator
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule targets unknown attribute '{logicalName}'.");
 
-                var handling = _edgeCaseValidator.Validate(ruleAttr, meta);
-                if (handling.Action == FieldAction.SpecialHandling && handling.HandlingCategory == SpecialHandlingCategory.AlternateKeyUniqueness)
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': field rule cannot target alternate-key attribute '{logicalName}'.");
-
                 var validation = RuleValidator.Validate(
-                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId));
+                    rule, ruleAttr, new RuleValidationContext(entityName, recordCount, config.RunId, meta));
                 if (!validation.IsValid)
                     throw new DataGenerationException(
                         $"Entity '{entityName}': field rule for '{logicalName}' is invalid — " +

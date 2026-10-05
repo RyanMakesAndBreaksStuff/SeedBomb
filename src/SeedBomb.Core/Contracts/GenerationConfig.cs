@@ -32,7 +32,7 @@ public record GenerationConfig
     /// <summary>
     /// Gets the batch size for bulk creation. Default is 500.
     /// </summary>
-    public int BatchSize { get; init; } = 500;
+    public int BatchSize { get; init; } = GenerationLimits.DefaultBatchSize;
 
     /// <summary>
     /// Gets the maximum degree of parallelism. Null means system default.
@@ -53,4 +53,28 @@ public record GenerationConfig
 
     /// <summary>Run stamp substituted for the {runId} pattern token. Never auto-injected into data (D4).</summary>
     public string RunId { get; init; } = "";
+
+    /// <summary>
+    /// Retry filter: when a table has an entry, only these generation-order rows are written (an empty
+    /// entry keeps the table in the topology but writes nothing). <see cref="RecordCounts"/> keeps the
+    /// original counts, so alternate keys, rule values and lookup-free values regenerate as before;
+    /// lookups whose parents are not retried draw from the environment instead of the original parents.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<int>>? RowIndexes { get; init; }
+
+    /// <summary>
+    /// Mixed into generated alternate-key values so separate runs never collide (CR-002). A retry keeps
+    /// its run's value so rejected rows regenerate the keys they were first given.
+    /// </summary>
+    public string AlternateKeyScope { get; init; } = "";
+
+    /// <summary>Planned rows for <paramref name="table"/>, or 0 when the table is absent or negative.</summary>
+    /// <param name="table">Entity logical name.</param>
+    public int PlannedRows(string table) =>
+        RowIndexes is not null && RowIndexes.TryGetValue(table, out var rows)
+            ? rows.Count
+            : Math.Max(0, RecordCounts.GetValueOrDefault(table));
+
+    /// <summary>Sum of <see cref="PlannedRows"/> across <see cref="EntityLogicalNames"/>.</summary>
+    public int PlannedTotal => EntityLogicalNames.Sum(PlannedRows);
 }

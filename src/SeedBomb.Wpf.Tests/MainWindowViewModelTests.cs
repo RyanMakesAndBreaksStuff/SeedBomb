@@ -18,6 +18,21 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SignedOut_shows_the_sign_in_overlay()
+    {
+        // WR-003: this lived in MainWindow.OnSignedOut, next to a write to the ConnectedProfileId mirror.
+        var auth = new Mock<IAuthService>();
+        var connectionManager = new ConnectionManagerViewModel(
+            Mock.Of<IConnectionProfileService>(), auth.Object, Mock.Of<IDataverseConnectionService>());
+        using var vm = new MainWindowViewModel(
+            Mock.Of<IConnectionProfileService>(), connectionManager, authService: auth.Object);
+
+        auth.Raise(a => a.SignedOut += null, EventArgs.Empty);
+
+        Assert.True(vm.NeedsSignIn);
+    }
+
+    [Fact]
     public async Task HasConnection_FollowsTheProfileCount()
     {
         var (vm, store) = await MainWindowViewModelWithProfilesAsync(count: 1);

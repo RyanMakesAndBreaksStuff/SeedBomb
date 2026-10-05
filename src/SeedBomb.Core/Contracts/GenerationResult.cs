@@ -27,8 +27,19 @@ public record GenerationResult
     public IReadOnlyList<BatchError> Errors { get; init; } = [];
 
     /// <summary>
+    /// Gets the number of rows the run lost across all <see cref="Errors"/> (a failed batch counts every row in it).
+    /// </summary>
+    public int RejectedRows => Errors.Sum(e => e.RowCount);
+
+    /// <summary>
     /// Gets whether the run was cancelled before it finished. <see cref="CreatedRecords"/> then holds
     /// only the rows written before the cancel; they are not rolled back.
     /// </summary>
     public bool Cancelled { get; init; }
+
+    /// <summary>
+    /// Set when the run stopped on an error after at least one row was written.
+    /// <see cref="CreatedRecords"/> then holds only the rows written before the failure; they are not rolled back.
+    /// </summary>
+    public string? FatalError { get; init; }
 }

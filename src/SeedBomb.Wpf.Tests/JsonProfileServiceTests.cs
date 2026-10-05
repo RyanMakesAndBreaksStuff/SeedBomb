@@ -501,4 +501,17 @@ public sealed class JsonProfileServiceTests : IDisposable
         Assert.NotNull(error);
         Assert.Contains("count must be at most", error, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task SaveAsync_RejectsACountTheLoaderWouldReject()
+    {
+        // WR-014: a count-0 profile saved, then failed to load.
+        using var svc = NewService(out _);
+        var profile = new Profile(Profile.CurrentProfileVersion, "zero", null, 42,
+            [new ProfileTable("account", 0, null)]);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.SaveAsync(profile, TestContext.Current.CancellationToken));
+        Assert.Contains("at least 1", ex.Message, StringComparison.Ordinal);
+    }
 }

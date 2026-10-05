@@ -5,9 +5,11 @@ using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Profiles;
 using SeedBomb.Services.Settings;
 using SeedBomb.ViewModels;
 using SeedBomb.Views.Pages;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -16,6 +18,7 @@ using System.Windows.Threading;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Markup;
 using Xunit;
+using InfoBar = Wpf.Ui.Controls.InfoBar;
 
 namespace SeedBomb.Wpf.Tests.Views;
 
@@ -110,6 +113,31 @@ public sealed class PageViewportStaTests : IDisposable
         var page = new RulesPage(vm);
         var host = Host(page, width, height);
         AssertInsideHost(page, host, "PreviewPane");
+    }
+
+    [StaFact]
+    public async Task ProfilesPage_StatusBar_ShowsAnErrorAndReopensAfterClose()
+    {
+        EnsureApplication();
+        var profiles = new Mock<IProfileService>();
+        profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("profiles folder locked"));
+        var vm = ProfilesHost.Create(profiles.Object);
+        var page = new ProfilesPage(vm);
+        var host = Host(page, LaunchContentWidth, LaunchContentHeight);
+        var bar = Assert.IsType<InfoBar>(page.FindName("StatusBar"));
+
+        await vm.OnNavigatedToAsync();
+        page.UpdateLayout();
+        Flush();
+        Assert.True(bar.IsOpen, "Error bar did not open.");
+        AssertInsideHost(page, host, "StatusBar");
+
+        bar.SetCurrentValue(InfoBar.IsOpenProperty, false); // what the close button does
+        await vm.OnNavigatedToAsync(); // same failure, same message
+        page.UpdateLayout();
+        Flush();
+        Assert.True(bar.IsOpen, "A repeated error did not reopen the closed bar.");
     }
 
     public void Dispose()

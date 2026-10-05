@@ -3,10 +3,11 @@ using SeedBomb.Core.Rules;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Metadata;
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 namespace SeedBomb.ViewModels;
 
-/// <summary>Debounced rule-preview samples for the Rules page.</summary>
+/// <summary>Rule-preview sampling: the Rules page's debounced preview and Review's samples (WR-005).</summary>
 public sealed class RulePreviewController
 {
     private int _generation;
@@ -16,6 +17,43 @@ public sealed class RulePreviewController
 
     /// <summary>Raised after <see cref="Values"/> is replaced.</summary>
     public event EventHandler? Changed;
+
+    /// <summary>
+    /// Run-time-only preview copy for lookupRandom, shown by the Rules page and Review.
+    /// Interpolates the shared candidate bound.
+    /// </summary>
+    public static string LookupRandomExplanation { get; } =
+        $"Uses up to {LookupRandomRule.MaximumCandidatesPerTarget.ToString("N0", CultureInfo.InvariantCulture)} existing records per target, captured before generation. Same seed and captured records give the same picks. Preview is resolved when the run starts. Candidate validation happens at Start before writes.";
+
+    /// <summary>
+    /// WR-005: the one rule sampler. Formats rows 0..<paramref name="rows"/>-1 of
+    /// <paramref name="effective"/>, or returns the lookupRandom explanation.
+    /// </summary>
+    /// <param name="effective">A validated effective rule.</param>
+    /// <param name="attr">Target column metadata.</param>
+    /// <param name="eval">Table, seed, locale, run id and record count to sample with.</param>
+    /// <param name="rows">How many rows to sample.</param>
+    /// <exception cref="InvalidOperationException">Generated text failed a length or transport-safety check.</exception>
+    public static IReadOnlyList<string> Sample(
+        FieldRule effective, AttributeMetadata attr, RuleEvaluationContext eval, int rows)
+    {
+        if (effective is LookupRandomRule)
+            return [LookupRandomExplanation];
+
+        var preview = new List<string>(rows);
+        if (effective is BogusRule bogus)
+        {
+            var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
+            using var session = new BogusEvaluatorSession(eval.Locale);
+            for (var row = 0; row < rows; row++)
+                preview.Add(Format(session.Evaluate(prepared, attr, eval, row)));
+            return preview;
+        }
+
+        for (var row = 0; row < rows; row++)
+            preview.Add(Format(RuleValueGenerator.Evaluate(effective, attr, eval.Seed, eval.Table, row, eval.RunId)));
+        return preview;
+    }
 
     /// <summary>Live preview rows mapped from <see cref="Values"/>.</summary>
     public ObservableCollection<PreviewRow> Rows { get; } = [];
@@ -43,8 +81,7 @@ public sealed class RulePreviewController
         int seed,
         string table,
         string runId,
-        int recordCount,
-        string lookupRandomExplanation)
+        int recordCount)
     {
         var generation = Interlocked.Increment(ref _generation);
         if (effective is null || attr is null)
@@ -58,8 +95,7 @@ public sealed class RulePreviewController
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
         _ = RunAsync(
-            generation, effective, attr, seed + _salt, table, runId, recordCount,
-            lookupRandomExplanation, _cts.Token);
+            generation, effective, attr, seed + _salt, table, runId, recordCount, _cts.Token);
     }
 
     private async Task RunAsync(
@@ -70,7 +106,6 @@ public sealed class RulePreviewController
         string table,
         string runId,
         int recordCount,
-        string lookupRandomExplanation,
         CancellationToken ct)
     {
         try
@@ -79,7 +114,9 @@ public sealed class RulePreviewController
             if (generation != _generation)
                 return;
 
-            var preview = Evaluate(effective, attr, seed, table, runId, recordCount, lookupRandomExplanation);
+            var preview = Sample(
+                effective, attr,
+                new RuleEvaluationContext(table, seed, DeterministicFaker.DefaultLocale, runId, recordCount), rows: 3);
             if (generation != _generation)
                 return;
             Publish(preview);
@@ -93,34 +130,6 @@ public sealed class RulePreviewController
             if (generation == _generation)
                 Publish([]);
         }
-    }
-
-    private static List<string> Evaluate(
-        FieldRule effective,
-        AttributeMetadata attr,
-        int seed,
-        string table,
-        string runId,
-        int recordCount,
-        string lookupRandomExplanation)
-    {
-        if (effective is LookupRandomRule)
-            return [lookupRandomExplanation];
-
-        var preview = new List<string>(3);
-        var eval = new RuleEvaluationContext(table, seed, DeterministicFaker.DefaultLocale, runId, recordCount);
-        if (effective is BogusRule bogus)
-        {
-            var prepared = BogusRulePreparer.CompileRule(bogus, attr, eval);
-            using var session = new BogusEvaluatorSession(eval.Locale);
-            for (var row = 0; row < 3; row++)
-                preview.Add(Format(session.Evaluate(prepared, attr, eval, row)));
-            return preview;
-        }
-
-        for (var row = 0; row < 3; row++)
-            preview.Add(Format(RuleValueGenerator.Evaluate(effective, attr, seed, table, row, runId)));
-        return preview;
     }
 
     private void Publish(IReadOnlyList<string> preview)

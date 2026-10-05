@@ -4,17 +4,25 @@ using System.Text;
 
 namespace SeedBomb.Services.Diagnostics;
 
-/// <summary>Appends log lines to one file per day under <see cref="AppPaths.Logs"/>.</summary>
+/// <summary>Appends log lines to one file per day under <see cref="AppPaths.Logs"/> (or a test directory).</summary>
 public sealed class FileLoggerProvider : ILoggerProvider
 {
     private const int RetainDays = 7;
     private readonly Lock _gate = new();
     private readonly LogLevel _minimum;
+    private readonly string _directory;
 
     /// <summary>Creates the provider and sweeps files older than seven days.</summary>
     /// <param name="minimum">Lowest level written to disk.</param>
     public FileLoggerProvider(LogLevel minimum = LogLevel.Information)
+        : this(AppPaths.Logs, minimum)
     {
+    }
+
+    /// <summary>Test seam: writes to <paramref name="directory"/> instead of <see cref="AppPaths.Logs"/>.</summary>
+    internal FileLoggerProvider(string directory, LogLevel minimum = LogLevel.Information)
+    {
+        _directory = directory;
         _minimum = minimum;
         Prune();
     }
@@ -48,15 +56,15 @@ public sealed class FileLoggerProvider : ILoggerProvider
         }
     }
 
-    private static string CurrentFile() =>
-        Path.Combine(AppPaths.Logs, $"seedbomb-{DateTime.Now:yyyyMMdd}.log");
+    private string CurrentFile() =>
+        Path.Combine(Directory.CreateDirectory(_directory).FullName, $"seedbomb-{DateTime.Now:yyyyMMdd}.log");
 
-    private static void Prune()
+    private void Prune()
     {
         try
         {
             var cutoff = DateTime.Now.AddDays(-RetainDays);
-            foreach (var file in Directory.EnumerateFiles(AppPaths.Logs, "seedbomb-*.log"))
+            foreach (var file in Directory.EnumerateFiles(Directory.CreateDirectory(_directory).FullName, "seedbomb-*.log"))
                 if (File.GetLastWriteTime(file) < cutoff)
                     File.Delete(file);
         }

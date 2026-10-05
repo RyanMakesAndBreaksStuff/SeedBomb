@@ -23,7 +23,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IOException("profile store is corrupt"));
 
-        var vm = new ProfilesViewModel(profiles.Object);
+        var vm = ProfilesHost.Create(profiles.Object);
 
         // Must not throw — WPF-UI notifies INavigationAware from an async void method,
         // so anything that escapes here crashes the process.
@@ -45,7 +45,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
             new ProfileTable("contact", 9000, null),
         ]), ct);
 
-        var vm = new ProfilesViewModel(svc);
+        var vm = ProfilesHost.Create(svc);
         await vm.RefreshCommand.ExecuteAsync(null);
 
         var row = Assert.Single(vm.Items);
@@ -64,7 +64,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         await svc.SaveAsync(new Profile(1, "Alpha", null, null, [new ProfileTable("account", 1, null)]), ct);
         await svc.SaveAsync(new Profile(1, "Beta", null, null, [new ProfileTable("contact", 1, null)]), ct);
 
-        var vm = new ProfilesViewModel(svc);
+        var vm = ProfilesHost.Create(svc);
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SearchText = "alp";
 
@@ -81,7 +81,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         await svc.SaveAsync(new Profile(1, "Alpha", null, null, [new ProfileTable("account", 1, null)]), ct);
         await svc.SaveAsync(new Profile(1, "Beta", null, null, [new ProfileTable("contact", 1, null)]), ct);
 
-        var vm = new ProfilesViewModel(svc);
+        var vm = ProfilesHost.Create(svc);
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = vm.Items.Single(i => i.Name == "Beta");
         await vm.RefreshCommand.ExecuteAsync(null);
@@ -94,7 +94,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         var profiles = new Mock<IProfileService>();
         profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidDataException("connections store is corrupt"));
-        var vm = new ProfilesViewModel(profiles.Object);
+        var vm = ProfilesHost.Create(profiles.Object);
 
         await vm.CycleSortCommand.ExecuteAsync(null);
 
@@ -116,7 +116,7 @@ public sealed class ProfilesViewModelPageTests : IDisposable
     }
 
     [Fact]
-    public async Task EditRules_replaces_the_generate_handoff_and_routes_saves_to_the_host()
+    public async Task EditRules_replaces_the_generate_handoff_and_routes_saves_to_the_board()
     {
         // Generate stamps these whenever it navigates away with tables selected.
         var request = new RulesNavigationRequest
@@ -125,20 +125,20 @@ public sealed class ProfilesViewModelPageTests : IDisposable
             ReturnPage = typeof(GeneratePage),
             OnSaved = _ => { },
         };
-        var (vm, _) = await ProfilesViewModelWithOneProfileAsync(request);
-        Action<Profile> rulesSaved = _ => { };
-        vm.RulesSaved = rulesSaved;
+        var board = ProfilesHost.Board();
+        var (vm, _) = await ProfilesViewModelWithOneProfileAsync(request, board.Object);
 
         await vm.EditRulesCommand.ExecuteAsync(null);
 
         Assert.Equal("Acme", request.Profile?.Name);
         Assert.Null(request.TableName);
         Assert.Null(request.ReturnPage);
-        Assert.Same(rulesSaved, request.OnSaved);
+        request.OnSaved!(request.Profile!);
+        board.Verify(b => b.ApplySavedProfileIfActive(request.Profile!), Times.Once);
     }
 
     private static async Task<(ProfilesViewModel Vm, Mock<IProfileService> Profiles)> ProfilesViewModelWithOneProfileAsync(
-        RulesNavigationRequest? rulesRequest = null)
+        RulesNavigationRequest? rulesRequest = null, IProfileBoard? board = null)
     {
         var profiles = new Mock<IProfileService>();
         profiles.Setup(p => p.ListAsync(It.IsAny<CancellationToken>()))
@@ -146,10 +146,11 @@ public sealed class ProfilesViewModelPageTests : IDisposable
         profiles.Setup(p => p.LoadAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Profile(1, "Acme", null, null, [new ProfileTable("account", 1, null)]));
 
-        var vm = new ProfilesViewModel(
+        var vm = ProfilesHost.Create(
             profiles.Object,
             rulesRequest: rulesRequest ?? new RulesNavigationRequest(),
-            navigator: Mock.Of<IAppNavigator>());
+            navigator: Mock.Of<IAppNavigator>(),
+            board: board);
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = Assert.Single(vm.Items);
         return (vm, profiles);

@@ -297,33 +297,12 @@ Full license texts are in [`licenses/`](licenses/).
 - Project: <https://www.newtonsoft.com/json>
 - License text: [licenses/Newtonsoft.Json-LICENSE.md](licenses/Newtonsoft.Json-LICENSE.md)
 
-## System.Formats.Asn1 11.0.0-preview.7.26381.103
-
-- License: MIT
-- Copyright: © Microsoft Corporation. All rights reserved.
-- Project: <https://dot.net/>
-- License text: [licenses/System.Formats.Asn1-DISPLAY.txt](licenses/System.Formats.Asn1-DISPLAY.txt)
-
 ## System.Runtime.Caching 4.7.0
 
 - License: MIT
 - Copyright: © Microsoft Corporation. All rights reserved.
 - Project: <https://github.com/dotnet/corefx>
 - License text: [licenses/System.Runtime.Caching-DISPLAY.txt](licenses/System.Runtime.Caching-DISPLAY.txt)
-
-## System.Security.Cryptography.Pkcs 11.0.0-preview.7.26381.103
-
-- License: MIT
-- Copyright: © Microsoft Corporation. All rights reserved.
-- Project: <https://dot.net/>
-- License text: [licenses/System.Security.Cryptography.Pkcs-DISPLAY.txt](licenses/System.Security.Cryptography.Pkcs-DISPLAY.txt)
-
-## System.Security.Cryptography.Xml 11.0.0-preview.7.26381.103
-
-- License: MIT
-- Copyright: © Microsoft Corporation. All rights reserved.
-- Project: <https://dot.net/>
-- License text: [licenses/System.Security.Cryptography.Xml-DISPLAY.txt](licenses/System.Security.Cryptography.Xml-DISPLAY.txt)
 
 ## System.ServiceModel.Http 8.1.2
 

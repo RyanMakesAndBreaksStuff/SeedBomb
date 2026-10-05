@@ -1,6 +1,5 @@
 using SeedBomb.Core.Contracts;
 using SeedBomb.Core.Rules;
-using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.ViewModels.Controls;
@@ -17,23 +16,19 @@ internal sealed class GenerateProfileBridge
     private readonly GenerateViewModel _owner;
     private readonly IProfileService _profiles;
     private readonly RulesNavigationRequest? _rulesRequest;
-    private readonly ILogger<GenerateViewModel> _logger;
     private Profile? _restoredDraft;
 
     /// <summary>Initialises the profile-bridge collaborator.</summary>
     public GenerateProfileBridge(
         GenerateViewModel owner,
         IProfileService profiles,
-        RulesNavigationRequest? rulesRequest,
-        ILogger<GenerateViewModel> logger)
+        RulesNavigationRequest? rulesRequest)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(profiles);
-        ArgumentNullException.ThrowIfNull(logger);
         _owner = owner;
         _profiles = profiles;
         _rulesRequest = rulesRequest;
-        _logger = logger;
     }
 
     /// <summary>Loads the autosaved draft and stamps its seed onto the wizard when present.</summary>
@@ -47,12 +42,12 @@ internal sealed class GenerateProfileBridge
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft profile load skipped");
+            _owner.ReportDraftFailure("restore", ex);
             _restoredDraft = null;
         }
     }
 
-    /// <summary>Deletes the autosaved draft. Failures are debug-logged.</summary>
+    /// <summary>Deletes the autosaved draft. Failures go to <see cref="GenerateViewModel.ReportDraftFailure"/>.</summary>
     public async Task ClearDraftAsync()
     {
         try
@@ -61,7 +56,7 @@ internal sealed class GenerateProfileBridge
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Draft clear skipped");
+            _owner.ReportDraftFailure("clear", ex);
         }
     }
 
@@ -90,15 +85,16 @@ internal sealed class GenerateProfileBridge
         return true;
     }
 
-    private Profile? _savedDuringRun;
+    // WR-009/WR-010: the last board change (a Rules save or an "Open in board" import) made while
+    // Generate runs. The latest one wins, matching what the user did last.
+    private Action? _deferredDuringRun;
 
-    /// <summary>Applies the last Rules save held back while Generate was running (WR-009).</summary>
-    public void ApplyRulesSavedDuringRun()
+    /// <summary>Applies the board change held back while Generate was running, if any.</summary>
+    public void ApplyDeferredBoardChange()
     {
-        if (_savedDuringRun is not { } profile)
-            return;
-        _savedDuringRun = null;
-        ApplySavedRulesProfile(profile);
+        var change = _deferredDuringRun;
+        _deferredDuringRun = null;
+        change?.Invoke();
     }
 
     /// <summary>Applies a profile returned from the Rules page onto the wizard board.</summary>
@@ -108,7 +104,7 @@ internal sealed class GenerateProfileBridge
         // renaming the profile and dropping tables under the run; GenerateAsync applies it after.
         if (_owner.IsRunning)
         {
-            _savedDuringRun = profile;
+            _deferredDuringRun = () => ApplySavedRulesProfile(profile);
             return;
         }
 
@@ -216,6 +212,12 @@ internal sealed class GenerateProfileBridge
     public void ApplyImportReport(ProfileImportReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
+
+        if (_owner.IsRunning)
+        {
+            _deferredDuringRun = () => ApplyImportReport(report);
+            return;
+        }
 
         // The Profiles page applies a report directly (no ApplySavedRulesProfile hop), so the
         // Profile card's name has to come off the report or it stays "No profile loaded".

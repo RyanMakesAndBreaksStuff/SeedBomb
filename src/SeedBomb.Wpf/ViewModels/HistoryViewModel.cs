@@ -115,7 +115,7 @@ public sealed partial class HistoryViewModel : ViewModelBase
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(HistorySummary));
 
-            if (_historyService.LoadWarning is { } warning)
+            if (_historyService.TakeLoadWarning() is { } warning)
                 _snackbar?.Show("Run history", warning, ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
         }
         catch (OperationCanceledException)
@@ -182,13 +182,12 @@ public sealed partial class HistoryViewModel : ViewModelBase
             {
                 var entities = string.Join("|", run.EntityNames);
                 var duration = $"{(int)run.Duration.TotalMinutes:00}:{run.Duration.Seconds:00}";
-                var status = run.Succeeded ? "Success" : "Failed";
                 lines.Add(string.Join(",",
                     CsvField.Escape(run.Timestamp.ToString("O")),
                     CsvField.Escape(entities),
                     CsvField.Escape(run.TotalRecords.ToString()),
                     CsvField.Escape(duration),
-                    CsvField.Escape(status),
+                    CsvField.Escape(run.Status),
                     CsvField.Escape(run.ErrorCount.ToString()),
                     CsvField.Escape(run.Environment),
                     CsvField.Escape(run.User),

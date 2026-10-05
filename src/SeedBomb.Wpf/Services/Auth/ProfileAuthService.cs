@@ -25,6 +25,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     private readonly IConnectionProfileService _profiles;
     // IN-003: written after ConfigureAwait(false) continuations and cleared from pool threads.
     private readonly ConcurrentDictionary<Guid, CachedClient> _clients = new();
+    private readonly RunSessionGate? _sessionGate;
     private IAccount? _account;
     private MsalCacheHelper? _userCacheHelper;
     private MsalCacheHelper? _appCacheHelper;
@@ -43,15 +44,36 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
     /// </summary>
     internal Func<ConnectionProfile, IPublicClientApplication>? CreatePcaOverride { get; set; }
 
+    /// <summary>
+    /// Test seam: replaces <c>AcquireTokenSilent(...).ExecuteAsync</c>. Null calls MSAL.
+    /// The public-client argument is the instance the caller is about to use.
+    /// </summary>
+    internal Func<IPublicClientApplication, string[], IAccount, CancellationToken, Task<AuthenticationResult>>? AcquireSilentOverride { get; set; }
+
+    /// <summary>
+    /// Test seam: replaces <c>AcquireTokenInteractive(...).ExecuteAsync</c>. Null calls MSAL.
+    /// </summary>
+    internal Func<IPublicClientApplication, string[], nint, CancellationToken, Task<AuthenticationResult>>? AcquireInteractiveOverride { get; set; }
+
+    /// <summary>
+    /// Test seam: replaces <c>AcquireTokenForClient(...).ExecuteAsync</c>. Null calls MSAL.
+    /// </summary>
+    internal Func<IConfidentialClientApplication, string[], CancellationToken, Task<AuthenticationResult>>? AcquireAppTokenOverride { get; set; }
+
     /// <summary>Initialises the service and subscribes to profile changes.</summary>
     /// <param name="profiles">Connection profile store.</param>
     /// <param name="logger">Optional logger. Tests may omit it.</param>
+    /// <param name="sessionGate">
+    /// Process-wide run/session gate. Null (tests that construct the service directly) does not coordinate.
+    /// </param>
     public ProfileAuthService(
         IConnectionProfileService profiles,
-        ILogger<ProfileAuthService>? logger = null)
+        ILogger<ProfileAuthService>? logger = null,
+        RunSessionGate? sessionGate = null)
     {
         _profiles = profiles;
         _logger = logger;
+        _sessionGate = sessionGate;
         _profiles.ProfilesChanged += OnProfilesChanged;
     }
 
@@ -170,33 +192,66 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Authenticated account and MSAL client held back until token acquisition succeeds.
+    /// Published together with <see cref="ActiveProfile"/> at the one commit boundary.
+    /// </summary>
+    private sealed record StagedSignIn(
+        AuthResult Result,
+        object? Client,
+        string? Fingerprint,
+        bool ReplaceClient,
+        IAccount? Account);
+
     private async Task<AuthResult> AuthenticateCoreAsync(
         ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)
     {
-        var result = profile.AuthType switch
+        var staged = profile.AuthType switch
         {
             AuthType.OAuth => await SignInOAuthAsync(profile, parentHwnd, commitSession, ct).ConfigureAwait(false),
             AuthType.ClientSecret or AuthType.Certificate => await SignInAppOnlyAsync(profile, commitSession, ct)
                 .ConfigureAwait(false),
-            _ => new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"),
+            _ => new StagedSignIn(new AuthResult(false, null, $"Unknown auth type: {profile.AuthType}"), null, null, false, null),
         };
 
-        if (result.Succeeded && commitSession)
+        if (!staged.Result.Succeeded || !commitSession)
+            return staged.Result;
+
+        // Cancellation before this point must not publish. After it, hint and last-used writes are
+        // best-effort: a cancel there still returns success so the switch can reset the connection.
+        ct.ThrowIfCancellationRequested();
+
+        if (staged.Account is not null)
         {
-            ActiveProfile = profile;
-            // CR-002: last-used moves only after a successful sign-in. It just picks what the next
-            // launch tries, so a failed write is logged rather than failing a session that is live.
             try
             {
-                await _profiles.SetLastUsedAsync(profile.Id, ct).ConfigureAwait(false);
+                await RememberAccountAsync(profile, staged.Account, ct).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Could not record {Profile} as the last-used connection", profile.Name);
+                _logger?.LogWarning(ex, "Could not record the signed-in account for {Profile}", profile.Name);
             }
         }
 
-        return result;
+        if (staged.ReplaceClient && staged.Client is not null && staged.Fingerprint is not null)
+            _clients[profile.Id] = new CachedClient(staged.Client, staged.Fingerprint);
+        if (staged.Account is not null)
+            _account = staged.Account;
+        ActiveProfile = profile;
+        RaiseActiveProfileChanged();
+
+        // CR-002: last-used only picks the next launch. A failed or cancelled write is logged;
+        // it must not report a cancelled switch that already changed the session.
+        try
+        {
+            await _profiles.SetLastUsedAsync(profile.Id, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Could not record {Profile} as the last-used connection", profile.Name);
+        }
+
+        return staged.Result;
     }
 
     /// <inheritdoc />
@@ -207,9 +262,9 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
         AuthenticationResult result;
         if (cached.Client is IPublicClientApplication pca)
-            result = await pca.AcquireTokenSilent(scopes, _account).ExecuteAsync(ct).ConfigureAwait(false);
+            result = await AcquireSilentAsync(pca, scopes, _account!, ct).ConfigureAwait(false);
         else if (cached.Client is IConfidentialClientApplication cca)
-            result = await cca.AcquireTokenForClient(scopes).ExecuteAsync(ct).ConfigureAwait(false);
+            result = await AcquireAppAsync(cca, scopes, ct).ConfigureAwait(false);
         else
             throw new InvalidOperationException("Unknown MSAL client type.");
 
@@ -240,10 +295,16 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         _account = null;
         ActiveProfile = null;
         SignedOut?.Invoke(this, EventArgs.Empty);
+        RaiseActiveProfileChanged();
     }
 
     /// <inheritdoc />
     public event EventHandler? SignedOut;
+
+    /// <inheritdoc />
+    public event EventHandler? ActiveProfileChanged;
+
+    private void RaiseActiveProfileChanged() => ActiveProfileChanged?.Invoke(this, EventArgs.Empty);
 
     /// <inheritdoc />
     public async Task ForgetProfileAsync(ConnectionProfile profile, CancellationToken ct = default)
@@ -268,11 +329,13 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         }
     }
 
-    private async Task<AuthResult> SignInOAuthAsync(
+    private async Task<StagedSignIn> SignInOAuthAsync(
         ConnectionProfile profile, nint parentHwnd, bool commitSession, CancellationToken ct)
     {
-        var pca = await GetOrCreatePca(profile, commitSession).ConfigureAwait(false);
-        var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
+        // Stage the candidate. GetOrCreatePca(commitSession: true) would replace the cached client
+        // before the token call; direct test calls of GetOrCreate* keep that cache behaviour.
+        var (pca, fingerprint, replaceClient) = await StagePcaAsync(profile, commitSession).ConfigureAwait(false);
+        var scopes = profile.DataverseScopes;
 
         try
         {
@@ -284,59 +347,48 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
             if (account is not null)
             {
-                var silent = await pca.AcquireTokenSilent(scopes, account).ExecuteAsync(ct).ConfigureAwait(false);
-                account = silent.Account;
-                if (commitSession)
-                    _account = account;
-                return new AuthResult(true, silent.Account.Username, null);
+                var silent = await AcquireSilentAsync(pca, scopes, account, ct).ConfigureAwait(false);
+                return Staged(silent.Account, silent.Account.Username, pca, fingerprint, replaceClient);
             }
 
             if (parentHwnd == nint.Zero)
-                return new AuthResult(false, null, "No cached session. Please sign in.");
+                return Failed("No cached session. Please sign in.");
 
-            var interactive = await pca.AcquireTokenInteractive(scopes)
-                .WithParentActivityOrWindow(parentHwnd)
-                .ExecuteAsync(ct).ConfigureAwait(false);
-            account = interactive.Account;
-            if (commitSession)
-            {
-                _account = account;
-                await RememberAccountAsync(profile, account, ct).ConfigureAwait(false);
-            }
-            return new AuthResult(true, interactive.Account.Username, null);
+            var interactive = await AcquireInteractiveAsync(pca, scopes, parentHwnd, ct).ConfigureAwait(false);
+            return Staged(interactive.Account, interactive.Account.Username, pca, fingerprint, replaceClient);
         }
         catch (MsalUiRequiredException)
         {
             if (parentHwnd == nint.Zero)
-                return new AuthResult(false, null, "Session expired. Please sign in again.");
+                return Failed("Session expired. Please sign in again.");
 
             try
             {
-                var interactive = await pca.AcquireTokenInteractive(scopes)
-                    .WithParentActivityOrWindow(parentHwnd)
-                    .ExecuteAsync(ct).ConfigureAwait(false);
-                if (commitSession)
-                {
-                    _account = interactive.Account;
-                    await RememberAccountAsync(profile, interactive.Account, ct).ConfigureAwait(false);
-                }
-                return new AuthResult(true, interactive.Account.Username, null);
+                var interactive = await AcquireInteractiveAsync(pca, scopes, parentHwnd, ct).ConfigureAwait(false);
+                return Staged(interactive.Account, interactive.Account.Username, pca, fingerprint, replaceClient);
             }
             catch (MsalException ex2)
             {
-                return new AuthResult(false, null, ex2.Message);
+                return Failed(ex2.Message);
             }
         }
         catch (MsalException ex)
         {
-            return new AuthResult(false, null, ex.Message);
+            return Failed(ex.Message);
         }
         catch (System.Runtime.InteropServices.COMException ex)
         {
             // WAM/broker RPC (0x6BA / 0x71A) when account service is unavailable — treat as no session.
-            return new AuthResult(false, null, ex.Message);
+            return Failed(ex.Message);
         }
     }
+
+    private static StagedSignIn Staged(
+        IAccount account, string? username, object client, string fingerprint, bool replaceClient) =>
+        new(new AuthResult(true, username, null), client, fingerprint, replaceClient, account);
+
+    private static StagedSignIn Failed(string message) =>
+        new(new AuthResult(false, null, message), null, null, false, null);
 
     // WR-005: record which cached account belongs to this profile so the next silent sign-in asks
     // for exactly that one. Only a hint for next time: a failed write is logged, not surfaced.
@@ -351,58 +403,88 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         {
             await _profiles.SaveAsync(profile, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
+            // Account-hint persistence is best-effort, including cancellation after the token succeeded.
             _logger?.LogWarning(ex, "Could not record the signed-in account for {Profile}", profile.Name);
         }
     }
 
-    private async Task<AuthResult> SignInAppOnlyAsync(
+    private async Task<StagedSignIn> SignInAppOnlyAsync(
         ConnectionProfile profile, bool commitSession, CancellationToken ct)
     {
         string? clientSecret = profile.ClientSecret;
         if (profile.AuthType == AuthType.Certificate)
         {
             if (string.IsNullOrWhiteSpace(profile.CertificateThumbprint))
-                return new AuthResult(false, null, "Certificate thumbprint is not configured for this profile.");
+                return Failed("Certificate thumbprint is not configured for this profile.");
         }
         else
         {
             clientSecret ??= await _profiles.GetSecretAsync(profile.Id, ct).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(clientSecret))
-                return new AuthResult(false, null,
+                return Failed(
                     "Re-enter the client secret for this connection — none is saved, or the saved one can't be decrypted for this Windows user.");
         }
 
-        var cca = await GetOrCreateCca(profile, commitSession, clientSecret).ConfigureAwait(false);
-        var scopes = new[] { $"{profile.EnvironmentUrl}/.default" };
+        var (cca, fingerprint, replaceClient) = await StageCcaAsync(profile, commitSession, clientSecret)
+            .ConfigureAwait(false);
+        var scopes = profile.DataverseScopes;
 
         try
         {
-            var result = await cca.AcquireTokenForClient(scopes).ExecuteAsync(ct).ConfigureAwait(false);
-            return new AuthResult(true, profile.Name, null);
+            await AcquireAppAsync(cca, scopes, ct).ConfigureAwait(false);
+            return new StagedSignIn(new AuthResult(true, profile.Name, null), cca, fingerprint, replaceClient, null);
         }
         catch (MsalException ex)
         {
-            return new AuthResult(false, null, ex.Message);
+            return Failed(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return new AuthResult(false, null, ex.Message);
+            return Failed(ex.Message);
         }
     }
 
+    private async Task<(IPublicClientApplication Client, string Fingerprint, bool ReplaceClient)> StagePcaAsync(
+        ConnectionProfile profile, bool commitSession)
+    {
+        var fingerprint = ComputePcaFingerprint(profile);
+        if (commitSession
+            && _clients.TryGetValue(profile.Id, out var existing)
+            && existing.Client is IPublicClientApplication cached
+            && existing.Fingerprint == fingerprint)
+            return (cached, fingerprint, false);
+
+        var created = await GetOrCreatePca(profile, commitSession: false).ConfigureAwait(false);
+        return (created, fingerprint, commitSession);
+    }
+
+    private async Task<(IConfidentialClientApplication Client, string Fingerprint, bool ReplaceClient)> StageCcaAsync(
+        ConnectionProfile profile, bool commitSession, string? clientSecret)
+    {
+        var fingerprint = ComputeCcaFingerprint(profile, clientSecret);
+        if (commitSession
+            && _clients.TryGetValue(profile.Id, out var existing)
+            && existing.Client is IConfidentialClientApplication cached
+            && existing.Fingerprint == fingerprint)
+            return (cached, fingerprint, false);
+
+        var created = await GetOrCreateCca(profile, commitSession: false, clientSecret).ConfigureAwait(false);
+        return (created, fingerprint, commitSession);
+    }
+
     /// <summary>
-    /// Fingerprint of the credential a public client is built from: the client ID plus the
-    /// auth type. A cached client whose fingerprint doesn't match the profile's current
+    /// Fingerprint of every input a public client is built from: auth type, client ID and
+    /// authority. A cached client whose fingerprint doesn't match the profile's current
     /// values is stale and must be rebuilt.
     /// </summary>
     private static string ComputePcaFingerprint(ConnectionProfile profile) =>
-        $"{profile.AuthType}:{profile.ClientId}";
+        $"{profile.AuthType}:{profile.ClientId}:{AuthorityKey(profile)}";
 
     /// <summary>
-    /// Fingerprint of the credential a confidential client is built from: the auth type plus
-    /// a SHA-256 hash of the secret or certificate thumbprint currently in use. Hashing keeps
+    /// Fingerprint of every input a confidential client is built from: auth type, client ID,
+    /// authority, and a SHA-256 hash of the secret or certificate thumbprint. Hashing keeps
     /// the raw secret out of the cache key/comparison state.
     /// </summary>
     private static string ComputeCcaFingerprint(ConnectionProfile profile, string? clientSecret)
@@ -411,8 +493,12 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
             ? profile.CertificateThumbprint
             : clientSecret;
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(credential ?? string.Empty));
-        return $"{profile.AuthType}:{Convert.ToHexString(hash)}";
+        return $"{profile.AuthType}:{profile.ClientId}:{AuthorityKey(profile)}:{Convert.ToHexString(hash)}";
     }
+
+    // WR-013: both builders call WithAuthority(ResolveCloud, ResolveTenant); the fingerprint must cover it too.
+    private static string AuthorityKey(ConnectionProfile profile) =>
+        $"{ResolveCloud(profile)}:{ResolveTenant(profile)}";
 
     internal async Task<IPublicClientApplication> GetOrCreatePca(ConnectionProfile profile, bool commitSession)
     {
@@ -517,31 +603,56 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
 
     private static void ValidateProfile(ConnectionProfile profile)
     {
-        if (string.IsNullOrWhiteSpace(profile.EnvironmentUrl))
-            throw new InvalidOperationException("Environment URL is not configured.");
-
-        if (string.IsNullOrWhiteSpace(profile.ClientId))
-            throw new InvalidOperationException("Client ID is not configured.");
-
-        if (!Guid.TryParse(profile.ClientId, out _))
-            throw new InvalidOperationException($"Client ID '{profile.ClientId}' is not a valid GUID.");
-
-        // TenantId is optional for OAuth (falls back to /common endpoint)
-        if (profile.AuthType != AuthType.OAuth)
-        {
-            if (string.IsNullOrWhiteSpace(profile.TenantId))
-                throw new InvalidOperationException("Tenant ID is not configured.");
-
-            if (!Guid.TryParse(profile.TenantId, out _))
-                throw new InvalidOperationException($"Tenant ID '{profile.TenantId}' is not a valid GUID.");
-        }
+        if (profile.SignInError() is { } error)
+            throw new InvalidOperationException(error);
     }
+
+    private Task<AuthenticationResult> AcquireSilentAsync(
+        IPublicClientApplication pca, string[] scopes, IAccount account, CancellationToken ct) =>
+        AcquireSilentOverride is { } acquire
+            ? acquire(pca, scopes, account, ct)
+            : pca.AcquireTokenSilent(scopes, account).ExecuteAsync(ct);
+
+    private Task<AuthenticationResult> AcquireInteractiveAsync(
+        IPublicClientApplication pca, string[] scopes, nint parentHwnd, CancellationToken ct) =>
+        AcquireInteractiveOverride is { } acquire
+            ? acquire(pca, scopes, parentHwnd, ct)
+            : pca.AcquireTokenInteractive(scopes).WithParentActivityOrWindow(parentHwnd).ExecuteAsync(ct);
+
+    private Task<AuthenticationResult> AcquireAppAsync(
+        IConfidentialClientApplication cca, string[] scopes, CancellationToken ct) =>
+        AcquireAppTokenOverride is { } acquire
+            ? acquire(cca, scopes, ct)
+            : cca.AcquireTokenForClient(scopes).ExecuteAsync(ct);
 
     private void OnProfilesChanged(object? sender, EventArgs e) =>
         _ = ReconcileSessionAsync();
 
     private async Task ReconcileSessionAsync()
     {
+        try
+        {
+            if (_sessionGate is null)
+            {
+                await ReconcileUnderLeaseAsync().ConfigureAwait(false);
+                return;
+            }
+
+            // Independent lease. A save/delete that raised ProfilesChanged is still holding its own
+            // and must not await this task, or the two leases deadlock.
+            using var lease = await _sessionGate.AcquireAsync().ConfigureAwait(false);
+            await ReconcileUnderLeaseAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Could not reconcile the live session with the connection store");
+        }
+    }
+
+    private async Task ReconcileUnderLeaseAsync()
+    {
+        // Re-read after the lease is held so a delayed pass cannot clear a session committed since
+        // this reconcile was queued.
         var active = ActiveProfile?.Id;
         if (active is null)
             return;
@@ -564,6 +675,7 @@ public sealed class ProfileAuthService : IAuthService, IDisposable
         ActiveProfile = null;
         // CR-002: say so — the shell still showed the deleted profile as connected.
         SignedOut?.Invoke(this, EventArgs.Empty);
+        RaiseActiveProfileChanged();
     }
 
     /// <inheritdoc />

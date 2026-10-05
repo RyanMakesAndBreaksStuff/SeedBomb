@@ -202,4 +202,21 @@ public class ThrottlePolicyTests
 
         Assert.Equal(1, callCount);
     }
+
+    public static TheoryData<Exception, bool> TransientCases => new()
+    {
+        { new EndpointNotFoundException("There was no endpoint listening at https://contoso.crm.dynamics.com."), true },
+        { new ServerTooBusyException("The server is too busy."), true },
+        { new TimeoutException(), true },
+        { new HttpRequestException(), true },
+        { new ProtocolException("The remote server returned an unexpected response: (429)  ."), true },
+        { new ProtocolException("The remote server returned an unexpected response: (502)  ."), false },
+        { new FaultException<OrganizationServiceFault>(new OrganizationServiceFault { ErrorCode = -2147220969 }), false },
+        { new InvalidOperationException(), false },
+    };
+
+    [Theory]
+    [MemberData(nameof(TransientCases))]
+    public void IsTransient_SeparatesNetworkFaultsFromDataFaults(Exception ex, bool expected) =>
+        Assert.Equal(expected, ThrottlePolicy.IsTransient(ex));
 }

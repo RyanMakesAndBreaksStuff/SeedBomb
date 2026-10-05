@@ -72,6 +72,47 @@ public sealed class ConnectionStoreRecoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Locked_connections_read_as_empty_without_caching_and_writes_still_fail()
+    {
+        // WR-008: GetLastUsedAsync threw at startup (App.ShowMainWindow), which ended the app.
+        var ct = TestContext.Current.CancellationToken;
+        using (var seed = new JsonConnectionProfileService(_dir))
+            await seed.SaveAsync(new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://org.crm.dynamics.com" }, ct);
+        using var svc = new JsonConnectionProfileService(_dir); // fresh cache, like a new launch
+
+        using (File.Open(StorePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Empty(await svc.GetAllAsync(ct));
+            Assert.Contains("could not be opened", svc.LoadWarning, StringComparison.Ordinal);
+            await Assert.ThrowsAnyAsync<IOException>(() => svc.SaveAsync(new ConnectionProfile { Name = "Other" }, ct));
+        }
+
+        Assert.Single(await svc.GetAllAsync(ct)); // the empty read was not cached
+        Assert.False(File.Exists(StorePath + ".corrupt"));
+    }
+
+    [Fact]
+    public async Task Locked_file_warning_clears_once_the_store_reads_again()
+    {
+        // WR-003: the locked-file warning stayed on the service and the Connections page after recovery.
+        var ct = TestContext.Current.CancellationToken;
+        using (var seed = new JsonConnectionProfileService(_dir))
+            await seed.SaveAsync(new ConnectionProfile { Name = "Dev", EnvironmentUrl = "https://org.crm.dynamics.com" }, ct);
+        using var svc = new JsonConnectionProfileService(_dir);
+        var vm = new ConnectionManagerViewModel(svc, Mock.Of<IAuthService>(), Mock.Of<IDataverseConnectionService>());
+
+        using (File.Open(StorePath, FileMode.Open, FileAccess.Read, FileShare.None))
+            await vm.LoadCommand.ExecuteAsync(null);
+        Assert.NotNull(vm.SwitchError);
+
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.Null(svc.LoadWarning);
+        Assert.Null(vm.SwitchError);
+        Assert.Single(vm.Profiles);
+    }
+
+    [Fact]
     public async Task SignIn_with_an_undecryptable_secret_asks_for_it_again()
     {
         // "AQID" is valid base64 but not DPAPI data: the same failure as a secret protected by

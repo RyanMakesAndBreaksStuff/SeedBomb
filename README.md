@@ -82,7 +82,7 @@ Verified test counts:
 ## Configuration and security
 
 - **WPF credentials**: connection profiles are stored in `%LOCALAPPDATA%\SeedBomb\connections.json`. Client secrets and passwords are encrypted with Windows DPAPI (`DataProtectionScope.CurrentUser`) before being written to disk.
-- **NuGet audit**: a transitive `System.Security.Cryptography.Xml` vulnerability in the Dataverse SDK is acknowledged. `NuGetAuditLevel` is set to `moderate`, and `NU1901`–`NU1903` warnings are not promoted to errors (see `Directory.Build.props`).
+- **NuGet audit**: `NuGetAuditLevel` is `moderate` and advisories fail the build (`TreatWarningsAsErrors`). The Dataverse SDK's transitive `System.Security.Cryptography.Xml` is pinned to a patched stable version for `net10.0` projects in `Directory.Packages.props`; the WPF app uses the copy in the Windows Desktop framework.
 
 ## Deploy
 

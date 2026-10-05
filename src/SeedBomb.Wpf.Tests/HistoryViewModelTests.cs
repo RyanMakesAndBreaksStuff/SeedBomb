@@ -83,7 +83,7 @@ public sealed class HistoryViewModelTests
     {
         var history = new Mock<IRunHistoryService>();
         history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        history.SetupGet(h => h.LoadWarning)
+        history.Setup(h => h.TakeLoadWarning())
             .Returns("Run history could not be read, so SeedBomb started without it.");
 
         var snackbar = new Mock<ISnackbarService>();
@@ -161,6 +161,40 @@ public sealed class HistoryViewModelTests
             exportDir.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public async Task ExportCsvAsync_LabelsRunsByOutcome()
+    {
+        // Smoke item 3: a run that only lost rows reads "Completed with N rejected rows" on the
+        // sheet, so History must not call it "Failed".
+        var now = DateTimeOffset.Now;
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new RunRecord(Guid.NewGuid(), now, ["Contact"], 0, TimeSpan.FromMinutes(1), false, 500),
+            new RunRecord(Guid.NewGuid(), now.AddMinutes(-1), ["Account"], 0, TimeSpan.FromMinutes(1), false, 0),
+            new RunRecord(Guid.NewGuid(), now.AddMinutes(-2), ["Account"], 10, TimeSpan.FromMinutes(1), true, 0),
+        ]);
+
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        var exportDir = Directory.CreateTempSubdirectory("seedbomb-history-export-test-");
+        vm.ExportDirectoryOverride = exportDir.FullName;
+        try
+        {
+            await vm.ExportCsvCommand.ExecuteAsync(null);
+
+            var lines = await File.ReadAllLinesAsync(
+                Directory.GetFiles(exportDir.FullName).Single(), TestContext.Current.CancellationToken);
+            Assert.Equal(["Rejected", "Failed", "Success"], lines.Skip(1).Select(l => l.Split(',')[4]));
+        }
+        finally
+        {
+            exportDir.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ExportCsvAsync_ShowsSuccessSnackbar_WhenWriteSucceeds()
     {
@@ -207,7 +241,7 @@ public sealed class HistoryViewModelTests
         live.ApplyResult(new SeedBomb.Core.Contracts.GenerationResult
         {
             Elapsed = TimeSpan.FromMinutes(1),
-            Errors = [new SeedBomb.Core.Contracts.BatchError("account", 0, "request throttled", -2147015902, 7)],
+            Errors = [new SeedBomb.Core.Contracts.BatchError("account", "request throttled", -2147015902, 7) { RowIndexes = [0, 1, 2, 3, 4, 5, 6] }],
         }, seed: 42, environmentHost: "contoso-dev",
             new SeedBomb.Core.Contracts.GenerationConfig {
                 EntityLogicalNames = ["account"],

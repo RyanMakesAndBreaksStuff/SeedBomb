@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SeedBomb.Core.Rules;
-using Microsoft.Xrm.Sdk.Metadata;
+using SeedBomb.Services;
 using SeedBomb.Services.Navigation;
 using SeedBomb.Services.Profiles;
 using SeedBomb.Views.Pages;
@@ -18,15 +18,13 @@ namespace SeedBomb.ViewModels;
 /// <param name="Name">Profile display name.</param>
 /// <param name="VersionLabel">e.g. v1.</param>
 /// <param name="SummaryLine">e.g. 3 tables · 11 rules · 9,500 rows.</param>
-/// <param name="Description">Optional profile description.</param>
-/// <param name="Seed">Pinned seed, if any.</param>
+/// <param name="RowCount">Total configured rows, used for sorting independently of display text.</param>
 /// <param name="RuleCount">Active column rules.</param>
 public sealed record ProfileListItem(
     string Name,
     string VersionLabel,
     string SummaryLine,
-    string? Description = null,
-    int? Seed = null,
+    int RowCount,
     int RuleCount = 0);
 
 /// <summary>One ruled column in the selected profile's detail table.</summary>
@@ -43,6 +41,8 @@ public sealed record ProfileRuleRow(string Table, string Column, string Operatio
 public sealed partial class ProfilesViewModel : ViewModelBase
 {
     private readonly IProfileService _profiles;
+    private readonly IProfileBoard _board;
+    private readonly IFileDialogService _files;
     private readonly RulesNavigationRequest? _rulesRequest;
     private readonly IAppNavigator? _navigator;
     private readonly IContentDialogService? _dialogs;
@@ -54,11 +54,15 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Initialises the view-model.</summary>
     public ProfilesViewModel(
         IProfileService profiles,
+        IProfileBoard board,
+        IFileDialogService files,
         RulesNavigationRequest? rulesRequest = null,
         IAppNavigator? navigator = null,
         IContentDialogService? dialogs = null)
     {
         _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
+        _board = board ?? throw new ArgumentNullException(nameof(board));
+        _files = files ?? throw new ArgumentNullException(nameof(files));
         _rulesRequest = rulesRequest;
         _navigator = navigator;
         _dialogs = dialogs;
@@ -202,44 +206,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// <summary>Pending import waiting for Open in board / Discard.</summary>
     public ProfileImportReport? PendingImport { get; private set; }
 
-    // ── Host callbacks (wired by GenerateViewModel before ShowAsync) ──────────
-
-    /// <summary>Snapshots the current wizard state as a profile (Save current).</summary>
-    public Func<string, Profile>? CaptureCurrent { get; set; }
-
-    /// <summary>True when the field-rules draft is dirty (Load confirm).</summary>
-    public Func<bool>? IsBoardDirty { get; set; }
-
-    /// <summary>Live entity metadata for import/load validation (same path as Task 9).</summary>
-    public Func<IReadOnlyDictionary<string, EntityMetadata>>? GetMetadata { get; set; }
-
-    /// <summary>
-    /// Fetches live metadata for the profile's tables. Invoked only when the user clicks Load —
-    /// never on selection — so browsing a profile whose tables are absent from the connected org
-    /// no longer throws. Provider failures surface through <see cref="LoadAsync"/>'s error handler.
-    /// </summary>
-    public Func<IReadOnlyList<string>, CancellationToken, Task>? EnsureMetadata { get; set; }
-
-    /// <summary>Current run id for pattern worst-case length during import validation.</summary>
-    public Func<string>? GetRunId { get; set; }
-
-    /// <summary>Optional confirm: return true to proceed overwriting a dirty board.</summary>
+    /// <summary>Test seam: return true to proceed overwriting a dirty board.</summary>
     public Func<string, bool>? ConfirmOverwrite { get; set; }
-
-    /// <summary>File picker: open path for import, or null if cancelled.</summary>
-    public Func<string?>? PickImportPath { get; set; }
-
-    /// <summary>File picker: export destination, or null if cancelled.</summary>
-    public Func<string, string?>? PickExportPath { get; set; }
-
-    /// <summary>Confirm delete; true = delete.</summary>
-    public Func<string, bool>? ConfirmDelete { get; set; }
-
-    /// <summary>Called when the Rules page saves a profile opened from here; the host syncs its board.</summary>
-    public Action<Profile>? RulesSaved { get; set; }
-
-    /// <summary>Raised when the user confirms an import preview. Arg is the validated report.</summary>
-    public event EventHandler<ProfileImportReport>? ProfileApplied;
 
     /// <summary>Reloads the profile list from the store.</summary>
     [RelayCommand]
@@ -270,7 +238,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
         IEnumerable<ProfileListItem> ordered = _sortMode switch
         {
-            1 => projected.OrderByDescending(p => ParseRowCount(p.SummaryLine)),
+            1 => projected.OrderByDescending(p => p.RowCount),
             _ => projected.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase),
         };
 
@@ -293,7 +261,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     }
 
     /// <summary>Loads the selected (or parameter) profile into the pending-import slot (then Open in board).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanMutateSelected))]
     private async Task LoadAsync(ProfileListItem? item)
     {
         if (item is not null)
@@ -315,26 +283,17 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// CR-005: the one way a profile reaches the pending-import slot, for Load and Import alike —
     /// ask before replacing a dirty board, then validate against live metadata for its tables.
     /// </summary>
-    /// <returns><see langword="false"/> when the user kept the board or no metadata host is wired.</returns>
+    /// <returns><see langword="false"/> when the user kept the board.</returns>
     private async Task<bool> PresentWithMetadataAsync(Profile profile, string sourceLabel, CancellationToken ct)
     {
-        if (IsBoardDirty?.Invoke() == true)
+        if (_board.IsBoardDirty())
         {
             var ok = await ConfirmOverwriteAsync(
                 "The rules board has unsaved changes. Load this profile and overwrite the draft?");
             if (!ok) return false;
         }
 
-        if (EnsureMetadata is not null)
-            await EnsureMetadata([.. profile.Tables.Select(t => t.Table)], ct);
-        if (GetMetadata is null)
-        {
-            // A host that cannot supply metadata cannot validate the profile against the
-            // org, so there is nothing to apply. Surface it rather than faking success.
-            SetError("Cannot open this profile — no table metadata is available. Connect first.");
-            return false;
-        }
-
+        await _board.EnsureMetadataAsync(profile.Tables.Select(t => t.Table), ct);
         PresentImport(profile, sourceLabel);
         return true;
     }
@@ -344,7 +303,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     private async Task ExportAsync()
     {
         if (SelectedItem is null) return;
-        var dest = PickExportPath?.Invoke(SelectedItem.Name);
+        var dest = _files.PickProfileExportPath(SelectedItem.Name);
         if (string.IsNullOrWhiteSpace(dest)) return;
 
         try
@@ -417,7 +376,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     [RelayCommand]
     private async Task ImportFromFileAsync()
     {
-        var path = PickImportPath?.Invoke();
+        var path = _files.PickProfileToImport();
         if (string.IsNullOrWhiteSpace(path)) return;
 
         await ImportFromPathAsync(path);
@@ -478,12 +437,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             return;
         }
 
-        if (GetMetadata is null)
-        {
-            SetStatus($"Imported “{profile.Name}”.");
-            return;
-        }
-
         try
         {
             // CR-005: the same path as Load — live metadata for its tables and the dirty-board prompt.
@@ -501,11 +454,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
     /// </summary>
     public ProfileImportReport PresentImport(Profile profile, string sourceLabel)
     {
-        var metadata = GetMetadata?.Invoke()
-                       ?? throw new InvalidOperationException("Metadata provider not wired for profile import.");
-        var runId = GetRunId?.Invoke() ?? "";
-
-        var report = ProfileImport.ValidateAgainstMetadata(profile, metadata, runId);
+        var report = ProfileImport.ValidateAgainstMetadata(profile, _board.EntityMetadataMap, _board.RunId);
         PendingImport = report;
         SchemaErrorMessage = null;
         ShowImportSummary = true;
@@ -535,13 +484,14 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         return report;
     }
 
-    /// <summary>Commits the pending import for the host to apply via <see cref="ProfileApplied"/>.</summary>
+    /// <summary>Loads the pending import onto the Generate board and opens Generate.</summary>
     [RelayCommand(CanExecute = nameof(CanOpenInBoard))]
     private void OpenInBoard()
     {
         if (PendingImport is null) return;
-        ProfileApplied?.Invoke(this, PendingImport);
+        _board.ApplyImportReport(PendingImport);
         ShowImportSummary = false;
+        _navigator?.Navigate(typeof(GeneratePage));
     }
 
     /// <summary>Drops the pending import / schema-error pane and returns to the profile list.</summary>
@@ -571,24 +521,18 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         }
     }
 
-    // Reusing CaptureCurrent guarantees a schema-valid profile: BuildProfileSnapshot falls
+    // Reusing the board snapshot guarantees a schema-valid profile: BuildProfileSnapshot falls
     // back to a placeholder "account" table when nothing is selected, so this never produces
     // an empty table list — which LoadAsync's schema check would reject on the next refresh.
     [RelayCommand]
     private async Task NewProfileAsync()
     {
-        if (CaptureCurrent is null)
-        {
-            SetError("No current board is available to save.");
-            return;
-        }
-
         var name = await AskNameAsync("new-profile");
         if (name is null || !JsonProfileService.IsValidName(name)) return;
 
         try
         {
-            var profile = CaptureCurrent(name.Trim());
+            var profile = _board.BuildProfileSnapshot(name.Trim());
             await _profiles.SaveAsync(profile);
             await RefreshAsync();
             SelectedItem = Items.FirstOrDefault(i =>
@@ -624,7 +568,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         _rulesRequest.Clear();
         _rulesRequest.Profile = profile;
         _rulesRequest.IsStored = true; // CR-003: rule edits go back to this profile's file
-        _rulesRequest.OnSaved = RulesSaved;
+        _rulesRequest.OnSaved = _board.ApplySavedProfileIfActive;
         _navigator.Navigate(typeof(RulesPage));
     }
 
@@ -683,8 +627,6 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     private async Task<bool> ConfirmDeleteAsync(string name)
     {
-        if (ConfirmDelete is not null)
-            return ConfirmDelete(name);
         if (_dialogs is null)
             return false;
 
@@ -693,19 +635,29 @@ public sealed partial class ProfilesViewModel : ViewModelBase
 
     private bool CanMutateSelected() => SelectedItem is not null && !ShowImportSummary;
 
-    private bool CanOpenInBoard() => ShowImportSummary && PendingImport is not null && SchemaErrorMessage is null;
+    // A report with no table in this org would load only a profile name and seed onto the board.
+    private bool CanOpenInBoard() =>
+        ShowImportSummary && PendingImport is { AppliedTableSummaries.Count: > 0 } && SchemaErrorMessage is null;
 
     private bool CanLeaveImportSummary() => ShowImportSummary;
 
     private void SetStatus(string message)
     {
         HasError = false;
-        StatusMessage = message;
+        ShowStatus(message);
     }
 
     private void SetError(string message)
     {
         HasError = true;
+        ShowStatus(message);
+    }
+
+    // The bar's close button sets IsOpen locally; an unchanged message raises no change and the
+    // bar stays closed. Clearing first makes every Set* reopen it.
+    private void ShowStatus(string message)
+    {
+        StatusMessage = null;
         StatusMessage = message;
     }
 
@@ -729,19 +681,8 @@ public sealed partial class ProfilesViewModel : ViewModelBase
             profile.Name,
             $"v{profile.ProfileVersion}",
             summary,
-            profile.Description,
-            profile.Seed,
+            rowCount,
             ruleCount);
-    }
-
-    private static int ParseRowCount(string summary)
-    {
-        var idx = summary.LastIndexOf('·');
-        var tail = idx >= 0 ? summary[(idx + 1)..] : summary;
-        tail = tail.Replace("rows", "", StringComparison.OrdinalIgnoreCase)
-            .Replace(",", "", StringComparison.Ordinal)
-            .Trim();
-        return int.TryParse(tail, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
     }
 
     private static string OperationSummary(FieldRule rule) => rule switch
@@ -753,6 +694,7 @@ public sealed partial class ProfilesViewModel : ViewModelBase
         SequenceRule => "sequence",
         NullRule => "null",
         BogusRule b => $"bogus · {b.Api}.{b.Endpoint}",
+        LookupRandomRule => "lookupRandom",
         _ => rule.GetType().Name,
     };
 }

@@ -5,6 +5,16 @@ namespace SeedBomb.Services.Auth;
 /// <summary>
 /// Provides MSAL-based authentication for the desktop application.
 /// </summary>
+/// <remarks>
+/// Session mutations and generation share one <see cref="RunSessionGate"/>. Callers that change the
+/// live session — a profile switch, save, or delete, settings sign-out, and the startup sign-in —
+/// acquire that gate and hold it across the mutation. <see cref="SignInAsync(nint, CancellationToken)"/>,
+/// <see cref="SignInAsync(ConnectionProfile, nint, CancellationToken)"/>, <see cref="SignOutAsync"/>,
+/// <see cref="GetTokenAsync"/> and <see cref="ForgetProfileAsync"/> do not acquire it. Token refresh
+/// must stay usable while a generation run owns the gate, and a caller that already holds the lease
+/// would deadlock if sign-in took it again. Reconciliation takes its own lease and must never be
+/// awaited by a mutation that still holds one.
+/// </remarks>
 public interface IAuthService
 {
     /// <summary>
@@ -43,6 +53,12 @@ public interface IAuthService
 
     /// <summary>Raised after <see cref="SignOutAsync"/> completes.</summary>
     event EventHandler? SignedOut;
+
+    /// <summary>
+    /// Raised after a sign-in commits the live session, and after sign-out or reconciliation clears it.
+    /// Not raised when a sign-in fails or is cancelled before that commit.
+    /// </summary>
+    event EventHandler? ActiveProfileChanged;
 
     /// <summary>Acquires a token silently for the given scopes.</summary>
     Task<string> GetTokenAsync(string[] scopes, CancellationToken ct = default);

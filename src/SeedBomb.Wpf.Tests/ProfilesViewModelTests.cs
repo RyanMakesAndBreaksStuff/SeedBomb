@@ -22,6 +22,15 @@ public sealed class ProfilesViewModelTests : IDisposable
         Assert.Equal("bogus · NAME.firstName", vm.SelectedProfileRules.Single().OperationSummary);
     }
 
+    [Fact]
+    public async Task LookupRandomRule_RendersItsOpName()
+    {
+        // IN-004: it fell through to the CLR type name.
+        var vm = await ProfilesViewModelWith(new LookupRandomRule());
+
+        Assert.Equal("lookupRandom", vm.SelectedProfileRules.Single().OperationSummary);
+    }
+
     private async Task<ProfilesViewModel> ProfilesViewModelWith(FieldRule rule)
     {
         Directory.CreateDirectory(_root);
@@ -37,7 +46,7 @@ public sealed class ProfilesViewModelTests : IDisposable
                 ["name"] = rule,
             })]), ct);
 
-        var vm = new ProfilesViewModel(svc);
+        var vm = ProfilesHost.Create(svc);
         await vm.RefreshCommand.ExecuteAsync(null);
         vm.SelectedItem = Assert.Single(vm.Items);
         return vm;

@@ -69,7 +69,17 @@ public partial class App : Application
             // back as a failed AuthResult and land on the sign-in overlay.
             splash.SetStatus("Restoring your session...");
             var auth = _host.Services.GetRequiredService<IAuthService>();
-            var result = await auth.SignInAsync(nint.Zero);
+            var sessionGate = _host.Services.GetRequiredService<RunSessionGate>();
+            AuthResult result;
+            var startupLease = await sessionGate.AcquireAsync();
+            try
+            {
+                result = await auth.SignInAsync(nint.Zero);
+            }
+            finally
+            {
+                startupLease.Dispose();
+            }
 
             // Always show MainWindow — its "Sign in to continue" overlay covers a failed
             // silent attempt, and the first-run overlay already covers zero profiles.
@@ -100,12 +110,14 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(
         object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
-        CrashLog.Write(e.Exception);
+        var logPath = CrashLog.Write(e.Exception);
         if (e.Exception is OutOfMemoryException or StackOverflowException or AccessViolationException)
             return;
 
+        // IN-002: only claim the details were saved when they were.
+        var details = logPath is null ? string.Empty : $"\n\nDetails were written to {logPath}.";
         MessageBox.Show(
-            $"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to the crash log.",
+            $"Something went wrong:\n\n{e.Exception.Message}{details}",
             "SeedBomb", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
@@ -156,11 +168,16 @@ public partial class App : Application
         Current.MainWindow = mainWindow;
         // WR-012: the snackbar presenter is set in MainWindow.OnWindowLoaded, which MainWindow's
         // constructor subscribed first, so this later Loaded handler always runs after it.
-        if (_host.Services.GetRequiredService<ISettingsService>().LoadWarning is { } settingsWarning)
+        var snackbar = _host.Services.GetRequiredService<ISnackbarService>();
+        foreach (var (title, warning) in new[]
+                 {
+                     ("Data folder", AppPaths.MigrationWarning),
+                     ("Settings", _host.Services.GetRequiredService<ISettingsService>().LoadWarning),
+                 })
         {
-            var snackbar = _host.Services.GetRequiredService<ISnackbarService>();
-            mainWindow.Loaded += (_, _) => snackbar.Show(
-                "Settings", settingsWarning, Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
+            if (warning is not null)
+                mainWindow.Loaded += (_, _) => snackbar.Show(
+                    title, warning, Wpf.Ui.Controls.ControlAppearance.Caution, null, TimeSpan.FromSeconds(6));
         }
         mainWindow.Show();
     }
@@ -204,6 +221,7 @@ public partial class App : Application
         // App services — all singleton (one app lifetime)
         sc.AddSingleton<ISettingsService, JsonSettingsService>();
         sc.AddSingleton<IConnectionProfileService, JsonConnectionProfileService>();
+        sc.AddSingleton<RunSessionGate>();
         sc.AddSingleton<IAuthService, ProfileAuthService>();
         sc.AddSingleton<IDataverseConnectionService, DataverseConnectionService>();
         sc.AddSingleton<IMetadataProvider, DataverseMetadataService>();
@@ -234,6 +252,8 @@ public partial class App : Application
         sc.AddSingleton<ConnectionManagerViewModel>();
         sc.AddTransient<EntitySelectorViewModel>();
         sc.AddSingleton<GenerateViewModel>();
+        sc.AddSingleton<IProfileBoard>(sp => sp.GetRequiredService<GenerateViewModel>());
+        sc.AddSingleton<IFileDialogService, FileDialogService>();
         sc.AddTransient<ProfilesViewModel>();
         sc.AddTransient<HistoryViewModel>();
         sc.AddTransient<SettingsViewModel>();
