@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SeedBomb.Services.History;
 
 /// <summary>
@@ -25,4 +27,11 @@ public record RunRecord(
     string Environment = "",
     string User = "",
     string Profile = "",
-    string[]? ActivityLog = null);
+    string[]? ActivityLog = null)
+{
+    /// <summary>History status: Success, Rejected (rows were rejected; the sheet reads "Completed with N rejected rows"), or Failed.</summary>
+    // ponytail: derived from stored fields so old rows relabel too; a cancelled or fatal run that also
+    // lost rows reads "Rejected". Persist an outcome enum if those ever need telling apart.
+    [JsonIgnore]
+    public string Status => Succeeded ? "Success" : ErrorCount > 0 ? "Rejected" : "Failed";
+}

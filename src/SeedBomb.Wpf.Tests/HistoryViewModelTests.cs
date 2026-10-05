@@ -161,6 +161,40 @@ public sealed class HistoryViewModelTests
             exportDir.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public async Task ExportCsvAsync_LabelsRunsByOutcome()
+    {
+        // Smoke item 3: a run that only lost rows reads "Completed with N rejected rows" on the
+        // sheet, so History must not call it "Failed".
+        var now = DateTimeOffset.Now;
+        var history = new Mock<IRunHistoryService>();
+        history.Setup(h => h.GetRunsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(
+        [
+            new RunRecord(Guid.NewGuid(), now, ["Contact"], 0, TimeSpan.FromMinutes(1), false, 500),
+            new RunRecord(Guid.NewGuid(), now.AddMinutes(-1), ["Account"], 0, TimeSpan.FromMinutes(1), false, 0),
+            new RunRecord(Guid.NewGuid(), now.AddMinutes(-2), ["Account"], 10, TimeSpan.FromMinutes(1), true, 0),
+        ]);
+
+        var vm = new HistoryViewModel(history.Object, Mock.Of<ILogger<HistoryViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        var exportDir = Directory.CreateTempSubdirectory("seedbomb-history-export-test-");
+        vm.ExportDirectoryOverride = exportDir.FullName;
+        try
+        {
+            await vm.ExportCsvCommand.ExecuteAsync(null);
+
+            var lines = await File.ReadAllLinesAsync(
+                Directory.GetFiles(exportDir.FullName).Single(), TestContext.Current.CancellationToken);
+            Assert.Equal(["Rejected", "Failed", "Success"], lines.Skip(1).Select(l => l.Split(',')[4]));
+        }
+        finally
+        {
+            exportDir.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ExportCsvAsync_ShowsSuccessSnackbar_WhenWriteSucceeds()
     {
