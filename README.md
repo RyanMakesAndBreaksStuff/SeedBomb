@@ -4,6 +4,19 @@ SeedBomb is a Microsoft Dataverse synthetic-data generator. It reads entity meta
 
 It ships as **SeedBomb.Wpf**, a Windows WPF desktop app with MSAL multi-profile authentication and DPAPI-encrypted connection profiles.
 
+Start with the [tutorials and how-to guides](documentation/index.md) for using the app or building and extending SeedBomb.
+
+## Documentation
+
+- **Tutorials**: [Generate your first test records](documentation/tutorials/first-generation.md) · [Build and test SeedBomb locally](documentation/tutorials/build-and-test.md)
+- **App how-to guides**: [Connections](documentation/how-to/app/connections.md) · [Tables and counts](documentation/how-to/app/tables-and-counts.md) · [Field rules](documentation/how-to/app/field-rules.md) · [Generation profiles](documentation/how-to/app/generation-profiles.md) · [Review and run](documentation/how-to/app/review-and-run.md) · [Failures and retry](documentation/how-to/app/failures-and-retry.md) · [History](documentation/how-to/app/history.md)
+- **Developer how-to guides**: [Focused tests](documentation/how-to/developer/focused-tests.md) · [Field generators](documentation/how-to/developer/field-generator.md) · [Diagnostics](documentation/how-to/developer/diagnostics.md) · [Publish](documentation/how-to/developer/publish.md)
+- **Verification record**: [What was checked when the guides were written](documentation/VERIFICATION.md)
+
+## Legacy Blazor version
+
+SeedBomb previously also shipped **SeedBomb.Web**, a Blazor Server app (MudBlazor UI, Microsoft.Identity.Web auth) on the same Core/Bulk engine. It was removed from `master` and is no longer maintained. The last version is preserved on the [`blazor`](https://github.com/RyanMakesAndBreaksStuff/SeedBomb/tree/blazor) branch.
+
 ## Technology stack
 
 - **.NET 10** with C# 14, nullable reference types, and implicit usings.
@@ -86,16 +99,11 @@ Verified test counts:
 
 ## Deploy
 
-- **WPF**: publish a self-contained single-file exe with `dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -c Release -p:PublishProfile=GitHubRelease -o ./publish`. GitHub Actions workflow **SeedBomb Publish** uploads `SeedBomb.exe` to GitHub Releases (push a `v*.*.*` tag, or run the workflow manually).
+- **WPF**: publish a self-contained single-file exe with `dotnet publish src/SeedBomb.Wpf/SeedBomb.Wpf.csproj -c Release -p:PublishProfile=GitHubRelease -o ./publish` (use `GitHubRelease-x86` for 32-bit). GitHub Actions workflow **SeedBomb Publish** uploads `SeedBomb.exe` (x64) and `SeedBomb-x86.exe` (x86) to GitHub Releases (push a `v*.*.*` tag, or run the workflow manually).
 - **Secrets** must always be supplied through secure configuration providers; never commit credentials to the repo.
 
 ## License
 
 SeedBomb is licensed under the [BSD 3-Clause License](LICENSE) (`BSD-3-Clause`). See [LICENSE](LICENSE).
 
-## Project conventions
 
-- Plans and specs live in `plans/` (e.g., `plans/connection.md`).
-- Active task tracking is in `tasks/todo.md`; lessons learned are captured in `tasks/lessons.md`.
-- Historical documentation is archived in `Docs/olddoc/`.
-- See `AGENTS.md` for the full agent guide, code style guidelines, and security notes.
