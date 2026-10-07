@@ -6,7 +6,7 @@
     <!-- Central CVE pin for the Dataverse SDK's transitive System.Security.Cryptography.Xml 8.0.2.
          net10.0 only: on net10.0-windows the Windows Desktop framework already ships a serviced
          copy, and referencing 10.x there fails restore with NU1510. -->
-    <GlobalPackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10"
+    <GlobalPackageReference Include="System.Security.Cryptography.Xml" Version="10.0.12"
                             Condition="!$(TargetFramework.Contains('-windows'))" />
   </ItemGroup>
   <ItemGroup>
