@@ -35,7 +35,7 @@ ScaffoldingReadMe.txt
 *.nupkg
 # NuGet Symbol Packages
 *.snupkg
-
+/Review
 # Others
 ~$*
 *~
@@ -63,7 +63,6 @@ nunit-*.xml
 .vscode
 Docs
 Plans
-/Review
 .codegraph
 .claude
 /tasks
@@ -81,9 +80,14 @@ AGENTS.md
 /CLAUDE.md
 /%SystemDrive%/ProgramData/Microsoft/Windows/Caches
 /08-13-2026-wpf-review-fixes.md
-/08-13-2026-wpf-review-fixes.md
-/08-13-2026-wpf-review-fixes.md
-/tasks/lessons.md
 /.mcp.json
 /media
 /SeedBomb-out-now.mp4
+/Assets
+/docs
+/plans
+/Review
+/reviews
+/documentation/OUTLINE.md
+
+*.user

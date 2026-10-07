@@ -34,7 +34,7 @@ Records are written during generation. Cancelling a run leaves records already c
 
 ## Documentation baseline
 
-These guides describe local `master` at `b2ac13be1cc170d099e857c2a3876dddf6fd058a`, inspected on 2026-10-05. UI instructions are checked against XAML and application code. Source inspection and mocked tests do not establish your environment's permissions or guarantee that a Dataverse write will succeed.
+These guides describe v2., inspected on 2026-10-05. UI instructions are checked against XAML and application code. Source inspection and mocked tests do not establish your environment's permissions or guarantee that a Dataverse write will succeed.
 
 See the [documentation verification record](VERIFICATION.md) for checks performed when these guides were written.
 

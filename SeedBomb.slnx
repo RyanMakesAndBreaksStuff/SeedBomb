@@ -10,9 +10,7 @@
     <Project Path="src/SeedBomb.Core/SeedBomb.Core.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
+    <Project Path="src/SeedBomb.Wpf/SeedBomb.Wpf.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="src/SeedBomb.Bulk.Tests/SeedBomb.Bulk.Tests.csproj">
