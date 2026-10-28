@@ -203,8 +203,36 @@ public class ThrottlePolicyTests
         Assert.Equal(1, callCount);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ConnectionResetWrappedInCommunicationException_IsRetried()
+    {
+        // ServiceClient surfaces a socket reset (10054) mid-upload as CommunicationException
+        // wrapping HttpRequestException, not the bare HttpRequestException.
+        var callCount = 0;
+
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new CommunicationException(
+                        "Error while copying content to a stream.",
+                        new HttpRequestException("Error while copying content to a stream.",
+                            new IOException("Unable to write data to the transport connection.")));
+                return Task.FromResult("success");
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
     public static TheoryData<Exception, bool> TransientCases => new()
     {
+        { new CommunicationException("Error while copying content to a stream.", new HttpRequestException()), true },
+        { new CommunicationException("Unrecognized message version."), false },
         { new EndpointNotFoundException("There was no endpoint listening at https://contoso.crm.dynamics.com."), true },
         { new ServerTooBusyException("The server is too busy."), true },
         { new TimeoutException(), true },

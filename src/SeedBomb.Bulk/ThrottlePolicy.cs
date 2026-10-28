@@ -84,6 +84,15 @@ public class ThrottlePolicy
                     entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
+            // ServiceClient wraps socket resets (10054) as CommunicationException over HttpRequestException.
+            catch (CommunicationException ex) when (attempt < maxRetries && IsWrappedNetworkFault(ex))
+            {
+                var delay = ComputeDelay(attempt);
+                _logger.LogWarning(
+                    "Network fault for {Entity} on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
+                    entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+            }
             catch (FaultException<OrganizationServiceFault> ex)
             {
                 // ServiceClient already pauses and resends on service-protection limits, so any
@@ -116,9 +125,13 @@ public class ThrottlePolicy
         // The request never reached Dataverse, so a resend cannot duplicate rows. Checked before
         // ProtocolException and FaultException, which are CommunicationExceptions too.
         EndpointNotFoundException or ServerTooBusyException => true,
-        ProtocolException p => IsRateLimited(p),
+        ProtocolException p => IsRateLimited(p) || IsWrappedNetworkFault(p),
+        CommunicationException c => IsWrappedNetworkFault(c),
         _ => false,
     };
+
+    private static bool IsWrappedNetworkFault(CommunicationException ex) =>
+        ex.InnerException is HttpRequestException or IOException;
 
     // ponytail: matches ServiceClient's own message text. A structured status code never reaches
     // us — ThrowIfResponseIsEmpty formats the code into the message and drops the response.
