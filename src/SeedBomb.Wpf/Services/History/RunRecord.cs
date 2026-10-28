@@ -16,6 +16,7 @@ namespace SeedBomb.Services.History;
 /// <param name="User">Signed-in user for the run, or "" when unknown.</param>
 /// <param name="Profile">Rule profile active for the run, or "" when unknown.</param>
 /// <param name="ActivityLog">Activity log lines, oldest first. Null for runs recorded before the log was persisted.</param>
+/// <param name="Cancelled">Whether the run was cancelled before it finished.</param>
 public record RunRecord(
     Guid Id,
     DateTimeOffset Timestamp,
@@ -27,11 +28,12 @@ public record RunRecord(
     string Environment = "",
     string User = "",
     string Profile = "",
-    string[]? ActivityLog = null)
+    string[]? ActivityLog = null,
+    bool Cancelled = false)
 {
-    /// <summary>History status: Success, Rejected (rows were rejected; the sheet reads "Completed with N rejected rows"), or Failed.</summary>
-    // ponytail: derived from stored fields so old rows relabel too; a cancelled or fatal run that also
-    // lost rows reads "Rejected". Persist an outcome enum if those ever need telling apart.
+    /// <summary>History status: Success, Cancelled, Rejected (rows were rejected; the sheet reads "Completed with N rejected rows"), or Failed.</summary>
+    // ponytail: derived from stored fields so old rows relabel too; rows saved before Cancelled was
+    // persisted read "Failed" (or "Rejected" when they also lost rows).
     [JsonIgnore]
-    public string Status => Succeeded ? "Success" : ErrorCount > 0 ? "Rejected" : "Failed";
+    public string Status => Succeeded ? "Success" : Cancelled ? "Cancelled" : ErrorCount > 0 ? "Rejected" : "Failed";
 }

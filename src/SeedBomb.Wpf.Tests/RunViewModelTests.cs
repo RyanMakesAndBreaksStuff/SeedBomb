@@ -451,6 +451,39 @@ public sealed class RunViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ApplyResult_Cancelled_DoesNotReadCompleted()
+    {
+        var vm = new RunViewModel();
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [],
+            Cancelled = true,
+        }, seed: 1, environmentHost: "contoso-dev");
+
+        Assert.Equal("Run cancelled", vm.OutcomeHeadline);
+        Assert.False(vm.LastRunSucceeded);
+        Assert.Contains("Nothing was rolled back", vm.OutcomeDetail, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, "Run cancelled", "Cancelled")]
+    [InlineData(false, "Run failed", "Failed")]
+    public void ShowHistorical_UnfinishedRun_DoesNotReadCompleted(bool cancelled, string headline, string status)
+    {
+        var vm = new RunViewModel();
+        var run = new SeedBomb.Services.History.RunRecord(Guid.NewGuid(), DateTimeOffset.Now, ["account", "contact"],
+            17_000, TimeSpan.FromMinutes(24), false, 0, Cancelled: cancelled);
+
+        vm.ShowHistorical(run);
+
+        Assert.Equal(headline, vm.SummaryView.OutcomeHeadline);
+        Assert.False(vm.SummaryView.LastRunSucceeded);
+        Assert.Equal(status, run.Status);
+    }
+
+    [Fact]
     public void ShowHistorical_ShowsSavedActivity()
     {
         var vm = new RunViewModel();

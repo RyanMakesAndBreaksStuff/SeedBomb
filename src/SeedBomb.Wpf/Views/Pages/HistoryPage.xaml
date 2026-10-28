@@ -226,6 +226,9 @@
                                                         <DataTrigger Binding="{Binding Status}" Value="Rejected">
                                                             <Setter Property="Foreground" Value="{DynamicResource DG.Warning}" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Cancelled">
+                                                            <Setter Property="Foreground" Value="{DynamicResource DG.Warning}" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
