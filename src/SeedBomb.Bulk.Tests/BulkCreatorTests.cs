@@ -943,6 +943,52 @@ public class BulkCreatorTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task CreateAsync_WithReconcile_CountsOnlyRowsWrittenAfterThePreRunWatermark()
+    {
+        // A wall-clock window with a margin counted the previous back-to-back run's rows too.
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        AnswerCreates(serviceMock);
+        var watermark = new DateTime(2026, 10, 30, 12, 20, 15, DateTimeKind.Utc);
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(
+                It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).TopCount == 1),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityCollection([new Entity("account") { ["modifiedon"] = watermark }]));
+        string? countQuery = null;
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(It.Is<QueryBase>(q => q is FetchExpression), It.IsAny<CancellationToken>()))
+            .Callback<QueryBase, CancellationToken>((q, _) => countQuery = ((FetchExpression)q).Query)
+            .ReturnsAsync(new EntityCollection([new Entity("account") { ["n"] = new AliasedValue("account", "accountid", 3) }]));
+
+        await RunThreeAccountsAsync(sut, reconcile: true);
+
+        Assert.Contains("""attribute="modifiedon" operator="gt" value="2026-10-30T12:20:15Z""", countQuery, StringComparison.Ordinal);
+        Assert.Contains(logger.Lines, l => l.StartsWith(
+            "[run] reconcile account: requested 3, acknowledged 3, observed 3 (created by caller, written after 2026-10-30T12:20:15",
+            StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithReconcile_ReportsATableWhoseWatermarkReadFailed()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        AnswerCreates(serviceMock);
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(
+                It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).TopCount == 1),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FaultException<OrganizationServiceFault>(new OrganizationServiceFault()));
+
+        await RunThreeAccountsAsync(sut, reconcile: true);
+
+        Assert.Contains(logger.Lines, l => l.StartsWith(
+            "[run] reconcile account: requested 3, acknowledged 3, observed unavailable (no pre-run watermark)",
+            StringComparison.Ordinal));
+    }
+
     private static EntityMetadata IntegerKeyedAccount(int min, int max)
     {
         var meta = Meta("account",

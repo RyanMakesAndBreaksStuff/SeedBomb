@@ -18,9 +18,6 @@ internal static class RunDiagnostics
 {
     private static readonly TimeSpan ReconcileTimeout = TimeSpan.FromSeconds(30);
 
-    // modifiedon is stamped by the server; the margin absorbs clock skew between this machine and it.
-    private static readonly TimeSpan ReconcileClockMargin = TimeSpan.FromMinutes(1);
-
     /// <summary>Logs how long the phase begun at <paramref name="startedTimestamp"/> took.</summary>
     public static void LogPhase(ILogger logger, string phase, long startedTimestamp, string? entity = null) =>
         logger.LogInformation("[timing] phase {Phase} {Entity} took {ElapsedMs:F0}ms",
@@ -48,9 +45,49 @@ internal static class RunDiagnostics
     }
 
     /// <summary>
+    /// When <see cref="GenerationConfig.ReconcileAfterRun"/> is set, reads each planned table's latest
+    /// <c>modifiedon</c> among rows the caller created, before the run writes anything. Server time on
+    /// both sides of the window, so neither clock skew nor a run that just finished can leak into the
+    /// count. A table whose read fails is left out, and its reconcile line says so.
+    /// </summary>
+    /// <returns>Table to watermark; null when the caller has no rows in the table yet.</returns>
+    public static async Task<IReadOnlyDictionary<string, DateTime?>> CaptureWatermarksAsync(
+        IOrganizationServiceAsync2 service,
+        GenerationConfig config,
+        IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> entityMetadata,
+        CancellationToken ct)
+    {
+        var watermarks = new Dictionary<string, DateTime?>(StringComparer.OrdinalIgnoreCase);
+        if (!config.ReconcileAfterRun)
+            return watermarks;
+
+        foreach (var table in config.EntityLogicalNames)
+        {
+            if (config.PlannedRows(table) == 0 || !entityMetadata.ContainsKey(table))
+                continue;
+            try
+            {
+                // Top 1 by modifiedon, not an aggregate max: an aggregate faults past 50,000 rows.
+                var query = new QueryExpression(table) { ColumnSet = new ColumnSet("modifiedon"), TopCount = 1 };
+                query.Criteria.AddCondition("createdby", ConditionOperator.EqualUserId);
+                query.AddOrder("modifiedon", OrderType.Descending);
+                var latest = await service.RetrieveMultipleAsync(query, ct).ConfigureAwait(false);
+                watermarks[table] = latest.Entities.FirstOrDefault()?.GetAttributeValue<DateTime?>("modifiedon");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                // Left out on purpose: ReconcileAsync reports the table as unavailable.
+            }
+        }
+
+        return watermarks;
+    }
+
+    /// <summary>
     /// When <see cref="GenerationConfig.ReconcileAfterRun"/> is set, logs requested, acknowledged and
     /// observed rows per table. Observed above acknowledged means a batch committed but its response
-    /// was lost. Uses its own timeout so a cancelled run is still reconciled.
+    /// was lost. Uses its own timeout so a cancelled run is still reconciled. The watermarks come from
+    /// <see cref="CaptureWatermarksAsync"/>, taken before the first write.
     /// </summary>
     public static async Task ReconcileAsync(
         ILogger logger,
@@ -58,12 +95,11 @@ internal static class RunDiagnostics
         GenerationConfig config,
         IReadOnlyDictionary<string, Microsoft.Xrm.Sdk.Metadata.EntityMetadata> entityMetadata,
         IReadOnlyDictionary<string, IReadOnlyList<Guid>> created,
-        DateTimeOffset runStart)
+        IReadOnlyDictionary<string, DateTime?> watermarks)
     {
         if (!config.ReconcileAfterRun)
             return;
 
-        var since = runStart - ReconcileClockMargin;
         using var cts = new CancellationTokenSource(ReconcileTimeout);
         foreach (var table in config.EntityLogicalNames)
         {
@@ -72,20 +108,28 @@ internal static class RunDiagnostics
                 continue;
 
             string observed;
-            try
+            if (!watermarks.TryGetValue(table, out var after))
             {
-                observed = (await CountCreatedByCallerSinceAsync(service, table, meta.PrimaryIdAttribute, since, cts.Token)
-                    .ConfigureAwait(false)).ToString();
+                observed = "unavailable (no pre-run watermark)";
             }
-            catch (Exception ex)
+            else
             {
-                // An aggregate over 50,000 rows faults (AggregateQueryRecordLimit); report, don't fail the run.
-                observed = $"unavailable ({ex.GetType().Name}: {ex.Message})";
+                try
+                {
+                    observed = (await CountCreatedByCallerAfterAsync(service, table, meta.PrimaryIdAttribute, after, cts.Token)
+                        .ConfigureAwait(false)).ToString();
+                }
+                catch (Exception ex)
+                {
+                    // An aggregate over 50,000 rows faults (AggregateQueryRecordLimit); report, don't fail the run.
+                    observed = $"unavailable ({ex.GetType().Name}: {ex.Message})";
+                }
             }
 
             logger.LogInformation(
-                "[run] reconcile {Entity}: requested {Requested}, acknowledged {Acknowledged}, observed {Observed} (created by caller, written since {Since:o})",
-                table, requested, created.GetValueOrDefault(table)?.Count ?? 0, observed, since);
+                "[run] reconcile {Entity}: requested {Requested}, acknowledged {Acknowledged}, observed {Observed} (created by caller, written after {After})",
+                table, requested, created.GetValueOrDefault(table)?.Count ?? 0, observed,
+                after is { } a ? a.ToString("o") : "the caller's first row");
         }
     }
 
@@ -93,15 +137,20 @@ internal static class RunDiagnostics
     // Dataverse then stamps createdon with that (past) date, so a createdon filter finds nothing.
     // modifiedon is always the real write time. A row the caller created earlier and modified
     // during the run also counts; SeedBomb only updates rows it created in the same run.
-    private static async Task<int> CountCreatedByCallerSinceAsync(
-        IOrganizationServiceAsync2 service, string table, string primaryId, DateTimeOffset since, CancellationToken ct)
+    // ponytail: modifiedon has one-second resolution, so a row written in the watermark's own second
+    // is missed. A run spends well over a second on metadata and preflight before its first write.
+    private static async Task<int> CountCreatedByCallerAfterAsync(
+        IOrganizationServiceAsync2 service, string table, string primaryId, DateTime? after, CancellationToken ct)
     {
+        var afterCondition = after is { } a
+            ? $"""<condition attribute="modifiedon" operator="gt" value="{DateTime.SpecifyKind(a, DateTimeKind.Utc):yyyy-MM-ddTHH:mm:ssZ}" />"""
+            : "";
         var fetch = $"""
             <fetch aggregate="true">
               <entity name="{SecurityElement.Escape(table)}">
                 <attribute name="{SecurityElement.Escape(primaryId)}" alias="n" aggregate="count" />
                 <filter>
-                  <condition attribute="modifiedon" operator="ge" value="{since.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}" />
+                  {afterCondition}
                   <condition attribute="createdby" operator="eq-userid" />
                 </filter>
               </entity>
