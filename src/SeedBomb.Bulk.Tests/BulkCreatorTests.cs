@@ -1,3 +1,4 @@
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Extensions.Logging;
 using SeedBomb.Core.EdgeCases;
 using SeedBomb.Core.Generators;
@@ -11,8 +12,25 @@ namespace SeedBomb.Bulk.Tests;
 public class BulkCreatorTests
 {
     // Helper: build a BulkCreator with real collaborators and a mocked service.
+    // ServiceClient.RecommendedDegreesOfParallelism is not mockable; this stands in for the server's hint.
+    private sealed class HintedBulkCreator(
+        Func<int> hint,
+        IOrganizationServiceAsync2 service,
+        GeneratorFactory generatorFactory,
+        EdgeCaseValidator edgeCaseValidator,
+        MessageAvailabilityChecker messageChecker,
+        ThrottlePolicy throttlePolicy,
+        TopologicalSort topologicalSort,
+        DeferredLookupBackfill deferredBackfill,
+        ILogger<BulkCreator> logger)
+        : BulkCreator(service, generatorFactory, edgeCaseValidator, messageChecker, throttlePolicy,
+            topologicalSort, deferredBackfill, logger)
+    {
+        protected override int RecommendedDopHint => hint();
+    }
+
     private static (BulkCreator sut, Mock<IOrganizationServiceAsync2> serviceMock) BuildSut(
-        ILogger<BulkCreator>? logger = null)
+        ILogger<BulkCreator>? logger = null, Func<int>? dopHint = null)
     {
         var serviceMock = new Mock<IOrganizationServiceAsync2>();
 
@@ -35,17 +53,144 @@ public class BulkCreatorTests
             new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance),
             NullLogger<DeferredLookupBackfill>.Instance);
 
-        var sut = new BulkCreator(
-            serviceMock.Object,
-            generatorFactory,
-            edgeCaseValidator,
-            messageChecker,
-            throttlePolicy,
-            topologicalSort,
-            deferredBackfill,
-            logger ?? NullLogger<BulkCreator>.Instance);
+        var sut = dopHint is null
+            ? new BulkCreator(
+                serviceMock.Object,
+                generatorFactory,
+                edgeCaseValidator,
+                messageChecker,
+                throttlePolicy,
+                topologicalSort,
+                deferredBackfill,
+                logger ?? NullLogger<BulkCreator>.Instance)
+            : new HintedBulkCreator(
+                dopHint,
+                serviceMock.Object,
+                generatorFactory,
+                edgeCaseValidator,
+                messageChecker,
+                throttlePolicy,
+                topologicalSort,
+                deferredBackfill,
+                logger ?? NullLogger<BulkCreator>.Instance);
 
         return (sut, serviceMock);
+    }
+
+    private static Task<GenerationResult> RunAccountsThenContactsAsync(BulkCreator sut, int? maxParallelism = null)
+    {
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        graph.AddNode("contact");
+        return sut.CreateAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account", "contact"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 2, ["contact"] = 2 },
+                BatchSize = 1,
+                MaxParallelism = maxParallelism,
+            },
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 100 }),
+                ["contact"] = Meta("contact", new StringAttributeMetadata { LogicalName = "lastname", MaxLength = 100 }),
+            },
+            graph);
+    }
+
+    private static IEnumerable<string> BatchDops(RecordingLogger<BulkCreator> logger) =>
+        logger.Lines
+            .Where(l => l.StartsWith("[timing] batch ", StringComparison.Ordinal))
+            .Select(l => l[(l.IndexOf(", DOP ", StringComparison.Ordinal) + 6)..].Split(',')[0]);
+
+    [Fact]
+    public async Task Dop_ServerHint_IsUsedFromTheFirstTable()
+    {
+        // The hint used to be adopted only after table 0, so the first table always ran at 8.
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => 4);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut);
+
+        Assert.Equal(["4", "4", "4", "4"], BatchDops(logger));
+    }
+
+    [Fact]
+    public async Task Dop_ExplicitConfig_OverridesTheHint()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => 4);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut, maxParallelism: 2);
+
+        Assert.All(BatchDops(logger), dop => Assert.Equal("2", dop));
+    }
+
+    [Fact]
+    public async Task Dop_NoHint_FallsBackToEight()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => 0);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut);
+
+        Assert.All(BatchDops(logger), dop => Assert.Equal("8", dop));
+    }
+
+    [Fact]
+    public async Task Dop_HintAboveMaxDop_IsUsedUnclampedAndLogged()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => GenerationLimits.MaxDop + 4);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut);
+
+        Assert.All(BatchDops(logger), dop => Assert.Equal((GenerationLimits.MaxDop + 4).ToString(), dop));
+        Assert.Contains(logger.Lines, l => l.Contains("above the configurable maximum", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Dop_HintThatChangesBetweenTables_IsReadPerTable()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var reads = 0;
+        // The warmup log reads once, then each table reads once: account sees 4, contact sees 6.
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => ++reads <= 2 ? 4 : 6);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut);
+
+        Assert.Equal(["4", "4", "6", "6"], BatchDops(logger)
+            .Zip(logger.Lines.Where(l => l.StartsWith("[timing] batch ", StringComparison.Ordinal)))
+            .OrderBy(p => p.Second.StartsWith("[timing] batch contact", StringComparison.Ordinal))
+            .Select(p => p.First));
+    }
+
+    [Fact]
+    public async Task Warmup_RunsBeforeTheFirstTable_WheneverDopIsAutomatic()
+    {
+        // Previously gated on 5,000+ total rows, so small runs never saw the hint before writing.
+        var (sut, serviceMock) = BuildSut(dopHint: () => 4);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut);
+
+        serviceMock.Verify(s => s.ExecuteAsync(It.IsAny<WhoAmIRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Warmup_IsSkipped_WhenDopIsConfigured()
+    {
+        var (sut, serviceMock) = BuildSut(dopHint: () => 4);
+        AnswerCreates(serviceMock);
+
+        await RunAccountsThenContactsAsync(sut, maxParallelism: 2);
+
+        serviceMock.Verify(s => s.ExecuteAsync(It.IsAny<WhoAmIRequest>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
