@@ -7,6 +7,7 @@ using SeedBomb.Core.Metadata;
 using SeedBomb.Core.Rules;
 using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
+using System.Diagnostics;
 
 namespace SeedBomb.Bulk;
 
@@ -44,10 +45,13 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
         var lf = _loggerFactory;
 
         progress?.Report(new GenerationPipelineProgress { Phase = "Inspecting schema" });
+        var phaseStart = Stopwatch.GetTimestamp();
         var metas = await _metadata.GetEntitiesAsync(config.EntityLogicalNames, ct).ConfigureAwait(false);
         var metaDict = metas.ToDictionary(e => e.LogicalName);
+        RunDiagnostics.LogPhase(_logger, "metadata", phaseStart);
 
         progress?.Report(new GenerationPipelineProgress { Phase = "Resolving dependencies" });
+        phaseStart = Stopwatch.GetTimestamp();
         var graphBuilder = new GraphBuilder(lf.CreateLogger<GraphBuilder>());
         var cycleDetector = new CycleDetector(lf.CreateLogger<CycleDetector>());
         // Backfill ownership (LookupRulePolicy.IsExplicit, used in BulkCreator) is a different
@@ -64,6 +68,7 @@ public sealed class GenerationPipeline(IMetadataProvider metadata, ILoggerFactor
             }
             cycleDetector.BreakCycles(graph, cycles, metaDict, SuppliesValueWithoutDependency);
         }
+        RunDiagnostics.LogPhase(_logger, "graph", phaseStart);
 
         progress?.Report(new GenerationPipelineProgress { Phase = "Generating records" });
         var topoSort = new TopologicalSort(lf.CreateLogger<TopologicalSort>());

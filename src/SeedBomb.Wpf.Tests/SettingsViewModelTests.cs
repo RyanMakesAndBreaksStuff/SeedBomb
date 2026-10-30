@@ -104,6 +104,28 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task RunDiagnostics_RoundTripsThroughLoadAndSave()
+    {
+        AppSettings? saved = null;
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AppSettings.Default with { RunDiagnostics = true });
+        settings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>(), It.IsAny<CancellationToken>()))
+            .Callback<AppSettings, CancellationToken>((s, _) => saved = s)
+            .Returns(Task.CompletedTask);
+
+        var vm = new SettingsViewModel(settings.Object, Mock.Of<ILogger<SettingsViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.RunDiagnostics);
+
+        vm.RunDiagnostics = false;
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.False(saved?.RunDiagnostics);
+    }
+
+    [Fact]
     public async Task SignOut_is_blocked_while_a_run_is_writing()
     {
         // WR-001: sign-out disposes the ServiceClient the running pipeline writes through.

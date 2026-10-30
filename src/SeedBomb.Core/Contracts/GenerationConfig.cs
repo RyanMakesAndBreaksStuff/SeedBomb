@@ -68,6 +68,12 @@ public record GenerationConfig
     /// </summary>
     public string AlternateKeyScope { get; init; } = "";
 
+    /// <summary>
+    /// After the run, count each table's rows created by the calling user since the run started and
+    /// log them beside the requested and acknowledged counts. One extra query per table; off by default.
+    /// </summary>
+    public bool ReconcileAfterRun { get; init; }
+
     /// <summary>Planned rows for <paramref name="table"/>, or 0 when the table is absent or negative.</summary>
     /// <param name="table">Entity logical name.</param>
     public int PlannedRows(string table) =>

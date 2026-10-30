@@ -12,13 +12,18 @@ namespace SeedBomb.Services.Settings;
 /// <param name="DarkTheme">Whether dark theme is enabled.</param>
 /// <param name="PaletteId">Selected color palette; see <see cref="Theme.DesignThemeManager.AvailablePalettes"/>.</param>
 /// <param name="KeepRunSheetOpen">When true, the run sheet stays up until the run finishes.</param>
+/// <param name="RunDiagnostics">
+/// When true, the Dataverse SDK's own warnings reach the app log (from the next connection) and each
+/// run ends with a per-table row count query.
+/// </param>
 public record AppSettings(
     int DefaultRecordCount = GenerationLimits.DefaultRecordCount,
     int DefaultBatchSize = GenerationLimits.DefaultBatchSize,
     int DefaultDop = 0,
     bool DarkTheme = false,
     string PaletteId = Theme.DesignThemeManager.DefaultPaletteId,
-    bool KeepRunSheetOpen = true)
+    bool KeepRunSheetOpen = true,
+    bool RunDiagnostics = false)
 {
     /// <summary>Returns a default settings instance.</summary>
     public static AppSettings Default => new();
