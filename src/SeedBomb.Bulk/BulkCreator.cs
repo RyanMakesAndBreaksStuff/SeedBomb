@@ -90,6 +90,8 @@ public class BulkCreator
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
         var allErrors = new List<BatchError>();
         var runStart = DateTimeOffset.UtcNow;
+        // Pre-run reconcile watermarks; empty until captured, so a failure before then reconciles nothing.
+        IReadOnlyDictionary<string, DateTime?> watermarks = new Dictionary<string, DateTime?>();
         try
         {
             var phaseStart = Stopwatch.GetTimestamp();
@@ -124,6 +126,8 @@ public class BulkCreator
             }
 
             RunDiagnostics.LogSnapshot(_logger, _service, config, sortedEntities, _messageChecker.ShouldAttemptCreateMultiple);
+            watermarks = await RunDiagnostics.CaptureWatermarksAsync(_service, config, entityMetadata, ct)
+                .ConfigureAwait(false);
 
             _logger.LogInformation(
                 "Starting bulk creation for {EntityCount} entities.",
@@ -206,7 +210,7 @@ public class BulkCreator
             _logger.LogInformation(
                 "Bulk creation complete. Total records: {Total}. Errors: {Errors}. Elapsed: {Elapsed}.",
                 allCreatedRecords.Values.Sum(v => v.Count), allErrors.Count, elapsed);
-            await RunDiagnostics.ReconcileAsync(_logger, _service, config, entityMetadata, allCreatedRecords, runStart)
+            await RunDiagnostics.ReconcileAsync(_logger, _service, config, entityMetadata, allCreatedRecords, watermarks)
                 .ConfigureAwait(false);
 
             return new GenerationResult
@@ -224,7 +228,7 @@ public class BulkCreator
             if (!cancelled)
                 _logger.LogError(ex, "Bulk creation stopped after {Count} table(s) were written.", allCreatedRecords.Count);
             // A partial run is where a lost response is most likely, so it is reconciled too.
-            await RunDiagnostics.ReconcileAsync(_logger, _service, config, entityMetadata, allCreatedRecords, runStart)
+            await RunDiagnostics.ReconcileAsync(_logger, _service, config, entityMetadata, allCreatedRecords, watermarks)
                 .ConfigureAwait(false);
             return new GenerationResult
             {
