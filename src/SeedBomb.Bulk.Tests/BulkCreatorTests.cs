@@ -880,6 +880,70 @@ public class BulkCreatorTests
         Assert.Equal(3, first.Select(e => e["accountnumber"]).Distinct().Count());
     }
 
+    private static EntityMetadata IntegerKeyedAccount(int min, int max)
+    {
+        var meta = Meta("account",
+            new IntegerAttributeMetadata { LogicalName = "new_code", MinValue = min, MaxValue = max });
+        meta.GetType().GetProperty("Keys")!.SetValue(meta, new[]
+        {
+            new EntityKeyMetadata { LogicalName = "code_key", KeyAttributes = ["new_code"] },
+        });
+        return meta;
+    }
+
+    private static Task<GenerationResult> RunIntegerKeyedAsync(
+        BulkCreator sut, EntityMetadata meta, int count, string scope = "scope-a")
+    {
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        return sut.CreateAsync(
+            KeyedConfig(scope) with { RecordCounts = new Dictionary<string, int> { ["account"] = count }, BatchSize = 1000 },
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = meta }, graph);
+    }
+
+    [Fact]
+    public async Task IntegerAlternateKey_StaysInsideARestrictedRange()
+    {
+        // The old formula multiplied the run offset by 100,000, overflowing any column capped below ~2.1e9.
+        var (sut, serviceMock) = BuildSut();
+        var written = AnswerCreates(serviceMock);
+
+        await RunIntegerKeyedAsync(sut, IntegerKeyedAccount(0, 99_999), 7_000);
+
+        var codes = written.Select(e => (int)e["new_code"]).ToList();
+        Assert.Equal(7_000, codes.Distinct().Count());
+        Assert.All(codes, c => Assert.InRange(c, 0, 99_999));
+    }
+
+    [Fact]
+    public async Task IntegerAlternateKey_DefaultRange_KeepsThePreviousKeyScheme()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var written = AnswerCreates(serviceMock);
+
+        await RunIntegerKeyedAsync(sut, IntegerKeyedAccount(int.MinValue, int.MaxValue), 3);
+
+        var scope = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("scope-a")));
+        var baseKey = (int)(scope % 21_000) * 100_000;
+        Assert.Equal([baseKey, baseKey + 1, baseKey + 2], written.Select(e => (int)e["new_code"]));
+    }
+
+    [Fact]
+    public async Task IntegerAlternateKeyRangeTooSmall_FailsBeforeAnyCreateCall()
+    {
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            RunIntegerKeyedAsync(sut, IntegerKeyedAccount(1, 5), 10));
+
+        Assert.Contains("new_code", ex.Message, StringComparison.Ordinal);
+        serviceMock.Verify(s => s.ExecuteAsync(
+            It.Is<OrganizationRequest>(r => r is CreateMultipleRequest || r is ExecuteMultipleRequest),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Theory]
     [InlineData(8)]
     [InlineData(16)]

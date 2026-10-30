@@ -1,6 +1,7 @@
 using SeedBomb.Core.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Xrm.Sdk;
+using System.Diagnostics;
 using System.ServiceModel;
 
 namespace SeedBomb.Bulk;
@@ -48,6 +49,7 @@ public class ThrottlePolicy
         for (int attempt = 0; attempt <= maxRetries; attempt++)
         {
             ct.ThrowIfCancellationRequested();
+            var started = Stopwatch.GetTimestamp();
             try
             {
                 return await operation().ConfigureAwait(false);
@@ -56,41 +58,15 @@ public class ThrottlePolicy
             {
                 throw;
             }
-            // IN-004: any other cancel is a transport timeout (TaskCanceledException from HttpClient):
-            // retry it like a timeout; on the last attempt it falls through to DataGenerationException.
-            catch (Exception ex) when (ex is TimeoutException or OperationCanceledException && attempt < maxRetries)
+            // On the last attempt a transient fault falls through to DataGenerationException.
+            catch (Exception ex) when (attempt < maxRetries && RetryReason(ex) is { } reason)
             {
                 var delay = ComputeDelay(attempt);
                 _logger.LogWarning(
-                    "Timeout for {Entity} on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
-                    entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
-                await Task.Delay(delay, ct).ConfigureAwait(false);
-            }
-            catch (HttpRequestException) when (attempt < maxRetries)
-            {
-                var delay = ComputeDelay(attempt);
-                await Task.Delay(delay, ct).ConfigureAwait(false);
-            }
-            catch (IOException) when (attempt < maxRetries)
-            {
-                var delay = ComputeDelay(attempt);
-                await Task.Delay(delay, ct).ConfigureAwait(false);
-            }
-            catch (ProtocolException ex) when (attempt < maxRetries && IsRateLimited(ex))
-            {
-                var delay = ComputeDelay(attempt);
-                _logger.LogWarning(
-                    "HTTP 429 for {Entity} on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
-                    entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
-                await Task.Delay(delay, ct).ConfigureAwait(false);
-            }
-            // ServiceClient wraps socket resets (10054) as CommunicationException over HttpRequestException.
-            catch (CommunicationException ex) when (attempt < maxRetries && IsWrappedNetworkFault(ex))
-            {
-                var delay = ComputeDelay(attempt);
-                _logger.LogWarning(
-                    "Network fault for {Entity} on attempt {Attempt}/{MaxRetries}. Retrying in {Delay}ms.",
-                    entityName, attempt + 1, maxRetries, delay.TotalMilliseconds);
+                    "{Reason} for {Entity} on attempt {Attempt} of {MaxAttempts} after {CallMs:F0}ms ({ExceptionType}: {ExceptionMessage}). Retrying in {Delay:F0}ms.",
+                    reason, entityName, attempt + 1, maxRetries + 1,
+                    Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+                    ex.GetType().Name, ex.Message, delay.TotalMilliseconds);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
             catch (FaultException<OrganizationServiceFault> ex)
@@ -119,15 +95,23 @@ public class ThrottlePolicy
     /// unreachable or busy endpoint, or HTTP 429. Service faults and other protocol errors are false.
     /// </summary>
     /// <param name="ex">The failure, unwrapped from <see cref="DataGenerationException"/>.</param>
-    public static bool IsTransient(Exception? ex) => ex switch
+    public static bool IsTransient(Exception? ex) => RetryReason(ex) is not null;
+
+    // The one transient classification: ExecuteAsync retries exactly what IsTransient reports.
+    private static string? RetryReason(Exception? ex) => ex switch
     {
-        TimeoutException or OperationCanceledException or HttpRequestException or IOException => true,
+        // IN-004: a cancel the caller did not request is a transport timeout (TaskCanceledException
+        // from HttpClient); ExecuteAsync rethrows a caller cancel before asking.
+        TimeoutException or OperationCanceledException => "Timeout",
+        HttpRequestException or IOException => "Network fault",
         // The request never reached Dataverse, so a resend cannot duplicate rows. Checked before
         // ProtocolException and FaultException, which are CommunicationExceptions too.
-        EndpointNotFoundException or ServerTooBusyException => true,
-        ProtocolException p => IsRateLimited(p) || IsWrappedNetworkFault(p),
-        CommunicationException c => IsWrappedNetworkFault(c),
-        _ => false,
+        EndpointNotFoundException => "Endpoint not found",
+        ServerTooBusyException => "Server too busy",
+        ProtocolException p when IsRateLimited(p) => "HTTP 429",
+        // ServiceClient wraps socket resets (10054) as CommunicationException over HttpRequestException.
+        CommunicationException c when IsWrappedNetworkFault(c) => "Network fault",
+        _ => null,
     };
 
     private static bool IsWrappedNetworkFault(CommunicationException ex) =>

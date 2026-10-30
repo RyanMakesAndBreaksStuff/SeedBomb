@@ -35,7 +35,7 @@ public class DataverseMetadataProvider(
         ArgumentException.ThrowIfNullOrWhiteSpace(logicalName);
 
         var cacheKey = $"entity:{logicalName}";
-        if (_cache.TryGetValue(cacheKey, out EntityMetadata? cached) && cached is not null)
+        if (TryGetCached(cacheKey, out EntityMetadata? cached) && cached is not null)
         {
             _logger.LogDebug("Cache hit for entity metadata: {EntityName}", logicalName);
             return cached;
@@ -55,7 +55,7 @@ public class DataverseMetadataProvider(
             var response = (RetrieveEntityResponse)await _service.ExecuteAsync(request, ct).ConfigureAwait(false);
             var metadata = response.EntityMetadata;
 
-            _cache.Set(cacheKey, metadata, CacheDuration);
+            SetCached(cacheKey, metadata);
             return metadata;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -80,7 +80,7 @@ public class DataverseMetadataProvider(
     public async Task<IReadOnlyList<EntitySummary>> ListUserEntitiesAsync(CancellationToken ct = default)
     {
         const string cacheKey = "entity:list:user";
-        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<EntitySummary>? cached) && cached is not null)
+        if (TryGetCached(cacheKey, out IReadOnlyList<EntitySummary>? cached) && cached is not null)
         {
             _logger.LogDebug("Cache hit for user entity list");
             return cached;
@@ -124,7 +124,7 @@ public class DataverseMetadataProvider(
                 .ToList()
                 .AsReadOnly();
 
-            _cache.Set(cacheKey, summaries, CacheDuration);
+            SetCached(cacheKey, summaries);
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Found {EntityCount} user entities", summaries.Count);
@@ -135,6 +135,34 @@ public class DataverseMetadataProvider(
         {
             _logger.LogError(ex, "Failed to retrieve user entity list");
             throw new SchemaException($"Failed to retrieve user entity list: {ex.Message}", ex);
+        }
+    }
+
+    // The owner may dispose the cache while a read is in flight (connection reset, app shutdown).
+    // A disposed cache is a miss on read and a no-op on write; the fetched metadata is still returned.
+    private bool TryGetCached<T>(string key, out T? value)
+    {
+        try
+        {
+            return _cache.TryGetValue(key, out value);
+        }
+        catch (ObjectDisposedException)
+        {
+            _logger.LogDebug("Metadata cache disposed; treating {CacheKey} as a miss", key);
+            value = default;
+            return false;
+        }
+    }
+
+    private void SetCached<T>(string key, T value)
+    {
+        try
+        {
+            _cache.Set(key, value, CacheDuration);
+        }
+        catch (ObjectDisposedException)
+        {
+            _logger.LogDebug("Metadata cache disposed; not caching {CacheKey}", key);
         }
     }
 }

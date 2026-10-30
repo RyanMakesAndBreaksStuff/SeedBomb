@@ -13,7 +13,6 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
-using System.Buffers.Binary;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.ServiceModel;
@@ -28,9 +27,6 @@ namespace SeedBomb.Bulk;
 /// </summary>
 public class BulkCreator
 {
-    // Eight scope hex characters, a separator and an eight-digit row index must survive truncation.
-    private const int MinimumScopedStringKeyLength = 17;
-
     private readonly IOrganizationServiceAsync2 _service;
     private readonly GeneratorFactory _generatorFactory;
     private readonly EdgeCaseValidator _edgeCaseValidator;
@@ -334,7 +330,7 @@ public class BulkCreator
 
             foreach (var attr in alternateKeyAttrs)
             {
-                entity[attr.LogicalName!] = GenerateUniqueKeyValue(attr, entityName, i, keyScope);
+                entity[attr.LogicalName!] = ScopedAlternateKey.Generate(attr, entityName, i, recordCount, keyScope);
             }
             entities.Add(entity);
         }
@@ -673,20 +669,6 @@ public class BulkCreator
         }
     }
 
-    // CR-002: scoped to the run so re-runs never collide, and a function of the row index so a
-    // retry regenerates the key a rejected row was first given. Preflight ensures truncation keeps scope and row.
-    // ponytail: integer keys get one of 21,000 run offsets (1-in-21,000 chance two runs share one);
-    // range-restricted integer keys are not honoured. Use string keys if either bites.
-    private static object GenerateUniqueKeyValue(AttributeMetadata attr, string entityName, int recordIndex, byte[] scope)
-    {
-        if (attr is IntegerAttributeMetadata)
-            return (int)(BinaryPrimitives.ReadUInt32BigEndian(scope) % 21_000) * GenerationLimits.MaxRecordCount + recordIndex;
-
-        var key = $"{entityName}-{Convert.ToHexStringLower(scope.AsSpan(0, 4))}-{recordIndex:D8}";
-        var max = (attr as StringAttributeMetadata)?.MaxLength ?? 100;
-        return key.Length > max ? key[^max..] : key;
-    }
-
     private async Task WarmupAndAdoptRecommendedDopAsync(CancellationToken ct)
     {
         try
@@ -721,12 +703,8 @@ public class BulkCreator
                 || !entityMetadata.TryGetValue(entityName, out var meta))
                 continue;
 
-            foreach (var attr in GetAlternateKeyAttributes(meta).OfType<StringAttributeMetadata>())
-            {
-                if ((attr.MaxLength ?? 100) < MinimumScopedStringKeyLength)
-                    throw new DataGenerationException(
-                        $"Entity '{entityName}': alternate-key attribute '{attr.LogicalName}' must allow at least {MinimumScopedStringKeyLength} characters to retain the run scope and row index (MaxLength was {attr.MaxLength}).");
-            }
+            if (ScopedAlternateKey.FindUnsupported(entityName, meta, count) is [var keyProblem, ..])
+                throw new DataGenerationException(keyProblem);
 
             // Tables written before this one with a positive count: their records fill its required lookups.
             var position = sortedEntities.ToList().FindIndex(t => string.Equals(t, entityName, StringComparison.OrdinalIgnoreCase));

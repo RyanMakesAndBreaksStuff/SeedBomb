@@ -665,9 +665,16 @@ public sealed partial class GenerateViewModel : ViewModelBase, IDisposable, IPro
             .ToArray();
         foreach (var entity in SelectedEntities)
         {
-            if (_entityMetadata.TryGetValue(entity.LogicalName, out var entityMeta))
-                messages.AddRange(RequiredLookupPreflight
-                    .FindUnsupplied(entity.LogicalName, entityMeta, reviewed.GetValueOrDefault(entity.LogicalName), created)
+            if (!_entityMetadata.TryGetValue(entity.LogicalName, out var entityMeta))
+                continue;
+            messages.AddRange(RequiredLookupPreflight
+                .FindUnsupplied(entity.LogicalName, entityMeta, reviewed.GetValueOrDefault(entity.LogicalName), created)
+                .Select(m => new RuleMessage(RuleMessageSeverity.Error, m)));
+            // Bulk refuses the same alternate-key columns before its first write; say so here instead.
+            var count = rawCounts.GetValueOrDefault(entity.LogicalName, DefaultRecordCount);
+            if (count > 0)
+                messages.AddRange(ScopedAlternateKey
+                    .FindUnsupported(entity.LogicalName, entityMeta, count)
                     .Select(m => new RuleMessage(RuleMessageSeverity.Error, m)));
         }
 
