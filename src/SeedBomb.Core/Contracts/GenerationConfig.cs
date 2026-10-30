@@ -1,4 +1,4 @@
-namespace SeedBomb.Core.Contracts;
+﻿namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// Configuration for a data generation run.
@@ -69,7 +69,7 @@ public record GenerationConfig
     public string AlternateKeyScope { get; init; } = "";
 
     /// <summary>
-    /// After the run, count each table's rows created by the calling user since the run started and
+    /// After the run, count each table's rows created by the calling user and written since the run started, and
     /// log them beside the requested and acknowledged counts. One extra query per table; off by default.
     /// </summary>
     public bool ReconcileAfterRun { get; init; }
