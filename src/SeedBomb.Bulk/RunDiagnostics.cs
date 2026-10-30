@@ -18,7 +18,7 @@ internal static class RunDiagnostics
 {
     private static readonly TimeSpan ReconcileTimeout = TimeSpan.FromSeconds(30);
 
-    // createdon is stamped by the server; the margin absorbs clock skew between this machine and it.
+    // modifiedon is stamped by the server; the margin absorbs clock skew between this machine and it.
     private static readonly TimeSpan ReconcileClockMargin = TimeSpan.FromMinutes(1);
 
     /// <summary>Logs how long the phase begun at <paramref name="startedTimestamp"/> took.</summary>
@@ -84,11 +84,15 @@ internal static class RunDiagnostics
             }
 
             logger.LogInformation(
-                "[run] reconcile {Entity}: requested {Requested}, acknowledged {Acknowledged}, observed {Observed} (created by caller since {Since:o})",
+                "[run] reconcile {Entity}: requested {Requested}, acknowledged {Acknowledged}, observed {Observed} (created by caller, written since {Since:o})",
                 table, requested, created.GetValueOrDefault(table)?.Count ?? 0, observed, since);
         }
     }
 
+    // Filters on modifiedon, not createdon: generated rows usually set overriddencreatedon, and
+    // Dataverse then stamps createdon with that (past) date, so a createdon filter finds nothing.
+    // modifiedon is always the real write time. A row the caller created earlier and modified
+    // during the run also counts; SeedBomb only updates rows it created in the same run.
     private static async Task<int> CountCreatedByCallerSinceAsync(
         IOrganizationServiceAsync2 service, string table, string primaryId, DateTimeOffset since, CancellationToken ct)
     {
@@ -97,7 +101,7 @@ internal static class RunDiagnostics
               <entity name="{SecurityElement.Escape(table)}">
                 <attribute name="{SecurityElement.Escape(primaryId)}" alias="n" aggregate="count" />
                 <filter>
-                  <condition attribute="createdon" operator="ge" value="{since.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}" />
+                  <condition attribute="modifiedon" operator="ge" value="{since.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}" />
                   <condition attribute="createdby" operator="eq-userid" />
                 </filter>
               </entity>
