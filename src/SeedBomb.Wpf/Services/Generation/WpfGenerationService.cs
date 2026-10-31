@@ -3,6 +3,7 @@ using SeedBomb.Bulk.Contracts;
 using SeedBomb.Core.Contracts;
 using Microsoft.Extensions.Logging;
 using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Settings;
 using System.Diagnostics;
 
 namespace SeedBomb.Services.Generation;
@@ -17,19 +18,38 @@ public sealed class WpfGenerationService : IWpfGenerationService
     private readonly IDataverseConnectionService _conn;
     private readonly GenerationPipeline _generationPipeline;
     private readonly ILogger<WpfGenerationService> _logger;
+    private readonly ISettingsService? _settings;
 
     /// <summary>Initialises the service.</summary>
     /// <param name="conn">Dataverse connection service.</param>
     /// <param name="generationPipeline">Bulk/Core orchestration pipeline.</param>
     /// <param name="logger">Logger.</param>
+    /// <param name="settings">Read per run for the run-diagnostics switch. Null leaves reconciliation off.</param>
     public WpfGenerationService(
         IDataverseConnectionService conn,
         GenerationPipeline generationPipeline,
-        ILogger<WpfGenerationService> logger)
+        ILogger<WpfGenerationService> logger,
+        ISettingsService? settings = null)
     {
         _conn = conn;
         _generationPipeline = generationPipeline;
         _logger = logger;
+        _settings = settings;
+    }
+
+    private async Task<bool> RunDiagnosticsEnabledAsync(CancellationToken ct)
+    {
+        if (_settings is null)
+            return false;
+        try
+        {
+            return (await _settings.LoadAsync(ct).ConfigureAwait(false)).RunDiagnostics;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Settings unavailable; run diagnostics off for this run");
+            return false;
+        }
     }
 
     /// <inheritdoc />
@@ -43,6 +63,7 @@ public sealed class WpfGenerationService : IWpfGenerationService
         try
         {
             var service = await _conn.GetOrganizationServiceAsync(ct).ConfigureAwait(false);
+            config = config with { ReconcileAfterRun = await RunDiagnosticsEnabledAsync(ct).ConfigureAwait(false) };
 
             var lastAt = TimeSpan.Zero;
             var pipelineProgress = new Progress<GenerationPipelineProgress>(p =>

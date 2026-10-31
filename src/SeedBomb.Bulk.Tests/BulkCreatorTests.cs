@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SeedBomb.Core.EdgeCases;
 using SeedBomb.Core.Generators;
 using SeedBomb.Core.Graph;
@@ -10,7 +11,8 @@ namespace SeedBomb.Bulk.Tests;
 public class BulkCreatorTests
 {
     // Helper: build a BulkCreator with real collaborators and a mocked service.
-    private static (BulkCreator sut, Mock<IOrganizationServiceAsync2> serviceMock) BuildSut()
+    private static (BulkCreator sut, Mock<IOrganizationServiceAsync2> serviceMock) BuildSut(
+        ILogger<BulkCreator>? logger = null)
     {
         var serviceMock = new Mock<IOrganizationServiceAsync2>();
 
@@ -41,7 +43,7 @@ public class BulkCreatorTests
             throttlePolicy,
             topologicalSort,
             deferredBackfill,
-            NullLogger<BulkCreator>.Instance);
+            logger ?? NullLogger<BulkCreator>.Instance);
 
         return (sut, serviceMock);
     }
@@ -878,6 +880,113 @@ public class BulkCreatorTests
         Assert.Empty(first.Select(e => e["new_code"]).Intersect(other.Select(e => e["new_code"])));
         Assert.All(first, e => Assert.True(((string)e["accountnumber"]).Length <= keyWidth));
         Assert.Equal(3, first.Select(e => e["accountnumber"]).Distinct().Count());
+    }
+
+    private static Task<GenerationResult> RunThreeAccountsAsync(BulkCreator sut, bool reconcile = false)
+    {
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        return sut.CreateAsync(
+            new GenerationConfig
+            {
+                EntityLogicalNames = ["account"],
+                RecordCounts = new Dictionary<string, int> { ["account"] = 3 },
+                BatchSize = 1,
+                ReconcileAfterRun = reconcile,
+            },
+            new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 100 }),
+            },
+            graph);
+    }
+
+    [Fact]
+    public async Task CreateAsync_LogsOneSnapshot_PhaseIntervals_AndOneTimingRecordPerBatch()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        AnswerCreates(serviceMock);
+
+        await RunThreeAccountsAsync(sut);
+
+        var lines = logger.Lines;
+        Assert.Single(lines, l => l.StartsWith("[run] snapshot:", StringComparison.Ordinal));
+        foreach (var phase in new[] { "preflight", "prepare", "generate account", "submit account", "backfill", "associate" })
+            Assert.Single(lines, l => l.StartsWith($"[timing] phase {phase} ", StringComparison.Ordinal));
+        var batches = lines.Where(l => l.StartsWith("[timing] batch account ", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, batches.Count);
+        // AnswerCreates rejects CreateMultiple as unsupported, so every batch lands through ExecuteMultiple.
+        Assert.All(batches, b => Assert.Contains("ExecuteMultiple", b, StringComparison.Ordinal));
+        Assert.All(batches, b => Assert.Contains(", ok, fault none", b, StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.StartsWith("[run] reconcile", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithReconcile_LogsRequestedAcknowledgedAndObserved()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        AnswerCreates(serviceMock);
+        var count = new Entity("account") { ["n"] = new AliasedValue("account", "accountid", 4) };
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(It.Is<QueryBase>(q => q is FetchExpression), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityCollection([count]));
+
+        await RunThreeAccountsAsync(sut, reconcile: true);
+
+        // One more row observed than acknowledged: what a committed batch with a lost response looks like.
+        Assert.Contains(logger.Lines, l => l.StartsWith(
+            "[run] reconcile account: requested 3, acknowledged 3, observed 4", StringComparison.Ordinal));
+        serviceMock.Verify(s => s.RetrieveMultipleAsync(
+            It.Is<QueryBase>(q => q is FetchExpression && ((FetchExpression)q).Query.Contains("eq-userid")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithReconcile_CountsOnlyRowsWrittenAfterThePreRunWatermark()
+    {
+        // A wall-clock window with a margin counted the previous back-to-back run's rows too.
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        AnswerCreates(serviceMock);
+        var watermark = new DateTime(2026, 10, 30, 12, 20, 15, DateTimeKind.Utc);
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(
+                It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).TopCount == 1),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EntityCollection([new Entity("account") { ["modifiedon"] = watermark }]));
+        string? countQuery = null;
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(It.Is<QueryBase>(q => q is FetchExpression), It.IsAny<CancellationToken>()))
+            .Callback<QueryBase, CancellationToken>((q, _) => countQuery = ((FetchExpression)q).Query)
+            .ReturnsAsync(new EntityCollection([new Entity("account") { ["n"] = new AliasedValue("account", "accountid", 3) }]));
+
+        await RunThreeAccountsAsync(sut, reconcile: true);
+
+        Assert.Contains("""attribute="modifiedon" operator="gt" value="2026-10-30T12:20:15Z""", countQuery, StringComparison.Ordinal);
+        Assert.Contains(logger.Lines, l => l.StartsWith(
+            "[run] reconcile account: requested 3, acknowledged 3, observed 3 (created by caller, written after 2026-10-30T12:20:15",
+            StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithReconcile_ReportsATableWhoseWatermarkReadFailed()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        AnswerCreates(serviceMock);
+        serviceMock
+            .Setup(s => s.RetrieveMultipleAsync(
+                It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).TopCount == 1),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FaultException<OrganizationServiceFault>(new OrganizationServiceFault()));
+
+        await RunThreeAccountsAsync(sut, reconcile: true);
+
+        Assert.Contains(logger.Lines, l => l.StartsWith(
+            "[run] reconcile account: requested 3, acknowledged 3, observed unavailable (no pre-run watermark)",
+            StringComparison.Ordinal));
     }
 
     private static EntityMetadata IntegerKeyedAccount(int min, int max)

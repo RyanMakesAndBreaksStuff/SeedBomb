@@ -1,4 +1,4 @@
-namespace SeedBomb.Core.Contracts;
+﻿namespace SeedBomb.Core.Contracts;
 
 /// <summary>
 /// Configuration for a data generation run.
@@ -67,6 +67,12 @@ public record GenerationConfig
     /// its run's value so rejected rows regenerate the keys they were first given.
     /// </summary>
     public string AlternateKeyScope { get; init; } = "";
+
+    /// <summary>
+    /// After the run, count each table's rows created by the calling user and written since the run started, and
+    /// log them beside the requested and acknowledged counts. One extra query per table; off by default.
+    /// </summary>
+    public bool ReconcileAfterRun { get; init; }
 
     /// <summary>Planned rows for <paramref name="table"/>, or 0 when the table is absent or negative.</summary>
     /// <param name="table">Entity logical name.</param>

@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using SeedBomb.Services.Auth;
+using SeedBomb.Services.Settings;
 
 namespace SeedBomb.Services.Dataverse;
 
@@ -10,6 +12,8 @@ namespace SeedBomb.Services.Dataverse;
 public sealed class DataverseConnectionService : IDataverseConnectionService, IDisposable
 {
     private readonly IAuthService _auth;
+    private readonly ISettingsService? _settings;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private ServiceClient? _cached;
     private Guid? _cachedProfileId;
@@ -30,9 +34,33 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
 
     /// <summary>Initialises the service with required dependencies.</summary>
     /// <param name="auth">Auth service: supplies the signed-in profile and its bearer tokens.</param>
-    public DataverseConnectionService(IAuthService auth)
+    /// <param name="settings">Read when a client is built, for the run-diagnostics switch. Null leaves SDK logging off.</param>
+    /// <param name="loggerFactory">Source of the SDK's logger when run diagnostics are on.</param>
+    public DataverseConnectionService(
+        IAuthService auth, ISettingsService? settings = null, ILoggerFactory? loggerFactory = null)
     {
         _auth = auth;
+        _settings = settings;
+        _loggerFactory = loggerFactory;
+    }
+
+    // Warning and above only: the SDK logs every request at lower levels. A settings read failure
+    // leaves SDK logging off rather than failing the connect.
+    private async Task<ILogger?> SdkLoggerAsync(CancellationToken ct)
+    {
+        if (_settings is null || _loggerFactory is null)
+            return null;
+        try
+        {
+            var settings = await _settings.LoadAsync(ct).ConfigureAwait(false);
+            return settings.RunDiagnostics
+                ? new MinimumLevelLogger(_loggerFactory.CreateLogger("Microsoft.PowerPlatform.Dataverse.Client"), LogLevel.Warning)
+                : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     /// <inheritdoc />
@@ -66,13 +94,15 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             var profileId = profile.Id;
             var environmentUrl = profile.EnvironmentUrl;
             var scopes = profile.DataverseScopes;
+            var sdkLogger = await SdkLoggerAsync(ct).ConfigureAwait(false);
 
             // WR-006: the constructor signs in and connects synchronously, and the awaits above
             // usually complete inline — so build it on the pool, never on the dispatcher.
             var client = await Task.Run(() => CreateClientOverride?.Invoke(environmentUrl) ?? new ServiceClient(
                 instanceUrl: new Uri(environmentUrl),
                 tokenProviderFunction: CreateTokenProvider(scopes),
-                useUniqueInstance: true)
+                useUniqueInstance: true,
+                logger: sdkLogger)
             {
                 // CR-001: keep the SDK's own retries — they honour Retry-After on service-protection
                 // faults, which ThrottlePolicy deliberately does not retry.

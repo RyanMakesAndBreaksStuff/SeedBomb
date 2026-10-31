@@ -13,6 +13,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.ServiceModel;
@@ -86,8 +87,11 @@ public class BulkCreator
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
         var allErrors = new List<BatchError>();
         var runStart = DateTimeOffset.UtcNow;
+        // Pre-run reconcile watermarks; empty until captured, so a failure before then reconciles nothing.
+        IReadOnlyDictionary<string, DateTime?> watermarks = new Dictionary<string, DateTime?>();
         try
         {
+            var phaseStart = Stopwatch.GetTimestamp();
             var validatedRules = ValidateConfiguredRules(config, entityMetadata);
             config = config with { FieldRules = validatedRules };
 
@@ -95,7 +99,9 @@ public class BulkCreator
             // to know which lookup targets this run creates before their source table.
             var sortedEntities = _topologicalSort.Sort(graph);
             var implicitLookups = PreflightTables(config, validatedRules, entityMetadata, sortedEntities);
+            RunDiagnostics.LogPhase(_logger, "preflight", phaseStart);
 
+            phaseStart = Stopwatch.GetTimestamp();
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
             var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
@@ -104,12 +110,21 @@ public class BulkCreator
             var pool = new DataverseRecordPool();
             await PopulateCurrencyPoolAsync(pool, ct).ConfigureAwait(false);
             await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
+            RunDiagnostics.LogPhase(_logger, "prepare", phaseStart);
 
             // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
             var effectiveDop = config.MaxParallelism ?? 8;
 
             if (config.RecordCounts.Values.Sum() >= 5000 && config.MaxParallelism is null)
+            {
+                phaseStart = Stopwatch.GetTimestamp();
                 await WarmupAndAdoptRecommendedDopAsync(ct).ConfigureAwait(false);
+                RunDiagnostics.LogPhase(_logger, "warmup", phaseStart);
+            }
+
+            RunDiagnostics.LogSnapshot(_logger, _service, config, sortedEntities, _messageChecker.ShouldAttemptCreateMultiple);
+            watermarks = await RunDiagnostics.CaptureWatermarksAsync(_service, config, entityMetadata, ct)
+                .ConfigureAwait(false);
 
             _logger.LogInformation(
                 "Starting bulk creation for {EntityCount} entities.",
@@ -185,22 +200,28 @@ public class BulkCreator
 
             // Phase 2: backfill deferred lookups
             _logger.LogInformation("Starting Phase 2: deferred lookup backfill.");
+            phaseStart = Stopwatch.GetTimestamp();
             var backfillErrors = await _deferredBackfill.BackfillLookupsAsync(
                 graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
                 isExplicitLookup: (table, column) => LookupRulePolicy.IsExplicit(config.FieldRules, table, column),
                 progress: progress).ConfigureAwait(false);
             allErrors.AddRange(backfillErrors);
+            RunDiagnostics.LogPhase(_logger, "backfill", phaseStart);
 
             // Phase 3: N:N associations
+            phaseStart = Stopwatch.GetTimestamp();
             var associateErrors = await _deferredBackfill.AssociateManyToManyAsync(
                 graph, pool, config.BatchSize, config.Seed, maxRetries: config.MaxRetries, ct: ct,
                 progress: progress).ConfigureAwait(false);
             allErrors.AddRange(associateErrors);
+            RunDiagnostics.LogPhase(_logger, "associate", phaseStart);
 
             var elapsed = DateTimeOffset.UtcNow - runStart;
             _logger.LogInformation(
                 "Bulk creation complete. Total records: {Total}. Errors: {Errors}. Elapsed: {Elapsed}.",
                 allCreatedRecords.Values.Sum(v => v.Count), allErrors.Count, elapsed);
+            await RunDiagnostics.ReconcileAsync(_logger, _service, config, entityMetadata, allCreatedRecords, watermarks)
+                .ConfigureAwait(false);
 
             return new GenerationResult
             {
@@ -216,6 +237,9 @@ public class BulkCreator
             var cancelled = ex is OperationCanceledException && ct.IsCancellationRequested;
             if (!cancelled)
                 _logger.LogError(ex, "Bulk creation stopped after {Count} table(s) were written.", allCreatedRecords.Count);
+            // A partial run is where a lost response is most likely, so it is reconciled too.
+            await RunDiagnostics.ReconcileAsync(_logger, _service, config, entityMetadata, allCreatedRecords, watermarks)
+                .ConfigureAwait(false);
             return new GenerationResult
             {
                 CreatedRecords = allCreatedRecords,
@@ -244,6 +268,7 @@ public class BulkCreator
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
+        var generateStart = Stopwatch.GetTimestamp();
         var tableRules = config.FieldRules is not null
             && config.FieldRules.TryGetValue(entityName, out var configuredRules)
             ? configuredRules
@@ -351,9 +376,13 @@ public class BulkCreator
             : [.. Enumerable.Range(0, recordCount)];
         var rowBatches = rowIndexes.Chunk(config.BatchSize).ToArray();
         var batches = rowBatches.Select(rows => rows.Select(row => entities[row]).ToArray()).ToArray();
+        RunDiagnostics.LogPhase(_logger, "generate", generateStart, entityName);
 
-        return await SubmitEntityBatchesAsync(
+        var submitStart = Stopwatch.GetTimestamp();
+        var submitted = await SubmitEntityBatchesAsync(
             entityName, batches, rowBatches, rowIndexes.Length, config, effectiveDop, progress, ct).ConfigureAwait(false);
+        RunDiagnostics.LogPhase(_logger, "submit", submitStart, entityName);
+        return submitted;
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> SubmitEntityBatchesAsync(
@@ -390,14 +419,18 @@ public class BulkCreator
                 var rows = rowBatches[batchIndex];
                 List<Guid> batchIds;
                 List<BatchError> batchErrors;
+                var trace = new BatchTrace();
+                var batchStart = Stopwatch.GetTimestamp();
+                string? failureType = null;
 
                 try
                 {
                     (batchIds, batchErrors) = await SubmitBatchAsync(
-                        entityName, batch, rows, config.MaxRetries, innerCt).ConfigureAwait(false);
+                        entityName, batch, rows, config.MaxRetries, trace, innerCt).ConfigureAwait(false);
                 }
                 catch (DataGenerationException ex)
                 {
+                    failureType = (ex.InnerException ?? ex).GetType().Name;
                     _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
                         batchIndex + 1, batches.Length, entityName);
                     batchIds = [];
@@ -411,6 +444,8 @@ public class BulkCreator
 
                 idBags[batchIndex] = batchIds;
                 errorBags[batchIndex] = batchErrors;
+                LogBatchTiming(entityName, batchIndex, batches.Length, batch.Length, effectiveDop,
+                    trace, batchStart, batchIds.Count, batchErrors, failureType);
 
                 var elapsed = (DateTimeOffset.UtcNow - entityStart).TotalMinutes;
                 var added = Interlocked.Add(ref createdCount, batchIds.Count);
@@ -455,6 +490,7 @@ public class BulkCreator
         Entity[] batch,
         int[] rows,
         int maxRetries,
+        BatchTrace trace,
         CancellationToken ct)
     {
         // No availability pre-check: the sdkmessagefilter probe returned false positives, so the
@@ -465,7 +501,7 @@ public class BulkCreator
             try
             {
                 return await _throttlePolicy.ExecuteAsync(
-                    () => CreateMultipleAsync(entityName, batch, ct),
+                    () => trace.CallAsync("CreateMultiple", () => CreateMultipleAsync(entityName, batch, ct)),
                     entityName, maxRetries, ct).ConfigureAwait(false);
             }
             catch (DataGenerationException ex) when (IsCreateMultipleUnsupported(ex))
@@ -485,8 +521,46 @@ public class BulkCreator
         }
 
         return await _throttlePolicy.ExecuteAsync(
-            () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct),
+            () => trace.CallAsync("ExecuteMultiple", () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct)),
             entityName, maxRetries, ct).ConfigureAwait(false);
+    }
+
+    // One "[timing] batch" line per batch: what a tuning decision is measured against.
+    private void LogBatchTiming(
+        string entityName, int batchIndex, int totalBatches, int rowCount, int dop, BatchTrace trace,
+        long batchStart, int idCount, List<BatchError> errors, string? failureType)
+    {
+        var outcome = errors.Count == 0 ? "ok" : idCount > 0 ? "partial" : "failed";
+        var fault = failureType
+            ?? (errors.FirstOrDefault(e => e.FaultCode is not null)?.FaultCode is int code ? $"0x{code:X8}" : "none");
+        _logger.LogInformation(
+            "[timing] batch {Entity} {BatchIndex}/{TotalBatches}: {Rows} rows via {Api}, {Attempts} attempt(s), DOP {Dop}, last call {CallMs:F0}ms, total {TotalMs:F0}ms, {Outcome}, fault {Fault}",
+            entityName, batchIndex + 1, totalBatches, rowCount, trace.Api ?? "none", trace.Attempts, dop,
+            trace.LastCallMs, Stopwatch.GetElapsedTime(batchStart).TotalMilliseconds, outcome, fault);
+    }
+
+    /// <summary>Which API a batch went through, how many calls it took, and how long the last one ran.</summary>
+    private sealed class BatchTrace
+    {
+        public string? Api { get; private set; }
+        public int Attempts { get; private set; }
+        public double LastCallMs { get; private set; }
+
+        // A batch's calls run one at a time, so no synchronisation is needed.
+        public async Task<T> CallAsync<T>(string api, Func<Task<T>> call)
+        {
+            Api = Api is null || Api == api ? api : $"{Api}>{api}";
+            Attempts++;
+            var started = Stopwatch.GetTimestamp();
+            try
+            {
+                return await call().ConfigureAwait(false);
+            }
+            finally
+            {
+                LastCallMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            }
+        }
     }
 
     private static bool IsCreateMultipleUnsupported(DataGenerationException ex) =>
