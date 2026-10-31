@@ -1,0 +1,54 @@
+name: CodeQL
+
+# Advanced setup, replacing default setup so test projects can be excluded. Test code is the
+# only source of the cs/cleartext-storage-of-sensitive-information false positives: a test
+# helper's EntityMetadata reaches log lines that print Dataverse table names.
+# Languages, query suite and categories match the previous default setup, so existing alerts
+# keep their identity.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "27 7 * * 2"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+          - language: csharp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          # Buildless: C# is extracted from source, which is what lets paths-ignore apply.
+          build-mode: none
+          config: |
+            paths-ignore:
+              - "src/*.Tests/**"
+              - "tests/**"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
