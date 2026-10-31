@@ -10,7 +10,7 @@ This repo ships the desktop app as a **self-contained 64-bit Windows executable*
 | Workflow | **SeedBomb Publish** (`.github/workflows/seedbomb-publish.yml`) |
 | Profiles | `src/SeedBomb.Wpf/Properties/PublishProfiles/GitHubRelease.pubxml` |
 
-The exe targets **64-bit Windows 10 1809 (build 17763) or later**, including Windows 11 on Arm through x64 emulation. It will not run on 32-bit Windows, Windows 7/8 or non-Windows OSes. The 32-bit (x86) build was dropped in 1.0.1.
+The exe targets **64-bit Windows 10 1809 (build 17763) or later**, including Windows 11 on Arm through x64 emulation. It will not run on 32-bit Windows, Windows 7/8 or non-Windows OSes. The 32-bit (x86) build was dropped in 1.0.2.
 
 ---
 
@@ -132,12 +132,14 @@ In Visual Studio: right-click **SeedBomb.Wpf → Publish** and use the **GitHubR
 
 ## 7. Re-publish the same version
 
-GitHub will not overwrite an existing release. To replace `v1.0.0`:
+GitHub will not overwrite an existing release. Prefer bumping the patch version (for example `1.0.2` → `1.0.3`) instead of rewriting a shipped tag.
 
-1. Delete the GitHub Release (and the `v1.0.0` tag if you will recreate it)
+To replace a release anyway:
+
+1. Delete the GitHub Release (and the tag too, if the new build should come from a different commit)
 2. Push the tag again, or re-run **SeedBomb Publish** with the same version
 
-Prefer bumping the patch version (`1.0.1`) instead of rewriting a shipped tag.
+**Immutable releases:** if the repository had *immutable releases* turned on (**Settings → General → Releases**) when a release was published, that tag can never get another release, even after you delete the release or turn the setting off. GitHub rejects it with `tag_name was used by an immutable release`; bump the version instead. This is why 1.0.1 couldn't be reissued after it was withdrawn, and 1.0.2 replaced it.
 
 ---
 
@@ -149,6 +151,7 @@ Prefer bumping the patch version (`1.0.1`) instead of rewriting a shipped tag.
 | Tag push did not start a run | Tag must match `v*.*.*` (use `v1.0.0`, not `1.0.0` or `release-1.0.0`) |
 | `Version must look like 1.2.3` | Use `1.2.3` or `v1.2.3` (optional `-beta.1` suffix is fine) |
 | `release already exists` | That tag already has a release — bump the version or delete the old release |
+| `tag_name was used by an immutable release` | That tag once had an immutable release and can't be reused — bump the version |
 | Tests fail in CI | Same command as local: `dotnet run --project src/SeedBomb.Wpf.Tests/SeedBomb.Wpf.Tests.csproj -c Release` |
 | `SeedBomb.exe was not produced` | Inspect the Publish step log; confirm `AssemblyName` is still `SeedBomb` |
 | Exe is only a few hundred KB | Self-contained publish failed; the file must be tens of MB |
