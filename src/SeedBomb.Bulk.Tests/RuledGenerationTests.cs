@@ -606,7 +606,7 @@ public class RuledGenerationTests
         var parent = LookupAttr("parentaccountid", "account");
         var partner = LookupAttr("msa_managingpartnerid", "account");
         var source = WithPrimaryId(BuildNamedMeta("contact", parent, partner), "contactid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         var id1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var id2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var ops = new List<string>();
@@ -638,7 +638,7 @@ public class RuledGenerationTests
                     ["msa_managingpartnerid"] = new LookupRandomRule(),
                 },
             },
-        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = account }, graph);
+        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = accountMeta }, graph);
 
         Assert.Equal(1, ops.Count(o => o == "query:account"));
         Assert.Contains("write", ops);
@@ -713,7 +713,7 @@ public class RuledGenerationTests
     {
         var lookup = LookupAttr("parentaccountid", "account");
         var source = WithPrimaryId(BuildNamedMeta("contact", lookup), "contactid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         const string cookie1 = "account-page-1";
         var pages = new List<(int Number, int Count, string? Cookie, int? TopCount, string[] Columns, string[] OrderAttrs, OrderType[] OrderTypes, string[] Conditions)>();
         var page1Ids = SequentialIds(1, 500).ToArray();
@@ -749,7 +749,7 @@ public class RuledGenerationTests
             EntityLogicalNames = ["contact"],
             RecordCounts = new() { ["contact"] = 2 },
             FieldRules = new() { ["contact"] = new() { ["parentaccountid"] = new LookupRandomRule() } },
-        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = account }, graph);
+        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = accountMeta }, graph);
 
         Assert.Equal(2, pages.Count);
         Assert.All(pages, p =>
@@ -920,7 +920,7 @@ public class RuledGenerationTests
         using var cts = new CancellationTokenSource();
         var lookup = LookupAttr("parentaccountid", "account");
         var source = WithPrimaryId(BuildNamedMeta("contact", lookup), "contactid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         var sawQueryToken = false;
         var (sut, captured) = BuildSut(onQuery: (q, ct) =>
         {
@@ -939,7 +939,7 @@ public class RuledGenerationTests
             RecordCounts = new() { ["contact"] = 2 },
             FieldRules = new() { ["contact"] = new() { ["parentaccountid"] = new LookupRandomRule() } },
         };
-        var meta = new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = account };
+        var meta = new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = accountMeta };
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             sut.CreateAsync(config, meta, graph, ct: cts.Token));
         Assert.True(sawQueryToken);
@@ -953,13 +953,13 @@ public class RuledGenerationTests
         var customer = LookupAttr("customerid", "account", "contact");
         SetAttributeType(customer, AttributeTypeCode.Customer);
         var source = WithPrimaryId(BuildNamedMeta("incident", customer), "incidentid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         var contact = WithPrimaryId(new EntityMetadata { LogicalName = "contact" }, "contactid");
         var contactId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var meta = new Dictionary<string, EntityMetadata>
         {
             ["incident"] = source,
-            ["account"] = account,
+            ["account"] = accountMeta,
             ["contact"] = contact,
         };
         var graph = new DependencyGraph();
@@ -1006,7 +1006,7 @@ public class RuledGenerationTests
     {
         var lookup = LookupAttr("parentaccountid", "account");
         var source = WithPrimaryId(BuildNamedMeta("contact", lookup), "contactid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         var firstIds = new[]
         {
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
@@ -1032,7 +1032,7 @@ public class RuledGenerationTests
             RecordCounts = new() { ["contact"] = 4 },
             FieldRules = new() { ["contact"] = new() { ["parentaccountid"] = new LookupRandomRule() } },
         };
-        var meta = new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = account };
+        var meta = new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = accountMeta };
 
         await sut.CreateAsync(config, meta, graph);
         var firstRefs = captured.Select(e => Assert.IsType<EntityReference>(e["parentaccountid"]).Id).ToArray();
@@ -1052,7 +1052,7 @@ public class RuledGenerationTests
         var lookup = LookupAttr("parentaccountid", "account");
         var name = NameAttr();
         var source = WithPrimaryId(BuildNamedMeta("contact", lookup, name), "contactid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         var (sut, captured) = BuildSut(onQuery: (q, _) =>
             string.Equals(q.EntityName, "account", StringComparison.OrdinalIgnoreCase)
                 ? TargetEntities("account", serviceOrder)
@@ -1073,7 +1073,7 @@ public class RuledGenerationTests
                     ["name"] = new PatternRule("R{seq:0000}"),
                 },
             },
-        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = account }, graph);
+        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = accountMeta }, graph);
         return [.. captured.OrderBy(e => (string)e["name"])
             .Select(e => Assert.IsType<EntityReference>(e["parentaccountid"]))];
     }
@@ -1084,7 +1084,7 @@ public class RuledGenerationTests
         var lookup = LookupAttr("parentaccountid", "account");
         var name = NameAttr();
         var source = WithPrimaryId(BuildNamedMeta("contact", lookup, name), "contactid");
-        var account = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
+        var accountMeta = WithPrimaryId(new EntityMetadata { LogicalName = "account" }, "accountid");
         var (sut, captured) = BuildSut(onQuery: (q, _) =>
             string.Equals(q.EntityName, "account", StringComparison.OrdinalIgnoreCase)
                 ? TargetEntities("account", candidateIds)
@@ -1105,7 +1105,7 @@ public class RuledGenerationTests
                     ["name"] = new PatternRule("R{seq:0000}"),
                 },
             },
-        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = account }, graph);
+        }, new Dictionary<string, EntityMetadata> { ["contact"] = source, ["account"] = accountMeta }, graph);
         return captured.ToDictionary(
             e => (string)e["name"],
             e =>
