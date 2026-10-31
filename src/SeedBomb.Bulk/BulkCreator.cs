@@ -28,6 +28,9 @@ namespace SeedBomb.Bulk;
 /// </summary>
 public class BulkCreator
 {
+    // Used when DOP is automatic and the server has sent no hint.
+    private const int DefaultDop = 8;
+
     private readonly IOrganizationServiceAsync2 _service;
     private readonly GeneratorFactory _generatorFactory;
     private readonly EdgeCaseValidator _edgeCaseValidator;
@@ -112,10 +115,10 @@ public class BulkCreator
             await PopulateSystemUserPoolAsync(pool, ct).ConfigureAwait(false);
             RunDiagnostics.LogPhase(_logger, "prepare", phaseStart);
 
-            // T-18: default DOP=8; updated after first entity if ServiceClient provides a recommendation
-            var effectiveDop = config.MaxParallelism ?? 8;
-
-            if (config.RecordCounts.Values.Sum() >= 5000 && config.MaxParallelism is null)
+            // T-18: with no configured DOP, a WhoAmI before the first table lets the server's
+            // x-ms-dop-hint reach ServiceClient, so every table — the first included — uses it.
+            // A run that writes nothing sends nothing.
+            if (config.MaxParallelism is null && config.PlannedTotal > 0)
             {
                 phaseStart = Stopwatch.GetTimestamp();
                 await WarmupAndAdoptRecommendedDopAsync(ct).ConfigureAwait(false);
@@ -155,6 +158,7 @@ public class BulkCreator
                     "Generating {RecordCount} records for {Entity}.",
                     recordCount, entityName);
 
+                var effectiveDop = ResolveDop(config, entityName);
                 var (createdIds, errors, failure) = await CreateEntityRecordsAsync(
                     entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, lookupRun, progress, ct).ConfigureAwait(false);
 
@@ -167,20 +171,6 @@ public class BulkCreator
                 _logger.LogInformation(
                     "Completed {Entity}: {Created}/{Requested} records created.",
                     entityName, createdIds.Count, recordCount);
-
-                // After first entity, re-read server-recommended DOP if no user override
-                if (entityIndex == 0 && config.MaxParallelism is null &&
-                    _service is ServiceClient sc)
-                {
-                    var hint = sc.RecommendedDegreesOfParallelism;
-                    if (hint > 0)
-                    {
-                        effectiveDop = hint;
-                        _logger.LogInformation(
-                            "DOP updated to {Dop} from ServiceClient.RecommendedDegreesOfParallelism",
-                            effectiveDop);
-                    }
-                }
             }
 
             // WR-002: a cancel during the last table must not fall through into linking.
@@ -743,15 +733,40 @@ public class BulkCreator
         }
     }
 
+    /// <summary>
+    /// The server's recommended degree of parallelism (<c>x-ms-dop-hint</c>) as last seen by
+    /// <see cref="ServiceClient"/>; 0 when unknown. Virtual so tests can supply a hint.
+    /// </summary>
+    protected virtual int RecommendedDopHint =>
+        _service is ServiceClient sc ? sc.RecommendedDegreesOfParallelism : 0;
+
+    // Read at the top of every table, so the hint reaches the first table and tracks any later change.
+    // Explicit config wins, then a positive server hint, then 8. The hint is not clamped to
+    // GenerationLimits.MaxDop (that bounds what a user may configure); one above it is logged.
+    private int ResolveDop(GenerationConfig config, string entityName)
+    {
+        if (config.MaxParallelism is { } configured)
+            return configured;
+
+        var hint = RecommendedDopHint;
+        if (hint <= 0)
+            return DefaultDop;
+
+        if (hint > GenerationLimits.MaxDop)
+            _logger.LogInformation(
+                "Server DOP hint {Hint} for {Entity} is above the configurable maximum {MaxDop}; using it as given.",
+                hint, entityName, GenerationLimits.MaxDop);
+        return hint;
+    }
+
     private async Task WarmupAndAdoptRecommendedDopAsync(CancellationToken ct)
     {
         try
         {
             await _service.ExecuteAsync(new WhoAmIRequest(), ct).ConfigureAwait(false);
-            if (_service is ServiceClient sc && sc.RecommendedDegreesOfParallelism > 0)
-            {
-                _logger.LogInformation("Warmup completed; server recommended DOP is {Dop}", sc.RecommendedDegreesOfParallelism);
-            }
+            var hint = RecommendedDopHint;
+            if (hint > 0)
+                _logger.LogInformation("Warmup completed; server recommended DOP is {Dop}", hint);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
