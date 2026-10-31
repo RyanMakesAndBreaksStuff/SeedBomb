@@ -84,19 +84,6 @@ jobs:
             -p:InformationalVersion=$env:VERSION `
             -o $env:PUBLISH_DIR/x64
 
-      - name: Publish self-contained single-file exe (x86)
-        run: |
-          dotnet publish ${{ env.PROJECT }} `
-            -c Release `
-            -r win-x86 `
-            --self-contained true `
-            -p:PublishProfile=GitHubRelease-x86 `
-            -p:Version=$env:VERSION `
-            -p:AssemblyVersion=$env:ASSEMBLY_VERSION `
-            -p:FileVersion=$env:ASSEMBLY_VERSION `
-            -p:InformationalVersion=$env:VERSION `
-            -o $env:PUBLISH_DIR/x86
-
       - name: Verify exes
         run: |
           function Assert-Exe([string]$Dir) {
@@ -112,17 +99,14 @@ jobs:
             Write-Host "Published $($file.FullName) ($([math]::Round($file.Length / 1MB, 1)) MB)"
           }
           Assert-Exe "$env:PUBLISH_DIR/x64"
-          Assert-Exe "$env:PUBLISH_DIR/x86"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $exeX64 = Join-Path $env:PUBLISH_DIR "x64/SeedBomb.exe"
-          $exeX86 = Join-Path $env:PUBLISH_DIR "x86/SeedBomb-x86.exe"
-          Copy-Item (Join-Path $env:PUBLISH_DIR "x86/SeedBomb.exe") $exeX86
           $ghArgs = @(
-            "release", "create", $env:RELEASE_TAG, $exeX64, $exeX86,
+            "release", "create", $env:RELEASE_TAG, $exeX64,
             "--title", "SeedBomb $($env:VERSION)",
             "--generate-notes",
             "--target", $env:GITHUB_SHA
