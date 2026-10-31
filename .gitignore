@@ -88,6 +88,7 @@ AGENTS.md
 /plans
 /Review
 /reviews
-/documentation/OUTLINE.md
 
 *.user
+*.md
+/src/SeedBomb.Wpf/Properties/PublishProfiles/FolderProfile.pubxml

@@ -406,7 +406,8 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
                 EnvironmentLabel,
                 UserLabel,
                 _profileName,
-                ActivityLines));
+                ActivityLines,
+                result?.Cancelled ?? false));
         }
         catch (Exception ex)
         {
@@ -563,6 +564,8 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         StatusHeadline = result.Cancelled ? "Cancelled" : OutcomeHeadline;
         if (result.FatalError is { } fatal)
             ApplyFailure($"{fatal} Stopped after writing {written:N0} rows; their lookups and links were not completed.");
+        else if (result.Cancelled)
+            ApplyCancelled(written, rejected);
 
         ReplaceGroups(result.Errors
             .GroupBy(e => (e.EntityLogicalName, e.ErrorMessage))
@@ -601,9 +604,15 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         _plannedTotal = run.TotalRecords;
         _plannedTables = run.EntityNames;
 
+        var unfinished = !run.Succeeded && run.ErrorCount == 0;
+        var ended = run.Cancelled ? "Cancelled" : unfinished ? "Stopped" : "Finished";
         RunMetaLine =
-            $"Finished {run.Timestamp.LocalDateTime:d MMM yyyy, HH:mm} · {FormatDuration(run.Duration)} · historical";
+            $"{ended} {run.Timestamp.LocalDateTime:d MMM yyyy, HH:mm} · {FormatDuration(run.Duration)} · historical";
         ApplyOutcome(run.TotalRecords, run.ErrorCount, run.Duration, run.EntityNames.Length);
+        if (run.Cancelled)
+            ApplyCancelled(run.TotalRecords, run.ErrorCount);
+        else if (unfinished)
+            ApplyFailure("This run did not finish.");
         ReplaceGroups([]);
         RefreshRetryChrome();
 
@@ -861,6 +870,16 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         {
             _logger?.LogWarning(ex, "Could not read KeepRunSheetOpen; keeping the default");
         }
+    }
+
+    /// <summary>A cancelled run is not "Completed": the banner must say it stopped early.</summary>
+    private void ApplyCancelled(int written, int rejected)
+    {
+        LastRunSucceeded = false;
+        OutcomeGlyph = SymbolRegular.Warning24;
+        OutcomeHeadline = "Run cancelled";
+        var rejects = rejected > 0 ? $" and rejected {rejected:N0}" : "";
+        OutcomeDetail = $"Wrote {written:N0} rows{rejects} before it stopped. Nothing was rolled back.";
     }
 
     private void ApplyOutcome(int written, int rejected, TimeSpan elapsed, int tableCount)

@@ -1025,6 +1025,32 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GoToReview_FlagsAlternateKeyColumnTooShortForScopedKeys()
+    {
+        // Bulk refused this at Start with no warning in Review.
+        var code = new StringAttributeMetadata { LogicalName = "new_code", MaxLength = 10, IsValidForCreate = true };
+        var account = BuildAccountMetadata(code);
+        account.GetType().GetProperty("Keys")!.SetValue(account, new[]
+        {
+            new EntityKeyMetadata { LogicalName = "code_key", KeyAttributes = ["new_code"] },
+        });
+        var viewModel = CreateViewModel(out _, out var metadataMock, out _);
+        metadataMock
+            .Setup(m => m.GetEntitiesAsync(It.IsAny<string[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<EntityMetadata>)[account]);
+        viewModel.AttachFieldRules(new FieldRulesViewModel());
+        viewModel.OnEntitiesChanged([new EntitySummary("account", "Account", false)]);
+        await viewModel.GoNextCommand.ExecuteAsync(null);
+
+        viewModel.GoToReviewCommand.Execute(null);
+
+        Assert.True(viewModel.ReviewHasErrors);
+        Assert.Contains("'new_code' allows 10 characters", viewModel.ReviewErrorSummary, StringComparison.Ordinal);
+        Assert.Contains("at least 17", viewModel.ReviewErrorSummary, StringComparison.Ordinal);
+        Assert.False(viewModel.GenerateCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task GoToReview_AllowsRequiredLookupToSelectedTable()
     {
         // CR-003 amendment: contact's required lookup targets account, which this run creates first.

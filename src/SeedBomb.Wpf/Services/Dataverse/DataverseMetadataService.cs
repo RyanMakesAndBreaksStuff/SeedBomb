@@ -16,9 +16,10 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
 {
     private readonly IDataverseConnectionService _conn;
     private readonly ILogger<DataverseMetadataProvider> _innerLogger;
-    private MemoryCache _cache = new(new MemoryCacheOptions());
+    private volatile MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private DataverseMetadataProvider? _inner;
+    private volatile DataverseMetadataProvider? _inner;
+    private int _disposed;
 
     /// <summary>Initialises the service.</summary>
     /// <param name="conn">Connection service that supplies the underlying <see cref="Microsoft.PowerPlatform.Dataverse.Client.ServiceClient"/>.</param>
@@ -68,10 +69,11 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
     private async Task ResetCacheAsync()
     {
         await _lock.WaitAsync().ConfigureAwait(false);
-        MemoryCache oldCache;
         try
         {
-            oldCache = _cache;
+            if (Volatile.Read(ref _disposed) != 0) return;
+            // The old cache is left for the GC rather than disposed: reads that started before the
+            // reset still hold its provider and write to it, and MemoryCache owns no unmanaged state.
             _cache = new MemoryCache(new MemoryCacheOptions());
             _inner = null;
         }
@@ -79,15 +81,15 @@ public sealed class DataverseMetadataService : IMetadataProvider, IDisposable
         {
             _lock.Release();
         }
-
-        oldCache.Dispose();
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _conn.ConnectionReset -= OnConnectionReset;
+        // _lock is not disposed: a reset or read may still be waiting on it, and a SemaphoreSlim
+        // whose AvailableWaitHandle was never read holds nothing to release.
         _cache.Dispose();
-        _lock.Dispose();
     }
 }

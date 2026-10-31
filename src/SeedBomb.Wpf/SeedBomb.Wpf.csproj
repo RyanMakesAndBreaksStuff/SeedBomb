@@ -13,18 +13,18 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ProduceReferenceAssembly>True</ProduceReferenceAssembly>
     <GenerateDocumentationFile>False</GenerateDocumentationFile>
-    <Platforms>AnyCPU</Platforms>
+    <Platforms>AnyCPU;x64</Platforms>
     <StartupObject>SeedBomb.App</StartupObject>
     <AssemblyTitle>SeedBomb</AssemblyTitle>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' AND ('$(Platform)' == 'AnyCPU' OR '$(Platform)' == 'x64')">
     <Optimize>True</Optimize>
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
     <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
     <DebugType>full</DebugType>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' AND ('$(Platform)' == 'AnyCPU' OR '$(Platform)' == 'x64')">
     <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
     <GenerateAssemblyInfo>True</GenerateAssemblyInfo>
     <DebugType>full</DebugType>

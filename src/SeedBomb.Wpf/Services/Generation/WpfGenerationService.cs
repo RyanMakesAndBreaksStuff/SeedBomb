@@ -74,8 +74,19 @@ public sealed class WpfGenerationService : IWpfGenerationService
                 .GenerateAsync(config, service, pipelineProgress, ct)
                 .ConfigureAwait(false);
 
-            _logger.LogInformation("Generation complete — {Total} records in {Elapsed}",
-                result.TotalRecords, sw.Elapsed);
+            if (result.Cancelled)
+                _logger.LogInformation("Generation cancelled — {Total} records written in {Elapsed}",
+                    result.TotalRecords, sw.Elapsed);
+            else if (result.FatalError is not null)
+                _logger.LogWarning("Generation failed after {Total} records in {Elapsed}: {Error}",
+                    result.TotalRecords, sw.Elapsed, result.FatalError);
+            else if (result.Errors.Count > 0)
+                _logger.LogWarning(
+                    "Generation finished with errors — {Total} records, {Rejected} rejected in {ErrorCount} batches, {Elapsed}",
+                    result.TotalRecords, result.RejectedRows, result.Errors.Count, sw.Elapsed);
+            else
+                _logger.LogInformation("Generation complete — {Total} records in {Elapsed}",
+                    result.TotalRecords, sw.Elapsed);
             return result;
         }
         catch (OperationCanceledException)

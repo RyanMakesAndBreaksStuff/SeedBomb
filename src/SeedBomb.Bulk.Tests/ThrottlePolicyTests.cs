@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Moq;
 using System.ServiceModel;
 
 namespace SeedBomb.Bulk.Tests;
@@ -203,8 +205,93 @@ public class ThrottlePolicyTests
         Assert.Equal(1, callCount);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ConnectionResetWrappedInCommunicationException_IsRetried()
+    {
+        // ServiceClient surfaces a socket reset (10054) mid-upload as CommunicationException
+        // wrapping HttpRequestException, not the bare HttpRequestException.
+        var callCount = 0;
+
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new CommunicationException(
+                        "Error while copying content to a stream.",
+                        new HttpRequestException("Error while copying content to a stream.",
+                            new IOException("Unable to write data to the transport connection.")));
+                return Task.FromResult("success");
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
+    public static TheoryData<Exception> UnreachedEndpointCases => new()
+    {
+        new EndpointNotFoundException("There was no endpoint listening at https://contoso.crm.dynamics.com."),
+        new ServerTooBusyException("The server is too busy."),
+    };
+
+    [Theory]
+    [MemberData(nameof(UnreachedEndpointCases))]
+    public async Task ExecuteAsync_FaultIsTransientReports_IsRetried(Exception fault)
+    {
+        // IsTransient and ExecuteAsync share one classification, so nothing IsTransient calls
+        // transient is left to fail on the first attempt.
+        var callCount = 0;
+
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1) throw fault;
+                return Task.FromResult("success");
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DirectHttpRequestException_LogsTheRetry()
+    {
+        var logger = new Mock<ILogger<ThrottlePolicy>>();
+        logger.Setup(l => l.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
+        var policy = new ThrottlePolicy(logger.Object);
+        var callCount = 0;
+
+        await policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1) throw new HttpRequestException("An existing connection was forcibly closed.");
+                return Task.FromResult(1);
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        logger.Verify(l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("Network fault for account on attempt 1 of 4")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
     public static TheoryData<Exception, bool> TransientCases => new()
     {
+        { new CommunicationException("Error while copying content to a stream.", new HttpRequestException()), true },
+        { new CommunicationException("Unrecognized message version."), false },
         { new EndpointNotFoundException("There was no endpoint listening at https://contoso.crm.dynamics.com."), true },
         { new ServerTooBusyException("The server is too busy."), true },
         { new TimeoutException(), true },
