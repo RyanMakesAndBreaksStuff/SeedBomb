@@ -36,6 +36,7 @@ These examples assume the column's metadata permits the values and length shown.
 | Generate recognizable text | **pattern** → Template: `DEMO-{seq:0000}`; first values are `DEMO-0001`, `DEMO-0002`, `DEMO-0003` |
 | Use a supported fake-data generator | **bogus** → choose an **API**, then an **Endpoint**, and fill any displayed bounds or length inputs |
 | Leave an optional column unset | **null** → omit the value and let the platform default apply |
+| Backdate when rows were created | Select **Record Created On** → **range** → Min: `2023-01-01`; Max: `2024-12-31` |
 
 Use a decimal point for numeric input, for example `12.5`. One-of input for non-choice scalar columns is comma-separated; it is not a CSV editor for text containing commas.
 
@@ -44,6 +45,14 @@ Patterns support `{seq}`, zero-padded sequence tokens such as `{seq:0000}`, `{ra
 Float columns do not offer sequence. Date and choice columns offer a smaller operation set than text and numeric columns. Null is invalid for required columns. The Bogus API and Endpoint lists are filtered for the selected column's value type.
 
 **Reroll** changes the preview sample; it does not change the saved run seed. Preview helps inspect values and validation, but does not guarantee that Dataverse permissions, business rules, or plug-ins will accept a write.
+
+## Set Created On
+
+Dataverse sets **Created On** when it writes a row, so it can't take a rule directly. Generated rows show the time of the run unless you add a rule to **Record Created On**: Dataverse copies that rule's date into **Created On** and keeps the real write time in **Record Created On**.
+
+- Use any date operation: **constant** for one date, **range** for a spread, **one-of** for a few fixed dates, or **bogus** → `DATE` for generated past or recent dates.
+- Dates are written as UTC; Dataverse shows them in each user's time zone.
+- Your security role needs the **Override Created on or Created by for Records during Data Import** privilege (`prvOverrideCreatedOnCreatedBy`). System Administrator and System Customizer have it. Without it, Dataverse rejects the rows.
 
 ## Link to specific existing records
 
