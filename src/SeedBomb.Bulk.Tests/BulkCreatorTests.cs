@@ -117,15 +117,59 @@ public class BulkCreatorTests
     }
 
     [Fact]
-    public async Task Dop_ExplicitConfig_OverridesTheHint()
+    public async Task Dop_ExplicitConfigBelowTheHint_IsUsed()
     {
         var logger = new RecordingLogger<BulkCreator>();
         var (sut, serviceMock) = BuildSut(logger, dopHint: () => 4);
         AnswerCreates(serviceMock);
 
-        await RunAccountsThenContactsAsync(sut, maxParallelism: 2);
+        var result = await RunAccountsThenContactsAsync(sut, maxParallelism: 2);
 
         Assert.All(BatchDops(logger), dop => Assert.Equal("2", dop));
+        Assert.Empty(result.Notices);
+    }
+
+    [Fact]
+    public async Task Dop_ExplicitConfigAboveTheHint_IsCappedAtTheHintAndReported()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => 4);
+        AnswerCreates(serviceMock);
+
+        var result = await RunAccountsThenContactsAsync(sut, maxParallelism: 8);
+
+        Assert.All(BatchDops(logger), dop => Assert.Equal("4", dop));
+        // Two tables hit the same cap: one notice, not two.
+        var notice = Assert.Single(result.Notices);
+        Assert.Contains("capped at 4", notice, StringComparison.Ordinal);
+        Assert.Contains("8 was requested", notice, StringComparison.Ordinal);
+        Assert.Contains(logger.Lines, l => l.Contains("above the server hint", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Dop_ExplicitConfigEqualToTheHint_IsNotReported()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => 4);
+        AnswerCreates(serviceMock);
+
+        var result = await RunAccountsThenContactsAsync(sut, maxParallelism: 4);
+
+        Assert.All(BatchDops(logger), dop => Assert.Equal("4", dop));
+        Assert.Empty(result.Notices);
+    }
+
+    [Fact]
+    public async Task Dop_ExplicitConfigWithNoHint_IsUsedAsConfigured()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger, dopHint: () => 0);
+        AnswerCreates(serviceMock);
+
+        var result = await RunAccountsThenContactsAsync(sut, maxParallelism: 8);
+
+        Assert.All(BatchDops(logger), dop => Assert.Equal("8", dop));
+        Assert.Empty(result.Notices);
     }
 
     [Fact]

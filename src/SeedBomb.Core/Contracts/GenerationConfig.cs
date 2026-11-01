@@ -35,7 +35,8 @@ public record GenerationConfig
     public int BatchSize { get; init; } = GenerationLimits.DefaultBatchSize;
 
     /// <summary>
-    /// Gets the maximum degree of parallelism. Null means system default.
+    /// Gets the maximum degree of parallelism. Null means automatic. A value above the server's
+    /// recommended DOP is lowered to it for the run and reported in <see cref="GenerationResult.Notices"/>.
     /// </summary>
     public int? MaxParallelism { get; init; }
 

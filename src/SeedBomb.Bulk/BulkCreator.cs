@@ -89,6 +89,7 @@ public class BulkCreator
         // WR-002: declared outside the try so a cancel can still report what was written.
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
         var allErrors = new List<BatchError>();
+        var notices = new List<string>();
         var runStart = DateTimeOffset.UtcNow;
         // Pre-run reconcile watermarks; empty until captured, so a failure before then reconciles nothing.
         IReadOnlyDictionary<string, DateTime?> watermarks = new Dictionary<string, DateTime?>();
@@ -158,7 +159,7 @@ public class BulkCreator
                     "Generating {RecordCount} records for {Entity}.",
                     recordCount, entityName);
 
-                var effectiveDop = ResolveDop(config, entityName);
+                var effectiveDop = ResolveDop(config, entityName, notices);
                 var (createdIds, errors, failure) = await CreateEntityRecordsAsync(
                     entityName, meta, entityIndex, recordCount, config, effectiveDop, pool, preparedRun, lookupRun, progress, ct).ConfigureAwait(false);
 
@@ -217,6 +218,7 @@ public class BulkCreator
             {
                 CreatedRecords = allCreatedRecords,
                 Errors = allErrors.AsReadOnly(),
+                Notices = notices.AsReadOnly(),
                 Elapsed = elapsed
             };
         }
@@ -234,6 +236,7 @@ public class BulkCreator
             {
                 CreatedRecords = allCreatedRecords,
                 Errors = allErrors.AsReadOnly(),
+                Notices = notices.AsReadOnly(),
                 Elapsed = DateTimeOffset.UtcNow - runStart,
                 Cancelled = cancelled,
                 FatalError = cancelled ? null : ex.Message,
@@ -745,14 +748,27 @@ public class BulkCreator
         _service is ServiceClient sc ? sc.RecommendedDegreesOfParallelism : 0;
 
     // Read at the top of every table, so the hint reaches the first table and tracks any later change.
-    // Explicit config wins, then a positive server hint, then 8. The hint is not clamped to
+    // An explicit DOP is a ceiling: above a positive server hint it is lowered to the hint, because
+    // more parallel calls than the hint worsens throughput and exhausts the service-protection
+    // execution-time budget. Otherwise a positive hint, then 8. The hint is not clamped to
     // GenerationLimits.MaxDop (that bounds what a user may configure); one above it is logged.
-    private int ResolveDop(GenerationConfig config, string entityName)
+    private int ResolveDop(GenerationConfig config, string entityName, List<string> notices)
     {
-        if (config.MaxParallelism is { } configured)
-            return configured;
-
         var hint = RecommendedDopHint;
+        if (config.MaxParallelism is { } configured)
+        {
+            if (hint <= 0 || configured <= hint)
+                return configured;
+
+            _logger.LogWarning(
+                "Parallelism {Configured} for {Entity} is above the server hint {Hint}; using the hint.",
+                configured, entityName, hint);
+            var notice = $"Parallelism capped at {hint} (the server's recommended maximum); {configured} was requested.";
+            if (!notices.Contains(notice))
+                notices.Add(notice);
+            return hint;
+        }
+
         if (hint <= 0)
             return DefaultDop;
 

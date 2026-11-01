@@ -42,4 +42,10 @@ public record GenerationResult
     /// <see cref="CreatedRecords"/> then holds only the rows written before the failure; they are not rolled back.
     /// </summary>
     public string? FatalError { get; init; }
+
+    /// <summary>
+    /// Run-level facts the user should see in the summary, such as a requested parallelism that was
+    /// lowered to the server's recommended maximum. Empty when the run changed nothing the user asked for.
+    /// </summary>
+    public IReadOnlyList<string> Notices { get; init; } = [];
 }
