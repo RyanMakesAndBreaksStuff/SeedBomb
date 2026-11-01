@@ -386,6 +386,45 @@ public sealed class RunViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ApplyResult_ShowsNotices_InTheOutcomeDetailAndTheActivityLog()
+    {
+        const string notice = "A run-level notice.";
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [.. Enumerable.Range(0, 100).Select(_ => Guid.NewGuid())],
+            },
+            Elapsed = TimeSpan.FromSeconds(5),
+            Notices = [notice],
+        }, seed: 1, environmentHost: "contoso-dev");
+
+        Assert.Contains(notice, vm.OutcomeDetail, StringComparison.Ordinal);
+        Assert.Contains(notice, vm.ActivityLines);
+    }
+
+    [Fact]
+    public void ApplyResult_WithoutNotices_LeavesTheOutcomeDetailAsIs()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>
+            {
+                ["account"] = [.. Enumerable.Range(0, 100).Select(_ => Guid.NewGuid())],
+            },
+            Elapsed = TimeSpan.FromSeconds(5),
+        }, seed: 1, environmentHost: "contoso-dev");
+
+        Assert.Equal("Wrote 100 rows. Nothing was rolled back.", vm.OutcomeDetail);
+    }
+
+    [Fact]
     public void ApplyResult_SettlesEveryTableRow_EvenWhenTheLastSnapshotWasDropped()
     {
         var vm = new RunViewModel();

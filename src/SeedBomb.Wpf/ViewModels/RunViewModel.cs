@@ -567,6 +567,14 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         else if (result.Cancelled)
             ApplyCancelled(written, rejected);
 
+        // After the outcome branches: ApplyFailure and ApplyCancelled replace OutcomeDetail.
+        if (result.Notices.Count > 0)
+        {
+            OutcomeDetail = $"{OutcomeDetail} {string.Join(' ', result.Notices)}";
+            foreach (var notice in result.Notices)
+                AppendActivity(notice);
+        }
+
         ReplaceGroups(result.Errors
             .GroupBy(e => (e.EntityLogicalName, e.ErrorMessage))
             .Select(BuildGroup));
