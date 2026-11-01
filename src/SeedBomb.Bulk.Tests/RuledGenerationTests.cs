@@ -251,6 +251,70 @@ public class RuledGenerationTests
         }
     }
 
+    // overriddencreatedon (Record Created On) as live metadata describes it: creatable, not required.
+    private static EntityMetadata BuildCreatedOnMetadata()
+    {
+        var meta = new EntityMetadata { LogicalName = "account" };
+        var name = new StringAttributeMetadata { LogicalName = "name", MaxLength = 100 };
+        var recordCreatedOn = new DateTimeAttributeMetadata { LogicalName = "overriddencreatedon", IsValidForCreate = true };
+        var sampleDate = new DateTimeAttributeMetadata { LogicalName = "sampledate" };
+        meta.GetType().GetProperty("Attributes")!.SetValue(meta, new AttributeMetadata[] { name, recordCreatedOn, sampleDate });
+        return meta;
+    }
+
+    private static GenerationConfig CreatedOnConfig(Dictionary<string, Dictionary<string, FieldRule>>? rules = null) => new()
+    {
+        EntityLogicalNames = ["account"],
+        RecordCounts = new Dictionary<string, int> { ["account"] = 3 },
+        BatchSize = 10,
+        FieldRules = rules,
+    };
+
+    [Fact]
+    public async Task Record_created_on_is_left_unset_without_a_rule()
+    {
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var (sut, captured) = BuildSut();
+
+        await sut.CreateAsync(CreatedOnConfig(), new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = BuildCreatedOnMetadata() }, graph);
+
+        Assert.Equal(3, captured.Count);
+        Assert.All(captured, e =>
+        {
+            Assert.False(e.Contains("overriddencreatedon"));
+            Assert.IsType<DateTime>(e["sampledate"]);
+        });
+    }
+
+    [Fact]
+    public async Task Record_created_on_rule_sets_the_date_and_leaves_other_columns_unchanged()
+    {
+        var graphA = new DependencyGraph();
+        graphA.AddNode("account");
+        var (sutA, capturedA) = BuildSut();
+        await sutA.CreateAsync(CreatedOnConfig(), new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = BuildCreatedOnMetadata() }, graphA);
+
+        var graphB = new DependencyGraph();
+        graphB.AddNode("account");
+        var (sutB, capturedB) = BuildSut();
+        var rules = new Dictionary<string, Dictionary<string, FieldRule>>
+        {
+            ["account"] = new() { ["overriddencreatedon"] = new ConstantRule(J("\"2024-03-01T00:00:00\"")) },
+        };
+        await sutB.CreateAsync(CreatedOnConfig(rules), new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase) { ["account"] = BuildCreatedOnMetadata() }, graphB);
+
+        // Names only: DateTimeFieldGenerator's range ends at DateTime.UtcNow, so dates differ between runs.
+        // Rows 2 and 3 draw their name after the previous row's overriddencreatedon draw, so equal
+        // names prove the column still consumes the Faker stream whether or not a rule is set.
+        Assert.Equal(3, capturedB.Count);
+        for (int i = 0; i < capturedB.Count; i++)
+        {
+            Assert.Equal(new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc), capturedB[i]["overriddencreatedon"]);
+            Assert.Equal(capturedA[i]["name"], capturedB[i]["name"]);
+        }
+    }
+
     private static EntityMetadata BuildMetaWithAttribute(AttributeMetadata attr, EntityKeyMetadata[]? keys = null)
     {
         var meta = new EntityMetadata { LogicalName = "ruled_ineligible" };

@@ -301,6 +301,8 @@ public class BulkCreator
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
                     value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
+                else if (FieldFilter.IsRuleOnly(attr))
+                    continue;   // rule-only: the draw above just keeps later columns' values stable
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;   // null rule: emit nothing, platform default applies
                 if (value is not null)
@@ -313,6 +315,8 @@ public class BulkCreator
                 var value = _generatorFactory.Generate(attr, faker, pool); // always consume legacy stream (S7)
                 if (attr.LogicalName is not null && tableRules.TryGetValue(attr.LogicalName, out var rule))
                     value = ResolveRuleValue(rule, attr, evalContext, i, preparedRun, lookupRun, pool, bogusSession);
+                else if (FieldFilter.IsRuleOnly(attr))
+                    continue;
                 if (ReferenceEquals(value, RuleValueGenerator.Omit))
                     continue;
                 if (value is not null)
