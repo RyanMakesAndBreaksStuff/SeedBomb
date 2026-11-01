@@ -208,6 +208,24 @@ public class RuleEligibilityTests
         Assert.Equal(EligibilityReason.Settable, r.Reason);
     }
 
+    [Fact]
+    public void Createdon_points_to_record_created_on()
+    {
+        var attr = new DateTimeAttributeMetadata { LogicalName = "createdon", IsValidForCreate = false };
+        var r = RuleEligibility.Classify(attr);
+        Assert.False(r.IsSettable);
+        Assert.Equal(EligibilityReason.CreatedOnViaOverride, r.Reason);
+    }
+
+    [Fact]
+    public void Record_created_on_is_settable()
+    {
+        var attr = new DateTimeAttributeMetadata { LogicalName = "overriddencreatedon", IsValidForCreate = true };
+        var r = RuleEligibility.Classify(attr);
+        Assert.True(r.IsSettable);
+        Assert.Equal(EligibilityReason.Settable, r.Reason);
+    }
+
     private static void SetAttributeType(AttributeMetadata attr, AttributeTypeCode type)
         => typeof(AttributeMetadata).GetProperty(nameof(AttributeMetadata.AttributeType))!
             .SetValue(attr, type);

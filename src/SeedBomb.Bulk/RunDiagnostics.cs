@@ -133,8 +133,8 @@ internal static class RunDiagnostics
         }
     }
 
-    // Filters on modifiedon, not createdon: generated rows usually set overriddencreatedon, and
-    // Dataverse then stamps createdon with that (past) date, so a createdon filter finds nothing.
+    // Filters on modifiedon, not createdon: a profile rule on overriddencreatedon (Record Created On)
+    // makes Dataverse stamp createdon with that date, so a createdon filter would miss those rows.
     // modifiedon is always the real write time. A row the caller created earlier and modified
     // during the run also counts; SeedBomb only updates rows it created in the same run.
     // ponytail: modifiedon has one-second resolution, so a row written in the watermark's own second

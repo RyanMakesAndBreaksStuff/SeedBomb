@@ -68,6 +68,24 @@ public sealed class RuleColumnCatalogTests
         }
     }
 
+    [StaFact]
+    public void Created_on_row_points_to_record_created_on()
+    {
+        var catalog = new RuleColumnCatalog();
+        var entity = new EntityMetadata { LogicalName = "account" };
+        typeof(EntityMetadata).GetProperty(nameof(EntityMetadata.Attributes))!
+            .SetValue(entity, new AttributeMetadata[]
+            {
+                new DateTimeAttributeMetadata { LogicalName = "createdon", IsValidForCreate = false },
+            });
+
+        catalog.Reset(entity, new Dictionary<string, AttributeMetadata>(), _ => false, _ => false);
+
+        var column = catalog.Find("createdon")!;
+        Assert.False(column.IsSelectable);
+        Assert.Equal("Set by Dataverse when the row is written — add a rule to Record Created On to choose this date.", column.DisabledReason);
+    }
+
     private static StringAttributeMetadata Column(
         string logicalName, string displayName, bool selectable = true, bool required = false) => new()
     {

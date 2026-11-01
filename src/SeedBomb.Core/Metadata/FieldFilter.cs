@@ -89,4 +89,16 @@ public static class FieldFilter
     /// <returns>True if the field is BPF-managed and must not be set on create.</returns>
     public static bool IsBpfField(AttributeMetadata attr)
         => attr.LogicalName is not null && _bpfFields.Contains(attr.LogicalName);
+
+    // Dataverse copies overriddencreatedon into createdon on create, so a generated value would
+    // backdate every row. SeedBomb writes it only when a profile rule asks for a date.
+    private static readonly HashSet<string> _ruleOnlyFields = new(StringComparer.OrdinalIgnoreCase) { "overriddencreatedon" };
+
+    /// <summary>
+    /// Determines whether the field is written only when a field rule supplies its value.
+    /// </summary>
+    /// <param name="attr">The attribute metadata.</param>
+    /// <returns>True if generation must leave the field unset unless a rule targets it.</returns>
+    public static bool IsRuleOnly(AttributeMetadata attr)
+        => attr.LogicalName is not null && _ruleOnlyFields.Contains(attr.LogicalName);
 }

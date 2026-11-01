@@ -176,7 +176,7 @@ public class BogusEvaluatorTests
 
     private static DateTimeAttributeMetadata DateAttr(string? behavior = null)
     {
-        var attr = new DateTimeAttributeMetadata { LogicalName = "createdon" };
+        var attr = new DateTimeAttributeMetadata { LogicalName = "overriddencreatedon" };
         if (behavior is not null)
         {
             attr.DateTimeBehavior = behavior switch

@@ -337,7 +337,7 @@ public class RuleValidatorTests
         new() { LogicalName = "n", MinValue = min, MaxValue = max };
 
     private static DateTimeAttributeMetadata DateAttr() =>
-        new() { LogicalName = "createdon" };
+        new() { LogicalName = "overriddencreatedon" };
 
     private static Dictionary<string, JsonElement> Args(params object[] pairs)
     {

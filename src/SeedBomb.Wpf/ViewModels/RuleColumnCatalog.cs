@@ -196,6 +196,7 @@ public sealed class RuleColumnCatalog
         EligibilityReason.NotCreatable => "Not valid for create.",
         EligibilityReason.MultiSelectV2 => "MultiSelect — rule editing planned for v2.",
         EligibilityReason.AlternateKey => "Alternate key — SeedBomb generates unique values for it.",
+        EligibilityReason.CreatedOnViaOverride => "Set by Dataverse when the row is written — add a rule to Record Created On to choose this date.",
         _ => reason.ToString(),
     };
 
