@@ -274,7 +274,7 @@
                         <StackPanel Grid.Column="6">
                             <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Parallelism" />
                             <ui:NumberBox Style="{DynamicResource DG.NumberBox}"
-                                          Value="{Binding MaxParallelism}" Minimum="0"
+                                          Value="{Binding MaxParallelism, Converter={StaticResource NullToZeroConverter}}" Minimum="0"
                                           Maximum="{Binding Source={x:Static core:GenerationLimits.MaxDop}, Mode=OneTime}"
                                           PlaceholderText="auto" />
                         </StackPanel>

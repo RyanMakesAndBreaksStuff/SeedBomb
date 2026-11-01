@@ -54,4 +54,25 @@ public sealed class ConverterTests
         Assert.Equal(Visibility.Visible, c.Convert("x", typeof(Visibility), null, Inv));
         Assert.Equal(Visibility.Collapsed, c.Convert(null, typeof(Visibility), null, Inv));
     }
+
+    [Theory]
+    [InlineData(0, 0d)]
+    [InlineData(8, 8d)]
+    public void NullToZero_ShowsTheIntAsADouble(int source, double expected)
+    {
+        var c = new NullToZeroConverter();
+        Assert.Equal(expected, c.Convert(source, typeof(double?), null, Inv));
+    }
+
+    [Theory]
+    [InlineData(null, 0)]
+    [InlineData(0d, 0)]
+    [InlineData(8d, 8)]
+    [InlineData(7.6, 8)]
+    [InlineData(double.NaN, 0)]
+    public void NullToZero_ClearedOrInvalidBoxMeansZero(double? box, int expected)
+    {
+        var c = new NullToZeroConverter();
+        Assert.Equal(expected, c.ConvertBack(box, typeof(int), null, Inv));
+    }
 }

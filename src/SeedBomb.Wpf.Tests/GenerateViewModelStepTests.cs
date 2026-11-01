@@ -257,6 +257,27 @@ public sealed class GenerateViewModelStepTests
     }
 
     [Fact]
+    public async Task GenerateAsync_ZeroParallelism_SendsNullSoTheRunIsAutomatic()
+    {
+        var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out var generationMock, out _, out _);
+        fieldRules.SetRule("account", "name",
+            new ConstantRule(System.Text.Json.JsonDocument.Parse("\"Acme\"").RootElement));
+        viewModel.GoToReviewCommand.Execute(null);
+        viewModel.MaxParallelism = 0;
+
+        GenerationConfig? captured = null;
+        generationMock
+            .Setup(g => g.GenerateAsync(It.IsAny<GenerationConfig>(), It.IsAny<IProgress<ProgressUpdate>>(), It.IsAny<CancellationToken>()))
+            .Callback<GenerationConfig, IProgress<ProgressUpdate>, CancellationToken>((cfg, _, _) => captured = cfg)
+            .ReturnsAsync(new GenerationResult());
+
+        await viewModel.GenerateCommand.ExecuteAsync(null);
+
+        Assert.NotNull(captured);
+        Assert.Null(captured!.MaxParallelism);
+    }
+
+    [Fact]
     public async Task GoToReview_BogusRule_UsesContextAndSessionPreview()
     {
         var viewModel = await CreateReadyForRulesAsync(out var fieldRules, out _, out _, out _);

@@ -172,7 +172,7 @@
                             </StackPanel>
                             <StackPanel MinWidth="160" Width="220" Margin="0,0,0,8">
                                 <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Max parallelism" />
-                                <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay}"
+                                <ui:NumberBox Value="{Binding DefaultDop, Mode=TwoWay, Converter={StaticResource NullToZeroConverter}}"
                                               Minimum="0" Maximum="{Binding Source={x:Static core:GenerationLimits.MaxDop}, Mode=OneTime}" PlaceholderText="auto"
                                               Height="{DynamicResource DG.Size.Control}" />
                             </StackPanel>
