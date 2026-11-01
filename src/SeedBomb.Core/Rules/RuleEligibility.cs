@@ -48,6 +48,9 @@ public enum EligibilityReason
 
     /// <summary>Alternate key — SeedBomb generates run-unique values for it.</summary>
     AlternateKey,
+
+    /// <summary>Set by Dataverse when the row is written — add a rule to Record Created On to choose this date.</summary>
+    CreatedOnViaOverride,
 }
 
 /// <summary>Classification result for one attribute.</summary>
@@ -105,6 +108,9 @@ public static class RuleEligibility
             return new(false, EligibilityReason.PolymorphicType);
         if (attr is MultiSelectPicklistAttributeMetadata)
             return new(false, EligibilityReason.MultiSelectV2);
+        // createdon is never writable; Dataverse copies a rule's overriddencreatedon value into it.
+        if (string.Equals(attr.LogicalName, "createdon", StringComparison.OrdinalIgnoreCase))
+            return new(false, EligibilityReason.CreatedOnViaOverride);
         if (attr.IsValidForCreate == false)
             return new(false, EligibilityReason.NotCreatable);
         // WR-004: keys are entity-level metadata, so this is the one gate that needs the entity.
