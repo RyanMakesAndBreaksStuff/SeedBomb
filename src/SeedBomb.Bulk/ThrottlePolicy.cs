@@ -51,6 +51,10 @@ public class ThrottlePolicy
     /// False for a non-idempotent write: a transport timeout is then terminal on the first attempt,
     /// because the server may have committed it. Reads and idempotent updates leave the default.
     /// </param>
+    /// <param name="resendOnAmbiguousTransport">
+    /// False for a non-idempotent write: a network failure may mean the server committed it but the
+    /// response was lost. Reads and idempotent updates leave the default.
+    /// </param>
     /// <returns>The result of the operation.</returns>
     /// <exception cref="DataGenerationException">Thrown when max retries are exceeded.</exception>
     public async Task<T> ExecuteAsync<T>(
@@ -58,7 +62,8 @@ public class ThrottlePolicy
         string entityName,
         int maxRetries,
         CancellationToken ct,
-        bool resendOnTimeout = true)
+        bool resendOnTimeout = true,
+        bool resendOnAmbiguousTransport = true)
     {
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(entityName);
@@ -78,7 +83,8 @@ public class ThrottlePolicy
             }
             // On the last attempt a transient fault falls through to DataGenerationException.
             catch (Exception ex) when (attempt < maxRetries && RetryReason(ex) is { } reason
-                && (resendOnTimeout || ex is not (TimeoutException or OperationCanceledException)))
+                && (resendOnTimeout || ex is not (TimeoutException or OperationCanceledException))
+                && (resendOnAmbiguousTransport || !IsAmbiguousTransport(ex)))
             {
                 var retryAfter = RetryAfterOf(ex);
                 var delay = retryAfter ?? ComputeDelay(attempt);
@@ -142,6 +148,11 @@ public class ThrottlePolicy
     /// </summary>
     /// <param name="ex">The failure, unwrapped from <see cref="DataGenerationException"/>.</param>
     public static bool IsTransient(Exception? ex) => RetryReason(ex) is not null;
+
+    /// <summary>True when a write's response may have been lost after the server committed it.</summary>
+    /// <param name="ex">The failure as thrown by the operation.</param>
+    public static bool IsAmbiguousTransport(Exception? ex) => ex is HttpRequestException or IOException
+        || ex is CommunicationException communication && IsWrappedNetworkFault(communication);
 
     // The one transient classification: ExecuteAsync retries exactly what IsTransient reports.
     private static string? RetryReason(Exception? ex) => ex switch

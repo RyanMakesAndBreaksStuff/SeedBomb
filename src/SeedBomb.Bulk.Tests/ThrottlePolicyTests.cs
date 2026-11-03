@@ -459,6 +459,36 @@ public class ThrottlePolicyTests
         Assert.Equal(2, callCount);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_AmbiguousTransportResendDisabled_DoesNotRetryNetworkButStillRetriesRejection()
+    {
+        var callCount = 0;
+        var network = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            _policy.ExecuteAsync<int>(
+                () =>
+                {
+                    callCount++;
+                    throw new CommunicationException("connection reset", new HttpRequestException("reset"));
+                },
+                "account", maxRetries: 3, CancellationToken.None, resendOnAmbiguousTransport: false));
+
+        Assert.Equal(1, callCount);
+        Assert.True(ThrottlePolicy.IsTransient(network.InnerException));
+
+        callCount = 0;
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                if (++callCount == 1)
+                    throw new ProtocolException("The remote server returned an unexpected response: (429) .");
+                return Task.FromResult("success");
+            },
+            "account", maxRetries: 3, CancellationToken.None, resendOnAmbiguousTransport: false);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
     public static TheoryData<Exception> UnreachedEndpointCases => new()
     {
         new EndpointNotFoundException("There was no endpoint listening at https://contoso.crm.dynamics.com."),

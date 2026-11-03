@@ -474,6 +474,8 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         // ring, rows and metrics as the last real snapshot left them. The next batch restores "Generating…".
         if (string.Equals(u.Phase, "Waiting", StringComparison.Ordinal))
         {
+            if (string.Equals(StatusHeadline, "Cancelled", StringComparison.Ordinal))
+                return;
             var note = u.Note ?? "Server busy, waiting…";
             if (!string.Equals(StatusHeadline, "Cancelling…", StringComparison.Ordinal))
                 StatusHeadline = note;

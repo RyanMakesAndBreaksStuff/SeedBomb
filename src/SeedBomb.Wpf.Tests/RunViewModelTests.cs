@@ -539,6 +539,30 @@ public sealed class RunViewModelTests : IDisposable
         Assert.Contains("Server busy, resuming in 47 s", vm.ActivityLines);
     }
 
+    [Fact]
+    public void AcceptProgress_QueuedWaitingSnapshotAfterCancellation_IsIgnored()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+        vm.AcceptProgress(Update("account", created: 40, total: 100), ["account"], 100);
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = new Guid[40] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Errors = [],
+            Cancelled = true,
+        }, seed: 1, environmentHost: "contoso-dev");
+        var activityCount = vm.ActivityLines.Length;
+
+        vm.AcceptProgress(
+            new ProgressUpdate("Waiting", "", 0, 0, 0, 0, 0, TimeSpan.Zero, Note: "Server busy, resuming in 47 s"),
+            ["account"], 100);
+
+        Assert.Equal("Cancelled", vm.StatusHeadline);
+        Assert.Equal("40", vm.RowsWrittenLabel);
+        Assert.Equal(activityCount, vm.ActivityLines.Length);
+    }
+
     private static ProgressUpdate Update(
         string entity, int created, int total, string phase = "Generating") =>
         new(phase, entity, created, total, BatchesCompleted: 1, TotalBatches: 4,
