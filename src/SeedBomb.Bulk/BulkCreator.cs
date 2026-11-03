@@ -464,10 +464,8 @@ public class BulkCreator
 
                     idBags[batchIndex] = batchIds;
                     errorBags[batchIndex] = batchErrors;
-                    if (failureType is null && batchErrors.All(e => !e.OutcomeUnknown))
+                    if (!trace.HadTimeout && failureType is null && batchErrors.All(e => !e.OutcomeUnknown))
                         sizer.ObserveCall(TimeSpan.FromMilliseconds(trace.LastCallMs));
-                    else if (batchErrors.Any(e => e.OutcomeUnknown))
-                        sizer.ObserveTimeout();
 
                     var done = Interlocked.Increment(ref completedBatches);
                     int total;
@@ -547,6 +545,8 @@ public class BulkCreator
             }
             catch (DataGenerationException ex) when (IsClientTimeout(ex, ct))
             {
+                trace.MarkTimeout();
+                sizer.ObserveTimeout();
                 return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, sizer, ex, ct)
                     .ConfigureAwait(false);
             }
@@ -560,6 +560,8 @@ public class BulkCreator
         }
         catch (DataGenerationException ex) when (IsClientTimeout(ex, ct))
         {
+            trace.MarkTimeout();
+            sizer.ObserveTimeout();
             return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, sizer, ex, ct)
                 .ConfigureAwait(false);
         }
@@ -577,7 +579,6 @@ public class BulkCreator
     {
         if (hasAlternateKey && batch.Length > 1)
         {
-            sizer.ObserveTimeout();
             var half = batch.Length / 2;
             _logger.LogWarning("The create batch for {Entity} timed out after {CallMs:F0}ms ({TimeoutType}); resending as {Left} + {Right} rows (alternate key rejects duplicates).",
                 entityName, trace.LastCallMs, timeout.InnerException?.GetType().Name, half, batch.Length - half);
@@ -617,6 +618,9 @@ public class BulkCreator
         public string? Api { get; private set; }
         public int Attempts { get; private set; }
         public double LastCallMs { get; private set; }
+        public bool HadTimeout { get; private set; }
+
+        public void MarkTimeout() => HadTimeout = true;
 
         // A batch's calls run one at a time, so no synchronisation is needed.
         public async Task<T> CallAsync<T>(string api, Func<Task<T>> call)

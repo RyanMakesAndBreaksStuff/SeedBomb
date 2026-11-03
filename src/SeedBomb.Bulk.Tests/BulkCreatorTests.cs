@@ -1099,6 +1099,47 @@ public class BulkCreatorTests
     }
 
     [Fact]
+    public async Task CreateAsync_ClientTimeoutOnUnkeyedBatch_HalvesTheNextBatchSize()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var sizes = new List<int>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<CreateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((req, _) =>
+            {
+                var count = ((CreateMultipleRequest)req).Targets.Entities.Count;
+                sizes.Add(count);
+                if (sizes.Count == 1) throw new TaskCanceledException("HttpClient.Timeout elapsed");
+                return Task.FromResult<OrganizationResponse>(new CreateMultipleResponse
+                {
+                    Results = { ["Ids"] = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray() }
+                });
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1000 },
+            BatchSize = 500,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(1000, sizes.Sum());
+        Assert.Equal(250, sizes[0]);
+        Assert.Equal(125, sizes[1]);
+        Assert.Equal(250, Assert.Single(result.Errors).RowCount);
+    }
+
+    [Fact]
     public async Task CreateAsync_ClientTimeoutOnKeyedTable_SplitsTheBatchOnce()
     {
         // A table with an alternate key makes a duplicate resend fail as a duplicate key rather than
@@ -1137,6 +1178,45 @@ public class BulkCreatorTests
         Assert.Equal([10, 5, 5], sizes);
         Assert.Equal(10, result.TotalRecords);
         Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ClientTimeoutOnKeyedBatch_DoesNotGrowAfterSuccessfulSplits()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var sizes = new List<int>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<CreateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((req, _) =>
+            {
+                var count = ((CreateMultipleRequest)req).Targets.Entities.Count;
+                sizes.Add(count);
+                if (count == 250) throw new TaskCanceledException("HttpClient.Timeout elapsed");
+                return Task.FromResult<OrganizationResponse>(new CreateMultipleResponse
+                {
+                    Results = { ["Ids"] = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray() }
+                });
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = KeyedConfig("scope") with
+        {
+            RecordCounts = new Dictionary<string, int> { ["account"] = 500 },
+            BatchSize = 500,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = KeyedAccount(),
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(500, result.TotalRecords);
+        Assert.Empty(result.Errors);
+        Assert.Equal([250, 125, 125, 125], sizes.Take(4));
     }
 
     [Fact]
