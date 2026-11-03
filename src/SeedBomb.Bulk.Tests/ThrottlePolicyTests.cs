@@ -266,6 +266,109 @@ public class ThrottlePolicyTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ShorterLaterRetryAfter_DoesNotShortenTheArmedPause()
+    {
+        // A shorter hint must never pull the deadline in: the pause only ever extends.
+        var policy = new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance);
+        var go = new TaskCompletionSource();
+        var secondCalls = 0;
+
+        // In flight before the pause exists, so its hint lands while other callers are asleep.
+        var second = policy.ExecuteAsync<int>(
+            async () =>
+            {
+                if (++secondCalls == 1)
+                {
+                    await go.Task;
+                    throw ThrottleFault(-2147015902, TimeSpan.FromMilliseconds(150));
+                }
+                return 2;
+            },
+            "contact", maxRetries: 1, CancellationToken.None);
+
+        var armed = new TaskCompletionSource();
+        var firstCalls = 0;
+
+        var first = policy.ExecuteAsync(
+            () =>
+            {
+                if (++firstCalls == 1)
+                {
+                    armed.SetResult();
+                    throw ThrottleFault(-2147015902, TimeSpan.FromMilliseconds(700));
+                }
+                return Task.FromResult(1);
+            },
+            "account", maxRetries: 1, CancellationToken.None);
+
+        await armed.Task;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        // Starting this caller reads the armed deadline synchronously, so it is asleep on the
+        // 700 ms pause before the shorter hint below arrives.
+        var third = policy.ExecuteAsync(() => Task.FromResult(3), "lead", maxRetries: 0, CancellationToken.None);
+
+        go.SetResult();
+
+        Assert.Equal(3, await third);
+        Assert.InRange(started.Elapsed, TimeSpan.FromMilliseconds(400), TimeSpan.FromSeconds(3));
+        Assert.Equal(2, await second);
+        Assert.Equal(2, secondCalls);
+        Assert.Equal(1, await first);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_LongerLaterRetryAfter_ExtendsAnAlreadyWaitingCaller()
+    {
+        // Every caller shares one deadline: a longer hint arriving mid-wait reaches the callers
+        // already asleep on the shorter one.
+        var policy = new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance);
+        var go = new TaskCompletionSource();
+        var secondCalls = 0;
+
+        // In flight before the pause exists, so its hint lands while other callers are asleep.
+        var second = policy.ExecuteAsync<int>(
+            async () =>
+            {
+                if (++secondCalls == 1)
+                {
+                    await go.Task;
+                    throw ThrottleFault(-2147015902, TimeSpan.FromMilliseconds(800));
+                }
+                return 2;
+            },
+            "contact", maxRetries: 1, CancellationToken.None);
+
+        var armed = new TaskCompletionSource();
+        var firstCalls = 0;
+
+        var first = policy.ExecuteAsync(
+            () =>
+            {
+                if (++firstCalls == 1)
+                {
+                    armed.SetResult();
+                    throw ThrottleFault(-2147015902, TimeSpan.FromMilliseconds(300));
+                }
+                return Task.FromResult(1);
+            },
+            "account", maxRetries: 1, CancellationToken.None);
+
+        await armed.Task;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var third = policy.ExecuteAsync(() => Task.FromResult(3), "lead", maxRetries: 0, CancellationToken.None);
+
+        // The longer hint lands while the caller above is asleep on the 300 ms deadline.
+        go.SetResult();
+
+        Assert.Equal(3, await third);
+        // Past the original 300 ms deadline, not just the extended 800 ms one.
+        Assert.InRange(started.Elapsed, TimeSpan.FromMilliseconds(550), TimeSpan.FromSeconds(3));
+        Assert.Equal(2, await second);
+        Assert.Equal(2, secondCalls);
+        Assert.Equal(1, await first);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Http429_RetriesAndSucceeds()
     {
         // ServiceClient surfaces a bare HTTP 429 as ProtocolException, not a service-protection

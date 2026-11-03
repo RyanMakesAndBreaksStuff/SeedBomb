@@ -115,11 +115,14 @@ public class ThrottlePolicy
 
     private async Task WaitIfPausedAsync(CancellationToken ct)
     {
-        var until = Interlocked.Read(ref _pausedUntil);
-        if (until == 0) return;
-        var remaining = TimeSpan.FromSeconds((double)(until - Stopwatch.GetTimestamp()) / Stopwatch.Frequency);
-        if (remaining > TimeSpan.Zero)
+        while (true)
+        {
+            var until = Interlocked.Read(ref _pausedUntil);
+            if (until == 0) return;
+            var remaining = TimeSpan.FromSeconds((double)(until - Stopwatch.GetTimestamp()) / Stopwatch.Frequency);
+            if (remaining <= TimeSpan.Zero) return;
             await Task.Delay(remaining, ct).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
