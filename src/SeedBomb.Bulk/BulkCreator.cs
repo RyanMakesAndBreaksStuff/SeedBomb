@@ -530,9 +530,17 @@ public class BulkCreator
             }
         }
 
-        return await _throttlePolicy.ExecuteAsync(
-            () => trace.CallAsync("ExecuteMultiple", () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct)),
-            entityName, maxRetries, ct, resendOnTimeout: false).ConfigureAwait(false);
+        try
+        {
+            return await _throttlePolicy.ExecuteAsync(
+                () => trace.CallAsync("ExecuteMultiple", () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct)),
+                entityName, maxRetries, ct, resendOnTimeout: false).ConfigureAwait(false);
+        }
+        catch (DataGenerationException ex) when (IsClientTimeout(ex, ct))
+        {
+            return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, ex, ct)
+                .ConfigureAwait(false);
+        }
     }
 
     private static bool IsClientTimeout(DataGenerationException ex, CancellationToken ct) =>
@@ -548,14 +556,14 @@ public class BulkCreator
         if (hasAlternateKey && batch.Length > 1)
         {
             var half = batch.Length / 2;
-            _logger.LogWarning("CreateMultiple for {Entity} timed out after {CallMs:F0}ms; resending as {Left} + {Right} rows (alternate key rejects duplicates).",
-                entityName, trace.LastCallMs, half, batch.Length - half);
+            _logger.LogWarning("The create batch for {Entity} timed out after {CallMs:F0}ms ({TimeoutType}); resending as {Left} + {Right} rows (alternate key rejects duplicates).",
+                entityName, trace.LastCallMs, timeout.InnerException?.GetType().Name, half, batch.Length - half);
             var left = await SubmitBatchAsync(entityName, batch[..half], rows[..half], maxRetries, hasAlternateKey, trace, ct).ConfigureAwait(false);
             var right = await SubmitBatchAsync(entityName, batch[half..], rows[half..], maxRetries, hasAlternateKey, trace, ct).ConfigureAwait(false);
             return ([.. left.ids, .. right.ids], [.. left.errors, .. right.errors]);
         }
 
-        _logger.LogWarning("CreateMultiple for {Entity} timed out after {CallMs:F0}ms; {Rows} rows have an unknown outcome and were not resent.",
+        _logger.LogWarning("The create batch for {Entity} timed out after {CallMs:F0}ms; {Rows} rows have an unknown outcome and were not resent.",
             entityName, trace.LastCallMs, batch.Length);
         return ([], [new BatchError(entityName,
             $"Timed out after {trace.LastCallMs / 1000:F0} s; outcome unknown. The server may have written these rows: check the table before retrying.",

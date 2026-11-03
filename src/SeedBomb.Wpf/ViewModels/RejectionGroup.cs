@@ -23,10 +23,10 @@ public sealed partial class RejectionGroup : ObservableObject
     /// <summary>When false the checkbox is disabled and excluded from retry.</summary>
     public bool IsRetryable { get; init; }
 
-    /// <summary>Retryable / Needs a fix.</summary>
+    /// <summary>Retryable / Unknown / Needs a fix.</summary>
     public required string DispositionLabel { get; init; }
 
-    /// <summary><c>Retryable</c> or <c>FixFirst</c>. XAML maps to DG.Success / DG.Warning. No Brush.</summary>
+    /// <summary><c>Retryable</c>, <c>Unknown</c> or <c>FixFirst</c>. XAML maps to DG.Success / DG.Warning. No Brush.</summary>
     public required string DispositionKey { get; init; }
 
     [ObservableProperty] private bool _isSelectedForRetry;

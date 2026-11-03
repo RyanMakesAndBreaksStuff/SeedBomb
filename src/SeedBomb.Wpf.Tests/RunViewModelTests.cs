@@ -80,6 +80,35 @@ public sealed class RunViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ApplyResult_UnknownOutcome_IsDispositionUnknownWithCheckTheTableHint()
+    {
+        // R6: a client timeout may have committed rows, so the group is never offered for retry.
+        var vm = new RunViewModel();
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(),
+            Elapsed = TimeSpan.FromSeconds(10),
+            Errors =
+            [
+                new BatchError("account",
+                    "Timed out after 30 s; outcome unknown. The server may have written these rows: check the table before retrying.",
+                    null, RowCount: 2, IsTransient: false)
+                {
+                    RowIndexes = [0, 1],
+                    OutcomeUnknown = true,
+                },
+            ],
+        }, seed: 40719, environmentHost: "contoso-dev");
+
+        var group = Assert.Single(vm.RejectionGroups);
+        Assert.Equal("Unknown", group.DispositionKey);
+        Assert.Equal("Unknown", group.DispositionLabel);
+        Assert.False(group.IsRetryable);
+        Assert.False(group.IsSelectedForRetry);
+        Assert.Equal("Timed out after the request may have reached the server — check the table for these rows before retrying.", group.CauseHint);
+    }
+
+    [Fact]
     public async Task RetrySelected_CallsGenerationService_WithoutGenerateViewModel()
     {
         var gen = new Mock<IWpfGenerationService>();

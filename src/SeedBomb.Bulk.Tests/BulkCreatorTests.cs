@@ -1139,6 +1139,99 @@ public class BulkCreatorTests
         Assert.Empty(result.Errors);
     }
 
+    [Fact]
+    public async Task CreateAsync_ClientTimeoutOnUnkeyedFallback_ReportsUnknownOutcomeWithoutResending()
+    {
+        // R6: ExecuteMultiple commits per row, so a timed-out fallback batch may also have written
+        // some rows; it must be reported unknown rather than offered as a safe retry.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var sends = 0;
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<ExecuteMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((_, _) =>
+            {
+                sends++;
+                throw new TaskCanceledException("HttpClient.Timeout elapsed");
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 3,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(1, sends);
+        var error = Assert.Single(result.Errors);
+        Assert.True(error.OutcomeUnknown);
+        Assert.False(error.IsTransient);
+        Assert.Equal(10, error.RowCount);
+        Assert.Contains("outcome unknown", error.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ClientTimeoutOnKeyedFallback_SplitsTheBatchOnce()
+    {
+        // R6: with an alternate key the halves can be resent through ExecuteMultiple, whose duplicate
+        // resend is rejected as a duplicate key rather than writing twice.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var sizes = new List<int>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<ExecuteMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((req, _) =>
+            {
+                var count = ((ExecuteMultipleRequest)req).Requests.Count;
+                lock (sizes) sizes.Add(count);
+                if (count == 10) throw new TaskCanceledException("HttpClient.Timeout elapsed");
+
+                var responses = new ExecuteMultipleResponseItemCollection();
+                for (int i = 0; i < count; i++)
+                {
+                    responses.Add(new ExecuteMultipleResponseItem
+                    {
+                        RequestIndex = i,
+                        Response = new CreateResponse { Results = { ["id"] = Guid.NewGuid() } },
+                    });
+                }
+                return Task.FromResult<OrganizationResponse>(new ExecuteMultipleResponse
+                {
+                    Results = { ["Responses"] = responses }
+                });
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = KeyedConfig("scope") with
+        {
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 3,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = KeyedAccount(),
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal([10, 5, 5], sizes);
+        Assert.Equal(10, result.TotalRecords);
+        Assert.Empty(result.Errors);
+    }
+
     private static EntityMetadata KeyedAccount(int keyWidth = 20)
     {
         var meta = Meta("account",
