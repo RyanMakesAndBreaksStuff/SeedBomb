@@ -33,7 +33,7 @@ internal static class RunDiagnostics
             .Where(t => config.PlannedRows(t) > 0)
             .Select(t => $"{t}={(attemptsCreateMultiple(t) ? "CreateMultiple" : "ExecuteMultiple")}"));
         logger.LogInformation(
-            "[run] snapshot: app {AppVersion}, Dataverse.Client {SdkVersion}, Caching.Memory {CacheVersion}, batch {BatchSize} (starting at {StartBatch}), configured DOP {ConfiguredDop}, SDK DOP hint {DopHint}, affinity cookie {AffinityCookie}, first-attempt API {Apis}",
+            "[run] snapshot: app {AppVersion}, Dataverse.Client {SdkVersion}, Caching.Memory {CacheVersion}, batch {BatchSize} (starting at {StartBatch}), configured DOP {ConfiguredDop}, SDK DOP hint {DopHint}, affinity cookie {AffinityCookie}, SDK retries {SdkRetries}, SDK retry pause {SdkPause}, connection timeout {Timeout}, first-attempt API {Apis}",
             VersionOf(Assembly.GetEntryAssembly()),
             VersionOf(typeof(ServiceClient).Assembly),
             LoadedVersion("Microsoft.Extensions.Caching.Memory"),
@@ -42,6 +42,9 @@ internal static class RunDiagnostics
             config.MaxParallelism?.ToString() ?? "auto",
             sc is null ? "n/a" : sc.RecommendedDegreesOfParallelism.ToString(),
             sc is null ? "n/a" : sc.EnableAffinityCookie.ToString(),
+            sc is null ? "n/a" : sc.MaxRetryCount.ToString(),
+            sc is null ? "n/a" : sc.RetryPauseTime.ToString(),
+            ServiceClient.MaxConnectionTimeout,
             apis);
     }
 

@@ -5,12 +5,37 @@ using Moq;
 using SeedBomb.Services.Auth;
 using SeedBomb.Services.Connections;
 using SeedBomb.Services.Dataverse;
+using SeedBomb.Services.Settings;
 using Xunit;
 
 namespace SeedBomb.Wpf.Tests;
 
 public sealed class DataverseConnectionServiceTests
 {
+    [Fact]
+    public async Task ClientOptions_ComeFromSettings()
+    {
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AppSettings.Default with { SdkMaxRetryCount = 2, SdkRetryPauseSeconds = 7, ConnectionTimeoutMinutes = 6 });
+
+        var options = await DataverseConnectionService.ClientOptionsAsync(settings.Object, CancellationToken.None);
+
+        Assert.Equal(2, options.MaxRetryCount);
+        Assert.Equal(TimeSpan.FromSeconds(7), options.RetryPauseTime);
+        Assert.Equal(TimeSpan.FromMinutes(6), options.ConnectionTimeout);
+    }
+
+    [Fact]
+    public async Task ClientOptions_DefaultToAppOwnedRetries_WhenSettingsAreUnavailable()
+    {
+        var options = await DataverseConnectionService.ClientOptionsAsync(null, CancellationToken.None);
+
+        Assert.Equal(0, options.MaxRetryCount);
+        Assert.Equal(TimeSpan.Zero, options.RetryPauseTime);
+        Assert.Equal(TimeSpan.FromMinutes(4), options.ConnectionTimeout);
+    }
+
     [Fact]
     public async Task TokenProviderIgnoresCallerCancellationToken()
     {

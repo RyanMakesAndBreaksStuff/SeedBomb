@@ -1446,6 +1446,8 @@ public class BulkCreatorTests
 
         var lines = logger.Lines;
         Assert.Single(lines, l => l.StartsWith("[run] snapshot:", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("[run] snapshot:", StringComparison.Ordinal)
+            && l.Contains("SDK retries n/a, SDK retry pause n/a, connection timeout ", StringComparison.Ordinal));
         foreach (var phase in new[] { "preflight", "prepare", "generate account", "submit account", "backfill", "associate" })
             Assert.Single(lines, l => l.StartsWith($"[timing] phase {phase} ", StringComparison.Ordinal));
         var batches = lines.Where(l => l.StartsWith("[timing] batch account ", StringComparison.Ordinal)).ToList();

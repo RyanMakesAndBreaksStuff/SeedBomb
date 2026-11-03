@@ -126,6 +126,38 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveAsync_PersistsTheDataverseClientKnobs()
+    {
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(AppSettings.Default with
+        {
+            SdkMaxRetryCount = 1,
+            SdkRetryPauseSeconds = 4,
+            ConnectionTimeoutMinutes = 5,
+        });
+        AppSettings? saved = null;
+        settings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>(), It.IsAny<CancellationToken>()))
+            .Callback<AppSettings, CancellationToken>((s, _) => saved = s)
+            .Returns(Task.CompletedTask);
+        var vm = new SettingsViewModel(settings.Object, Mock.Of<ILogger<SettingsViewModel>>());
+        await vm.LoadCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, vm.SdkMaxRetryCount);
+        Assert.Equal(4, vm.SdkRetryPauseSeconds);
+        Assert.Equal(5, vm.ConnectionTimeoutMinutes);
+
+        vm.SdkMaxRetryCount = 3;
+        vm.SdkRetryPauseSeconds = 10;
+        vm.ConnectionTimeoutMinutes = 8;
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.NotNull(saved);
+        Assert.Equal(3, saved.SdkMaxRetryCount);
+        Assert.Equal(10, saved.SdkRetryPauseSeconds);
+        Assert.Equal(8, saved.ConnectionTimeoutMinutes);
+    }
+
+    [Fact]
     public async Task SignOut_is_blocked_while_a_run_is_writing()
     {
         // WR-001: sign-out disposes the ServiceClient the running pipeline writes through.

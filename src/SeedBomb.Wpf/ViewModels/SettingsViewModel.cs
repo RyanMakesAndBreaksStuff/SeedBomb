@@ -55,6 +55,9 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] private string _paletteId = DesignThemeManager.DefaultPaletteId;
     [ObservableProperty] private bool _keepRunSheetOpen = true;
     [ObservableProperty] private bool _runDiagnostics;
+    [ObservableProperty] private int _sdkMaxRetryCount;
+    [ObservableProperty] private int _sdkRetryPauseSeconds;
+    [ObservableProperty] private int _connectionTimeoutMinutes = 4;
 
     /// <summary>Gets the palettes offered in the appearance picker.</summary>
     public IReadOnlyList<ThemePaletteOption> AvailablePalettes => DesignThemeManager.AvailablePalettes;
@@ -125,6 +128,9 @@ public sealed partial class SettingsViewModel(
             PaletteId = DesignThemeManager.ResolvePaletteId(s.PaletteId);
             KeepRunSheetOpen = s.KeepRunSheetOpen;
             RunDiagnostics = s.RunDiagnostics;
+            SdkMaxRetryCount = s.SdkMaxRetryCount;
+            SdkRetryPauseSeconds = s.SdkRetryPauseSeconds;
+            ConnectionTimeoutMinutes = s.ConnectionTimeoutMinutes;
 
             // A retried load after an earlier failure must re-enable Save.
             if (_loadFailed)
@@ -164,7 +170,8 @@ public sealed partial class SettingsViewModel(
         {
             var settings = new AppSettings(
                 DefaultRecordCount, DefaultBatchSize, DefaultDop,
-                DarkTheme, PaletteId, KeepRunSheetOpen, RunDiagnostics).Clamped();
+                DarkTheme, PaletteId, KeepRunSheetOpen, RunDiagnostics,
+                SdkMaxRetryCount, SdkRetryPauseSeconds, ConnectionTimeoutMinutes).Clamped();
 
             CancelPendingAppearanceSave();
             await _settingsService.SaveAsync(settings);

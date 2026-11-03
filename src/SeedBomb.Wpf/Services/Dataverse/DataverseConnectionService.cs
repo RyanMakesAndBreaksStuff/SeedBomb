@@ -44,6 +44,26 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
         _loggerFactory = loggerFactory;
     }
 
+    /// <summary>What a new <see cref="ServiceClient"/> is built with. From settings; defaults keep retries in the app.</summary>
+    /// <param name="MaxRetryCount">SDK retries per call.</param>
+    /// <param name="RetryPauseTime">Base SDK pause between retries.</param>
+    /// <param name="ConnectionTimeout">HTTP timeout per call; set on the static <see cref="ServiceClient.MaxConnectionTimeout"/> before construction.</param>
+    public sealed record ClientOptions(int MaxRetryCount, TimeSpan RetryPauseTime, TimeSpan ConnectionTimeout);
+
+    /// <summary>Reads the client options; an unavailable settings store yields the defaults.</summary>
+    /// <param name="settings">Settings store, or null.</param>
+    /// <param name="ct">Cancellation.</param>
+    public static async Task<ClientOptions> ClientOptionsAsync(ISettingsService? settings, CancellationToken ct)
+    {
+        var s = AppSettings.Default;
+        if (settings is not null)
+        {
+            try { s = (await settings.LoadAsync(ct).ConfigureAwait(false)).Clamped(); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { /* defaults */ }
+        }
+        return new ClientOptions(s.SdkMaxRetryCount, TimeSpan.FromSeconds(s.SdkRetryPauseSeconds), TimeSpan.FromMinutes(s.ConnectionTimeoutMinutes));
+    }
+
     // Warning and above only: the SDK logs every request at lower levels. A settings read failure
     // leaves SDK logging off rather than failing the connect.
     private async Task<ILogger?> SdkLoggerAsync(CancellationToken ct)
@@ -95,6 +115,9 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
             var environmentUrl = profile.EnvironmentUrl;
             var scopes = profile.DataverseScopes;
             var sdkLogger = await SdkLoggerAsync(ct).ConfigureAwait(false);
+            var options = await ClientOptionsAsync(_settings, ct).ConfigureAwait(false);
+            // Static and read only at construction (SDK contract); set it right before building.
+            ServiceClient.MaxConnectionTimeout = options.ConnectionTimeout;
 
             // WR-006: the constructor signs in and connects synchronously, and the awaits above
             // usually complete inline — so build it on the pool, never on the dispatcher.
@@ -104,10 +127,8 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 useUniqueInstance: true,
                 logger: sdkLogger)
             {
-                // Recommendation 1: ThrottlePolicy is the only retry owner. It honours Retry-After
-                // itself; nested SDK retries (default 10) are what stalled runs for minutes.
-                MaxRetryCount = 0,
-                RetryPauseTime = TimeSpan.Zero,
+                MaxRetryCount = options.MaxRetryCount,
+                RetryPauseTime = options.RetryPauseTime,
                 EnableAffinityCookie = false
             }, ct).ConfigureAwait(false);
 

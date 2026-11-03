@@ -210,6 +210,27 @@
                                              AutomationProperties.Name="Run diagnostics" />
                         </Grid>
 
+                        <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Advanced: Dataverse client" Margin="0,20,0,0" />
+                        <TextBlock Style="{DynamicResource DG.Tertiary}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                   Text="SeedBomb retries throttled and failed calls itself. Leave SDK retries at 0 unless support asks otherwise. Changes apply to the next connection." />
+                        <WrapPanel Margin="0,8,0,0">
+                            <StackPanel MinWidth="160" Width="220" Margin="0,0,16,8">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="SDK retries" />
+                                <ui:NumberBox Value="{Binding SdkMaxRetryCount, Mode=TwoWay}" Minimum="0" Maximum="10"
+                                              Height="{DynamicResource DG.Size.Control}" AutomationProperties.Name="SDK retries" />
+                            </StackPanel>
+                            <StackPanel MinWidth="160" Width="220" Margin="0,0,16,8">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="SDK retry pause (s)" />
+                                <ui:NumberBox Value="{Binding SdkRetryPauseSeconds, Mode=TwoWay}" Minimum="0" Maximum="300"
+                                              Height="{DynamicResource DG.Size.Control}" AutomationProperties.Name="SDK retry pause in seconds" />
+                            </StackPanel>
+                            <StackPanel MinWidth="160" Width="220" Margin="0,0,0,8">
+                                <TextBlock Style="{DynamicResource DG.GroupLabel}" Text="Call timeout (min)" />
+                                <ui:NumberBox Value="{Binding ConnectionTimeoutMinutes, Mode=TwoWay}" Minimum="1" Maximum="30"
+                                              Height="{DynamicResource DG.Size.Control}" AutomationProperties.Name="Call timeout in minutes" />
+                            </StackPanel>
+                        </WrapPanel>
+
                         <TextBlock Style="{DynamicResource DG.Tertiary}"
                                    Text="Leave parallelism at 0 to let SeedBomb pick based on the environment's throttling response."
                                    Margin="0,10,0,0" TextWrapping="Wrap" />
