@@ -23,7 +23,7 @@ namespace SeedBomb.Bulk;
 
 /// <summary>
 /// Generates and bulk-creates Dataverse records in topological dependency order.
-/// Uses <c>CreateMultiple</c> where available and falls back to <c>ExecuteMultiple</c>.
+/// Uses <c>CreateMultiple</c> where available and falls back to <c>ExecuteMultiple</c> only when Dataverse reports the message unsupported.
 /// Bogus record generation is sequential per entity; API calls are parallelised per batch.
 /// </summary>
 public class BulkCreator
@@ -520,13 +520,6 @@ public class BulkCreator
                     "CreateMultiple rejected by Dataverse for {Entity} (sdkmessagefilter false positive); falling back to ExecuteMultiple.",
                     entityName);
                 _messageChecker.MarkUnsupported(entityName);
-            }
-            catch (DataGenerationException ex) when (ex.InnerException is FaultException<OrganizationServiceFault>)
-            {
-                _logger.LogWarning(
-                    ex,
-                    "CreateMultiple failed for {Entity}; performing single ExecuteMultiple fallback batch.",
-                    entityName);
             }
         }
 

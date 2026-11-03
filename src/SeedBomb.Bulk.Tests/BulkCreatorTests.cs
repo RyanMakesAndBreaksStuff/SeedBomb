@@ -616,6 +616,45 @@ public class BulkCreatorTests
     }
 
     [Fact]
+    public async Task CreateAsync_DataFaultOnCreateMultiple_RecordsOneBatchErrorAndNeverFallsBack()
+    {
+        // Recommendation 2: a data fault (plug-in, required field, duplicate key) on a transactional
+        // CreateMultiple is terminal for the batch. Replaying it as 10 Creates spends budget on
+        // requests known to fail and floods the sheet with identical lines.
+        var (sut, serviceMock) = BuildSut();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<CreateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+            {
+                ErrorCode = -2147220969,
+                Message = "Attribute validation error",
+            }));
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(-2147220969, error.FaultCode);
+        Assert.Equal(10, error.RowCount);
+        Assert.Equal(Enumerable.Range(0, 10), error.RowIndexes);
+        serviceMock.Verify(s => s.ExecuteAsync(It.IsAny<ExecuteMultipleRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CreateAsync_UnreachableEndpoint_MarksTheBatchTransient()
     {
         // A dropped network surfaces as EndpointNotFoundException; Retry must be offered for it.
