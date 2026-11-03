@@ -50,3 +50,13 @@ Choose tests based on the failing area:
 Use [Run focused tests](focused-tests.md) to make the reproduction fast. Add a test that reproduces the observed behavior before fixing it, then repeat both the test and the original app scenario.
 
 The logging implementation is in [FileLoggerProvider](../../../src/SeedBomb.Wpf/Services/Diagnostics/FileLoggerProvider.cs); exception subscriptions and handling are in [App.xaml.cs](../../../src/SeedBomb.Wpf/App.xaml.cs) and [CrashLog](../../../src/SeedBomb.Wpf/Services/Diagnostics/CrashLog.cs).
+
+## 5. Before merging a write-path change
+
+Any change under `src/SeedBomb.Bulk` or `src/SeedBomb.Wpf/Services/Dataverse` is verified against a live environment before it merges. Unit tests cannot see nested retries, `Retry-After` growth or execution-time throttling.
+
+1. Tag the commit you are about to build on (`git tag pre-<topic>`), so a user can go back.
+2. Turn on **Run diagnostics** in Settings.
+3. Run a few thousand rows on one standard table and one custom table with parallelism left at automatic.
+4. Paste the `[run] snapshot` line and the `[timing] batch` lines from the app log into the pull request, with the rejected-row count from the run sheet.
+5. A `[timing] batch` line whose `attempts` is above 1 while `total` is in minutes and `last call` is in seconds means something is sleeping inside an attempt. Find it before merging.
