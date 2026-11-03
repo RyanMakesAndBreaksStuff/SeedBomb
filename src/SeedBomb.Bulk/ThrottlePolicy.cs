@@ -31,7 +31,9 @@ public class ThrottlePolicy
     }
 
     /// <summary>
-    /// Executes an operation with retry on transient timeout and network faults.
+    /// Executes an operation with retry on transient faults: timeouts, network faults, HTTP
+    /// 429/502/503, busy endpoints, and service-protection faults (which wait the server's
+    /// <c>Retry-After</c>). Any other fault is terminal and wrapped in <see cref="DataGenerationException"/>.
     /// </summary>
     /// <typeparam name="T">The return type of the operation.</typeparam>
     /// <param name="operation">The async operation to execute.</param>
@@ -93,7 +95,8 @@ public class ThrottlePolicy
 
     /// <summary>
     /// True for a fault a later resend can clear unchanged: a timeout, a network failure, an
-    /// unreachable or busy endpoint, or HTTP 429. Service faults and other protocol errors are false.
+    /// unreachable or busy endpoint, HTTP 429/502/503, or a service-protection fault. Data faults
+    /// and other protocol errors are false.
     /// </summary>
     /// <param name="ex">The failure, unwrapped from <see cref="DataGenerationException"/>.</param>
     public static bool IsTransient(Exception? ex) => RetryReason(ex) is not null;
@@ -121,7 +124,12 @@ public class ThrottlePolicy
     private static bool IsServiceProtection(FaultException<OrganizationServiceFault> ex) =>
         ex.Detail is { } d && Array.IndexOf(ServiceProtectionCodes, d.ErrorCode) >= 0;
 
-    /// <summary>The server's wait for a service-protection fault, or null when the fault carries none.</summary>
+    /// <summary>
+    /// The <c>Retry-After</c> hint carried by a Dataverse fault, or null when it carries none.
+    /// Reads the detail from any <see cref="FaultException{TDetail}"/> over
+    /// <see cref="OrganizationServiceFault"/>; it does not check that the fault is a
+    /// service-protection fault, so callers own that classification.
+    /// </summary>
     /// <param name="ex">The failure as thrown by the operation.</param>
     public static TimeSpan? RetryAfterOf(Exception? ex) =>
         ex is FaultException<OrganizationServiceFault> { Detail.ErrorDetails: { } details }

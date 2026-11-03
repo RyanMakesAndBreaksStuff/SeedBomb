@@ -368,8 +368,8 @@ public class DeferredLookupBackfillTests
         mock.Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
-                // Timeout is the transient fault ThrottlePolicy still retries; throttle faults
-                // are ServiceClient's job and are terminal by the time they surface here.
+                // Timeouts and service-protection faults are both retried by ThrottlePolicy now;
+                // this test covers the timeout path.
                 if (Interlocked.Increment(ref callCount) == 1) throw new TimeoutException("socket timeout");
                 return Task.FromResult<OrganizationResponse>(new ExecuteMultipleResponse
                 {
