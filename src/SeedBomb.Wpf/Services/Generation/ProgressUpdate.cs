@@ -11,6 +11,7 @@ namespace SeedBomb.Services.Generation;
 /// <param name="TotalBatches">Total batch count across all entities.</param>
 /// <param name="RecordsPerMinute">Instantaneous throughput rate.</param>
 /// <param name="Elapsed">Total wall-clock time since generation started.</param>
+/// <param name="Note">Free text for a phase-only snapshot, such as the server's wait. Null for record counts.</param>
 public sealed record ProgressUpdate(
     string Phase,
     string EntityName,
@@ -19,4 +20,5 @@ public sealed record ProgressUpdate(
     int BatchesCompleted,
     int TotalBatches,
     double RecordsPerMinute,
-    TimeSpan Elapsed);
+    TimeSpan Elapsed,
+    string? Note = null);

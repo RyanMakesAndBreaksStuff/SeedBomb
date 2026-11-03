@@ -465,6 +465,22 @@ public sealed class RunViewModelTests : IDisposable
         Assert.Equal("Resolving dependencies", Assert.Single(vm.RecentActivity).Line);
     }
 
+    [Fact]
+    public void AcceptProgress_WaitingSnapshot_ShowsTheServerWaitWithoutTouchingCounts()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+        vm.AcceptProgress(Update("account", created: 40, total: 100), ["account"], 100);
+
+        vm.AcceptProgress(
+            new ProgressUpdate("Waiting", "", 0, 0, 0, 0, 0, TimeSpan.Zero, Note: "Server busy, resuming in 47 s"),
+            ["account"], 100);
+
+        Assert.Equal("Server busy, resuming in 47 s", vm.StatusHeadline);
+        Assert.Equal("40", vm.RowsWrittenLabel);
+        Assert.Contains("Server busy, resuming in 47 s", vm.ActivityLines);
+    }
+
     private static ProgressUpdate Update(
         string entity, int created, int total, string phase = "Generating") =>
         new(phase, entity, created, total, BatchesCompleted: 1, TotalBatches: 4,

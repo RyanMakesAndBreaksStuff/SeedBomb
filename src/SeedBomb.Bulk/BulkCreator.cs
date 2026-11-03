@@ -85,6 +85,18 @@ public class BulkCreator
         ArgumentNullException.ThrowIfNull(graph);
         GenerationLimits.Validate(config);
 
+        void ReportWait(string entity, TimeSpan delay) => progress?.Report(new BulkCreationProgress
+        {
+            Phase = "Waiting",
+            EntityLogicalName = string.Empty,
+            BatchIndex = 0,
+            TotalBatches = 0,
+            RecordsCreated = 0,
+            TotalRecords = 0,
+            ErrorMessage = $"Server busy, resuming in {Math.Ceiling(delay.TotalSeconds):F0} s ({entity})",
+        });
+        _throttlePolicy.Waiting += ReportWait;
+
         PreparedBogusRun? preparedRun = null;
         // WR-002: declared outside the try so a cancel can still report what was written.
         var allCreatedRecords = new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.OrdinalIgnoreCase);
@@ -244,6 +256,7 @@ public class BulkCreator
         }
         finally
         {
+            _throttlePolicy.Waiting -= ReportWait;
             preparedRun?.Dispose();
         }
     }

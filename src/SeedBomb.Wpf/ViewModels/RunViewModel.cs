@@ -468,6 +468,17 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(u);
         ArgumentNullException.ThrowIfNull(plannedTables);
 
+        // A wait snapshot carries no counts: show the server's wait as the headline and leave the
+        // ring, rows and metrics as the last real snapshot left them. The next batch restores "Generating…".
+        if (string.Equals(u.Phase, "Waiting", StringComparison.Ordinal))
+        {
+            var note = u.Note ?? "Server busy, waiting…";
+            if (!string.Equals(StatusHeadline, "Cancelling…", StringComparison.Ordinal))
+                StatusHeadline = note;
+            AppendActivity(note);
+            return;
+        }
+
         // A link snapshot is not a record-creation snapshot: it must not touch _tableWritten, the
         // per-table rows or the ring, which would read as corrupted progress. The secondary bar carries it.
         if (string.Equals(u.Phase, "Linking", StringComparison.Ordinal))

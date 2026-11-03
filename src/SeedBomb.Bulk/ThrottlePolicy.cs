@@ -25,6 +25,9 @@ public class ThrottlePolicy
     // caller of this instance (one per run), so a Retry-After stops the thundering herd.
     private long _pausedUntil;
 
+    /// <summary>Raised before each retry sleep with the entity and the wait, so a UI can show it.</summary>
+    public event Action<string, TimeSpan>? Waiting;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ThrottlePolicy"/> class.
     /// </summary>
@@ -80,6 +83,7 @@ public class ThrottlePolicy
                     reason, entityName, attempt + 1, maxRetries + 1,
                     Stopwatch.GetElapsedTime(started).TotalMilliseconds,
                     ex.GetType().Name, ex.Message, delay.TotalMilliseconds);
+                Waiting?.Invoke(entityName, delay);
                 await Task.Delay(delay, ct).ConfigureAwait(false);
             }
             catch (FaultException<OrganizationServiceFault> ex)

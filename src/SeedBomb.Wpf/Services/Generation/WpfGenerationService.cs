@@ -88,7 +88,7 @@ public sealed class WpfGenerationService : IWpfGenerationService
                     p.BatchIndex,
                     p.TotalBatches,
                     p.RecordsPerMinute,
-                    now));
+                    now, p.ErrorMessage));
             });
 
             var result = await _generationPipeline
