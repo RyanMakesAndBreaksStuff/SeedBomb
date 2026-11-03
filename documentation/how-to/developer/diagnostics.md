@@ -53,10 +53,10 @@ The logging implementation is in [FileLoggerProvider](../../../src/SeedBomb.Wpf/
 
 ## 5. Before merging a write-path change
 
-Any change under `src/SeedBomb.Bulk` or `src/SeedBomb.Wpf/Services/Dataverse` is verified against a live environment before it merges. Unit tests cannot see nested retries, `Retry-After` growth or execution-time throttling.
+Any change under `src/SeedBomb.Bulk` or `src/SeedBomb.Wpf/Services/Dataverse` is verified against a non-production live Dataverse environment before it merges. Automated tests cover retry logic and can catch deterministic regressions, but they do not prove behavior under live Dataverse request execution, including nested retries, `Retry-After` growth or execution-time throttling.
 
 1. Tag the commit you are about to build on (`git tag pre-<topic>`), so a user can go back.
 2. Turn on **Run diagnostics** in Settings.
-3. Run a few thousand rows on one standard table and one custom table with parallelism left at automatic.
+3. In the non-production environment, run a few thousand rows on one standard table and one custom table with parallelism left at automatic.
 4. Paste the `[run] snapshot` line and the `[timing] batch` lines from the app log into the pull request, with the rejected-row count from the run sheet.
-5. A `[timing] batch` line whose `attempts` is above 1 while `total` is in minutes and `last call` is in seconds means something is sleeping inside an attempt. Find it before merging.
+5. A `[timing] batch` line with `attempts` above 1, `total` measured in minutes and `last call` measured in seconds is a signal to inspect retry/backoff behavior and SDK timing. Because `total` can include retry waits and prior calls, this pattern alone does not prove a sleep inside one attempt.
