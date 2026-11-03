@@ -1729,11 +1729,46 @@ public class BulkCreatorTests
         var (sut, serviceMock) = BuildSut(logger);
         serviceMock
             .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+            .ReturnsAsync((OrganizationRequest request, CancellationToken _) =>
             {
-                ErrorCode = -2147220969,
-                Message = "Attribute validation error",
-            }));
+                if (request is CreateMultipleRequest)
+                    throw new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+                    {
+                        ErrorCode = unchecked((int)0x80040800),
+                    });
+
+                if (request is ExecuteMultipleRequest executeMultiple)
+                {
+                    var responses = new ExecuteMultipleResponseItemCollection();
+                    for (var index = 0; index < executeMultiple.Requests.Count; index++)
+                    {
+                        if (index < 2)
+                        {
+                            responses.Add(new ExecuteMultipleResponseItem
+                            {
+                                RequestIndex = index,
+                                Fault = new OrganizationServiceFault
+                                {
+                                    ErrorCode = -2147220969,
+                                    Message = "Attribute validation error",
+                                },
+                            });
+                        }
+                        else
+                        {
+                            responses.Add(new ExecuteMultipleResponseItem
+                            {
+                                RequestIndex = index,
+                                Response = new CreateResponse { Results = { ["id"] = Guid.NewGuid() } },
+                            });
+                        }
+                    }
+
+                    return new ExecuteMultipleResponse { Results = { ["Responses"] = responses } };
+                }
+
+                return new OrganizationResponse();
+            });
 
         var graph = new DependencyGraph();
         graph.AddNode("account");
@@ -1750,8 +1785,11 @@ public class BulkCreatorTests
             ["account"] = new EntityMetadata { LogicalName = "account" }
         };
 
-        await sut.CreateAsync(config, metadata, graph);
+        var result = await sut.CreateAsync(config, metadata, graph);
 
-        Assert.Single(logger.Lines, l => l.StartsWith("account: 3 batch(es) (30 rows) failed with: ", StringComparison.Ordinal));
+        Assert.Equal(6, result.Errors.Count);
+        Assert.Equal([0, 1, 10, 11, 20, 21], result.Errors.SelectMany(error => error.RowIndexes).Order());
+        Assert.Single(logger.Lines, line => line.StartsWith(
+            "account: 3 batch(es) (6 rows) failed with: Attribute validation error", StringComparison.Ordinal));
     }
 }

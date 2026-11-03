@@ -524,10 +524,16 @@ public class BulkCreator
         foreach (var index in idBags.Keys.Order()) allIds.AddRange(idBags[index]);
         foreach (var index in errorBags.Keys.Order()) allErrors.AddRange(errorBags[index]);
 
-        // Recommendation 6: one line per distinct failure per table, instead of one per batch.
-        foreach (var group in allErrors.Where(e => e.RowIndexes.Count > 1).GroupBy(e => e.ErrorMessage))
+        // Recommendation 6: summarize all row and batch failures once per table and message.
+        var errorsByBatch = errorBags
+            .OrderBy(pair => pair.Key)
+            .SelectMany(pair => pair.Value.Select(error => (BatchIndex: pair.Key, Error: error)));
+        foreach (var group in errorsByBatch.GroupBy(item => item.Error.ErrorMessage))
             _logger.LogError("{Entity}: {Batches} batch(es) ({Rows} rows) failed with: {Message}",
-                entityName, group.Count(), group.Sum(e => e.RowCount), group.Key);
+                entityName,
+                group.Select(item => item.BatchIndex).Distinct().Count(),
+                group.Sum(item => item.Error.RowCount),
+                group.Key);
 
         return (allIds, allErrors, failure);
     }
