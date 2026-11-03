@@ -1721,4 +1721,37 @@ public class BulkCreatorTests
         var indexes = timingLines.Select(l => int.Parse(l.Split(' ')[3].Split('/')[0])).Order().ToArray();
         Assert.Equal(Enumerable.Range(1, timingLines.Length), indexes);
     }
+
+    [Fact]
+    public async Task CreateAsync_IdenticalBatchFailures_AreSummarisedOncePerTable()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<OrganizationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FaultException<OrganizationServiceFault>(new OrganizationServiceFault
+            {
+                ErrorCode = -2147220969,
+                Message = "Attribute validation error",
+            }));
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 30 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Single(logger.Lines, l => l.StartsWith("account: 3 batch(es) (30 rows) failed with: ", StringComparison.Ordinal));
+    }
 }

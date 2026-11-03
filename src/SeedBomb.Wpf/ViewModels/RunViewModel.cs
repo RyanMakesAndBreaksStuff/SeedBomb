@@ -59,6 +59,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
 
     private readonly List<RejectionGroup> _allRejectionGroups = [];
     private readonly List<RunActivityRow> _activityLog = [];
+    private int _lastActivityRepeats;
     private readonly Dictionary<string, int> _tableWritten = new(StringComparer.OrdinalIgnoreCase);
     private readonly System.Diagnostics.Stopwatch _runClock = new();
     private System.Windows.Threading.DispatcherTimer? _clockTimer;
@@ -432,6 +433,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         // A new run must not inherit the previous run's lines — this is the only reset point,
         // and ShowFullLogAsync reads the same backing list as the RecentActivity tail.
         _activityLog.Clear();
+        _lastActivityRepeats = 0;
         RecentActivity.Clear();
 
         IsRunning = true;
@@ -1079,14 +1081,26 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
 
     private void AppendActivity(string line)
     {
-        _activityLog.Add(new RunActivityRow(line, "Normal"));
-        if (_activityLog.Count > ActivityLogCap)
-            _activityLog.RemoveAt(0);
+        // Recommendation 6: identical consecutive lines become one line with a count.
+        if (_activityLog.Count > 0 && string.Equals(_activityLog[^1].Line, Repeated(line, _lastActivityRepeats), StringComparison.Ordinal))
+        {
+            _lastActivityRepeats++;
+            _activityLog[^1] = new RunActivityRow(Repeated(line, _lastActivityRepeats), "Normal");
+        }
+        else
+        {
+            _lastActivityRepeats = 1;
+            _activityLog.Add(new RunActivityRow(line, "Normal"));
+            if (_activityLog.Count > ActivityLogCap)
+                _activityLog.RemoveAt(0);
+        }
 
         RecentActivity.Clear();
         foreach (var row in _activityLog.TakeLast(RecentActivityCap))
             RecentActivity.Add(row);
     }
+
+    private static string Repeated(string line, int count) => count > 1 ? $"{line} (×{count})" : line;
 
     private string BuildRunDescription(int written, int planned, string host, int seed)
     {

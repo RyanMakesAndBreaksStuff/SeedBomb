@@ -454,6 +454,24 @@ public sealed class RunViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ApplyResult_CollapsesIdenticalConsecutiveNoticesWithACount()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 10, tables: ["account"]);
+
+        vm.ApplyResult(new GenerationResult
+        {
+            CreatedRecords = new Dictionary<string, IReadOnlyList<Guid>> { ["account"] = [Guid.NewGuid()] },
+            Elapsed = TimeSpan.FromSeconds(1),
+            Notices = ["Server busy", "Server busy", "Server busy", "Parallelism capped at 4"],
+        }, seed: 1, environmentHost: "contoso-dev");
+
+        Assert.Contains("Server busy (×3)", vm.ActivityLines);
+        Assert.DoesNotContain("Server busy", vm.ActivityLines);
+        Assert.Contains("Parallelism capped at 4", vm.ActivityLines);
+    }
+
+    [Fact]
     public void ApplyResult_SettlesEveryTableRow_EvenWhenTheLastSnapshotWasDropped()
     {
         var vm = new RunViewModel();

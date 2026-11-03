@@ -463,8 +463,8 @@ public class BulkCreator
                     catch (DataGenerationException ex)
                     {
                         failureType = (ex.InnerException ?? ex).GetType().Name;
-                        _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
-                            batchIndex + 1, Math.Max(allocatedBatches, batchIndex + 1), entityName);
+                        _logger.LogWarning("Batch {BatchIndex}/{TotalBatches} for {Entity} failed: {Message}",
+                            batchIndex + 1, Math.Max(allocatedBatches, batchIndex + 1), entityName, ex.Message);
                         batchIds = [];
                         batchErrors = [new BatchError(entityName, ex.Message,
                             (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length,
@@ -523,6 +523,11 @@ public class BulkCreator
 
         foreach (var index in idBags.Keys.Order()) allIds.AddRange(idBags[index]);
         foreach (var index in errorBags.Keys.Order()) allErrors.AddRange(errorBags[index]);
+
+        // Recommendation 6: one line per distinct failure per table, instead of one per batch.
+        foreach (var group in allErrors.Where(e => e.RowIndexes.Count > 1).GroupBy(e => e.ErrorMessage))
+            _logger.LogError("{Entity}: {Batches} batch(es) ({Rows} rows) failed with: {Message}",
+                entityName, group.Count(), group.Sum(e => e.RowCount), group.Key);
 
         return (allIds, allErrors, failure);
     }
