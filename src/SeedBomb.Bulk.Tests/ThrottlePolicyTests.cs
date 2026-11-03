@@ -39,17 +39,91 @@ public class ThrottlePolicyTests
         Assert.Contains("account", ex.Message);
     }
 
-    [Fact]
-    public async Task ExecuteAsync_ThrottleFault_IsNotRetriedByPolicy()
+    private static FaultException<OrganizationServiceFault> ThrottleFault(int code, TimeSpan retryAfter)
     {
-        // ServiceClient already pauses and resends on service-protection codes before a fault
-        // ever surfaces, so if one still reaches the policy it is terminal: wrap immediately.
+        var fault = new OrganizationServiceFault { ErrorCode = code, Message = "Service protection limit." };
+        fault.ErrorDetails["Retry-After"] = retryAfter;
+        return new FaultException<OrganizationServiceFault>(fault, "Throttled");
+    }
+
+    [Theory]
+    [InlineData(-2147015902)]
+    [InlineData(-2147015903)]
+    [InlineData(-2147015898)]
+    public async Task ExecuteAsync_ThrottleFaultWithRetryAfter_WaitsOnceAndStaysWithinBudget(int code)
+    {
+        // Recommendation 1 and 8: the app is the only retry owner, it waits exactly the server's
+        // Retry-After, and the attempt count is bounded by maxRetries + 1 whatever the server says.
+        var callCount = 0;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            _policy.ExecuteAsync<int>(
+                () =>
+                {
+                    callCount++;
+                    throw ThrottleFault(code, TimeSpan.FromMilliseconds(300));
+                },
+                "account",
+                maxRetries: 2,
+                CancellationToken.None));
+
+        Assert.Equal(3, callCount);
+        // Two waits of 300 ms, no exponential 2 s base: well under 2 s in total.
+        Assert.InRange(started.Elapsed, TimeSpan.FromMilliseconds(600), TimeSpan.FromSeconds(2));
+        Assert.True(ThrottlePolicy.IsTransient(ex.InnerException));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThrottleFaultWithoutRetryAfter_UsesBackoff()
+    {
+        var callCount = 0;
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new FaultException<OrganizationServiceFault>(
+                        new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Too many requests" });
+                return Task.FromResult("success");
+            },
+            "account",
+            maxRetries: 3,
+            CancellationToken.None);
+
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ThrottleWait_IsCancellable()
+    {
+        using var cts = new CancellationTokenSource();
+        var task = _policy.ExecuteAsync<int>(
+            () =>
+            {
+                cts.CancelAfter(100);
+                throw ThrottleFault(-2147015902, TimeSpan.FromMinutes(5));
+            },
+            "account",
+            maxRetries: 1,
+            cts.Token);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    // was: ExecuteAsync_ThrottleFault_IsNotRetriedByPolicy, asserting callCount == 1
+    [Fact]
+    public async Task ExecuteAsync_ThrottleFault_IsRetriedByPolicy()
+    {
+        // The SDK client is built with MaxRetryCount = 0, so a service-protection fault reaches
+        // the policy on the first attempt and the policy owns the resend.
         var throttleFault = new FaultException<OrganizationServiceFault>(
             new OrganizationServiceFault { ErrorCode = -2147015902, Message = "Too many requests" },
             "Throttled");
 
         var callCount = 0;
-        var ex = await Assert.ThrowsAsync<DataGenerationException>(() =>
+        await Assert.ThrowsAsync<DataGenerationException>(() =>
             _policy.ExecuteAsync<int>(
                 () =>
                 {
@@ -57,11 +131,10 @@ public class ThrottlePolicyTests
                     throw throttleFault;
                 },
                 "account",
-                maxRetries: 3,
+                maxRetries: 1,
                 CancellationToken.None));
 
-        Assert.Equal(1, callCount);
-        Assert.Same(throttleFault, ex.InnerException);
+        Assert.Equal(2, callCount);
     }
 
     [Fact]
@@ -186,23 +259,27 @@ public class ThrottlePolicyTests
         Assert.Equal(2, callCount);
     }
 
-    [Fact]
-    public async Task ExecuteAsync_NonThrottleProtocolFault_IsNotRetried()
+    // was: ExecuteAsync_NonThrottleProtocolFault_IsNotRetried, asserting callCount == 1 on (502)
+    [Theory]
+    [InlineData("(502)")]
+    [InlineData("(503)")]
+    public async Task ExecuteAsync_GatewayProtocolFault_IsRetried(string status)
     {
         var callCount = 0;
+        var result = await _policy.ExecuteAsync(
+            () =>
+            {
+                callCount++;
+                if (callCount == 1)
+                    throw new ProtocolException($"The remote server returned an unexpected response: {status}  .");
+                return Task.FromResult("success");
+            },
+            "contact",
+            maxRetries: 3,
+            CancellationToken.None);
 
-        await Assert.ThrowsAsync<DataGenerationException>(() =>
-            _policy.ExecuteAsync<int>(
-                () =>
-                {
-                    callCount++;
-                    throw new ProtocolException("The remote server returned an unexpected response: (502)  .");
-                },
-                "contact",
-                maxRetries: 3,
-                CancellationToken.None));
-
-        Assert.Equal(1, callCount);
+        Assert.Equal("success", result);
+        Assert.Equal(2, callCount);
     }
 
     [Fact]
@@ -297,7 +374,8 @@ public class ThrottlePolicyTests
         { new TimeoutException(), true },
         { new HttpRequestException(), true },
         { new ProtocolException("The remote server returned an unexpected response: (429)  ."), true },
-        { new ProtocolException("The remote server returned an unexpected response: (502)  ."), false },
+        { new ProtocolException("The remote server returned an unexpected response: (502)  ."), true },
+        { new FaultException<OrganizationServiceFault>(new OrganizationServiceFault { ErrorCode = -2147015902 }), true },
         { new FaultException<OrganizationServiceFault>(new OrganizationServiceFault { ErrorCode = -2147220969 }), false },
         { new InvalidOperationException(), false },
     };

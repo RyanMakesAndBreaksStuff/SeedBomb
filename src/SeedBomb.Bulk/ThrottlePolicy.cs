@@ -7,14 +7,17 @@ using System.ServiceModel;
 namespace SeedBomb.Bulk;
 
 /// <summary>
-/// Executes Dataverse API calls with automatic retry on transient timeout and network faults.
-/// Service-protection (throttle) faults are not retried here — <c>ServiceClient</c> already
-/// pauses and resends those itself before a fault ever surfaces. A bare HTTP 429 is the exception:
-/// it reaches us as a <see cref="ProtocolException"/> that <c>ServiceClient</c> did not handle, so
-/// this policy resends it. Uses exponential backoff with jitter.
+/// The one retry owner for Dataverse calls. The <c>ServiceClient</c> is built with
+/// <c>MaxRetryCount = 0</c>, so every fault reaches this policy on the first attempt. A
+/// service-protection fault waits the server's <c>Retry-After</c>; timeouts, network faults,
+/// HTTP 429/502/503 and busy endpoints wait an exponential backoff with jitter. Any other fault
+/// is terminal.
 /// </summary>
 public class ThrottlePolicy
 {
+    // Dataverse service-protection codes: number of requests, execution time, concurrency.
+    private static readonly int[] ServiceProtectionCodes = [-2147015902, -2147015903, -2147015898];
+
     private static readonly TimeSpan BaseDelay = TimeSpan.FromSeconds(2);
     private readonly ILogger<ThrottlePolicy> _logger;
 
@@ -61,7 +64,7 @@ public class ThrottlePolicy
             // On the last attempt a transient fault falls through to DataGenerationException.
             catch (Exception ex) when (attempt < maxRetries && RetryReason(ex) is { } reason)
             {
-                var delay = ComputeDelay(attempt);
+                var delay = RetryAfterOf(ex) ?? ComputeDelay(attempt);
                 _logger.LogWarning(
                     "{Reason} for {Entity} on attempt {Attempt} of {MaxAttempts} after {CallMs:F0}ms ({ExceptionType}: {ExceptionMessage}). Retrying in {Delay:F0}ms.",
                     reason, entityName, attempt + 1, maxRetries + 1,
@@ -71,8 +74,6 @@ public class ThrottlePolicy
             }
             catch (FaultException<OrganizationServiceFault> ex)
             {
-                // ServiceClient already pauses and resends on service-protection limits, so any
-                // fault that still surfaces is terminal — wrap it, don't retry it.
                 throw new DataGenerationException(
                     $"Batch creation failed for '{entityName}' on attempt {attempt + 1}: {ex.Detail?.Message ?? ex.Message}",
                     ex);
@@ -108,11 +109,25 @@ public class ThrottlePolicy
         // ProtocolException and FaultException, which are CommunicationExceptions too.
         EndpointNotFoundException => "Endpoint not found",
         ServerTooBusyException => "Server too busy",
+        // Recommendation 1: the SDK no longer retries these; the policy does, honouring Retry-After.
+        FaultException<OrganizationServiceFault> f when IsServiceProtection(f) => "Service protection",
         ProtocolException p when IsRateLimited(p) => "HTTP 429",
+        ProtocolException p when IsGatewayFault(p) => "HTTP 502/503",
         // ServiceClient wraps socket resets (10054) as CommunicationException over HttpRequestException.
         CommunicationException c when IsWrappedNetworkFault(c) => "Network fault",
         _ => null,
     };
+
+    private static bool IsServiceProtection(FaultException<OrganizationServiceFault> ex) =>
+        ex.Detail is { } d && Array.IndexOf(ServiceProtectionCodes, d.ErrorCode) >= 0;
+
+    /// <summary>The server's wait for a service-protection fault, or null when the fault carries none.</summary>
+    /// <param name="ex">The failure as thrown by the operation.</param>
+    public static TimeSpan? RetryAfterOf(Exception? ex) =>
+        ex is FaultException<OrganizationServiceFault> { Detail.ErrorDetails: { } details }
+        && details.TryGetValue("Retry-After", out var value) && value is TimeSpan wait && wait > TimeSpan.Zero
+            ? wait
+            : null;
 
     private static bool IsWrappedNetworkFault(CommunicationException ex) =>
         ex.InnerException is HttpRequestException or IOException;
@@ -121,6 +136,9 @@ public class ThrottlePolicy
     // us — ThrowIfResponseIsEmpty formats the code into the message and drops the response.
     private static bool IsRateLimited(ProtocolException ex) =>
         ex.Message.Contains("(429)", StringComparison.Ordinal);
+
+    private static bool IsGatewayFault(ProtocolException ex) =>
+        ex.Message.Contains("(502)", StringComparison.Ordinal) || ex.Message.Contains("(503)", StringComparison.Ordinal);
 
     private static TimeSpan ComputeDelay(int attempt)
     {

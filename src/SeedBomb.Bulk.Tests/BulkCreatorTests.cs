@@ -612,7 +612,7 @@ public class BulkCreatorTests
 
         var error = Assert.Single(result.Errors);
         Assert.Equal(-2147015902, error.FaultCode);
-        Assert.False(error.IsTransient);
+        Assert.True(error.IsTransient);   // was Assert.False: a throttle fault is now the policy's to retry
     }
 
     [Fact]

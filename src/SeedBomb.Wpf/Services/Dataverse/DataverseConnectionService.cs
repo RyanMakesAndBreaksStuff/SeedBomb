@@ -104,8 +104,10 @@ public sealed class DataverseConnectionService : IDataverseConnectionService, ID
                 useUniqueInstance: true,
                 logger: sdkLogger)
             {
-                // CR-001: keep the SDK's own retries — they honour Retry-After on service-protection
-                // faults, which ThrottlePolicy deliberately does not retry.
+                // Recommendation 1: ThrottlePolicy is the only retry owner. It honours Retry-After
+                // itself; nested SDK retries (default 10) are what stalled runs for minutes.
+                MaxRetryCount = 0,
+                RetryPauseTime = TimeSpan.Zero,
                 EnableAffinityCookie = false
             }, ct).ConfigureAwait(false);
 
