@@ -874,6 +874,33 @@ public class BulkCreatorTests
     }
 
     [Fact]
+    public async Task CreateAsync_ImplicitRequiredLookupWithInRunParent_ReadsNothingFromTheEnvironment()
+    {
+        // Recommendation 5: the implicit rule prefers this run's parents, so the pre-run
+        // RetrieveMultiple over the parent table is wasted budget and an unlabelled stall.
+        var (sut, serviceMock) = BuildSut();
+        AnswerCreates(serviceMock);
+        var (metadata, graph) = AccountContact();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 2, ["contact"] = 2 },
+            BatchSize = 10,
+            MaxParallelism = 1,
+        };
+        var phases = new List<string>();
+        var progress = new InlineProgress(p => phases.Add(p.Phase));
+
+        var result = await sut.CreateAsync(config, metadata, graph, progress);
+
+        Assert.Equal(4, result.TotalRecords);
+        serviceMock.Verify(s => s.RetrieveMultipleAsync(
+            It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).EntityName == "account"),
+            It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("Preparing lookups", phases);
+    }
+
+    [Fact]
     public async Task CreateAsync_ChildOnlyRetry_KeepsTopologyAndRegeneratesTheRow()
     {
         // WR-001: retrying only contact row 1 keeps account in the topology (empty filter), passes

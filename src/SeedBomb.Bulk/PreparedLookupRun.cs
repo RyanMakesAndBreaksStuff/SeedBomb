@@ -90,25 +90,34 @@ internal sealed class PreparedLookupRun(
                     .Select(t => t.ToLowerInvariant())
                     .ToArray();
 
+                // Implicit required-lookups prefer this run's parents; skip environment reads
+                // when every target is created earlier in topological order.
+                var preferInRunColumn = preferInRun?.Contains($"{table}.{column}") == true;
+                var readsEnvironment = !(preferInRunColumn
+                    && targets.All(t => inRunTargets.Contains(t.ToLowerInvariant(), StringComparer.Ordinal)));
+
                 var candidates = new List<LookupRuleValue>();
-                foreach (var target in targets)
+                if (readsEnvironment)
                 {
-                    if (!byTarget.TryGetValue(target, out var rows))
+                    foreach (var target in targets)
                     {
-                        try
+                        if (!byTarget.TryGetValue(target, out var rows))
                         {
-                            rows = await ReadTargetAsync(target, config.MaxRetries, metadata, service,
-                                throttle, logger, ct).ConfigureAwait(false);
+                            try
+                            {
+                                rows = await ReadTargetAsync(target, config.MaxRetries, metadata, service,
+                                    throttle, logger, ct).ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException) { throw; }
+                            catch (Exception ex) when (ex is DataGenerationException or InvalidOperationException)
+                            {
+                                throw new DataGenerationException(
+                                    $"Lookup preparation failed for '{table}.{column}' ({count} rows), target '{target}': {ex.Message}", ex);
+                            }
+                            byTarget.Add(target, rows);
                         }
-                        catch (OperationCanceledException) { throw; }
-                        catch (Exception ex) when (ex is DataGenerationException or InvalidOperationException)
-                        {
-                            throw new DataGenerationException(
-                                $"Lookup preparation failed for '{table}.{column}' ({count} rows), target '{target}': {ex.Message}", ex);
-                        }
-                        byTarget.Add(target, rows);
+                        candidates.AddRange(rows);
                     }
-                    candidates.AddRange(rows);
                 }
                 var ordered = candidates.DistinctBy(v => (v.Entity, v.Id))
                     .OrderBy(v => v.Entity, StringComparer.Ordinal)
@@ -118,7 +127,7 @@ internal sealed class PreparedLookupRun(
                         $"No readable existing candidates for '{table}.{column}' ({count} planned rows). Choose records manually or remove this rule.");
                 byColumn.Add($"{table}.{column}",
                     new PreparedLookupColumn(Array.AsReadOnly(ordered), Array.AsReadOnly(inRunTargets),
-                        preferInRun?.Contains($"{table}.{column}") == true));
+                        preferInRunColumn));
             }
         }
         return new(byColumn.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase));

@@ -120,6 +120,15 @@ public class BulkCreator
             phaseStart = Stopwatch.GetTimestamp();
             preparedRun = await PrepareBogusRunOrThrowAsync(config, entityMetadata, ct).ConfigureAwait(false);
 
+            progress?.Report(new BulkCreationProgress
+            {
+                Phase = "Preparing lookups",
+                EntityLogicalName = string.Empty,
+                BatchIndex = 0,
+                TotalBatches = 0,
+                RecordsCreated = 0,
+                TotalRecords = 0,
+            });
             var lookupRun = await PreparedLookupRun.PrepareAsync(config, entityMetadata, sortedEntities,
                 _service, _throttlePolicy, _logger, ct, implicitLookups).ConfigureAwait(false);
 

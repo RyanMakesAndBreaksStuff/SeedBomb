@@ -521,7 +521,7 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
         RunDescription = BuildRunDescription(written, plannedTotal, _environmentHost, _seed);
 
         if (!string.Equals(StatusHeadline, "Cancelling…", StringComparison.Ordinal))
-            StatusHeadline = "Generating…";
+            StatusHeadline = string.IsNullOrEmpty(u.EntityName) ? $"{u.Phase}…" : "Generating…";
 
         RefreshMetrics(u, written, plannedTotal);
         var entity = string.IsNullOrEmpty(u.EntityName) ? "" : $"  {u.EntityName}";

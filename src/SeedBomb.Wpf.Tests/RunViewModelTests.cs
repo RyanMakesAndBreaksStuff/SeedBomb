@@ -495,6 +495,17 @@ public sealed class RunViewModelTests : IDisposable
     }
 
     [Fact]
+    public void AcceptProgress_PhaseOnlySnapshot_UsesThePhaseAsTheHeadline()
+    {
+        var vm = new RunViewModel();
+        vm.StartRun("contoso-dev", seed: 1, plannedTotal: 100, tables: ["account"]);
+
+        vm.AcceptProgress(Update("", created: 0, total: 0, phase: "Preparing lookups"), ["account"], 100);
+
+        Assert.Equal("Preparing lookups…", vm.StatusHeadline);
+    }
+
+    [Fact]
     public void AcceptProgress_WaitingSnapshot_ShowsTheServerWaitWithoutTouchingCounts()
     {
         var vm = new RunViewModel();
