@@ -1497,4 +1497,94 @@ public class BulkCreatorTests
         Assert.Equal(rejected["accountnumber"], row["accountnumber"]);
         Assert.Equal(rejected["new_code"], row["new_code"]);
     }
+
+    [Fact]
+    public void AdaptiveBatchSize_StartsLowGrowsOnFastCallsAndHalvesOnTimeout()
+    {
+        var sizer = new AdaptiveBatchSize(configured: 1000);
+        Assert.Equal(250, sizer.Current);
+
+        sizer.ObserveCall(TimeSpan.FromSeconds(5));
+        Assert.Equal(375, sizer.Current);
+        sizer.ObserveCall(TimeSpan.FromSeconds(25));
+        Assert.Equal(375, sizer.Current);
+        for (var i = 0; i < 10; i++) sizer.ObserveCall(TimeSpan.FromSeconds(1));
+        Assert.Equal(1000, sizer.Current);
+
+        sizer.ObserveTimeout();
+        Assert.Equal(500, sizer.Current);
+        for (var i = 0; i < 10; i++) sizer.ObserveTimeout();
+        Assert.Equal(25, sizer.Current);
+
+        Assert.Equal(10, new AdaptiveBatchSize(configured: 10).Current);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AdaptiveBatchSize_StartsAt250AndGrowsTowardConfigured()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var sizes = new List<int>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<CreateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((req, _) =>
+            {
+                var count = ((CreateMultipleRequest)req).Targets.Entities.Count;
+                lock (sizes) sizes.Add(count);
+                return Task.FromResult<OrganizationResponse>(new CreateMultipleResponse
+                {
+                    Results = { ["Ids"] = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray() }
+                });
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1000 },
+            BatchSize = 500,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(1000, result.TotalRecords);
+        Assert.Equal(250, sizes[0]);
+        Assert.Equal(375, sizes[1]);
+        Assert.Equal(1000, sizes.Sum());
+        Assert.All(sizes, s => Assert.InRange(s, 1, 500));
+    }
+
+    [Fact]
+    public async Task CreateAsync_AdaptiveBatchSize_ParallelWorkersSubmitEveryRowOnceWithUniqueBatchIndexes()
+    {
+        var logger = new RecordingLogger<BulkCreator>();
+        var (sut, serviceMock) = BuildSut(logger);
+        var written = AnswerCreates(serviceMock);
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 2_000 },
+            BatchSize = 500,
+            MaxParallelism = 4,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = Meta("account", new StringAttributeMetadata { LogicalName = "name", MaxLength = 100 })
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(2_000, result.TotalRecords);
+        Assert.Equal(2_000, written.Count);
+        var timingLines = logger.Lines.Where(l => l.StartsWith("[timing] batch account ", StringComparison.Ordinal)).ToArray();
+        var indexes = timingLines.Select(l => int.Parse(l.Split(' ')[3].Split('/')[0])).Order().ToArray();
+        Assert.Equal(Enumerable.Range(1, timingLines.Length), indexes);
+    }
 }

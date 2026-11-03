@@ -384,94 +384,117 @@ public class BulkCreator
         int[] rowIndexes = config.RowIndexes?.GetValueOrDefault(entityName) is { } retryRows
             ? [.. retryRows.Distinct().Order()]
             : [.. Enumerable.Range(0, recordCount)];
-        var rowBatches = rowIndexes.Chunk(config.BatchSize).ToArray();
-        var batches = rowBatches.Select(rows => rows.Select(row => entities[row]).ToArray()).ToArray();
         RunDiagnostics.LogPhase(_logger, "generate", generateStart, entityName);
 
         var submitStart = Stopwatch.GetTimestamp();
         var submitted = await SubmitEntityBatchesAsync(
-            entityName, batches, rowBatches, rowIndexes.Length, alternateKeyAttrs.Length > 0, config, effectiveDop, progress, ct).ConfigureAwait(false);
+            entityName, entities, rowIndexes, config, effectiveDop, alternateKeyAttrs.Length > 0, progress, ct).ConfigureAwait(false);
         RunDiagnostics.LogPhase(_logger, "submit", submitStart, entityName);
         return submitted;
     }
 
     private async Task<(List<Guid> ids, List<BatchError> errors, Exception? failure)> SubmitEntityBatchesAsync(
         string entityName,
-        Entity[][] batches,
-        int[][] rowBatches,
-        int plannedCount,
-        bool hasAlternateKey,
+        List<Entity> entities,
+        int[] rowIndexes,
         GenerationConfig config,
         int effectiveDop,
+        bool hasAlternateKey,
         IProgress<BulkCreationProgress>? progress,
         CancellationToken ct)
     {
+        var plannedCount = rowIndexes.Length;
         var allIds = new List<Guid>(plannedCount);
         var allErrors = new List<BatchError>();
         var createdCount = 0;
+        var completedBatches = 0;
+        var allocatedBatches = 0;
         var entityStart = DateTimeOffset.UtcNow;
+        var sizer = new AdaptiveBatchSize(config.BatchSize);
+        var cursor = 0;
+        var cursorLock = new object();
+        var idBags = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Guid>>();
+        var errorBags = new System.Collections.Concurrent.ConcurrentDictionary<int, List<BatchError>>();
 
-        var parallelOptions = new ParallelOptions
+        (int index, int[] rows)? NextSlice()
         {
-            MaxDegreeOfParallelism = effectiveDop,
-            CancellationToken = ct
-        };
-
-        // Thread-safe accumulators indexed by batch position
-        var idBags = new List<Guid>[batches.Length];
-        var errorBags = new List<BatchError>[batches.Length];
+            lock (cursorLock)
+            {
+                if (cursor >= plannedCount) return null;
+                var take = Math.Min(sizer.Current, plannedCount - cursor);
+                var result = (allocatedBatches++, rowIndexes[cursor..(cursor + take)]);
+                cursor += take;
+                return result;
+            }
+        }
 
         var submit = Parallel.ForEachAsync(
-            Enumerable.Range(0, batches.Length),
-            parallelOptions,
-            async (batchIndex, innerCt) =>
+            Enumerable.Range(0, Math.Min(effectiveDop, Math.Max(1, plannedCount))),
+            new ParallelOptions { MaxDegreeOfParallelism = effectiveDop, CancellationToken = ct },
+            async (_, innerCt) =>
             {
-                var batch = batches[batchIndex];
-                var rows = rowBatches[batchIndex];
-                List<Guid> batchIds;
-                List<BatchError> batchErrors;
-                var trace = new BatchTrace();
-                var batchStart = Stopwatch.GetTimestamp();
-                string? failureType = null;
+                while (NextSlice() is { } next)
+                {
+                    var (batchIndex, rows) = next;
+                    var batch = rows.Select(row => entities[row]).ToArray();
+                    List<Guid> batchIds;
+                    List<BatchError> batchErrors;
+                    var trace = new BatchTrace();
+                    var batchStart = Stopwatch.GetTimestamp();
+                    string? failureType = null;
 
-                try
-                {
-                    (batchIds, batchErrors) = await SubmitBatchAsync(
-                        entityName, batch, rows, config.MaxRetries, hasAlternateKey, trace, innerCt).ConfigureAwait(false);
-                }
-                catch (DataGenerationException ex)
-                {
-                    failureType = (ex.InnerException ?? ex).GetType().Name;
-                    _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
-                        batchIndex + 1, batches.Length, entityName);
-                    batchIds = [];
-                    batchErrors = [new BatchError(entityName, ex.Message,
-                        (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length,
-                        ThrottlePolicy.IsTransient(ex.InnerException))
+                    try
                     {
-                        RowIndexes = rows,
-                    }];
+                        (batchIds, batchErrors) = await SubmitBatchAsync(
+                            entityName, batch, rows, config.MaxRetries, hasAlternateKey, trace, sizer, innerCt).ConfigureAwait(false);
+                    }
+                    catch (DataGenerationException ex)
+                    {
+                        failureType = (ex.InnerException ?? ex).GetType().Name;
+                        _logger.LogError(ex, "Batch {BatchIndex}/{TotalBatches} for {Entity} failed",
+                            batchIndex + 1, Math.Max(allocatedBatches, batchIndex + 1), entityName);
+                        batchIds = [];
+                        batchErrors = [new BatchError(entityName, ex.Message,
+                            (ex.InnerException as FaultException<OrganizationServiceFault>)?.Detail?.ErrorCode, batch.Length,
+                            ThrottlePolicy.IsTransient(ex.InnerException))
+                        {
+                            RowIndexes = rows,
+                        }];
+                    }
+
+                    idBags[batchIndex] = batchIds;
+                    errorBags[batchIndex] = batchErrors;
+                    if (failureType is null && batchErrors.All(e => !e.OutcomeUnknown))
+                        sizer.ObserveCall(TimeSpan.FromMilliseconds(trace.LastCallMs));
+                    else if (batchErrors.Any(e => e.OutcomeUnknown))
+                        sizer.ObserveTimeout();
+
+                    var done = Interlocked.Increment(ref completedBatches);
+                    int total;
+                    lock (cursorLock)
+                    {
+                        var remaining = Math.Max(0, plannedCount - cursor);
+                        total = allocatedBatches
+                            + (int)Math.Ceiling((double)remaining / Math.Max(1, sizer.Current));
+                    }
+                    LogBatchTiming(entityName, done - 1, total, batch.Length, effectiveDop,
+                        trace, batchStart, batchIds.Count, batchErrors, failureType);
+
+                    var elapsed = (DateTimeOffset.UtcNow - entityStart).TotalMinutes;
+                    var added = Interlocked.Add(ref createdCount, batchIds.Count);
+                    var ratePerMin = elapsed >= 0.001 ? added / elapsed : 0;
+
+                    progress?.Report(new BulkCreationProgress
+                    {
+                        EntityLogicalName = entityName,
+                        BatchIndex = done,
+                        TotalBatches = total,
+                        RecordsCreated = added,
+                        TotalRecords = plannedCount,
+                        RecordsPerMinute = ratePerMin,
+                        ErrorMessage = batchErrors.Count > 0 ? batchErrors[0].ErrorMessage : null
+                    });
                 }
-
-                idBags[batchIndex] = batchIds;
-                errorBags[batchIndex] = batchErrors;
-                LogBatchTiming(entityName, batchIndex, batches.Length, batch.Length, effectiveDop,
-                    trace, batchStart, batchIds.Count, batchErrors, failureType);
-
-                var elapsed = (DateTimeOffset.UtcNow - entityStart).TotalMinutes;
-                var added = Interlocked.Add(ref createdCount, batchIds.Count);
-                var ratePerMin = elapsed >= 0.001 ? added / elapsed : 0;
-
-                progress?.Report(new BulkCreationProgress
-                {
-                    EntityLogicalName = entityName,
-                    BatchIndex = batchIndex + 1,
-                    TotalBatches = batches.Length,
-                    RecordsCreated = added,
-                    TotalRecords = plannedCount,
-                    RecordsPerMinute = ratePerMin,
-                    ErrorMessage = batchErrors.Count > 0 ? batchErrors[0].ErrorMessage : null
-                });
             });
 
         Exception? failure = null;
@@ -488,10 +511,8 @@ public class BulkCreator
             failure = ex;
         }
 
-        foreach (var idBag in idBags)
-            if (idBag is not null) allIds.AddRange(idBag);
-        foreach (var errorBag in errorBags)
-            if (errorBag is not null) allErrors.AddRange(errorBag);
+        foreach (var index in idBags.Keys.Order()) allIds.AddRange(idBags[index]);
+        foreach (var index in errorBags.Keys.Order()) allErrors.AddRange(errorBags[index]);
 
         return (allIds, allErrors, failure);
     }
@@ -503,6 +524,7 @@ public class BulkCreator
         int maxRetries,
         bool hasAlternateKey,
         BatchTrace trace,
+        AdaptiveBatchSize sizer,
         CancellationToken ct)
     {
         // No availability pre-check: the sdkmessagefilter probe returned false positives, so the
@@ -525,7 +547,7 @@ public class BulkCreator
             }
             catch (DataGenerationException ex) when (IsClientTimeout(ex, ct))
             {
-                return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, ex, ct)
+                return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, sizer, ex, ct)
                     .ConfigureAwait(false);
             }
         }
@@ -538,7 +560,7 @@ public class BulkCreator
         }
         catch (DataGenerationException ex) when (IsClientTimeout(ex, ct))
         {
-            return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, ex, ct)
+            return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, sizer, ex, ct)
                 .ConfigureAwait(false);
         }
     }
@@ -551,15 +573,16 @@ public class BulkCreator
     // one the rows are reported as unknown and never resent. A batch of one row cannot be split.
     private async Task<(List<Guid> ids, List<BatchError> errors)> ResolveTimedOutBatchAsync(
         string entityName, Entity[] batch, int[] rows, int maxRetries, bool hasAlternateKey,
-        BatchTrace trace, DataGenerationException timeout, CancellationToken ct)
+        BatchTrace trace, AdaptiveBatchSize sizer, DataGenerationException timeout, CancellationToken ct)
     {
         if (hasAlternateKey && batch.Length > 1)
         {
+            sizer.ObserveTimeout();
             var half = batch.Length / 2;
             _logger.LogWarning("The create batch for {Entity} timed out after {CallMs:F0}ms ({TimeoutType}); resending as {Left} + {Right} rows (alternate key rejects duplicates).",
                 entityName, trace.LastCallMs, timeout.InnerException?.GetType().Name, half, batch.Length - half);
-            var left = await SubmitBatchAsync(entityName, batch[..half], rows[..half], maxRetries, hasAlternateKey, trace, ct).ConfigureAwait(false);
-            var right = await SubmitBatchAsync(entityName, batch[half..], rows[half..], maxRetries, hasAlternateKey, trace, ct).ConfigureAwait(false);
+            var left = await SubmitBatchAsync(entityName, batch[..half], rows[..half], maxRetries, hasAlternateKey, trace, sizer, ct).ConfigureAwait(false);
+            var right = await SubmitBatchAsync(entityName, batch[half..], rows[half..], maxRetries, hasAlternateKey, trace, sizer, ct).ConfigureAwait(false);
             return ([.. left.ids, .. right.ids], [.. left.errors, .. right.errors]);
         }
 
