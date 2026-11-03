@@ -15,8 +15,10 @@ namespace SeedBomb.Bulk;
 /// <param name="Existing">Canonically ordered rows read from the environment before generation.</param>
 /// <param name="InRunTargets">Lower-cased targets created earlier in topological order.</param>
 /// <param name="PreferInRun">Implicit required-lookup rule: link to this run's parents, falling back to Existing (WR-002).</param>
+/// <param name="DeferredTargets">Targets read only if the run creates no parent rows.</param>
 internal sealed record PreparedLookupColumn(
-    IReadOnlyList<LookupRuleValue> Existing, IReadOnlyList<string> InRunTargets, bool PreferInRun = false);
+    IReadOnlyList<LookupRuleValue> Existing, IReadOnlyList<string> InRunTargets,
+    bool PreferInRun = false, IReadOnlyList<string>? DeferredTargets = null);
 
 internal sealed class PreparedLookupRun(
     FrozenDictionary<string, PreparedLookupColumn> columns)
@@ -27,6 +29,10 @@ internal sealed class PreparedLookupRun(
     // Row generation for one table is sequential (BulkCreator generates before it submits), so the
     // first Get for a column resolves the pool once and every later row reuses the same list.
     private readonly Dictionary<string, IReadOnlyList<LookupRuleValue>> _resolved =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<LookupRuleValue>> _deferredExisting =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<LookupRuleValue>> _fallbackByTarget =
         new(StringComparer.OrdinalIgnoreCase);
 
     internal IReadOnlyList<LookupRuleValue> Get(string table, string column, DataverseRecordPool pool)
@@ -47,12 +53,53 @@ internal sealed class PreparedLookupRun(
             .ToArray();
         if (fromRun.Length == 0 && prepared.Existing.Count > 0)
             return prepared.Existing;
+        if (fromRun.Length == 0 && _deferredExisting.TryGetValue(key, out var fallback) && fallback.Count > 0)
+            return fallback;
         if (fromRun.Length == 0)
             throw new DataGenerationException(
                 $"No candidates for '{key}': target(s) {string.Join(", ", prepared.InRunTargets)} created no rows in this run.");
         var resolved = Array.AsReadOnly(fromRun);
         _resolved[key] = resolved;
         return resolved;
+    }
+
+    internal async Task PrepareFallbackAsync(string table, DataverseRecordPool pool, int maxRetries,
+        IReadOnlyDictionary<string, EntityMetadata> metadata, IOrganizationServiceAsync2 service,
+        ThrottlePolicy throttle, ILogger logger, CancellationToken ct)
+    {
+        foreach (var (key, prepared) in columns)
+        {
+            if (!key.StartsWith($"{table}.", StringComparison.OrdinalIgnoreCase)
+                || !prepared.PreferInRun || prepared.DeferredTargets is not { Count: > 0 }
+                || prepared.InRunTargets.Any(target => pool.Get(target).Count > 0)
+                || _deferredExisting.ContainsKey(key))
+                continue;
+
+            var candidates = new List<LookupRuleValue>();
+            foreach (var target in prepared.DeferredTargets)
+            {
+                if (!_fallbackByTarget.TryGetValue(target, out var rows))
+                {
+                    try
+                    {
+                        rows = await ReadTargetAsync(target, maxRetries, metadata, service,
+                            throttle, logger, ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex) when (ex is DataGenerationException or InvalidOperationException)
+                    {
+                        throw new DataGenerationException(
+                            $"Lookup fallback failed for '{key}', target '{target}': {ex.Message}", ex);
+                    }
+                    _fallbackByTarget.Add(target, rows);
+                }
+                candidates.AddRange(rows);
+            }
+            var ordered = candidates.DistinctBy(v => (v.Entity, v.Id))
+                .OrderBy(v => v.Entity, StringComparer.Ordinal)
+                .ThenBy(v => v.Id.ToString("D"), StringComparer.Ordinal).ToArray();
+            _deferredExisting.Add(key, Array.AsReadOnly(ordered));
+        }
     }
 
     internal static async Task<PreparedLookupRun> PrepareAsync(GenerationConfig config,
@@ -127,7 +174,7 @@ internal sealed class PreparedLookupRun(
                         $"No readable existing candidates for '{table}.{column}' ({count} planned rows). Choose records manually or remove this rule.");
                 byColumn.Add($"{table}.{column}",
                     new PreparedLookupColumn(Array.AsReadOnly(ordered), Array.AsReadOnly(inRunTargets),
-                        preferInRunColumn));
+                        preferInRunColumn, readsEnvironment ? null : Array.AsReadOnly(targets)));
             }
         }
         return new(byColumn.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase));

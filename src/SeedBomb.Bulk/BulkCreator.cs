@@ -176,6 +176,9 @@ public class BulkCreator
                     continue;
                 }
 
+                await lookupRun.PrepareFallbackAsync(entityName, pool, config.MaxRetries, entityMetadata,
+                    _service, _throttlePolicy, _logger, ct).ConfigureAwait(false);
+
                 _logger.LogInformation(
                     "Generating {RecordCount} records for {Entity}.",
                     recordCount, entityName);

@@ -901,6 +901,33 @@ public class BulkCreatorTests
     }
 
     [Fact]
+    public async Task CreateAsync_ImplicitRequiredLookupWithFailedInRunParent_FallsBackToEnvironment()
+    {
+        var existing = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var (sut, serviceMock) = BuildSut();
+        var captured = AnswerCreates(serviceMock, e => e.LogicalName == "account");
+        ExistingAccounts(serviceMock, [existing]);
+        var (metadata, graph) = AccountContact();
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account", "contact"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 1, ["contact"] = 1 },
+            BatchSize = 10,
+            MaxRetries = 0,
+            MaxParallelism = 1,
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Empty(result.CreatedRecords.GetValueOrDefault("account", []));
+        var contact = Assert.Single(captured, e => e.LogicalName == "contact");
+        Assert.Equal(existing, Assert.IsType<EntityReference>(contact["new_requiredid"]).Id);
+        serviceMock.Verify(s => s.RetrieveMultipleAsync(
+            It.Is<QueryBase>(q => q is QueryExpression && ((QueryExpression)q).EntityName == "account"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task CreateAsync_ChildOnlyRetry_KeepsTopologyAndRegeneratesTheRow()
     {
         // WR-001: retrying only contact row 1 keeps account in the topology (empty filter), passes
