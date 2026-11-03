@@ -1060,6 +1060,85 @@ public class BulkCreatorTests
         return captured;
     }
 
+    [Fact]
+    public async Task CreateAsync_ClientTimeoutOnUnkeyedTable_ReportsUnknownOutcomeWithoutResending()
+    {
+        var (sut, serviceMock) = BuildSut();
+        var sends = 0;
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<CreateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((_, _) =>
+            {
+                sends++;
+                throw new TaskCanceledException("HttpClient.Timeout elapsed");
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = new GenerationConfig
+        {
+            EntityLogicalNames = ["account"],
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 3,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = new EntityMetadata { LogicalName = "account" }
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal(1, sends);
+        var error = Assert.Single(result.Errors);
+        Assert.True(error.OutcomeUnknown);
+        Assert.False(error.IsTransient);
+        Assert.Equal(10, error.RowCount);
+        Assert.Contains("outcome unknown", error.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ClientTimeoutOnKeyedTable_SplitsTheBatchOnce()
+    {
+        // A table with an alternate key makes a duplicate resend fail as a duplicate key rather than
+        // write twice, so the halves can be resent. Sizes seen: 10 (timeout), then 5 and 5.
+        var (sut, serviceMock) = BuildSut();
+        var sizes = new List<int>();
+        serviceMock
+            .Setup(s => s.ExecuteAsync(It.IsAny<CreateMultipleRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<OrganizationRequest, CancellationToken>((req, _) =>
+            {
+                var count = ((CreateMultipleRequest)req).Targets.Entities.Count;
+                sizes.Add(count);
+                if (count == 10) throw new TaskCanceledException("HttpClient.Timeout elapsed");
+                return Task.FromResult<OrganizationResponse>(new CreateMultipleResponse
+                {
+                    Results = { ["Ids"] = Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray() }
+                });
+            });
+
+        var graph = new DependencyGraph();
+        graph.AddNode("account");
+        var config = KeyedConfig("scope") with
+        {
+            RecordCounts = new Dictionary<string, int> { ["account"] = 10 },
+            BatchSize = 10,
+            MaxRetries = 3,
+            MaxParallelism = 1,
+        };
+        var metadata = new Dictionary<string, EntityMetadata>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["account"] = KeyedAccount(),
+        };
+
+        var result = await sut.CreateAsync(config, metadata, graph);
+
+        Assert.Equal([10, 5, 5], sizes);
+        Assert.Equal(10, result.TotalRecords);
+        Assert.Empty(result.Errors);
+    }
+
     private static EntityMetadata KeyedAccount(int keyWidth = 20)
     {
         var meta = Meta("account",

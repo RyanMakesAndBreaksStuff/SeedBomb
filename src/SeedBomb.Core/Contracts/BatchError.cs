@@ -27,4 +27,10 @@ public record BatchError(
     /// regenerates exactly these. Empty for link-phase errors, which regenerating rows cannot fix.
     /// </summary>
     public IReadOnlyList<int> RowIndexes { get; init; } = [];
+
+    /// <summary>
+    /// The request timed out on the client after it may have reached the server, so these rows may
+    /// or may not exist. Never offered for retry; the user checks the table first.
+    /// </summary>
+    public bool OutcomeUnknown { get; init; }
 }

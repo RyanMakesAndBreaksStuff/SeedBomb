@@ -191,6 +191,25 @@ public class ThrottlePolicyTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TimeoutWithResendDisabled_IsTerminalAndStillTransient()
+    {
+        // Recommendation 3: a create that timed out may have committed; the caller decides what to
+        // do, the policy must not resend it. IsTransient still reports it, so the sheet can label it.
+        var callCount = 0;
+        var ex = await Assert.ThrowsAsync<DataGenerationException>(() =>
+            _policy.ExecuteAsync<int>(
+                () =>
+                {
+                    callCount++;
+                    throw new TaskCanceledException("HttpClient.Timeout elapsed");
+                },
+                "account", maxRetries: 3, CancellationToken.None, resendOnTimeout: false));
+
+        Assert.Equal(1, callCount);
+        Assert.IsType<TaskCanceledException>(ex.InnerException);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ThrowsOnNullOperation()
     {
         await Assert.ThrowsAsync<ArgumentNullException>(() =>

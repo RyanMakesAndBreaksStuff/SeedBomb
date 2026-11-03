@@ -924,16 +924,19 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
     {
         var rows = grouping.SelectMany(e => e.RowIndexes).Distinct().Order().ToArray();
         var transient = grouping.Any(RejectionClassifier.IsRetryable);
+        var unknown = grouping.Any(e => e.OutcomeUnknown);
         // CR-002: only rows Bulk can locate can be regenerated; link-phase errors carry none.
-        var retryable = transient && rows.Length > 0;
+        var retryable = transient && !unknown && rows.Length > 0;
         var message = grouping.Key.ErrorMessage;
-        var hint = retryable
-            ? "Transient throttle or timeout — safe to retry."
-            : transient
-                ? "Throttled while linking records — these links were not written."
-                : message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
-                    ? "Duplicate key — fix the source data or rule before retry."
-                    : "Needs a data or plugin fix before retry.";
+        var hint = unknown
+            ? "Timed out after the request may have reached the server — check the table for these rows before retrying."
+            : retryable
+                ? "Transient throttle or timeout — safe to retry."
+                : transient
+                    ? "Throttled while linking records — these links were not written."
+                    : message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                        ? "Duplicate key — fix the source data or rule before retry."
+                        : "Needs a data or plugin fix before retry.";
 
         return new RejectionGroup
         {
@@ -943,8 +946,8 @@ public sealed partial class RunViewModel : ObservableObject, IDisposable
             RowCount = grouping.Sum(e => e.RowCount),
             RowIndexes = rows,
             IsRetryable = retryable,
-            DispositionLabel = retryable ? "Retryable" : "Needs a fix",
-            DispositionKey = retryable ? "Retryable" : "FixFirst",
+            DispositionLabel = unknown ? "Unknown" : retryable ? "Retryable" : "Needs a fix",
+            DispositionKey = unknown ? "Unknown" : retryable ? "Retryable" : "FixFirst",
             IsSelectedForRetry = retryable,
         };
     }

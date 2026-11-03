@@ -47,13 +47,18 @@ public class ThrottlePolicy
     /// <param name="entityName">The entity name, for logging.</param>
     /// <param name="maxRetries">Maximum number of retry attempts.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="resendOnTimeout">
+    /// False for a non-idempotent write: a transport timeout is then terminal on the first attempt,
+    /// because the server may have committed it. Reads and idempotent updates leave the default.
+    /// </param>
     /// <returns>The result of the operation.</returns>
     /// <exception cref="DataGenerationException">Thrown when max retries are exceeded.</exception>
     public async Task<T> ExecuteAsync<T>(
         Func<Task<T>> operation,
         string entityName,
         int maxRetries,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool resendOnTimeout = true)
     {
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentException.ThrowIfNullOrWhiteSpace(entityName);
@@ -72,7 +77,8 @@ public class ThrottlePolicy
                 throw;
             }
             // On the last attempt a transient fault falls through to DataGenerationException.
-            catch (Exception ex) when (attempt < maxRetries && RetryReason(ex) is { } reason)
+            catch (Exception ex) when (attempt < maxRetries && RetryReason(ex) is { } reason
+                && (resendOnTimeout || ex is not (TimeoutException or OperationCanceledException)))
             {
                 var retryAfter = RetryAfterOf(ex);
                 var delay = retryAfter ?? ComputeDelay(attempt);

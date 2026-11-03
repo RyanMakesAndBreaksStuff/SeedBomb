@@ -390,7 +390,7 @@ public class BulkCreator
 
         var submitStart = Stopwatch.GetTimestamp();
         var submitted = await SubmitEntityBatchesAsync(
-            entityName, batches, rowBatches, rowIndexes.Length, config, effectiveDop, progress, ct).ConfigureAwait(false);
+            entityName, batches, rowBatches, rowIndexes.Length, alternateKeyAttrs.Length > 0, config, effectiveDop, progress, ct).ConfigureAwait(false);
         RunDiagnostics.LogPhase(_logger, "submit", submitStart, entityName);
         return submitted;
     }
@@ -400,6 +400,7 @@ public class BulkCreator
         Entity[][] batches,
         int[][] rowBatches,
         int plannedCount,
+        bool hasAlternateKey,
         GenerationConfig config,
         int effectiveDop,
         IProgress<BulkCreationProgress>? progress,
@@ -436,7 +437,7 @@ public class BulkCreator
                 try
                 {
                     (batchIds, batchErrors) = await SubmitBatchAsync(
-                        entityName, batch, rows, config.MaxRetries, trace, innerCt).ConfigureAwait(false);
+                        entityName, batch, rows, config.MaxRetries, hasAlternateKey, trace, innerCt).ConfigureAwait(false);
                 }
                 catch (DataGenerationException ex)
                 {
@@ -500,6 +501,7 @@ public class BulkCreator
         Entity[] batch,
         int[] rows,
         int maxRetries,
+        bool hasAlternateKey,
         BatchTrace trace,
         CancellationToken ct)
     {
@@ -512,7 +514,7 @@ public class BulkCreator
             {
                 return await _throttlePolicy.ExecuteAsync(
                     () => trace.CallAsync("CreateMultiple", () => CreateMultipleAsync(entityName, batch, ct)),
-                    entityName, maxRetries, ct).ConfigureAwait(false);
+                    entityName, maxRetries, ct, resendOnTimeout: false).ConfigureAwait(false);
             }
             catch (DataGenerationException ex) when (IsCreateMultipleUnsupported(ex))
             {
@@ -521,11 +523,47 @@ public class BulkCreator
                     entityName);
                 _messageChecker.MarkUnsupported(entityName);
             }
+            catch (DataGenerationException ex) when (IsClientTimeout(ex, ct))
+            {
+                return await ResolveTimedOutBatchAsync(entityName, batch, rows, maxRetries, hasAlternateKey, trace, ex, ct)
+                    .ConfigureAwait(false);
+            }
         }
 
         return await _throttlePolicy.ExecuteAsync(
             () => trace.CallAsync("ExecuteMultiple", () => ExecuteMultipleFallbackAsync(entityName, batch, rows, ct)),
-            entityName, maxRetries, ct).ConfigureAwait(false);
+            entityName, maxRetries, ct, resendOnTimeout: false).ConfigureAwait(false);
+    }
+
+    private static bool IsClientTimeout(DataGenerationException ex, CancellationToken ct) =>
+        ex.InnerException is TimeoutException or OperationCanceledException && !ct.IsCancellationRequested;
+
+    // Recommendation 3: the server may have committed a batch whose response never arrived. With an
+    // alternate key a duplicate resend is rejected as a duplicate, so halves can be resent; without
+    // one the rows are reported as unknown and never resent. A batch of one row cannot be split.
+    private async Task<(List<Guid> ids, List<BatchError> errors)> ResolveTimedOutBatchAsync(
+        string entityName, Entity[] batch, int[] rows, int maxRetries, bool hasAlternateKey,
+        BatchTrace trace, DataGenerationException timeout, CancellationToken ct)
+    {
+        if (hasAlternateKey && batch.Length > 1)
+        {
+            var half = batch.Length / 2;
+            _logger.LogWarning("CreateMultiple for {Entity} timed out after {CallMs:F0}ms; resending as {Left} + {Right} rows (alternate key rejects duplicates).",
+                entityName, trace.LastCallMs, half, batch.Length - half);
+            var left = await SubmitBatchAsync(entityName, batch[..half], rows[..half], maxRetries, hasAlternateKey, trace, ct).ConfigureAwait(false);
+            var right = await SubmitBatchAsync(entityName, batch[half..], rows[half..], maxRetries, hasAlternateKey, trace, ct).ConfigureAwait(false);
+            return ([.. left.ids, .. right.ids], [.. left.errors, .. right.errors]);
+        }
+
+        _logger.LogWarning("CreateMultiple for {Entity} timed out after {CallMs:F0}ms; {Rows} rows have an unknown outcome and were not resent.",
+            entityName, trace.LastCallMs, batch.Length);
+        return ([], [new BatchError(entityName,
+            $"Timed out after {trace.LastCallMs / 1000:F0} s; outcome unknown. The server may have written these rows: check the table before retrying.",
+            null, batch.Length, IsTransient: false)
+        {
+            RowIndexes = rows,
+            OutcomeUnknown = true,
+        }]);
     }
 
     // One "[timing] batch" line per batch: what a tuning decision is measured against.
