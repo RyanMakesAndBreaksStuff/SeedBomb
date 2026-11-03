@@ -237,6 +237,35 @@ public class ThrottlePolicyTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ConcurrentCallers_ShareOneRetryAfterPause()
+    {
+        // Recommendation 4: a Retry-After pauses the whole run, not just the batch that was told.
+        var policy = new ThrottlePolicy(NullLogger<ThrottlePolicy>.Instance);
+        var faulted = new TaskCompletionSource();
+        var firstCalls = 0;
+
+        var first = policy.ExecuteAsync(
+            () =>
+            {
+                if (++firstCalls == 1)
+                {
+                    faulted.SetResult();
+                    throw ThrottleFault(-2147015902, TimeSpan.FromMilliseconds(500));
+                }
+                return Task.FromResult(1);
+            },
+            "account", maxRetries: 1, CancellationToken.None);
+
+        await faulted.Task;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var second = await policy.ExecuteAsync(() => Task.FromResult(2), "contact", maxRetries: 0, CancellationToken.None);
+
+        Assert.Equal(2, second);
+        Assert.InRange(started.Elapsed, TimeSpan.FromMilliseconds(350), TimeSpan.FromSeconds(2));
+        Assert.Equal(1, await first);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Http429_RetriesAndSucceeds()
     {
         // ServiceClient surfaces a bare HTTP 429 as ProtocolException, not a service-protection

@@ -21,6 +21,10 @@ public class ThrottlePolicy
     private static readonly TimeSpan BaseDelay = TimeSpan.FromSeconds(2);
     private readonly ILogger<ThrottlePolicy> _logger;
 
+    // Run-wide pause deadline as a Stopwatch timestamp; 0 means not paused. Shared by every
+    // caller of this instance (one per run), so a Retry-After stops the thundering herd.
+    private long _pausedUntil;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ThrottlePolicy"/> class.
     /// </summary>
@@ -54,6 +58,7 @@ public class ThrottlePolicy
         for (int attempt = 0; attempt <= maxRetries; attempt++)
         {
             ct.ThrowIfCancellationRequested();
+            await WaitIfPausedAsync(ct).ConfigureAwait(false);
             var started = Stopwatch.GetTimestamp();
             try
             {
@@ -66,7 +71,10 @@ public class ThrottlePolicy
             // On the last attempt a transient fault falls through to DataGenerationException.
             catch (Exception ex) when (attempt < maxRetries && RetryReason(ex) is { } reason)
             {
-                var delay = RetryAfterOf(ex) ?? ComputeDelay(attempt);
+                var retryAfter = RetryAfterOf(ex);
+                var delay = retryAfter ?? ComputeDelay(attempt);
+                if (retryAfter is { } serverWait)
+                    PauseFor(serverWait);
                 _logger.LogWarning(
                     "{Reason} for {Entity} on attempt {Attempt} of {MaxAttempts} after {CallMs:F0}ms ({ExceptionType}: {ExceptionMessage}). Retrying in {Delay:F0}ms.",
                     reason, entityName, attempt + 1, maxRetries + 1,
@@ -91,6 +99,27 @@ public class ThrottlePolicy
         // Required by compiler — logically unreachable because catch blocks always throw on final attempt
         throw new DataGenerationException(
             $"Batch creation for '{entityName}' exhausted {maxRetries} retries with no result.");
+    }
+
+    private void PauseFor(TimeSpan wait)
+    {
+        var until = Stopwatch.GetTimestamp() + (long)(wait.TotalSeconds * Stopwatch.Frequency);
+        // Only ever extend: a later, longer Retry-After wins; a shorter one never shortens the pause.
+        long seen;
+        do
+        {
+            seen = Interlocked.Read(ref _pausedUntil);
+            if (until <= seen) return;
+        } while (Interlocked.CompareExchange(ref _pausedUntil, until, seen) != seen);
+    }
+
+    private async Task WaitIfPausedAsync(CancellationToken ct)
+    {
+        var until = Interlocked.Read(ref _pausedUntil);
+        if (until == 0) return;
+        var remaining = TimeSpan.FromSeconds((double)(until - Stopwatch.GetTimestamp()) / Stopwatch.Frequency);
+        if (remaining > TimeSpan.Zero)
+            await Task.Delay(remaining, ct).ConfigureAwait(false);
     }
 
     /// <summary>
